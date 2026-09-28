@@ -862,9 +862,17 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
 
 ## 13. Readiness and completion predicates
 
-- **Implementation-ready:** PRD/Spec PO-accepted; submission/approval bound;
-  phase `implementation`; Nova rebase done; #100 resolved per PO decision
-  (PRD §9.3); E1 freeze artifact committed.
+- **Implementation-authorized:** PRD/Spec PO-accepted; submission/approval
+  bound to the complete current package; phase `implementation`; Nova rebase
+  done; #100 resolved per PO decision (PRD §9.3). E1 is the first authorized
+  foundation act and is not a prerequisite for the authority that permits it.
+- **Work-package implementation-ready:** implementation authorized and E1
+  freeze artifact committed with the required family/revision bindings. Every
+  dependent WP waits for this predicate; E1 itself does not depend on its own
+  output. A valid, pinned E1 artifact already present on the inherited
+  baseline may satisfy the foundation requirement without recreating it.
+  A stale or mismatched freeze does not. These are sequencing predicates,
+  not an additional ordinary PO approval.
 - **Wave-complete:** each wave's WPs green in Verify + Critic-reviewed with
   documented fail-then-fix cycles; PO-visible wave summary.
 - **E3-complete:** every §8.1 fixture is green on one candidate, the receipt
@@ -935,3 +943,77 @@ review; a source release pass requires a distinct truthful terminal binding
 contract. Any item not satisfied on the exact candidate remains visible as an
 open release impact or needs an explicit PO-visible disposition. No backlog
 status or sprint assignment is silently changed by this section.
+
+## 17. 0.7 design-workflow authority and acceptance
+
+The final design-workflow package has five independently hashed current
+sources: the preserved original input, PRD, Spec, final design and
+traceability. Its closed metadata binds candidate commit/tree, Advisor demand
+and route-selection evidence, answer receipt plus Elephant disposition or a
+proposed scoped exception, and one independent readiness receipt. A package
+builder may prepare this before approval but cannot set implementation
+authority. Any material change to a source, route policy, demand, disposition
+or final design invalidates the affected evidence and requires fresh readiness
+before presentation.
+
+Readiness is a fresh comparison by an independent read-only reviewer. The
+host creates a new session without coordinator chat, handover, prior answers
+or memory, and independently observes its start, completion and permitted
+effects. The host-only execution evidence binds the same dispatch, candidate,
+five source hashes, requested route and exact report digest. It names the
+isolation mechanism actually used and records the observed profile/tool
+admission and terminal state; a model-authored claim of freshness or read-only
+behavior cannot satisfy these facts. Host attestation must be read back from
+the private immutable execution store and survive an identical second read.
+
+For the Codex tool-free structured host route, all five complete source
+contents are delivered as a bounded, digest-validated untrusted evidence
+bundle. The host disables inherited MCP/plugin tools, hooks, commands,
+environment access and external tool surfaces before the turn, and verifies
+the exact fresh thread's profile and tool inventory. An unexpected tool item
+or server request fails the duty. Credentials stay at the host authentication
+boundary and are never copied or linked into model-readable scratch. A
+standalone host process must have registered ownership, bounded shutdown and
+restart recovery before launch. This route requires its own truthful private
+host observation; it cannot claim the selected-sandbox assurance of another
+transport. Freshness, denied outside reads, denied writes, suppressed inherited
+tools, stale/replayed receipt rejection and interrupted-child cleanup each
+have positive/negative fixtures and live Codex readback. The common validator
+rejects missing or forged execution facts before implementation authority.
+
+The Advisor host admits repository consent, export permission and route
+capability before constructing or sending a question. Claude tries a native
+Advisor and, after a typed failure, its governed fresh read-only consult
+fallback. Codex and Antigravity use the ordinary fresh consult route. Every
+answered receipt binds the exact demand, question/evidence hashes, candidate,
+selected route and observed dispatch/result; a model name or agent assertion
+is not execution, provider or OS attestation. Each failed applicable route
+records phase, typed reason and child-start fact. The no-child case never
+claims an answer. A proposed unavailable exception needs valid failure and
+route-attempt evidence and remains non-authorizing until the final PO decision.
+
+One pure package validator checks closed shapes, source bytes, digests,
+candidate and receipt provenance. One common implementation-authority
+predicate checks the validated package, independent readiness outcome and the
+single final approved-package readback. The transition writer and all three
+runner entrypoints call that predicate. Each entrypoint has positive and
+negative invocation tests for missing, forged, stale, mismatched, failed and
+replayed evidence; a pure validator unit test does not replace entrypoint
+coverage. Approval is atomic with exact package-digest readback and preserves
+authority only while the governed scope remains unchanged.
+
+The sanctioned plan approval is the single ordinary PO final-package
+decision in either configured chat or signature mode. Both modes bind the
+same closed bytes, readiness and any Advisor exception, and reject stale or
+replayed approvals. Earlier PRD/Spec acknowledgement and exact protected-file
+write signatures are distinct facts and cannot satisfy this decision. No
+separate ordinary Advisor or implementation approval is added. Host export
+denial is final for that attempt; no alternate egress is silently tried.
+
+Before Full Verify, a fresh independent Critic must review the frozen
+candidate; a changed candidate invalidates both Critic and Verify evidence.
+Qualification records the installed plugin identity separately for Codex,
+Claude and Antigravity and does not infer it from source HEAD. The 0.7 release
+preflight checks all open greenfield blocker, security, quality and efficiency
+items against their own acceptance evidence. Unresolved impact remains visible
+to the PO; no install or publication occurs as a side effect of source checks.

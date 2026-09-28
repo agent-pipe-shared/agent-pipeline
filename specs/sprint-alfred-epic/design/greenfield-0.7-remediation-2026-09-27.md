@@ -82,6 +82,92 @@ Reader course at four two-stage rounds plus one terminal correction, with no
 fifth reader. Plan approval, exact protected-file signatures, and final
 candidate installation remain separate human acts.
 
+## Design-workflow authority for the 0.7 package
+
+This section makes the workflow contract reviewable within this design source.
+`design-advisory-workflow.md` remains the detailed historical draft; a final
+five-source readiness review must not depend on an unlisted sixth file to find
+these requirements. The governed sequence is: preserve the original input
+bytes and digest; dispatch a fresh initial design; ask one concrete Advisor
+question against the input and draft; record typed route evidence; let the
+Elephant adopt or reject each bounded proposal with a reason and revise the
+design; obtain a fresh independent comparison of the original input, PRD,
+Spec, final design, and traceability; then present one complete digest-bound
+package for the single ordinary PO approval before implementation. Coherence
+with the Spec alone cannot establish input coverage. A materially changed
+input, PRD, Spec, design, route policy, or disposition invalidates the affected
+evidence and requires a fresh comparison before presentation.
+
+The readiness host observes a new, independent session with no inherited
+coordinator context and records the actual read-only isolation and terminal
+facts. Codex's tool-free structured host route supplies the complete bounded
+five-source bundle with inherited and external tools disabled. It keeps
+authentication outside model-readable scratch, uses thread-bound admission
+readbacks, and registers any standalone child for shutdown and crash recovery.
+Its receipt never borrows the assurance of the older selected-sandbox route.
+Model-authored assertions cannot establish these host facts.
+
+E1 remains the first authorized foundation act. The final package approval
+permits E1 without depending on its not-yet-created output; dependent WPs wait
+for the committed, valid freeze. An already valid pinned baseline freeze may
+satisfy that later predicate. This distinction removes a circular gate and
+adds no extra ordinary human approval.
+
+Claude tries its native Advisor route when available, then the governed fresh
+read-only consult fallback after a typed native failure. Codex and Antigravity
+use the ordinary fresh consult route. The host must admit repository consent,
+export permission, and route capability before constructing or transmitting
+the question; denied admission produces no prompt or child. An answered route
+needs an observed dispatch/result/receipt binding to the exact demand,
+candidate, question digest, evidence bundle, selected adapter and observed
+identity. A model name or local result is not provider, effective-model, or OS
+attestation. A failed host route is recorded with its phase, typed reason and
+whether a child started. The selected-sandbox route is not a prerequisite for
+the ordinary workflow. The Codex/WSL route must either complete with these
+observations or produce a truthful unavailable result, never an invented PASS.
+
+The package validator must require closed, current source digests, Advisor
+demand and answer/disposition or a proposed unavailable exception, independent
+readiness evidence, candidate binding and the final approval readback. The
+common implementation-authority predicate and each Claude, Codex and
+Antigravity entrypoint must reject missing, forged, stale, mismatched, failed
+or replayed evidence. A package builder may assemble a draft before approval;
+it cannot mark implementation authority true. Negative tests must invoke the
+actual covered transitions and entrypoints, not only a pure validator. These
+tests establish the covered routes, not universal host-tool enforcement.
+
+An Advisor-unavailable candidate contains a package-bound failure receipt and
+route-selection record with the demand/evidence digests, each applicable
+normal and governed fallback attempt, phase, typed failure and child-start
+fact. A pre-launch denial is a recorded failed route attempt and never an
+Advisor answer. A skipped, malformed or unobserved fallback does not establish
+unavailability. The Elephant records why proceeding without advice is safe.
+The exception remains proposed until the final PO decision; it waives only the
+Advisor answer. It cannot supply readiness, an Advisor PASS, implementation
+authority, a publication permission or approval of an incomplete package.
+
+The sanctioned plan approval is the **one ordinary final PO decision** for the
+complete package. The project-selected chat or signature ceremony binds its
+closed digest, Advisor outcome or exception, readiness receipt and current
+source bytes, then writes and reads back the approved state atomically. An
+Advisor exception should be included in that same decision whenever possible.
+Earlier PRD/Spec intake acknowledgement and exact protected-file HGO signatures
+are separate continuity and write-authorization facts; neither is an extra
+routine Advisor or implementation decision, nor may either substitute for the
+final package decision. The current source must be checked for an
+approval/admission cycle before this path is activated.
+
+0.7 integration acceptance also owns the Critic-before-Full-Verify repair,
+plugin-update drift repair, and chat/signature consistency repair named in the
+original input. A candidate test must reject release Verify when a fresh
+candidate-bound Critic is absent or failed, and rerun when the candidate
+changes. Installed plugin identity is read back per runner; source HEAD alone
+does not attest installation. The same complete-package digest and authority
+predicate must behave consistently in chat and signature modes, including
+Advisor exception handling and replay/staleness rejection. Release Verify,
+Reader closure, security checks and the local install handoff remain bound to
+the frozen candidate; no install or publication is inferred from source tests.
+
 ## Reader terminal-binding design constraint
 
 The ordinary no-edit v1 Reader binding remains valid. A separate terminal

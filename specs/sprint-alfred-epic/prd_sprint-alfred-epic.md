@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 167b99e5a565e204a13cc4f1cd4312b70dfe631b78236dc75bb0e061d09a73b9 -->
+<!-- technical-spec-sha256: 828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -381,7 +381,8 @@ dogfood case, end to end.
 
 ### Track E — Integration (#108)
 - **E1 Contract freeze.** Shared identifier/schema families frozen and
-  versioned before any WP implementation (first implementation act).
+  versioned before any dependent WP implementation (first authorized
+  foundation act; it does not require its own output for authorization).
 - **E2 Integrated qualification.** One exact candidate qualified across all
   member issues plus the two 2026-08-27 incident classes; per-issue closing
   comments; sprint close evidence.
@@ -479,7 +480,9 @@ identities, and the interim is bounded by the provisional-identity marking
   posted as an issue comment and the PO closes the issue — Alfred neither
   owns nor waives it.
 - Upstream #46 authority contracts: available on the accepted base (Nova).
-- Shared schema boundaries frozen: delivered as E1 (first act).
+- Shared schema boundaries frozen: delivered as E1 (first authorized act),
+  required before dependent WPs begin. Plan/implementation authority permits
+  this foundation act without depending on the freeze it will create.
 - PO names any `sprint:NONE` items that must land first: decision below.
 - **No active Sprint branch is expanded or coupled to Alfred** — reconciled
   explicitly rather than merely asserted, because Alfred's design base is a
@@ -668,5 +671,42 @@ executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
 
 The 2026-09-27 amendment awaits renewed content review and the sanctioned
 PO plan acknowledgement before submission.
+
+## 11. 0.7 design-workflow product requirement
+
+The next local candidate must implement the PO's 2026-09-19 design workflow
+for this Epic and for future Feature packages that use the same route. The
+original input is preserved and digest-bound before a fresh initial design.
+One concrete Advisor consultation compares the input and draft; the Elephant
+records proposal-by-proposal disposition and revises the design. A separate,
+fresh read-only reviewer then compares the original input, PRD, Spec, final
+design and traceability before the complete package is shown to the PO. A
+coherent Spec alone is insufficient evidence of original-input coverage.
+
+The ordinary path has **one final PO approval of that complete package**. The
+sanctioned `approve-plan` act is that final decision; it must bind and read
+back the package digest, Advisor result or narrow exception, independent
+readiness and current source bytes. Earlier intake/content acknowledgement is
+not this final decision. Exact-file HGO signatures authorize protected writes
+and are not additional ordinary Advisor or implementation approvals. Host
+export permission is a separate host boundary and cannot be bypassed by this
+workflow or silently converted into a Pipeline approval.
+
+Missing, forged, stale, mismatched, failed or replayed required evidence must
+block the governed implementation transition at the common authority boundary
+and at the Claude, Codex and Antigravity entrypoints. If all applicable
+Advisor routes truly fail, the final package may propose a PO-visible,
+package-bound exception for the Advisor answer only, with observed route
+attempts and typed failure receipts. That exception does not count as Advisor
+PASS, waive independent readiness, or authorize implementation or publication
+before the same final decision. A no-child pre-launch denial is a truthful
+failure fact, never an invented consultation result.
+
+Candidate qualification must also integrate the requested Critic-before-Full-
+Verify ordering, installed-plugin drift readback, and equivalent chat/signature
+package binding. The local candidate is offered to the PO for installation
+only after those checks and the greenfield blocker/security/quality acceptance
+evidence bind one frozen source commit. Source tests alone cannot attest which
+plugin version a runner has installed.
 
 <!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
