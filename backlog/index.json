@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "dd63db30335c8178eb1e95ad1b223836a7d5471b4ffa4a7fe65cca302c60ce72"
+    "transitionHead": "c4be069489a51f40ca67a229516cd19b69e6de5e1f399a7ad9e153b84d1014b5"
   },
   "counts": {
-    "open": 54,
+    "open": 55,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -2555,6 +2555,16 @@
       "closureRepository": "self",
       "closureCommit": "f3dfd5097752402664f6bb3df292a741c68069bf",
       "closureEvidence": "backlog/items/2026-08-28-a-dead-key-directory-pointer-is-permanent-and-silent.md"
+    },
+    {
+      "id": "pipeline.declared-system-skill-read-requires-human-override",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Codex candidate preparation, 2026-09-28: installed lifecycle guard refuses the runtime-declared skill-creator SKILL.md read with GUARD-READ-SCOPE-OUTSIDE-ROOT and offers only a signed override.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.decouple-hosted-project-document-language-from-operator-facing-language",

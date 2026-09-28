@@ -193,6 +193,7 @@
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-09-08 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | — | 2026-08-12 | — | — |
 | pipeline.dead-key-directory-pointer-is-permanent-and-silent | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless. |
+| pipeline.declared-system-skill-read-requires-human-override | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | batman | 2026-08-28 | — | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
@@ -718,7 +719,7 @@
 
 ## Counts
 
-- open: 54
+- open: 55
 - in_progress: 0
 - closed: 642
 - rejected: 3
