@@ -5,7 +5,37 @@
 
 **Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
 
-## Aktueller Übergang — lokaler 0.7-Kandidat, 2026-09-27
+## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-28
+
+Die kanonische Planfreigabe wurde am 2026-09-28 verifiziert und der reguläre
+Übergang nach **Implementation** ausgeführt. Maßgeblich sind
+`project/pipeline-state.json` und das unveränderte
+[freigegebene Designpaket](../specs/sprint-alfred-epic/evidence/design-workflow-package-c22c1cd281b1.json).
+Die dokumentierte Advisor-Unverfügbarkeit wurde mit diesem Paket akzeptiert;
+sie ist kein erfolgreicher Advisor-Aufruf. Die native Readiness meldete keine
+offenen Befunde. Eine weitere Planfreigabe ist für den genehmigten Umfang
+nicht erforderlich.
+
+Der PO hat den Recovery-Stand `f9ebdd5b` lokal installiert. Seine drei Runner-
+Stamps teilen die Build-Identität `20260928194946.0cace08c`. Er enthält die
+bereits geprüfte Paketvalidierung und die Korrektur des Codex-Compact-
+SessionStart-JSON. Der neu geladene Codex-Guard akzeptiert die bestehende
+Implementation-Autorität; der Arbeitsbaum war nach dem Recovery-Commit sauber.
+Dies ist noch kein vollständig qualifizierter neuer 0.7-Kandidat.
+
+Die genehmigten Pakete zu Aktivierung und Hook-Scope, Agy-Topologie und
+Aktualisierung sowie inhaltserhaltender Deinstallation mit Git-Hook-Recovery
+werden parallel umgesetzt. Frühere 0.7-Korrekturen bleiben im gemeinsamen
+Integrationsumfang. Der neue Claude-Readiness-Alias-Befund ist kanonisch im
+Backlog registriert; der bestätigte Compact-Befund erhält seine dauerhafte
+Regression und Eintragung im nächsten Integrationsschritt. Danach folgen
+gebundene Prüfbelege, der unabhängige Critic und die finale Qualifizierung.
+Es gibt keine weitere Reader-Korrekturrunde. Installation des abschließenden
+Kandidaten übernimmt der PO; Push, Tag und Veröffentlichung bleiben eigene
+spätere Freigaben. Die folgenden älteren Checkpoints bleiben historische
+Referenzen und ersetzen diese aktuelle Arbeitsanweisung nicht.
+
+## Historischer Übergang — lokaler 0.7-Kandidat, 2026-09-27
 
 Alfred ist jetzt die aktive 0.7-Arbeitslinie; die älteren Nova-/Alfred-
 Abschnitte weiter unten sind historische Checkpoints, keine Anweisung, die
