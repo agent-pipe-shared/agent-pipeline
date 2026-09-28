@@ -102,3 +102,24 @@ between inert contained scratch source and actual acknowledgement authority,
 retaining physical alias/live-root exclusions and writer-only authority on real
 PRDs. This is an additional reproduced boundary case; earlier seven containment
 fixtures do not prove it is repaired.
+
+### Prepared marker-quotation correction (2026-09-28)
+
+The additional source proposal skips the payload-only acknowledgement refusal
+only when the target satisfies the existing shared physical scratch predicate.
+It does not return early from the guard: bootstrap receipt, cross-root,
+protected-path and lifecycle checks still apply. Real PRDs and authority paths,
+symlink/hardlink aliases, traversal and active plugin roots remain writer-only.
+This is a preparation fix; the installed guard has not changed.
+
+Three new cases are included in the proposed regular guard test file. Those
+cases and the existing direct-PRD refusal case pass against exact proposed
+bytes: native Write/Edit and translated marker flags in scratch across six
+readiness outcomes; real authority, aliases and traversal; an active plugin
+under scratch; and normal ready-state PRD protection. Terminal/hash evidence is
+`scratch/scratch-marker-quotation-evidence.json`. The aggregate remains 55 files
+with 47 passing syntax checks and successful Git dry application.
+
+This supersedes the unprepared payload-only branch above. Full guard-union,
+mixed apply-patch adapter, subagent bootstrap and installed Codex sweeps remain
+pending; no universal live scratch guarantee or release stamp is claimed.
