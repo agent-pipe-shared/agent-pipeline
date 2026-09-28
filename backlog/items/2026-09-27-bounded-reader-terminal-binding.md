@@ -44,3 +44,32 @@ four reports and final correction without fabricating a fresh Reader verdict.
 - **Decision:** pending
 - **Assignment:** Alfred release preparation
 - **Date:** 2026-09-27
+
+## Preparation evidence (2026-09-28)
+
+`scratch/reader-terminal-source.patch` prepares a separate closed terminal
+record, the committed checker branch, candidate-matching release dependency
+readback, source protocol/skill instructions, canonical tests and Verify
+registration. The unchanged-state v1 path remains available for early closure.
+The terminal record distinguishes the fourth reviewed snapshot from the final
+editorially corrected snapshot and does not assert a fifth or final fresh review.
+
+Eight tests using exact proposed checker functions over real committed
+synthetic Git repositories pass. They exercise four rounds plus final correction,
+declared policy/report normalization, extra fifth reports including subsequent
+deletion, open or invented resolutions, post-closure document/governance drift,
+explicit owner acceptance, omitted correction commits, rewritten immutable
+reports and duplicate-key records. This is a synthetic contract test, not an
+Alfred Reader verdict or an assertion of human/reader identity.
+
+The combined `scratch/0.7-virtual-integration.patch` now includes the Reader
+connection and has 53 proposed files; all 45 proposed JavaScript files pass
+syntax checks, relative dependencies resolve and Git dry application passes.
+`scratch/reader-terminal-preparation-evidence.json` binds preparation bytes
+and the observed test result. No canonical implementation was changed.
+
+The actual Alfred course still needs its exact historical reviewed states,
+all eight report references and their honest publication provenance, complete
+finding dispositions, actual resolution commits, owner-policy/decision source
+and the eventual protocol transition. Productive integration, canonical tests
+and release qualification remain pending; this item stays open.
