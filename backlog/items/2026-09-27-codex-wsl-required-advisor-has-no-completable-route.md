@@ -117,3 +117,26 @@ reader defect has its own open item,
 `pipeline.advisor-evidence-read-enforces-size-limit-after-allocation`; preparation
 of a bounded public reader does not close either this ordinary-route item or
 the generic canonical defect.
+
+## Prepared host composition (2026-09-28)
+
+Virtual aggregate
+`563fbe7b923e8d1f05073a814dba5022149885085f5cc7b02a3f6c1c342ad89e`
+now includes the explicit duty/pre-content host callback and input disposition,
+Readiness caller migration and registered Advisor process-root extension.
+Nine actual managed Node protocol cases and eight physical namespace cases pass.
+All 61 source preimages/revisions and six worker postimages match; 53 syntax
+checks and Git dry application pass.
+
+The combined exact graph also passes two managed process cases using the
+registered Advisor root: approved sends exactly one `turn/start`; refusal after
+MCP sends none. Both independently verify closed ownership and actual shutdown.
+Stable graph/import/metadata bindings and metadata-only actual event transcripts
+are in `scratch/codex-advisor-host-namespace-composition-evidence.md` and JSON.
+
+These fixtures execute Node protocol scripts, not Codex or a model. Registration
+is controller-local and purpose is absent from the generic intent. The future
+productive store must bind the exact Advisor namespace. Real export observation,
+ordinary sealed adapter/store/transaction, raw-output/complete-stdio custody,
+registered isolation adoption and actual installed replay remain outstanding.
+No answered Advisor receipt, formal stamp or item closure is claimed.

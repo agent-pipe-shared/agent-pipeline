@@ -78,3 +78,15 @@ with 21 stable source hashes in
 These Scratch changes do not modify the canonical generic reader; its correction
 and integrated regression evidence remain required. No item closure, productive
 Advisor receipt or native qualification follows from this run.
+
+The generic canonical correction is now separately prepared and included in
+aggregate `563fbe7b923e8d1f05073a814dba5022149885085f5cc7b02a3f6c1c342ad89e`.
+It bounds descriptor reads to limit+1, checks file size before allocation and
+uses a rolling aggregate budget before the next read. Generic path policy and
+canonical digest remain unchanged. Seven new physical/VM regression cases,
+two existing actual evidence cases and Git dry application pass; eight inputs
+remained stable. Patch SHA256
+`abb922538c790c64e8f1099936a97b26a794dbeff83c164cae27f9d6d7780fc8`;
+`scratch/advisory-canonical-read-bounds-evidence.md` reports the exact scope.
+The source file remains unchanged. Canonical regression registration, productive
+integration and candidate qualification remain required.
