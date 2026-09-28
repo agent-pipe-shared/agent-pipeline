@@ -99,6 +99,29 @@ Isolated fixtures cannot attest preservation of a real consumer worktree.
 Historical tests and receipts remain provenance and cannot become current
 candidate PASS records merely by relabeling them.
 
+### Source freeze and receipt publication order
+
+Commit the complete five-source design before producing candidate-bound
+Advisor and readiness evidence. Those observations are published afterward,
+then independently read and validated by the complete-package builder and
+final presentation writer against that frozen candidate. Publishing a local
+receipt does not require another source commit before presentation. The
+containing design must not be required to embed the hash of a receipt that
+itself binds that design's containing commit; that would be circular. Historical
+receipt citations in these documents remain historical observations.
+
+The independent five-source comparison evaluates coverage, consistency,
+preservation, proposal disposition and unresolved design choices. The
+package validator separately enforces actual current Advisor and readiness
+execution provenance; a document statement cannot satisfy those checks. A
+fully described proposed Advisor-only exception is a final PO decision,
+not an undecided design choice or a readiness waiver. Presentation still
+requires current canonical failure evidence and a valid independent
+ready-for-po-review receipt. An undeclared material design alternative or
+missing disposition remains blocking. The answered-path acceptance remains
+mandatory for the delivered implementation even when the current design
+package proposes proceeding after a genuine unavailable observation.
+
 ## Existing PO decisions and next decisions
 
 The PO already directed the ordinary fresh, read-only Advisor consult in

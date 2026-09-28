@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad -->
+<!-- technical-spec-sha256: fc25a5cc9184505120c0afa972b7942d7807d18c6dadc733286b5f718568f55d -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -10,8 +10,8 @@ surfaces throughout)
 sanctioned State submission/approval, the phase transition, and the Nova
 rebase precondition below.
 **Current amendment:** The 2026-09-27 greenfield remediation increment is
-prepared for PO review. The current State is design/draft with stale prior
-approval; this amendment grants no implementation authority by itself.
+prepared for PO review. The current State is reopened design/draft; the
+amendment grants no implementation authority by itself.
 **Current design base:** `feat/sprint-alfred` at `a50c8093` (clone of the Nova
 line); epic opened by PO-released `discard-feature` + `set-feature`
 (2026-08-27, commit `0d0031ea`).
@@ -669,8 +669,10 @@ executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
 | 2026-08-27 incidents | `docs/state.md` current section; the two filed items → A4/A5, C1 seed codes |
 | 2026-09-27 three-runner greenfield findings | `design/greenfield-0.7-remediation-2026-09-27.md` → five non-overlapping implementation slices, exact backlog acceptance, host readbacks and candidate evidence |
 
-The 2026-09-27 amendment awaits renewed content review and the sanctioned
-PO plan acknowledgement before submission.
+The agent submits the 2026-09-27 amendment autonomously after preparing the
+design and required evidence. No separate PO content acknowledgement or
+permission to submit is required. The PO reviews and approves the complete
+final package once before implementation.
 
 ## 11. 0.7 design-workflow product requirement
 
@@ -686,11 +688,22 @@ coherent Spec alone is insufficient evidence of original-input coverage.
 The ordinary path has **one final PO approval of that complete package**. The
 sanctioned `approve-plan` act is that final decision; it must bind and read
 back the package digest, Advisor result or narrow exception, independent
-readiness and current source bytes. Earlier intake/content acknowledgement is
-not this final decision. Exact-file HGO signatures authorize protected writes
+readiness and current source bytes. The agent owns submission and complete
+package presentation; neither step requires separate human permission or
+content acknowledgement. Historical intake/content acknowledgements retain
+their original scope and cannot become another submission gate or satisfy
+the final decision. Exact-file HGO signatures authorize protected writes
 and are not additional ordinary Advisor or implementation approvals. Host
 export permission is a separate host boundary and cannot be bypassed by this
 workflow or silently converted into a Pipeline approval.
+
+The consultation budget is one durable cycle per design course, including
+finite governed fallback attempts. Incorporating advice, packaging, readiness
+correction and restart do not start another cycle. Preserve the actual initial
+question, evidence and candidate; bind real proposal disposition and committed
+revision provenance to the final design. Fresh readiness and the final PO
+decision bind that final package. A materially new substantive question needs
+an explicit new-course decision, never an automatic retry on a new commit.
 
 Missing, forged, stale, mismatched, failed or replayed required evidence must
 block the governed implementation transition at the common authority boundary

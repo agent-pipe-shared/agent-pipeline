@@ -1,0 +1,72 @@
+{
+  "candidate": {
+    "commit": "9a416793af66d75e1cdcefe162e47bfef182b688",
+    "tree": "2d6c1357fded6786e69cce0860dc232a0d0b7891"
+  },
+  "dispatchId": "alfred-greenfield-readiness-9a416793-20260928b",
+  "findings": [
+    {
+      "code": "CURRENT_ADVISOR_BINDING_MISSING",
+      "severity": "blocking",
+      "summary": "The design says the historical unavailable Advisor receipt belongs to an earlier candidate and requires a fresh canonical no-child record for the revised candidate/design, or a usable governed Advisor result, before presentation. Neither current binding is included in the supplied evidence, so the proposed exception cannot yet be validated."
+    },
+    {
+      "code": "SUBMISSION_ACK_GATE_CONFLICT",
+      "severity": "blocking",
+      "summary": "PRD §10 says renewed content review and a sanctioned PO plan acknowledgement are required before submission. The design and traceability say submit-plan and present-plan proceed autonomously without a separate content acknowledgement, and the Spec distinguishes earlier acknowledgement from final approval. Resolve the PRD conflict so the package defines one consistent approval sequence."
+    }
+  ],
+  "hostExecution": {
+    "dutyReceiptSha256": "5bfc6fd8de5b4fd8f25045151e03607c91c63233e8ab7785f95bb8e38dcb7460",
+    "executionReceiptSha256": "ae8be376616ecc08db3933a7928f115e5f2f8021620b92d0daa7a504fab5476b",
+    "repoFingerprint": "468021d018a706c26049c829295f12234b1421955f902b925cb7d7496c4806bc",
+    "route": {
+      "candidateCommit": "9a416793af66d75e1cdcefe162e47bfef182b688",
+      "effort": "high",
+      "model": "gpt-6-luna",
+      "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16"
+    },
+    "runner": "codex",
+    "schema": "pipeline.design-readiness-host-execution.v1",
+    "selectionId": "drh_2b50837a2bfac3cd2bb7decfa11a96ff",
+    "selectionSha256": "4fd6f8a67aa95da4fd6a464abd51dafc3448c686432df0ffc8ded7f28fbeddde"
+  },
+  "outcome": "not-ready",
+  "runner": "codex",
+  "schema": "pipeline.design-readiness-receipt.v1",
+  "sources": {
+    "design": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md",
+      "sha256": "6972ea639dcb05da248ced4acc754e379d02ca9d78533574ed516b460fe76b27"
+    },
+    "input": {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow-input.md",
+      "sha256": "c0f43c9bfb202296a8a0b811eb1b4332d6db149b42edf9356e4c349a0aa72b13"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "c98674205a6342059319355e314601544baae81c06295b74be51dbda1bec4ace"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-traceability-2026-09-27.md",
+      "sha256": "19fdde9dbf002d4325c012d8106cf2ab99cd2080da34fb8363960f40610fda57"
+    }
+  },
+  "summary": "Not ready for PO review: the current Advisor outcome is not bound to this revised candidate, and the PRD conflicts with the design and traceability on whether a separate pre-submission acknowledgement is required. Readiness does not grant PO approval.",
+  "unresolvedChoices": [
+    {
+      "id": "advisor-unavailable-exception",
+      "impact": "The exception remains unaccepted and cannot count as an Advisor PASS or authorize implementation; the missing current record currently blocks presentation.",
+      "question": "After producing a current candidate-bound Advisor failure record, should the final PO package proceed with the proposed Advisor-only exception or wait for a usable Advisor result?"
+    },
+    {
+      "id": "pre-submission-acknowledgement",
+      "impact": "The sources currently specify conflicting human approval steps, so the intended single-approval workflow is not unambiguous.",
+      "question": "Does the PRD §10 pre-submission PO acknowledgement gate remain, or is it removed as stated in the design and traceability?"
+    }
+  ]
+}

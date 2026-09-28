@@ -1002,13 +1002,26 @@ replayed evidence; a pure validator unit test does not replace entrypoint
 coverage. Approval is atomic with exact package-digest readback and preserves
 authority only while the governed scope remains unchanged.
 
-The sanctioned plan approval is the single ordinary PO final-package
-decision in either configured chat or signature mode. Both modes bind the
-same closed bytes, readiness and any Advisor exception, and reject stale or
-replayed approvals. Earlier PRD/Spec acknowledgement and exact protected-file
-write signatures are distinct facts and cannot satisfy this decision. No
-separate ordinary Advisor or implementation approval is added. Host export
-denial is final for that attempt; no alternate egress is silently tried.
+The agent submits the plan and presents the complete package autonomously;
+neither mechanical act requires PO permission, a content acknowledgement or
+a signature. The sanctioned plan approval is the single ordinary PO
+final-package decision in either configured chat or signature mode. Both
+modes bind the same closed bytes, readiness and any Advisor exception, and
+reject stale or replayed approvals. Historical PRD/Spec acknowledgements and
+exact protected-file write signatures retain their original limited scope;
+they cannot satisfy this final decision or become an additional submission
+gate. No separate ordinary Advisor or implementation approval is added. Host
+export denial is final for that attempt; no alternate egress is silently tried.
+
+Reserve at most one durable Advisor consultation cycle per design course;
+registry-bounded fallback attempts are inside it. Dispatch changes, packaging,
+readiness corrections and restarts never reset that budget. A materially new
+substantive question requires an explicit new-course owner decision and prior
+course linkage. Preserve the genuine initial candidate, canonical question,
+evidence, actual answer and proposal disposition. Independently verify an
+ordered committed revision chain to the final five sources; never relabel an
+initial receipt to the final revised candidate. Final independent readiness
+and PO approval bind that final candidate and complete versioned package.
 
 Before Full Verify, a fresh independent Critic must review the frozen
 candidate; a changed candidate invalidates both Critic and Verify evidence.

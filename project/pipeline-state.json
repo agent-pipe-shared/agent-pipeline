@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": false,
-  "updatedAt": "2026-09-28T06:57:34.280Z",
+  "updatedAt": "2026-09-28T07:38:15.270Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -412,13 +412,17 @@
       {
         "phase": "design",
         "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
       }
     ]
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-alfred-epic",
-    "revision": 9,
+    "revision": 10,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -427,11 +431,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-        "sha256": "c98674205a6342059319355e314601544baae81c06295b74be51dbda1bec4ace"
+        "sha256": "2d4bb65afc5a8073eb6c475542cb2703e2976d6108970a015b10cf0c17287b68"
       },
       "spec": {
         "path": "specs/sprint-alfred-epic/spec.md",
-        "sha256": "828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad"
+        "sha256": "fc25a5cc9184505120c0afa972b7942d7807d18c6dadc733286b5f718568f55d"
       },
       "result": null
     },
@@ -447,7 +451,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 9,
+      "sourceRevision": 10,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -475,7 +479,7 @@
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-alfred-epic",
-    "invalidatedSubmissionSha256": "a9d1f87bbe89079a8b393403e71fa4a94f528445eaa63bbd066dc0cdee9c45ca",
+    "invalidatedSubmissionSha256": "f9bd8905f3e5aeec92598ef5f6a09b3650915c3d457795c63128d1c648f64d5b",
     "invalidatedApprovalSha256": null,
     "invalidatedBy": "codex",
     "invalidatedAt": "2026-09-27T19:19:34.288Z",
@@ -495,22 +499,22 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-alfred-epic",
     "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-    "planSha256": "c98674205a6342059319355e314601544baae81c06295b74be51dbda1bec4ace",
+    "planSha256": "2d4bb65afc5a8073eb6c475542cb2703e2976d6108970a015b10cf0c17287b68",
     "specPath": "specs/sprint-alfred-epic/spec.md",
-    "specSha256": "828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad",
+    "specSha256": "fc25a5cc9184505120c0afa972b7942d7807d18c6dadc733286b5f718568f55d",
     "profile": "epic",
     "profileSha256": "5bb624fabec4e374842e36caa556727e9af044ad88ee186d54c4f64fc11c33f9",
     "submittedBy": "codex",
-    "submittedAt": "2026-09-28T06:57:34.280Z"
+    "submittedAt": "2026-09-28T07:38:15.270Z"
   },
   "planApprovalBriefing": {
     "schema": "pipeline.plan-approval-briefing.v1",
     "scope": {
       "featureId": "sprint-alfred-epic",
       "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-      "planSha256": "c98674205a6342059319355e314601544baae81c06295b74be51dbda1bec4ace",
+      "planSha256": "2d4bb65afc5a8073eb6c475542cb2703e2976d6108970a015b10cf0c17287b68",
       "specPath": "specs/sprint-alfred-epic/spec.md",
-      "specSha256": "828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad",
+      "specSha256": "fc25a5cc9184505120c0afa972b7942d7807d18c6dadc733286b5f718568f55d",
       "profile": "epic"
     },
     "change": {
