@@ -63,3 +63,25 @@ as the fix.
 - **Decision:** pending
 - **Assignment:** Alfred release preparation
 - **Date:** 2026-09-27
+
+## Integration preparation (2026-09-28)
+
+The lifecycle B slice and shared physical-boundary proposal now compose in
+`scratch/0.7-virtual-integration.patch` against `40059ebc`, together with
+onboarding, architecture, process identity, Codex readiness and design-package
+corrections. The aggregate has 45 proposed files, passes exact Git dry
+application, and all 39 proposed JavaScript files pass syntax checks. Relative
+dependencies resolve. The metadata binds original and proposed file hashes.
+
+Composition exposed preparation defects which were corrected before source
+integration: imports before hook shebangs, malformed worker-test addition
+prefixes, out-of-order contexts and one handover indentation mismatch. The
+aggregate additionally adds the physical scratch helper to the protected kernel
+and registers its test in Verify. Seven previously passing physical-boundary
+fixtures still bind the unchanged helper/test bytes; these syntax and patch
+checks do not prove the all-state live guard union.
+
+Only flat inert scratch revisions and patch bytes were written. Previously
+denied nested hook copies and canonical guard files remain unchanged. Productive
+integration, official kernel closure, integrated tests and the required live
+state/guard sweep are pending; this item remains open.
