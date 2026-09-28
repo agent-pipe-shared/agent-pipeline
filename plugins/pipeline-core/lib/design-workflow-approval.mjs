@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Exact PO-decision contract for a complete design workflow package. */
-import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { readApprovedDesignWorkflowPackage, readDesignWorkflowPackageFromRepository } from "./design-workflow-package.mjs";
 import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 
@@ -104,7 +104,7 @@ export function validateDesignWorkflowPackageApprovalRequest({
     expected = makeIntent({ featureId, planSha256, specSha256, candidate: pkg.candidate,
       packageSha256: request.packageSha256 });
   } catch { return { ok: false, code: "DWP-APPROVAL-INTENT" }; }
-  if (JSON.stringify(expected) !== JSON.stringify(request.approvalIntent)) return { ok: false, code: "DWP-APPROVAL-INTENT-DRIFT" };
+  if (canonical(expected) !== canonical(request.approvalIntent)) return { ok: false, code: "DWP-APPROVAL-INTENT-DRIFT" };
   return { ok: true, request, packageRead, packageSha256: request.packageSha256,
     intentSha256: expected.sha256 };
 }

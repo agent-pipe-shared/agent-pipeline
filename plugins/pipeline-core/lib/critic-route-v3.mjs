@@ -46,7 +46,7 @@ export function resolveV3DutyRoute({
   const cell = intent?.routing?.duties?.[dutyId]?.[runner];
   if (!cell || typeof cell !== "object" || Array.isArray(cell)) fail("requested duty route is unavailable");
   exactKeys(cell.selector, ["kind", "value"], "requested duty selector");
-  if (typeof cell.state !== "string" || cell.selector.kind !== "model-id" || typeof cell.selector.value !== "string" || cell.selector.value.length === 0
+  if (typeof cell.state !== "string" || !(cell.selector.kind === "model-id" || (runner === "claude" && cell.selector.kind === "alias")) || typeof cell.selector.value !== "string" || cell.selector.value.length === 0
     || typeof cell.effort !== "string" || cell.effort.length === 0) fail("requested duty route is unavailable");
   return Object.freeze({ dutyId, runner, model: cell.selector.value, effort: cell.effort, state: cell.state, sourceSha256: sha256(source), candidateCommit });
 }
