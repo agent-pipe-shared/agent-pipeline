@@ -425,6 +425,7 @@
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.onboarding-guidance-never-asks-about-an-existing-signing-key | closed | defect | pipeline | — | 2026-08-30 | — | Retrospective-analysis follow-up item #2, PO-confirmed 2026-08-30 ('auch verdrahten und fixen! das muss der runner zwingend abfragen') |
 | pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'. |
+| pipeline.onboarding-home-override-does-not-bind-machine-plane | open | workflow-improvement | pipeline | none | 2026-09-28 | — | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | — | 2026-08-06 | — | — |
 | pipeline.onboarding-must-bootstrap-the-trust-anchor-once | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly |
 | pipeline.onboarding-must-elicit-the-real-verify-contract | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step |
@@ -719,7 +720,7 @@
 
 ## Counts
 
-- open: 55
+- open: 56
 - in_progress: 0
 - closed: 642
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c4be069489a51f40ca67a229516cd19b69e6de5e1f399a7ad9e153b84d1014b5"
+    "transitionHead": "271c5df3a2c2f34ff96a7a5c9b51a82c8c4093a08ecdbc6b91c9bb9e03d4c3c3"
   },
   "counts": {
-    "open": 55,
+    "open": 56,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -5689,6 +5689,16 @@
       "closureRepository": "self",
       "closureCommit": "7ac3ee73b7681403cf9b8ee3fceccca47edc3ab6",
       "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    },
+    {
+      "id": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Controlled Codex onboarding first-answer verification; source dependency mismatch and a synthetic differing OS-home/CLI-home counterprobe. See scratch/onboarding-answer-route-evidence.md. No ordinary native-home defect or release blocker is claimed.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
