@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.advisor-demand-reuse-has-no-design-course-bound
-type: optimization
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-09-28

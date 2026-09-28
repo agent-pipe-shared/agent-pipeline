@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7c69588940258c5cdd366d42d6b51db51a459ab486aa6c2ca15d739de3cbd322"
+    "transitionHead": "42cf6903f9f1206494523f2985ac2fad1f9c9db1ece7346a6b784dae4107c400"
   },
   "counts": {
-    "open": 61,
+    "open": 63,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -548,6 +548,16 @@
       "closureEvidence": "backlog/items/2026-08-17-advisor-consent-is-requested-before-the-readiness-preflight.md"
     },
     {
+      "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "PO question about repeated Advisor calls; current and prepared-source analysis confirms per-demand limits without a design-course limit.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.advisor-evidence-read-enforces-size-limit-after-allocation",
       "status": "open",
       "type": "defect",
@@ -566,6 +576,16 @@
       "source": "Codex/WSL greenfield review B2 on 2026-09-27; bridge source-order verification in specs/sprint-alfred-epic/evidence/0.7-codex-greenfield-advisor-triage-2026-09-27.md.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Code-level comparison of the actual design advisory coordinator with the final design-workflow package validator during the PO's Advisor loop inquiry.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.afk-assumption-mode",

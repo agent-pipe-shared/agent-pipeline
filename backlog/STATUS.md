@@ -44,8 +44,10 @@
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | — | 2026-08-05 | — | — |
 | pipeline.adr-0056-conflict-scope-text-narrower-than-code | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.advisor-consent-is-requested-before-the-readiness-preflight | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.advisor-demand-reuse-has-no-design-course-bound | open | workflow-improvement | pipeline | none | 2026-09-28 | — | — |
 | pipeline.advisor-evidence-read-enforces-size-limit-after-allocation | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.advisor-prompt-is-emitted-before-host-route-admission | open | defect | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.advisor-question-contract-and-final-source-binding-conflict | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.afk-assumption-mode | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-binding-guards-are-not-os-level-sandboxing | closed | defect | pipeline | nova-b | 2026-08-25 | — | Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature. |
 | pipeline.agent-can-self-arm-the-git-override | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -725,7 +727,7 @@
 
 ## Counts
 
-- open: 61
+- open: 63
 - in_progress: 0
 - closed: 642
 - rejected: 3
