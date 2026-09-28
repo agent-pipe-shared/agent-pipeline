@@ -79,4 +79,3 @@ verification and successful expiry recovery are root execution evidence.
 No productive source, installed guard, or live capability was changed by
 this preparation. Targeted proposal test evidence will be recorded separately;
 this item does not claim productive integration or a release readiness PASS.
-

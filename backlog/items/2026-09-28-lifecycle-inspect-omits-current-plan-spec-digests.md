@@ -59,4 +59,3 @@ runtime contents.
 The exact repair signatures were consumed and the 25-surface host-readiness repair committed as `8b5dcf4fbe4fc39f914118885d642fc0952d9210`; this diagnostic correction remains separately pending.
 
 A two-file correction is prepared in `scratch/inspect-source-digest-correction-914270f1/`. Actual host-authorized tests passed 26/26 (a8cd00); source patch SHA256 `24952b6f8dedac0431ea0c75db6bd0c25c1ac49c764a1c0e5c34ade686bedd9a`. Prepared tests and scratch source are not productive integration or manual closure evidence.
-
