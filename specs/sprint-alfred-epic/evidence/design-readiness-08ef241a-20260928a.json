@@ -1,0 +1,72 @@
+{
+  "candidate": {
+    "commit": "08ef241a3b06b1db6a8eed722d08e7db1024836e",
+    "tree": "17c91f4e0490893180e3542a8e7e5a0cb6b69521"
+  },
+  "dispatchId": "alfred-greenfield-readiness-08ef241a-20260928a",
+  "findings": [
+    {
+      "code": "PREMATURE-IMPLEMENTATION-AUTHORITY",
+      "severity": "blocking",
+      "summary": "The design directs a protected-source repair to scripts/pipeline-state.mjs before ordinary plan approval and says it is a prerequisite for that approval. This authorizes implementation work before the final package decision, contrary to the input sequence and PRD gate. A separate protected-write signature does not resolve that authority conflict."
+    },
+    {
+      "code": "MISSING-INPUT-PRESERVATION-REQUIREMENT",
+      "severity": "blocking",
+      "summary": "The input requires preserving existing consumer work and historical evidence, but the design and traceability do not state this boundary or identify acceptance evidence for it."
+    },
+    {
+      "code": "ADVISOR-DISPOSITION-EVIDENCE-ABSENT",
+      "severity": "blocking",
+      "summary": "The input requires an Advisor consultation followed by Elephant disposition and design revision before independent readiness. The supplied five sources describe that process but provide no demand, route result, Advisor response or unavailable receipt, nor proposal-by-proposal disposition and revision evidence."
+    }
+  ],
+  "hostExecution": {
+    "dutyReceiptSha256": "aaf9aff77c2b6b30f859dfac42b4d30834b2789d7c8c8afbf85639f51bf6ba6a",
+    "executionReceiptSha256": "00ea62a435022f29935057a5c785129429e8c70a7d87712c0259d6750ee372b6",
+    "repoFingerprint": "468021d018a706c26049c829295f12234b1421955f902b925cb7d7496c4806bc",
+    "route": {
+      "candidateCommit": "08ef241a3b06b1db6a8eed722d08e7db1024836e",
+      "effort": "high",
+      "model": "gpt-6-luna",
+      "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16"
+    },
+    "runner": "codex",
+    "schema": "pipeline.design-readiness-host-execution.v1",
+    "selectionId": "drh_0d8e3d1edbb9cd323077cce7f1e5aedf",
+    "selectionSha256": "8ed847af05ffd08b5b91e4204d5fe45334b6ad35fa72ab449cb319edd8444942"
+  },
+  "outcome": "not-ready",
+  "runner": "codex",
+  "schema": "pipeline.design-readiness-receipt.v1",
+  "sources": {
+    "design": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md",
+      "sha256": "911137207fecf3172760f923a95738f18911c246e68382502039f47f7a6554fb"
+    },
+    "input": {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow-input.md",
+      "sha256": "c0f43c9bfb202296a8a0b811eb1b4332d6db149b42edf9356e4c349a0aa72b13"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "c98674205a6342059319355e314601544baae81c06295b74be51dbda1bec4ace"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-traceability-2026-09-27.md",
+      "sha256": "9fba7c2edd43736d8756d5fefa941e19eb97944f111d5848c4010442a4662631"
+    }
+  },
+  "summary": "Not ready for PO review: the design authorizes a source repair before final package approval, omits an explicit input preservation requirement, and lacks evidence that the required Advisor and Elephant disposition steps occurred. This readiness result is not PO approval.",
+  "unresolvedChoices": [
+    {
+      "id": "PRE-APPROVAL-REPAIR",
+      "impact": "Until reconciled, the design conflicts with the stated approval-before-implementation gate.",
+      "question": "Is the reopened-plan acknowledgement source repair intended to be authorized before the single final package approval, or should it be sequenced after that approval?"
+    }
+  ]
+}
