@@ -122,3 +122,36 @@ composition and architecture adoption are not integrated, and the feature
 remains open. `scratch/draft-codex-tool-free-readiness-host.md` proposes the
 explicit readiness-only architecture boundary. The compiled estate reports
 ADR-0039 as proposed; ADR-0041 remains accepted for the separate Advisor route.
+
+The next preparation batch on `e925be24` completed an authenticated native
+Codex review over five committed synthetic sources. The full canonical report
+returned `ready-for-po-review`; its private receipt was independently verified
+by reconstructing the exact request from source bytes and reading the actual
+closed process journal. No coordinator-supplied expectations substitute for
+that reconstruction. This is recorded in
+`scratch/codex-tool-free-five-source-store-smoke.json`, not an approval of the
+product design or a production execution stamp.
+
+Six scratch private-store fixtures and seven five-source composition fixtures
+pass, including forged ownership, weak assurance, immutable-read drift,
+uncommitted source bytes, ready-with-blocker rejection and tool-attempt failure.
+Seven exact proposed regular-host-function fixtures additionally cover export
+denial before startup, repository/route mismatch, source drift, failed private
+readback, candidate drift, preserving not-ready and retaining recovery input.
+The earlier 66 component tests remain bound to unchanged file hashes; the
+seven host tests are incremental verification.
+
+`scratch/codex-tool-free-readiness-source.patch` now prepares the Codex-only
+library and regular host/bootstrap connection, a separate private namespace,
+truthful host-observed tool-free assurance, typed bootstrap diagnostics,
+canonical tests, Verify registration and kernel/threat-model dependencies.
+The regular host chooses that class explicitly; it does not silently retry
+between isolation classes after a denial or failed execution. Static prepared
+kernel-edge checking identified and included the transitive tool-identity
+reader. Syntax/import checks and dry application pass; the incremental record
+is `scratch/codex-readiness-activation-evidence.json`.
+
+No canonical implementation was changed in this preparation batch. Architecture
+adoption, protected source integration, official kernel-closure and canonical
+tests, the real committed product-package readiness and final candidate gates
+remain required. The backlog item remains open.
