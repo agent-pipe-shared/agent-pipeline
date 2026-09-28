@@ -1,0 +1,56 @@
+{
+  "candidate": {
+    "commit": "628df5aa29f613510c36e0543cfcea6507b8bcb9",
+    "tree": "d0381696d56feda61feefe33284237cbfeced86e"
+  },
+  "dispatchId": "alfred-greenfield-readiness-628df5aa-20260928c",
+  "findings": [
+    {
+      "code": "ADVISOR-CURRENT-BINDING-MISSING",
+      "severity": "blocking",
+      "summary": "The package cites only a historical unavailable Advisor result for an earlier candidate. It says a fresh canonical no-child receipt bound to the revised candidate and design, or a usable governed Advisor result, is required before presentation; neither is included in the supplied evidence."
+    }
+  ],
+  "hostExecution": {
+    "dutyReceiptSha256": "810e95b09f546dab8c5a0fa9267dc651fedc4ed5e570e6f5e217b50555a038b8",
+    "executionReceiptSha256": "6618d6047532823cb2b12ab88b38f2f9098d21c6e561204a6ac86c18bea4e713",
+    "repoFingerprint": "468021d018a706c26049c829295f12234b1421955f902b925cb7d7496c4806bc",
+    "route": {
+      "candidateCommit": "628df5aa29f613510c36e0543cfcea6507b8bcb9",
+      "effort": "high",
+      "model": "gpt-6-luna",
+      "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16"
+    },
+    "runner": "codex",
+    "schema": "pipeline.design-readiness-host-execution.v1",
+    "selectionId": "drh_718c7be6ac0f18f9d3acb27c68b4f3c0",
+    "selectionSha256": "b6c2d1a605e257fe8addfc0432f736a0048d6c42c35034708520f79299d0ee8c"
+  },
+  "outcome": "not-ready",
+  "runner": "codex",
+  "schema": "pipeline.design-readiness-receipt.v1",
+  "sources": {
+    "design": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md",
+      "sha256": "0531daaef25ba07d4bee15f0de7a61146daa8ff6fa8ad03895550a601727ebdf"
+    },
+    "input": {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow-input.md",
+      "sha256": "c0f43c9bfb202296a8a0b811eb1b4332d6db149b42edf9356e4c349a0aa72b13"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "2d4bb65afc5a8073eb6c475542cb2703e2976d6108970a015b10cf0c17287b68"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "fc25a5cc9184505120c0afa972b7942d7807d18c6dadc733286b5f718568f55d"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-traceability-2026-09-27.md",
+      "sha256": "19fdde9dbf002d4325c012d8106cf2ab99cd2080da34fb8363960f40610fda57"
+    }
+  },
+  "summary": "The five sources align on input coverage, preservation, implementation authority, and the single final PO decision. Readiness does not grant PO approval. Current Advisor evidence required for presentation is missing.",
+  "unresolvedChoices": []
+}
