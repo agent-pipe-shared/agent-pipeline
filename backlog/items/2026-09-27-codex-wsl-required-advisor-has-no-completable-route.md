@@ -196,3 +196,24 @@ complete pipes and independently closed ownership. Source/runtime hashes remain
 stable. Evidence: `scratch/codex-custody-namespace-composition-evidence.json`.
 This does not integrate the separate ordinary store/recipe/binding or create a
 productive Advisor receipt. Formal gates and installed replay remain pending.
+
+Further registered host-context preparation passes nine controlled cases with
+twenty stable inputs and Git dry application. It reuses the exact existing
+bridge route function via a one-line export, independently reads Git/topology,
+existing GUID, route and physical executable twice, and returns metadata only.
+The positive executable resolver is an explicitly controlled fixture; the
+default PATH-independent resolver is source-audited, with no operator HOME
+probe or real Codex invocation. Capability/readiness/consent/export authority
+are not established. Evidence: `scratch/codex-advisor-host-context-evidence.md`.
+
+Durable custody preparation separately executes one managed Node host and a
+fresh process reader over immutable metadata. The v2 in-memory actual-result
+requirement cannot be filled from a receipt itself after restart. A complete
+versioned v3 contract and sealed private reader/writer integration remain
+necessary; the current durable prototype is not a complete record validator.
+Inspection also identifies its preexecution context's required answer/duty-
+receipt digests as premature for an unknown real answer. The future version
+must separate request coordinates from postexecution bindings, without guessed
+digests or a fake actual host result. This is a prototype integration finding,
+not a demonstrated installed failure. Evidence and constraints:
+`scratch/codex-advisor-durable-custody-design.md`.

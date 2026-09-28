@@ -87,3 +87,14 @@ The prepared Readiness store already allows shared 0755, so it needs no matching
 compatibility relaxation. Its common/shared directory observations still lack
 the explicit group/world-write refusal, a separate remaining hardening surface.
 These patches are unapplied; installed replay and item closure remain pending.
+
+The separate Readiness hardening is now prepared against aggregatecb817e20.
+It adds owner/no022 checks and captures common/shared device/inode/UID/exact-mode
+for subsequent reads and writes. Constructor-only checks would leave a retained
+store closure unaware of later parent replacement or mode drift. Six actual
+filesystem cases pass, including first sanctioned mint/shared0755, unsafe modes,
+aliases and pre-context/pre-publication drift refusals. A source-capable test
+suite and Verify entry pass exact-preimage dry application. Existing complete
+record/ownership happy-path tests were not re-run and are not claimed.
+`scratch/codex-readiness-shared-parent-hardening-evidence.md` binds the scope.
+This separate patch is not yet part of aggregatecb817e20 or productive source.
