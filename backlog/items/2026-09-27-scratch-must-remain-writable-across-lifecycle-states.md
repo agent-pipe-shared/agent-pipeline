@@ -85,3 +85,20 @@ Only flat inert scratch revisions and patch bytes were written. Previously
 denied nested hook copies and canonical guard files remain unchanged. Productive
 integration, official kernel closure, integrated tests and the required live
 state/guard sweep are pending; this item remains open.
+
+### Remaining content-only scratch denial
+
+During Spec-marker preparation, writing an inert `.txt` fixture under physical
+`scratch/` was refused with `GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY` because
+its source text contained a literal human acknowledgement marker. The attempted
+patch was not applied. The test was safely prepared through the existing
+sanctioned acknowledgement fixture writer instead.
+
+Source confirms `isBootstrapAcknowledgementMarkerMutation` searches payload
+strings, and the lifecycle guard calls it before its scratch lane without a
+target-path distinction. The current prepared physical-boundary union does not
+yet reconcile this earlier content-only branch. Prepare and test a distinction
+between inert contained scratch source and actual acknowledgement authority,
+retaining physical alias/live-root exclusions and writer-only authority on real
+PRDs. This is an additional reproduced boundary case; earlier seven containment
+fixtures do not prove it is repaired.

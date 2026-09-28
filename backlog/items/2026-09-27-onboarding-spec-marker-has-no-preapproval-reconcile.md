@@ -41,3 +41,29 @@ Keep the substantive PRD/Spec review separate from this mechanical repair.
 
 ## Triage
 
+## Prepared repair core (2026-09-28)
+
+`scratch/onboarding-spec-marker-core.patch` prepares a read-only plan and
+mechanical apply beside bootstrap acknowledgement. Paths come only from the
+validated generated checkpoint. The plan binds absent-pristine continuity,
+calibration, checkpoint revision/digest, stable single-link PRD/Spec identities,
+both document hashes and the exact PRD postimage. Acknowledged or bound authority
+is refused. Apply reobserves under existing writer locks, atomically replaces
+only the marker, preserves the Spec and checkpoint, and reads documents back.
+Drift after publication reports a committed error, never a success receipt.
+
+Eight proposed source-fixture cases pass: byte-exact marker-only repair and
+current-state no-op, stale PRD/Spec, acknowledged/bound refusal, malformed
+markers/UTF-8, injected prepublication edit, committed readback drift,
+symlink/hardlink aliases and BOM/CRLF/Unicode preservation. Fixture acknowledgement
+uses the existing sanctioned writer; an initial literal acknowledgement-marker
+fixture was refused by the installed guard and was not applied or bypassed.
+The proposed test corpus and Verify policy both declare 295 cases.
+
+This core is not yet an executable returned onboarding route: CLI metadata and
+dispatch, producer ordering before PO acknowledgement, closed argv admission
+and phase/host replay remain to be prepared. Existing acknowledgement and
+generation writers do not all share one document lock; final CAS/readback checks
+are not a universal exclusion of concurrent filesystem mutation. Canonical
+integration, full tests and actual consumer readback remain pending. Current
+live-host scope is Codex; no Claude/Windows acceptance is claimed.
