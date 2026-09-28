@@ -204,6 +204,7 @@
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.default-claude-readiness-route-rejects-registered-alias | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | batman | 2026-08-28 | — | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
+| pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
@@ -738,7 +739,7 @@
 
 ## Counts
 
-- open: 73
+- open: 74
 - in_progress: 0
 - closed: 643
 - rejected: 3

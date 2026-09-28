@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ac1238ccd4ae6e763b1ee40720a236379605b19dd725555a4b099b42e02dfaa0"
+    "transitionHead": "d8704ae8f9a5efce7c5454a7ed9bec9004f6700c8715b2f55c07eff93e02dc68"
   },
   "counts": {
-    "open": 73,
+    "open": 74,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -2674,6 +2674,16 @@
       "deferred": false,
       "tracking": "Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate",
       "sprint": "batman"
+    },
+    {
+      "id": "pipeline.design-approval-validator-rejects-json-key-reordering",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Actual Source validator reproduction against the genuinely approved package: original request accepted; semantically identical recursively sorted JSON rejected as DWP-APPROVAL-INTENT-DRIFT. Terminal 03e031, exit 0; no signing or provider call.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
