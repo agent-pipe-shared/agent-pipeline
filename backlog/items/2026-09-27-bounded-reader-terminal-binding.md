@@ -96,3 +96,20 @@ discloses normalization; phase two is byte-identical to its retained raw source.
 Only private digests are recorded, not raw private report bytes. Individual
 finding/disposition reconstruction and the final committed policy transition
 still remain; this audit is not a passing Alfred Reader binding.
+
+### Finding reconciliation
+
+Three read-only historical tasks mapped all 30 distinct reported findings to
+their phase-two adjudication and covered Git intervals. The complete matrix is
+`scratch/alfred-reader-finding-reconciliation.md`: 21 concrete corrections,
+seven explicit phase-two challenges, one carried relocation without its
+requested correction in that round, and one partly evidenced terminal finding.
+The round-two consumer cut is proven; relocation of every removed internal
+note into the linked threat model is not proven and must not be asserted.
+
+The proposal's current resolved/owner-accepted disposition form cannot encode
+the seven legitimate phase-two no-change adjudications. Prepare a narrowly
+report-bound adjudication form, retaining unresolved or partial findings as
+non-passing. Do not infer owner acceptance, fabricate resolution commits,
+restart the bounded course, or launch a fifth Reader. Actual Alfred binding
+remains pending even though all eight report blobs are immutable.

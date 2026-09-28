@@ -39,3 +39,20 @@ degraded substitute. The Agy consumer scenario is read back after repair.
 - **Decision:** pending
 - **Assignment:** Alfred candidate verification
 - **Date:** 2026-09-27
+
+## Codex preparation (2026-09-28)
+
+`scratch/browser-preflight-source.patch` prepares actual local Chromium launch
+and close, typed host-dependency/start failures, a bounded outer probe, seven
+canonical fixture tests and registration in source Verify. Seven scratch
+fixtures pass, including an existing executable with missing shared library,
+generic launch and close failures, nonzero degraded fallback, probe timeout
+and static evidence that does not launch a browser. These tests use local
+Playwright-shaped fixtures; they are not actual product browser tests.
+
+The patch is incorporated into `scratch/0.7-virtual-integration.patch`.
+All 47 proposed JavaScript files in the 55-file aggregate pass syntax checks,
+relative dependency checks succeed, and Git dry application passes. Canonical
+implementation and consumer replay remain pending. Per the PO's current scope,
+active host validation is limited to Codex; this does not claim a fresh Agy
+replay or close this item.
