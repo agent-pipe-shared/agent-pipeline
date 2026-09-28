@@ -66,3 +66,24 @@ fixture provisioning limitation. A separate compatibility patch is being
 prepared; no source correction or item closure is claimed.
 
 ## Triage
+
+## Prepared compatibility correction (2026-09-28)
+
+Separate Journal and Advisor-store patches now classify the common/shared
+directories as owner-owned physical directories without group/world write
+permissions. The shared parent may remain 0755; duty/GUID/process/receipt
+directories remain private. Existing inode/owner/mode snapshots are retained.
+No existing directory is silently chmod-repaired.
+
+Sixteen focused cases pass, including actual sanctioned mint followed by both
+registration and store creation, linked worktree store creation, unsafe shared
+permissions, private 0755 refusal, aliases and root drift. The earlier namespace
+test that required shared 0755 refusal is explicitly revised in a separate test
+copy to require private duty 0755 refusal; its changed contract is not hidden.
+Patch preflight against exact proposed preimages passes. Evidence:
+`scratch/codex-shared-namespace-compatibility-evidence.md`.
+
+The prepared Readiness store already allows shared 0755, so it needs no matching
+compatibility relaxation. Its common/shared directory observations still lack
+the explicit group/world-write refusal, a separate remaining hardening surface.
+These patches are unapplied; installed replay and item closure remain pending.

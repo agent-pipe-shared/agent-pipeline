@@ -173,3 +173,14 @@ Evidence: `scratch/codex-host-output-custody-evidence.md`,
 `scratch/existing-repository-identity-registration-evidence.md`.
 These are prepared contracts and controlled process evidence. No productive
 Advisor execution, source application, release stamp or new signature occurred.
+
+The asynchronous independent binding counterpart now passes ten cases/subtests
+using the actual prepared private store, Git identity and a closed managed Node
+fixture. Both store reads are awaited, inputs are snapshotted before the first
+await and each returned record is immediately copied; physical evidence/Git/
+executable bindings are rechecked. Promise rejection, returned-record drift and
+caller mutation refuse or preserve the admitted snapshot as specified.
+`scratch/codex-advisor-binding-async-evidence.md` records seventeen stable inputs.
+This verifier still binds v1 and does not establish sealed live host authority,
+v2 custody adoption or a timeout for a hanging store dependency. Live callers
+must await and require `result.ok === true`.

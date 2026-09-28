@@ -108,3 +108,13 @@ growth and instrumentation use an isolated VM dependency seam; ordinary fixture
 filesystem reads are real. Source preparation and proposed Verify registration
 are in `scratch/codex-journal-read-bounds-*`. No source application or native
 Advisor/store qualification follows from these cases.
+
+The generic lifecycle regression registration is separately prepared:
+`scratch/advisory-read-bounds-registration-source.patch` adds all seven cases
+to the existing canonical suite. Sixteen cases pass (nine existing/seven new),
+with stable inputs and Git dry application. The existing Verify entry suffices;
+no completion receipt is invented. Journal bounds have a separate proposed
+six-case source suite and Verify entry in
+`scratch/codex-journal-read-bounds-registration.patch`, with six passing adapted
+source tests and exact stable byte bindings. Productive registered Verify has
+not run against these proposed tests.
