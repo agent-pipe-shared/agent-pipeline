@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "271c5df3a2c2f34ff96a7a5c9b51a82c8c4093a08ecdbc6b91c9bb9e03d4c3c3"
+    "transitionHead": "e4d9396ca032d0f1cef3c42a6ed75680bb37020bf2eadaab24b8cf2d52c298f4"
   },
   "counts": {
-    "open": 56,
+    "open": 57,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -546,6 +546,16 @@
       "closureRepository": "self",
       "closureCommit": "6ba4e5884e14a5e3ff08361603fb3a5eb07bffbf",
       "closureEvidence": "backlog/items/2026-08-17-advisor-consent-is-requested-before-the-readiness-preflight.md"
+    },
+    {
+      "id": "pipeline.advisor-evidence-read-enforces-size-limit-after-allocation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Independent read-only source audit of canonical advisory-lifecycle-v2.mjs and Scratch Codex Advisor binding, source 98e752a9. Physical reads are unbounded before declared limits; no large or private operator file was read.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.advisor-prompt-is-emitted-before-host-route-admission",
