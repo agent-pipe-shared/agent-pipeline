@@ -70,3 +70,21 @@ isolation assertions and the successful answered-action tests with an explicitly
 declared provider substitution. This item records the gap; no fix is claimed.
 
 ## Triage
+
+## Prepared correction (2026-09-28)
+
+The narrow default-reader closure now supplies the selected `homedirFn`, while
+the final dependency override preserves explicitly supplied readers unchanged.
+Patch SHA256 `4ff73d6276b1eae8a5a6022147eed2a8356e84cad9b4bebc335ed878f04944e1`;
+six controlled cases pass, including absent/malformed/invalid selected home,
+custom zero-argument reader, unchanged ordinary default and the actual CLI
+before/after with separate synthetic A/B scopes. No global OS mutation or
+real key/anchor is used. See `scratch/onboarding-selected-home-evidence.md`.
+
+The patch is included in virtual aggregate
+`dfcb19eb5cec0abe813c83a6ec0c55108db3401f6c3e2377b0162edb9d700bb5`.
+All 297 regular continuity cases pass on that exact selected-import graph with
+FD3 completion: zero failure/skip/todo, exit 0 in 43,143 ms, stable aggregate.
+The earlier aggregate's run is retained separately. Current evidence is
+`scratch/proposed-onboarding-continuity-selected-home.evidence.json`.
+Canonical source and installed runtime remain unchanged; the item stays open.

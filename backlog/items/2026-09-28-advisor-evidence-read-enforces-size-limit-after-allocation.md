@@ -59,3 +59,22 @@ Independent audit and bounded reader preparation are being recorded under
 source ordering defect; no integrated correction or closure is claimed.
 
 ## Triage
+
+## Prepared Codex public reader (2026-09-28)
+
+The separate bounded public reader now rejects all disallowed paths before
+opening content, rejects descriptor/file and rolling aggregate sizes before
+allocation/read, bounds racing reads and rechecks physical source identities.
+Its shared path policy is also used by request construction, and both binding
+source reads use it. Eleven controlled reader cases pass.
+
+Independent canonical-bundle comparison exposed an additional prototype digest
+mismatch: pretty JSON versus canonical lifecycle compact JSON. Request creation
+now calls the actual `advisoryEvidenceBundleSha256` API. The combined physical
+reader/request/private-binding run passes 30/30 cases, exit 0, zero skip/todo,
+with 21 stable source hashes in
+`scratch/codex-advisor-bounded-evidence-composition.evidence.json`.
+
+These Scratch changes do not modify the canonical generic reader; its correction
+and integrated regression evidence remain required. No item closure, productive
+Advisor receipt or native qualification follows from this run.

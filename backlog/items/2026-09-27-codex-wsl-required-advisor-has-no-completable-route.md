@@ -100,3 +100,20 @@ Independent binding now passes seven cases/subtests including a separately
 selected host executable: the private journal cannot choose the expected binary.
 All host selection and capability dependencies still need sealed live wiring;
 the actual Node fixture remains synthetic Advisor/session evidence.
+
+The concrete execution composition audit identifies three further integration
+requirements in the proposed generic host: a sealed admission recheck immediately
+before `turn/start` (the current API has no hook), an explicitly registered
+Advisor process namespace (the current journal accepts only Readiness), and
+honest input/stdio custody observations (parsed report plus bytecounts cannot
+prove raw-output completeness). These are recorded with actual API/field mappings
+in `scratch/codex-advisor-execution-composition-design.md`; no executable wrapper
+or fake proof hides the gaps. Host startup before content is distinguished from
+an actual submitted consult attempt.
+
+The independent component audit also confirmed physical evidence allocation
+before size limits and public path refusal after content reads. The canonical
+reader defect has its own open item,
+`pipeline.advisor-evidence-read-enforces-size-limit-after-allocation`; preparation
+of a bounded public reader does not close either this ordinary-route item or
+the generic canonical defect.
