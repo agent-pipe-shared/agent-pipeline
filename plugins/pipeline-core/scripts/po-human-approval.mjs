@@ -1572,8 +1572,18 @@ function executeHumanApproval(args, dependencies = {}) {
       try { raw = read(canonicalRequestPath, "utf8"); } catch { fail("--request could not be read"); }
       let record;
       try { record = JSON.parse(raw); } catch { fail("--request must contain valid JSON"); }
-      if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
-      args.intentSha256 = record.intentSha256;
+      if (record?.schema === DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA) {
+        // The canonical closed DWP request has four keys; its digest belongs
+        // to approvalIntent. Never add a top-level alias or fall through to a
+        // generic digest when the nested transport is malformed. The unchanged
+        // default package validator below still rebinds every source before
+        // disclosure, human confirmation, key access and signing.
+        if (!SHA.test(record.approvalIntent?.sha256 ?? "")) fail("--request design-workflow JSON must carry approvalIntent.sha256 (64 lowercase hexadecimal characters)");
+        args.intentSha256 = record.approvalIntent.sha256;
+      } else {
+        if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
+        args.intentSha256 = record.intentSha256;
+      }
       scratchRequestRecord = record;
       scratchProofPath = scratchSiblingPath(canonicalRequestPath, "proof");
       scratchSignerPath = scratchSiblingPath(canonicalRequestPath, "signer");

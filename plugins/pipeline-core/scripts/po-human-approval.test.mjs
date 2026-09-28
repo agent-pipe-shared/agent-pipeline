@@ -60,6 +60,38 @@ import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 
+function nestedDwpSigningRequest() {
+  const packageSha256 = "d".repeat(64);
+  const approvalIntent = createPoApprovalIntent({ kind: "design-workflow-package", featureId: "signing-fixture",
+    planSha256: "1".repeat(64), specSha256: "2".repeat(64), candidate: { commit: "a".repeat(40), tree: "b".repeat(40) },
+    policyRevision: "design-workflow-package-v1", subjectSha256: packageSha256, decision: "approve" });
+  return { schema: "pipeline.design-workflow-package-approval-request.v1", packagePath: "specs/signing-fixture/evidence/package.json", packageSha256, approvalIntent };
+}
+test("DWP nested digest transport reaches the unchanged default complete-package validator without a top-level alias", () => {
+  const dirs = fixtureDirs();try {
+    keyFixture(dirs.directory);mkdirSync(join(dirs.repoRoot,"scratch"));const request=nestedDwpSigningRequest();assert.equal(Object.keys(request).length,4);assert.equal(Object.hasOwn(request,"intentSha256"),false);
+    writeFileSync(join(dirs.repoRoot,"scratch","dwp-request-fixture.json"),JSON.stringify(request));let confirmations=0,signs=0,fallbacks=0;
+    assert.throws(()=>runHumanApproval(["sign-intent","--repo-root",dirs.repoRoot,"--directory",dirs.directory,"--request","scratch/dwp-request-fixture.json"],{readConfirmation:()=>{confirmations++;return "approve";},spawn:()=>{signs++;throw Error("unexpected signing");},describeIntentRecord:()=>{fallbacks++;throw Error("unexpected generic fallback");}}),/design-workflow approval request does not bind a current, complete package/);
+    assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(fallbacks,0);assert.equal(existsSync(join(dirs.repoRoot,"scratch","dwp-proof-fixture.json")),false);
+  }finally{cleanup(dirs);}
+});
+test("DWP nested digest transport rejects malformed nested hashes even when a generic top-level digest exists", () => {
+  const dirs=fixtureDirs();try {
+    keyFixture(dirs.directory);mkdirSync(join(dirs.repoRoot,"scratch"));for(const nested of [undefined,"bad","A".repeat(64)]){
+      const request=nestedDwpSigningRequest();request.intentSha256="c".repeat(64);request.approvalIntent.sha256=nested;writeFileSync(join(dirs.repoRoot,"scratch","dwp-request-malformed.json"),JSON.stringify(request));let confirmations=0,signs=0;
+      assert.throws(()=>runHumanApproval(["sign-intent","--repo-root",dirs.repoRoot,"--directory",dirs.directory,"--request","scratch/dwp-request-malformed.json"],{readConfirmation:()=>{confirmations++;return "approve";},spawn:()=>{signs++;throw Error("unexpected signing");}}),/approvalIntent.sha256/);assert.equal(confirmations,0);assert.equal(signs,0);
+    }
+  }finally{cleanup(dirs);}
+});
+test("DWP nested transport cannot bypass closed request or changed intent validation before confirmation/signing",()=>{
+  const dirs=fixtureDirs();try {
+    keyFixture(dirs.directory);mkdirSync(join(dirs.repoRoot,"scratch"));for(const mutate of [r=>{r.intentSha256=r.approvalIntent.sha256;},r=>{r.approvalIntent.sha256="e".repeat(64);},r=>{r.packageSha256="f".repeat(64);},r=>{r.approvalIntent.value.decision="reject";}]){
+      const request=nestedDwpSigningRequest();mutate(request);writeFileSync(join(dirs.repoRoot,"scratch","dwp-request-changed.json"),JSON.stringify(request));let confirmations=0,signs=0;
+      assert.throws(()=>runHumanApproval(["sign-intent","--repo-root",dirs.repoRoot,"--directory",dirs.directory,"--request","scratch/dwp-request-changed.json"],{readConfirmation:()=>{confirmations++;return "approve";},spawn:()=>{signs++;throw Error("unexpected signing");}}),/design-workflow approval request does not bind a current, complete package/);assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(existsSync(join(dirs.repoRoot,"scratch","dwp-proof-changed.json")),false);
+    }
+  }finally{cleanup(dirs);}
+});
+
 test("AC-19 inherited source signing disclosure binds every source and rejects drift", () => {
   const dirs = fixtureDirs();
   try {

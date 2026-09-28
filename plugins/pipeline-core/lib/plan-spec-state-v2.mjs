@@ -31,6 +31,9 @@ const HUMAN_REFERENCE_SCHEMA = "pipeline.human-decision-reference.v1";
 export const PLAN_SUBMISSION_SCHEMA = "pipeline.plan-submission.v1";
 export const PLAN_INVALIDATION_SCHEMA = "pipeline.plan-invalidation.v1";
 export const PLAN_CANCELLATION_SCHEMA = "pipeline.plan-cancellation.v1";
+export const PLAN_CANCELLATION_HISTORY_SCHEMA = "pipeline.plan-cancellation.v2";
+export const PLAN_CANCELLATION_HISTORY_MAX_RECEIPTS = 64;
+export const PLAN_CANCELLATION_HISTORY_MAX_BYTES = 65536;
 export const PLAN_MIXED_STATE_RECOVERY_SCHEMA = "pipeline.plan-mixed-state-recovery.v1";
 const AUTHORITY_SCHEMA = "pipeline.po-gate-authority.v2";
 const REVOCATION_SCHEMA = "pipeline.plan-revocation.v2";
@@ -425,12 +428,27 @@ export function validPlanInvalidation(value) {
  * mutable document/authority object that a later submission could overwrite.
  */
 export function validPlanCancellation(value) {
-  return hasExactKeys(value, CANCELLATION_KEYS)
-    && value.schema === PLAN_CANCELLATION_SCHEMA
-    && isNonBlankString(value.featureId)
-    && SHA256.test(value.submissionSha256)
-    && isNonBlankString(value.cancelledBy)
-    && isCanonicalIso(value.cancelledAt);
+  const validBase = receipt => isNonBlankString(receipt.featureId)
+    && SHA256.test(receipt.submissionSha256) && isNonBlankString(receipt.cancelledBy)
+    && isCanonicalIso(receipt.cancelledAt);
+  if (hasExactKeys(value, CANCELLATION_KEYS) && value.schema === PLAN_CANCELLATION_SCHEMA) return validBase(value);
+  try {
+    if (JSON.stringify(value).length > PLAN_CANCELLATION_HISTORY_MAX_BYTES
+      || Buffer.byteLength(JSON.stringify(value), "utf8") > PLAN_CANCELLATION_HISTORY_MAX_BYTES) return false;
+    const seen = new Set(); let current = value, count = 0, newerAt = null;
+    while (current !== null) {
+      if (++count > PLAN_CANCELLATION_HISTORY_MAX_RECEIPTS || !isPlainObject(current)
+        || !validBase(current) || current.featureId !== value.featureId
+        || seen.has(current.submissionSha256) || (newerAt !== null && Date.parse(current.cancelledAt) > newerAt)) return false;
+      seen.add(current.submissionSha256); newerAt = Date.parse(current.cancelledAt);
+      if (current.schema === PLAN_CANCELLATION_SCHEMA) return hasExactKeys(current, CANCELLATION_KEYS);
+      if (current.schema !== PLAN_CANCELLATION_HISTORY_SCHEMA
+        || !hasExactKeys(current, [...CANCELLATION_KEYS, "previousCancellation"])
+        || !isPlainObject(current.previousCancellation)) return false;
+      current = current.previousCancellation;
+    }
+    return false;
+  } catch { return false; }
 }
 
 /**
@@ -765,7 +783,7 @@ export function cancelSubmittedPlan({
     || !SHA256.test(expectedSubmissionSha256 ?? "")
     || !isNonBlankString(by)
     || !isCanonicalIso(at)) return fail("PLAN-CANCEL-REQUEST-INVALID");
-  const cancellation = {
+  let cancellation = {
     schema: PLAN_CANCELLATION_SCHEMA,
     featureId: state.activeFeature.id,
     submissionSha256: expectedSubmissionSha256,
@@ -776,15 +794,19 @@ export function cancelSubmittedPlan({
   if (!checked.ok) return checked;
   if (state.planCancellation !== undefined) {
     const exactReplay = validPlanCancellation(state.planCancellation)
-      && equalCanonical(state.planCancellation, cancellation)
+      && ["featureId", "submissionSha256", "cancelledBy", "cancelledAt"].every(key => state.planCancellation[key] === cancellation[key])
       && checked.lifecycle.status === "draft"
       && state.planSubmission === undefined
       && state.planApproval === undefined
       && state.planPresentation === undefined
       && state.planApprovalBriefing === undefined
       && state.planApproved === false;
-    if (exactReplay) return { ok: true, replay: true, state, cancellation };
-    return fail("PLAN-CANCEL-ALREADY-CANCELLED");
+    if (exactReplay) return { ok: true, replay: true, state, cancellation: state.planCancellation };
+    // Historic receipts cannot cancel a newer submission, but they must not
+    // strand its own exact cancellation. Replays only name the latest receipt.
+    if (checked.lifecycle.status === "draft" || state.planCancellation.submissionSha256 === expectedSubmissionSha256) {
+      return fail("PLAN-CANCEL-ALREADY-CANCELLED");
+    }
   }
   if (checked.lifecycle.status !== "awaiting-approval" || state.activeFeature.phase !== "design") {
     return fail("PLAN-CANCEL-STATE-INVALID");
@@ -799,6 +821,11 @@ export function cancelSubmittedPlan({
   if (!validateContinuityState(continuity, state.activeFeature.id).ok
     || continuity.revision >= Number.MAX_SAFE_INTEGER) {
     return fail("PLAN-CANCEL-CONTINUITY-INVALID");
+  }
+  if (state.planCancellation !== undefined) {
+    cancellation = { ...cancellation, schema: PLAN_CANCELLATION_HISTORY_SCHEMA,
+      previousCancellation: structuredClone(state.planCancellation) };
+    if (!validPlanCancellation(cancellation)) return fail("PLAN-CANCEL-HISTORY-LIMIT");
   }
   const next = {
     ...state,

@@ -11,6 +11,7 @@ import {
   approveSubmittedPlan,
   cancelMixedPlanState,
   cancelSubmittedPlan,
+  validPlanCancellation,
   derivePlanLifecycle,
   enterPlanImplementation,
   planLegacyV2RevocationRecovery,
@@ -1232,4 +1233,24 @@ test("NVA-CF-MINORPUSH: a null invalidatedSubmissionSha256 is rejected for reaso
     },
   };
   assert.notEqual(derivePlanLifecycle(legitimate).code, "PLAN-LIFECYCLE-INVALIDATION-INVALID");
+});
+
+test("Cancellation receipt for an older submission cannot strand the exact current successor",()=>{
+  const first=submitted(),firstSha=sha256CanonicalJson(first.planSubmission),cancelled=cancelSubmittedPlan({state:first,expectedStateSha256:sha256CanonicalJson(first),expectedSubmissionSha256:firstSha,by:"PO",at:REOPENED});assert.equal(cancelled.ok,true);
+  const next=submitted(cancelled.state,AUTHORITY,RESUBMITTED),nextSha=sha256CanonicalJson(next.planSubmission);assert.notEqual(nextSha,firstSha);const oldReceipt=structuredClone(next.planCancellation);
+  const result=cancelSubmittedPlan({state:next,expectedStateSha256:sha256CanonicalJson(next),expectedSubmissionSha256:nextSha,by:"PO",at:REAPPROVED});assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.replay,false);assert.equal(result.cancellation.schema,"pipeline.plan-cancellation.v2");assert.equal(result.cancellation.submissionSha256,nextSha);assert.deepEqual(result.cancellation.previousCancellation,oldReceipt);assert.deepEqual(next.planCancellation,oldReceipt);assert.equal(result.state.planSubmission,undefined);assert.equal(derivePlanLifecycle(result.state).status,"draft");assert.equal(validPlanCancellation(result.cancellation),true);
+  const replay=cancelSubmittedPlan({state:result.state,expectedStateSha256:sha256CanonicalJson(result.state),expectedSubmissionSha256:nextSha,by:"PO",at:REAPPROVED});assert.equal(replay.ok,true);assert.equal(replay.replay,true);assert.equal(replay.state,result.state);assert.equal(replay.cancellation,result.state.planCancellation);
+  const oldReplay=cancelSubmittedPlan({state:result.state,expectedStateSha256:sha256CanonicalJson(result.state),expectedSubmissionSha256:firstSha,by:"PO",at:REOPENED});assert.equal(oldReplay.ok,false);assert.equal(oldReplay.code,"PLAN-CANCEL-ALREADY-CANCELLED");
+  const third=submitted(result.state,AUTHORITY,IMPLEMENTED);const thirdResult=cancelSubmittedPlan({state:third,expectedStateSha256:sha256CanonicalJson(third),expectedSubmissionSha256:sha256CanonicalJson(third.planSubmission),by:"PO",at:"2026-07-30T20:35:00.000Z"});assert.equal(thirdResult.ok,true);assert.deepEqual(thirdResult.cancellation.previousCancellation,result.cancellation);assert.deepEqual(thirdResult.cancellation.previousCancellation.previousCancellation,oldReceipt);
+});
+test("Historic cancellation never cancels stale, approved or foreign current submissions",()=>{
+ const first=submitted(),firstSha=sha256CanonicalJson(first.planSubmission),cancelled=cancelSubmittedPlan({state:first,expectedStateSha256:sha256CanonicalJson(first),expectedSubmissionSha256:firstSha,by:"PO",at:REOPENED}).state,next=submitted(cancelled,AUTHORITY,RESUBMITTED),before=sha256CanonicalJson(next);
+ for(const [state,submissionSha,code]of [[next,firstSha,"PLAN-CANCEL-ALREADY-CANCELLED"],[next,"f".repeat(64),"PLAN-CANCEL-SUBMISSION-STALE"],[approved(next,AUTHORITY,REAPPROVED),sha256CanonicalJson(next.planSubmission),"PLAN-CANCEL-STATE-INVALID"]]){const result=cancelSubmittedPlan({state,expectedStateSha256:sha256CanonicalJson(state),expectedSubmissionSha256:submissionSha,by:"PO",at:IMPLEMENTED});assert.equal(result.ok,false);assert.equal(result.code,code);}
+ assert.equal(sha256CanonicalJson(next),before);assert.equal(derivePlanLifecycle({...next,planCancellation:{...next.planCancellation,featureId:"foreign"}}).ok,false);
+});
+test("Cancellation history schema remains closed, bounded, feature-bound and preserves every prior fact",()=>{
+ const old={schema:"pipeline.plan-cancellation.v1",featureId:"feature",submissionSha256:"a".repeat(64),cancelledBy:"PO",cancelledAt:REOPENED},current={...old,schema:"pipeline.plan-cancellation.v2",submissionSha256:"b".repeat(64),cancelledAt:REAPPROVED,previousCancellation:old};assert.equal(validPlanCancellation(old),true);assert.equal(validPlanCancellation(current),true);
+ for(const mutate of [v=>{v.unexpected=true;},v=>{v.previousCancellation.featureId="foreign";},v=>{v.previousCancellation.unexpected=true;},v=>{v.previousCancellation.submissionSha256=v.submissionSha256;},v=>{v.previousCancellation.cancelledAt=IMPLEMENTED;},v=>{v.previousCancellation=null;},v=>{v.cancelledBy="x".repeat(65537);}]){const value=structuredClone(current);mutate(value);assert.equal(validPlanCancellation(value),false);}
+ let history={...old,submissionSha256:"1".padStart(64,"0")};for(let i=2;i<=64;i++)history={...old,schema:"pipeline.plan-cancellation.v2",submissionSha256:i.toString(16).padStart(64,"0"),previousCancellation:history};assert.equal(validPlanCancellation(history),true);
+ const before={...draft(),planCancellation:history},next=submitted(before,AUTHORITY,RESUBMITTED),digest=sha256CanonicalJson(next),result=cancelSubmittedPlan({state:next,expectedStateSha256:digest,expectedSubmissionSha256:sha256CanonicalJson(next.planSubmission),by:"PO",at:REAPPROVED});assert.equal(result.ok,false);assert.equal(result.code,"PLAN-CANCEL-HISTORY-LIMIT");assert.equal(sha256CanonicalJson(next),digest);assert.deepEqual(next.planCancellation,history);
 });
