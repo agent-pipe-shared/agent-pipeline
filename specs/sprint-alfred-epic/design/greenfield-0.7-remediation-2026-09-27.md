@@ -340,3 +340,13 @@ fourth review and this new terminal contract must be explicitly bound as a
 policy transition; it cannot be silently treated as unchanged. The checker
 can validate bytes and ancestry, not actual reader identity or semantic
 quality. A fifth reader is prohibited by the owner's decision.
+
+## 2026-09-28 candidate scope extension: activation, topology and uninstall
+
+Integrate the three active items `pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin`, `pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in`, and `pipeline.no-uninstall-path-for-a-repository-that-once-opted-in` in the next local candidate alongside all existing slices. Git conventions/publication rules are opted-in-only by explicit PO decision. Outside enrollment retain only destructive Git protection and the initial hint; persistent refusal suppresses the hint.
+
+Add five implementation boundaries: central activation/enrollment/decline; all-hook early consumers and destructive/process split; observed Agy topology plus source-owned convergent refresh; journaled ownership-derived content-preserving uninstall; cross-runner qualification/registration. Freeze activation APIs first, then parallelize hook consumers, Agy observer and uninstall over disjoint files. Agy productive topology depends on isolated CLI precedence facts. One integrator merges shared kernel/harness/docs surfaces, preserving all prior0.7 registrations.
+
+Never treat retained AGENTS/architecture/specs as activation. Uninstall keeps them, removes only mechanics with proven ownership, writes durable decline before private-state retirement, and checks live executable references rather than all textual mentions. Shared worktrees and foreign keys/hooks require explicit safe classification. New enrollment cannot inherit historical plan approval.
+
+The detailed slice table, acceptance matrix, engineering questions and architecture alignment are in [the tracked additional-scope design](greenfield-0.7-additional-scope-2026-09-28.md). Scratch remains temporary preparation and is not a normative release dependency.

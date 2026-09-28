@@ -52,3 +52,11 @@ findings and final local-candidate qualification. Do not install or push.
 Preserve existing consumer work and historical evidence. The reported Windows
 Claude session was resumed; its lack of architecture-adoption prompt is not yet
 a confirmed fresh-session defect. The PO is testing greenfield separately.
+
+## Additional PO candidate direction, 2026-09-28
+
+This is a later distilled input addendum; preserve the original design-workflow input and its historical receipts.
+
+The next local candidate must also include the imported Agy snapshot/source-topology item, the hooks-without-opt-in item, and a sanctioned uninstall that preserves project content. Use one central explicit activation contract and durable refusal. Git conventions apply only to Pipeline repositories. Outside opted-in scope only destructive Git protection and the initial opt-in hint may act; a persistent `no` suppresses the hint. Global plugin installation and retained documentation must not automatically activate a repository.
+
+Unregister mechanics while preserving all work, entry/architecture documents, design packages and history. Keep foreign configuration/hooks, remove only owned bindings, and leave Git and project workflows working. Distinguish Agy observed physical facts from unverified managed/import/global/workspace precedence; verify that behavior without mutating the operator's real global configuration. Retain all prior0.7 scope and parallelize only disjoint file ownership.

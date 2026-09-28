@@ -1,0 +1,50 @@
+{
+  "candidate": {
+    "commit": "f038d96e2a5629da11a9b58fe4ceb304efb69219",
+    "tree": "2db7f0cb9d2a3eaf25df39eb19cb9af3ab4f16d2"
+  },
+  "dispatchId": "alfred-greenfield-readiness-f038d96e-20260928d",
+  "findings": [],
+  "hostExecution": {
+    "dutyReceiptSha256": "0b4c6513927b75104d6fe5c16122f949da92f09337f1c3e69ca477719b64c6a4",
+    "executionReceiptSha256": "bc327997f3500eac1930a23e5171ebaa1a1dc1445421f051195212b0ae8edd7d",
+    "repoFingerprint": "468021d018a706c26049c829295f12234b1421955f902b925cb7d7496c4806bc",
+    "route": {
+      "candidateCommit": "f038d96e2a5629da11a9b58fe4ceb304efb69219",
+      "effort": "high",
+      "model": "gpt-6-luna",
+      "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16"
+    },
+    "runner": "codex",
+    "schema": "pipeline.design-readiness-host-execution.v1",
+    "selectionId": "drh_b23490f4fa0e7c1005f43c143a810285",
+    "selectionSha256": "69ad1d8bd18d2af863498e2c2f0cfd72589c62af39590fc8a76e7b990054bba2"
+  },
+  "outcome": "ready-for-po-review",
+  "runner": "codex",
+  "schema": "pipeline.design-readiness-receipt.v1",
+  "sources": {
+    "design": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md",
+      "sha256": "0531daaef25ba07d4bee15f0de7a61146daa8ff6fa8ad03895550a601727ebdf"
+    },
+    "input": {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow-input.md",
+      "sha256": "c0f43c9bfb202296a8a0b811eb1b4332d6db149b42edf9356e4c349a0aa72b13"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "2d4bb65afc5a8073eb6c475542cb2703e2976d6108970a015b10cf0c17287b68"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "fc25a5cc9184505120c0afa972b7942d7807d18c6dadc733286b5f718568f55d"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-traceability-2026-09-27.md",
+      "sha256": "19fdde9dbf002d4325c012d8106cf2ab99cd2080da34fb8363960f40610fda57"
+    }
+  },
+  "summary": "The five sources consistently preserve the original workflow, define acceptance and authority boundaries, and disclose remaining work. The supplied current-candidate Advisor observation supports the documented no-child unavailable path; the Advisor-only exception remains a final PO decision. Readiness does not grant that exception or approve implementation.",
+  "unresolvedChoices": []
+}

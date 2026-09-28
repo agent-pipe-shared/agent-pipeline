@@ -1,0 +1,56 @@
+{
+  "schema": "pipeline.design-workflow-package.v1",
+  "featureId": "sprint-alfred-epic",
+  "authoringDispatchId": "alfred-design-package-author-20260927a",
+  "candidate": {
+    "commit": "f038d96e2a5629da11a9b58fe4ceb304efb69219",
+    "tree": "2db7f0cb9d2a3eaf25df39eb19cb9af3ab4f16d2"
+  },
+  "sources": {
+    "input": {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow-input.md",
+      "sha256": "c0f43c9bfb202296a8a0b811eb1b4332d6db149b42edf9356e4c349a0aa72b13"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "2d4bb65afc5a8073eb6c475542cb2703e2976d6108970a015b10cf0c17287b68"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "fc25a5cc9184505120c0afa972b7942d7807d18c6dadc733286b5f718568f55d"
+    },
+    "design": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md",
+      "sha256": "0531daaef25ba07d4bee15f0de7a61146daa8ff6fa8ad03895550a601727ebdf"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-traceability-2026-09-27.md",
+      "sha256": "19fdde9dbf002d4325c012d8106cf2ab99cd2080da34fb8363960f40610fda57"
+    }
+  },
+  "advisor": {
+    "status": "unavailable",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "receipt": {
+      "path": "specs/sprint-alfred-epic/evidence/design-advisor-b2e4485bd7ea4dafab6b53ca3792b38736424c86dc80e645963157ab1009d852.receipt.json",
+      "sha256": "be3f3bb46275cc0acebbabdfa16baea83220c2684c2aeba550f3958b357d8ced"
+    },
+    "attemptTrail": {
+      "path": "specs/sprint-alfred-epic/evidence/design-advisor-b2e4485bd7ea4dafab6b53ca3792b38736424c86dc80e645963157ab1009d852.route-selection.json",
+      "sha256": "73335f178c3a2a25ae2442c13d2f4a63bd40fde598c1b69d308490b9e0398c80"
+    },
+    "disposition": null,
+    "exception": {
+      "status": "proposed",
+      "failureCode": "route-unavailable",
+      "rationale": "The ordinary Codex Advisor host callback is unavailable; no child or model call occurred. Request a package-bound Advisor exception while retaining independent readiness."
+    }
+  },
+  "readiness": {
+    "path": "specs/sprint-alfred-epic/evidence/design-readiness-f038d96e-20260928d.json",
+    "sha256": "926bf9396d3976f42dddb215c7649a9651f0290c42cf6ab3dbfbd8a1c1f6a491",
+    "dispatchId": "alfred-greenfield-readiness-f038d96e-20260928d"
+  },
+  "createdAt": "2026-09-28T18:01:54.135Z"
+}

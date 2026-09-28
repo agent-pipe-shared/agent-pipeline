@@ -1,0 +1,242 @@
+{
+  "schema": "pipeline.backlog.targeted-diagnostic.v1",
+  "evidenceClass": "sanitized-diagnostic-copy",
+  "observedDate": "2026-09-28",
+  "candidate": {
+    "status": 0,
+    "signal": null,
+    "error": null,
+    "stdout": "f038d96e2a5629da11a9b58fe4ceb304efb69219\n2db7f0cb9d2a3eaf25df39eb19cb9af3ab4f16d2\n",
+    "stderr": ""
+  },
+  "provenance": {
+    "hook": {
+      "rawSha256": "fcd75b9641d8d8a4437ac36b23cf951ea34e65f32e14a5f688d7ef36276f0bbf",
+      "terminal": "b0fbe9",
+      "exit": 0
+    },
+    "git": {
+      "rawSha256": "53ae2befb0f20fc2ad889e61fde4c2eeaf7ca8332afcc2059564fa4350f9cdb7",
+      "terminal": "d76c16",
+      "exit": 0
+    },
+    "transformation": "Replace local repository/home prefixes with disclosed placeholders; omit transient namespace paths and unrelated reset plan content."
+  },
+  "hookCases": [
+    {
+      "id": "F1",
+      "hook": "<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "hookSha256": "e5629b80a205ff3b02818855eb7c9a145ff9e8f7ba1071e953225308c59af9e8",
+      "exit": 2,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-ONBOARDING-CONSENT-REQUIRED: Ask the user, then run this consent-record action with the observed answer:\nnode \"<repo>/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs\" record --root \"<repo>/scratch/ungoverned-uninstall-intake-20260928/namespace-F1-5XC9jM\" --session-id \"fixture-session\" --answer yes\n(or to record refusal: node \"<repo>/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs\" record --root \"<repo>/scratch/ungoverned-uninstall-intake-20260928/namespace-F1-5XC9jM\" --session-id \"fixture-session\" --answer no)\nAfter recording yes or no, retry the identical write action.\n",
+      "changes": []
+    },
+    {
+      "id": "F3",
+      "hook": "<repo>/plugins/pipeline-core/hooks/setup-check.mjs",
+      "hookSha256": "0b1fd5119a93d579dc0e64d6590c5971314b7286e209e2d258cf4e0fcda7b7c8",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "{\"systemMessage\":\"Setup observation (point-in-time, not a gate): project personalization has not run yet.\\n- pipeline.user.yaml is still missing (fresh clone).\\n- Resolved by:\\n  - `node setup.mjs` (see SETUP.md) — writes pipeline.user.yaml, then compiles the runtime configs (.claude/settings.json, pipeline.json, pipeline.yaml).\\n  - the onboarding authority-seed step — writes pipeline.user.yaml itself during a greenfield run, often seconds after this message.\\n- Scope: this hook looks only at pipeline.user.yaml, at this moment. It is not the pipeline-start readiness verdict — `pipeline-start-preflight` answers a different question (plugin distribution identity) and can correctly report `ready` while personalization has not run.\",\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"Setup observation (point-in-time, not a gate): project personalization has not run yet.\\n- pipeline.user.yaml is still missing (fresh clone).\\n- Resolved by:\\n  - `node setup.mjs` (see SETUP.md) — writes pipeline.user.yaml, then compiles the runtime configs (.claude/settings.json, pipeline.json, pipeline.yaml).\\n  - the onboarding authority-seed step — writes pipeline.user.yaml itself during a greenfield run, often seconds after this message.\\n- Scope: this hook looks only at pipeline.user.yaml, at this moment. It is not the pipeline-start readiness verdict — `pipeline-start-preflight` answers a different question (plugin distribution identity) and can correctly report `ready` while personalization has not run.\"}}\n",
+      "stderr": "",
+      "changes": []
+    },
+    {
+      "id": "F6",
+      "hook": "<repo>/plugins/pipeline-core/hooks/guard-dispatch.mjs",
+      "hookSha256": "3bf4a3e132214cc8eb9079322f101ce26c25fd935c65b9b6f5aca607846cdabb",
+      "exit": 2,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": "BLOCKED (guard-dispatch, plugin pipeline-core): this critic dispatch failed before launch against templates/prompts/critic-review.md.\n{\"schema\":\"pipeline.role-dispatch-preflight.v1\",\"status\":\"rejected\",\"phase\":\"packet\",\"findings\":[\"DISPATCH-NO-RULESET-SHA\",\"DISPATCH-NO-MODEL\"],\"modelCalls\":0}\n\n  1. DISPATCH-NO-RULESET-SHA\n     the task frame requires a ruleset SHA; without one the Critic cannot state which ruleset it measured against and will emit NOT-PROVIDED-BY-DISPATCH\n  2. DISPATCH-NO-MODEL\n     every dispatch names its model explicitly (MP-05); subagents otherwise inherit the session's silently\n\nCorrect the packet using templates/prompts/critic-review.md and dispatch that. The template already forbids\nevery pattern listed above, in those words. A review steered by the dispatcher's own\nhypotheses is not an independent review, and an incomplete briefing is not dispatchable.\n\nThis check is structural. It cannot see a steer written in fresh prose — read the template.\n",
+      "changes": []
+    },
+    {
+      "id": "F7",
+      "hook": "<repo>/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+      "hookSha256": "e60390484b81a43af6d25a15149b2feabfb91f3448fc82202843041c1405854f",
+      "exit": 2,
+      "signal": null,
+      "error": null,
+      "stdout": "{\"decision\":\"deny\",\"reason\":\"BLOCKED (Hardening Layer): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.\"}\n",
+      "stderr": "BLOCKED: BLOCKED (Hardening Layer): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.\n",
+      "changes": []
+    },
+    {
+      "id": "F8",
+      "hook": "<repo>/plugins/pipeline-core/hooks/guard-git.mjs",
+      "hookSha256": "6f15d01cd3e863edf01f4d4eef946f4fd63a38bf0897a7cde9f75cf94769b9c5",
+      "exit": 2,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": "BLOCKED (git-guard GIT-03, plugin pipeline-core): this commit message carries no exact `AI-Assisted: true` entry in the final Git trailer block and no `Dispatch:` entry in the final Git trailer block.\nCodes: GIT-03-MARKER-MISSING, GIT-03-DISPATCH-MISSING. Inspected: -m.\nguardrails/git.md GIT-03: the anonymous `AI-Assisted: true` marker is the COMPLETE assistance signal.\nProvider or model co-author trailers, session URLs or IDs, and account identifiers turn public history into a correlation index, and public history cannot be unpublished.\nThere is no override for this rule. Rewrite the message.\n",
+      "changes": []
+    },
+    {
+      "id": "F9",
+      "hook": "<repo>/plugins/pipeline-core/hooks/guard-push.mjs",
+      "hookSha256": "62562d6d56211817000f89c9794b662d099ae153e9589c1bd850a3df5cade179",
+      "exit": 2,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": "BLOCKED (guard-push publication boundary): raw Bash/Git cannot publish refs/heads/main.\nOnly the plugin-owned fixed publication executor may consume exact-candidate main authority; GG-03 and Human Guard Override do not widen it.\nThe one exception is a push the human attested for this exact commit, tree, remote and ref (ADR-0056 §6); no such proof verified here (PUSH-PROOF-DESTINATION-UNRESOLVED).\nThis push's destination ref could not be resolved from the colon-less form, so it was never checked against an attestation at all. Use the fully-qualified refspec instead: git push origin main:refs/heads/main.\n",
+      "changes": []
+    },
+    {
+      "id": "F10",
+      "hook": "<repo>/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "hookSha256": "1997adb4e9b585cf8b6f1914a735a9b98e13fba9e8f5adac3b1d3b186e937861",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": "",
+      "changes": [
+        ".git/agent-pipeline/dispatch-budget/orchestrator-seen/unknown-session.json"
+      ]
+    }
+  ],
+  "reset": {
+    "installs": [
+      {
+        "name": "pre-push",
+        "status": "installed"
+      },
+      {
+        "name": "pre-commit",
+        "status": "installed"
+      },
+      {
+        "name": "commit-msg",
+        "status": "installed"
+      }
+    ],
+    "resultStatus": "applied",
+    "missingImpls": [
+      {
+        "name": "pre-push",
+        "shimStillPresent": true,
+        "execution": {
+          "status": 1,
+          "signal": null,
+          "error": null,
+          "stdout": "",
+          "stderr": "node:internal/modules/cjs/loader:1479\n  throw err;\n  ^\n\nError: Cannot find module '<repo>/scratch/ungoverned-uninstall-intake-20260928/reset-Hfg6c9/.git/agent-pipeline/pre-push-hook/impl.mjs'\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1476:15)\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)\n    at Module._load (node:internal/modules/cjs/loader:1262:25)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v24.15.0\n"
+        },
+        "removalStatus": "nothing-to-remove"
+      },
+      {
+        "name": "pre-commit",
+        "shimStillPresent": true,
+        "execution": {
+          "status": 1,
+          "signal": null,
+          "error": null,
+          "stdout": "",
+          "stderr": "node:internal/modules/cjs/loader:1479\n  throw err;\n  ^\n\nError: Cannot find module '<repo>/scratch/ungoverned-uninstall-intake-20260928/reset-Hfg6c9/.git/agent-pipeline/pre-commit-hook/impl.mjs'\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1476:15)\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)\n    at Module._load (node:internal/modules/cjs/loader:1262:25)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v24.15.0\n"
+        },
+        "removalStatus": "nothing-to-remove"
+      },
+      {
+        "name": "commit-msg",
+        "shimStillPresent": true,
+        "execution": {
+          "status": 1,
+          "signal": null,
+          "error": null,
+          "stdout": "",
+          "stderr": "node:internal/modules/cjs/loader:1479\n  throw err;\n  ^\n\nError: Cannot find module '<repo>/scratch/ungoverned-uninstall-intake-20260928/reset-Hfg6c9/.git/agent-pipeline/commit-msg-hook/impl.mjs'\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1476:15)\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)\n    at Module._load (node:internal/modules/cjs/loader:1262:25)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v24.15.0\n"
+        },
+        "removalStatus": "foreign-hook-present"
+      }
+    ],
+    "actualCommitAfterReset": {
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": "node:internal/modules/cjs/loader:1479\n  throw err;\n  ^\n\nError: Cannot find module '<repo>/scratch/ungoverned-uninstall-intake-20260928/reset-Hfg6c9/.git/agent-pipeline/pre-commit-hook/impl.mjs'\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1476:15)\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)\n    at Module._load (node:internal/modules/cjs/loader:1262:25)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v24.15.0\n"
+    }
+  },
+  "versionPath": {
+    "installStatus": "installed",
+    "beforeDeletion": {
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    "afterDeletion": {
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": "BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.\n  - the installed commit-message policy could not be loaded (Error); policy evaluation cannot continue.\nHuman operators retain Git's hook-bypass mechanism. Automated agents must not use it.\n"
+    },
+    "removalStatus": "removed"
+  },
+  "sourceBindings": [
+    {
+      "path": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+      "sha256": "ea9262517f2da0c55daa9dd32ab57e817cbf0905e0c1fa1aa65b512b2b91a059"
+    },
+    {
+      "path": "backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+      "sha256": "6893933f4aa623fb97df6d644a31a3b9b41940b48c8287c0394225d859fa64e3"
+    },
+    {
+      "path": "backlog/evidence/2026-09-28-ungoverned-hook-probe.mjs",
+      "sha256": "28a7402a7982865d65876a52970d8e31a1764b89c72d984306c175225f172711"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/project-reset.mjs",
+      "sha256": "539cdd0a2dae482f284bffd411c244ea5f7a91d2e16b401d8f93a5d2aaeaac13"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+      "sha256": "6719315f956aac5f67968175060d67a68b2ea5a5ea7581a6561782bcab328706"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sha256": "e4cc58102d139f5e167184dfe50ac1e6325e5c3a3ad21cd9fd2daf55bf37c319"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs",
+      "sha256": "cd858b894dce8bc6985b817f6aaef564ef291ea864b5a7209395ae72d7e07a33"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "sha256": "e1a67026eb36e4d5ec52d6db8e04e568a799496dab93bb17a7e4c13448bafe48"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/codex-hooks.json",
+      "sha256": "dcc23075e81a254603c9b7ab96bc6e2bc046830532b1cc0535934e6af67aa010"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks.json",
+      "sha256": "3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96"
+    }
+  ],
+  "limits": {
+    "liveRunners": false,
+    "approximateHookPayloads": true,
+    "noPushExecuted": true,
+    "fixtureGitOnly": true,
+    "realGlobalSettingsReadOrWrite": false,
+    "HOMEReassigned": false,
+    "modelCalls": 0,
+    "sourceWrites": false,
+    "stateWritesOutsideOwnedFixtures": false,
+    "nativeRunnerHookDeliveryVerified": false,
+    "actualGlobalPluginPruningVerified": false,
+    "noFull334Rerun": true
+  }
+}

@@ -1030,3 +1030,15 @@ Claude and Antigravity and does not infer it from source HEAD. The 0.7 release
 preflight checks all open greenfield blocker, security, quality and efficiency
 items against their own acceptance evidence. Unresolved impact remains visible
 to the PO; no install or publication occurs as a side effect of source checks.
+
+## 18. Repository activation, source topology and uninstall contract
+
+Freeze a shared bounded read-only activation observer and sanctioned writer before hook migration. Closed metadata binds physical scope, state, enrollment/decline provenance and source observations. `active` requires validated enrollment, never an arbitrary marker union. Durable decline overrides retained authority/documents and survives private-state removal; absent enrollment has no Pipeline side effects. Malformed proven-active authority stays governed and fails through typed recovery rather than becoming an ungoverned bypass. Git common/worktree and non-Git decline semantics are explicit and tested.
+
+Every hook and nested Pipeline effect producer checks activation before role/input/lifecycle enforcement, telemetry or bootstrap. Inactive/declined ordinary operations exit silently without files or HOME/private stores. Always-on destructive Git protection is separated from active-only GIT-03/publication conventions. Its foreign-repository denials do not initialize Pipeline HGO state. Wiring-enumerated tests cover all three runners, declined restart, retained documents, unsupported roots and active positive controls.
+
+A shared Antigravity topology observer reports bounded physical managed/imported/global/workspace and external Pipeline hook identities with explicit errors. Source fixtures, isolated CLI precedence facts and live executed-source readback are separate assurance classes. A host-owned convergent refresh binds a concrete approved-source/topology plan and preserves unrelated configuration. No global cleanup follows implicitly from a per-project operation.
+
+Uninstall derives ownership/footprint independently from existing authority/projection/hook records and uses a digest-bound resumable journal. Remove owned Git shims before implementation/private state; strip exact owned keys; unregister exact workspace mechanics; persist decline; archive/remove admissible private state last. Foreign/modified/shared-worktree artifacts are preserved or yield explicit conflict. Readback checks executable bindings rather than banning textual plugin references in retained content. Kept digests, local hook-active Git commit/push, fault-boundary resume, re-onboarding and stale-cache-hook fixtures are required.
+
+The implementation sequence and exclusive file ownership are defined in the associated activation/topology/uninstall design addendum. Schema mirrors, static closure and registered probes join the full existing 0.7 candidate checks. Source test success does not qualify an installed runner.

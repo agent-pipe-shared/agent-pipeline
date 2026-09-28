@@ -39,6 +39,14 @@ approval state and the PO's first-hand observation.
 
 ## Triage
 
-- **Decision:** pending
-- **Assignment:** Alfred candidate acceptance
-- **Date:** 2026-09-27
+- **Decision:** Supersession authorized by the PO on 2026-09-28, by
+  [pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin](2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md).
+- **Rationale:** The successor retains this historical evidence classification
+  and version-correct acceptance requirement, and adds the independently observed
+  managed-copy/registry topology and diagnostic/refresh gaps. This is deduplication,
+  not a fixed claim; the old run remains unsuitable as 0.7 acceptance.
+- **Assignment:** Successor item; no separate active acceptance task here.
+  The status transition to `closed` follows the committed successor evidence
+  and receives its exact closure metadata before ledger reconciliation. The
+  temporary `open` status is not a separate delivery assignment.
+- **Date:** 2026-09-28

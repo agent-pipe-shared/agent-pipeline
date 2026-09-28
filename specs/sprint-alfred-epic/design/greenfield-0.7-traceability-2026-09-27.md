@@ -82,3 +82,20 @@ The slice letters refer to the table in the design addendum.
 No reported symptom is accepted solely because a report asserts it. Each
 source fix needs its own test or readback; the source commit and installed
 plugin version must be recorded separately in final release evidence.
+
+## Additional local-candidate scope, 2026-09-28
+
+| Input/item | Normative location | Acceptance |
+| --- | --- | --- |
+| Central opt-in; Git conventions only in Pipeline repos; persisted no suppresses hint | PRD§12/Spec§18 and activation/uninstall design scope | Same activation observation across three runners; inactive/declined wiring probe has no ordinary effects; destructive protections remain; active positive controls; retained AGENTS/maps do not activate. |
+| `pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin` | Topology observer/convergent refresh slice | Existing physical duplicate facts retained; isolated S1–S6 CLI facts; fixture source conflicts; actual executed root/content/version readback and convergent approved refresh. No stale-version report promoted. |
+| `pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in` | Activation/hook slices | Wiring-enumerated fixture matrix including declined restart/non-Git, no working-tree/private/HOME footprint, foreign Critic/inline/tool ordinary operations, active controls and separate destructive union. |
+| `pipeline.no-uninstall-path-for-a-repository-that-once-opted-in` | Content-preserving unregister slice | Exact ownership-derived plan; owned shim removal before private implementation; kept digests and foreign/shared-worktree preservation; interruption resume; durable decline; hook-active local Git and later additive enrollment. |
+
+All three remain open until their own actual acceptance and canonical backlog reconciliation. This addendum records requirements and planned checks, not source implementation or installed-host acceptance. The original five-source workflow and single final approval contract remain truthful; changed source bindings are handled by the parent through the sanctioned authority route.
+
+The existing approval/lifecycle repair slice also owns the newly confirmed
+`design-workflow-signing-request-schema-drift` and
+`historical-plan-cancellation-blocks-current-withdrawal` items: canonical closed
+request signing with one confirmation, and successive cancellation/replay with
+validated history retention. Both remain open until their real acceptance.

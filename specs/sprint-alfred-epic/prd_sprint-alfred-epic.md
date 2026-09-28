@@ -723,3 +723,13 @@ evidence bind one frozen source commit. Source tests alone cannot attest which
 plugin version a runner has installed.
 
 <!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
+
+## 12. Explicit repository activation and preserved-content exit
+
+The next local 0.7 candidate includes the three 2026-09-28 source items for imported Antigravity snapshot topology, Pipeline hook effects without opt-in, and absence of a content-preserving uninstall. This extends candidate scope without replacing the existing Greenfield acceptance or design-workflow requirements.
+
+Pipeline behavior requires explicit repository enrollment observed through one shared activation contract. Global plugin loading and retained entry/architecture documents do not establish enrollment. Outside opted-in repositories, only destructive Git protection and the initial opt-in hint may act; persistent decline suppresses that hint. Pipeline Git conventions, publication policy, lifecycle guards, telemetry and state writes are inactive outside that scope. Active projects retain their strict authority checks.
+
+Antigravity installation and refresh diagnose managed/imported, global and workspace sources independently of the loaded copy. Unknown precedence needs isolated actual CLI and fresh loaded-source evidence; registry-only or version-label agreement is insufficient. Refresh preserves unrelated configuration and has one derived effective source per explicitly selected scope.
+
+A sanctioned repository uninstall unregisters mechanics and preserves all source, docs, AGENTS/architecture, packages, ADRs, backlog, evidence, handovers and Git history by default. It removes only proven owned bindings/keys/hooks, keeps foreign or modified artifacts, persists decline outside removed private state, survives interruption, and leaves ordinary Git and project workflows usable. Re-enrollment is explicit and preserves retained work. Global plugin lifecycle remains a separate action.

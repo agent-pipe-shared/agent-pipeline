@@ -1,0 +1,183 @@
+{
+  "schema": "pipeline.backlog.agy-imported-snapshot-readonly.v1",
+  "observedAt": "2026-09-28T18:23:17.285Z",
+  "registry": {
+    "path": "/home/skar667/.gemini/config/plugins.json",
+    "present": true,
+    "sha256": "c5b548994449e1a9d431776b7d015d7233869eb1c28baa36f9cbac261f02e666",
+    "bytes": 120,
+    "mtime": "2026-09-27T18:40:40.005Z",
+    "projection": {
+      "pipelineEntries": [
+        {
+          "path": "/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core"
+        }
+      ]
+    }
+  },
+  "imported": {
+    "path": "/home/skar667/.gemini/config/import_manifest.json",
+    "present": true,
+    "sha256": "2cb885fb1961720417da749c6bbac4ddeb372fabcfc162a842dd1f51a300cb1d",
+    "bytes": 228,
+    "mtime": "2026-09-15T20:18:50.588Z",
+    "projection": {
+      "pipelineEntries": [
+        {
+          "name": "agent-pipeline-core",
+          "source": "antigravity",
+          "importedAt": "2026-09-15T20:18:50Z",
+          "components": [
+            "skills",
+            "agents",
+            "hooks"
+          ]
+        }
+      ]
+    }
+  },
+  "manifests": [
+    {
+      "path": "/home/skar667/.gemini/config/plugins/agent-pipeline-core/plugin.json",
+      "present": true,
+      "sha256": "3850fede7d3431c98aa1f233637aaf056be31be1afe5b78171dcae52e61c86ae",
+      "bytes": 191,
+      "mtime": "2026-09-15T20:18:50.460Z",
+      "projection": {
+        "name": "agent-pipeline-core",
+        "version": "0.6.2+antigravity.20260913103423.c1e799c"
+      }
+    },
+    {
+      "path": "/home/skar667/.gemini/config/plugins/agent-pipeline-core/.claude-plugin/plugin.json",
+      "present": true,
+      "sha256": "fcb5740da9af65e04658ea9976c6d3fde48460d7eac6578eb3074a0bf3a03443",
+      "bytes": 400,
+      "mtime": "2026-09-15T20:18:50.350Z",
+      "projection": {
+        "name": "pipeline-core",
+        "version": "0.6.2+claude.20260913103423.c1e799c"
+      }
+    },
+    {
+      "path": "/home/skar667/.gemini/config/plugins/agent-pipeline-core/.codex-plugin/plugin.json",
+      "present": true,
+      "sha256": "712b4ae85458c39d7bc6fa39e321ec9d2db20b4b5c748e9d7e9f0d1e4c694f0b",
+      "bytes": 816,
+      "mtime": "2026-09-15T20:18:50.351Z",
+      "projection": {
+        "name": "pipeline-core",
+        "version": "0.6.2+codex.20260913103423.c1e799c"
+      }
+    },
+    {
+      "path": "/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/plugin.json",
+      "present": true,
+      "sha256": "e2f88941ec8b6a64241cde23fe01c875b95a7c8c423fa667306daf699e60f795",
+      "bytes": 192,
+      "mtime": "2026-09-27T17:47:22.624Z",
+      "projection": {
+        "name": "agent-pipeline-core",
+        "version": "0.7.0+antigravity.20260927174722.15c963ef"
+      }
+    },
+    {
+      "path": "/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/.claude-plugin/plugin.json",
+      "present": true,
+      "sha256": "b1b9b8a91e61d20e058ea2b3929d74722a0e93553210d806c702637038bd17d1",
+      "bytes": 401,
+      "mtime": "2026-09-27T17:47:22.624Z",
+      "projection": {
+        "name": "pipeline-core",
+        "version": "0.7.0+claude.20260927174722.15c963ef"
+      }
+    },
+    {
+      "path": "/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/.codex-plugin/plugin.json",
+      "present": true,
+      "sha256": "c780f14bef916caf5a6fe2bd4e59307f9e223512dba2ef6e54bc5de2d2e6c1fe",
+      "bytes": 817,
+      "mtime": "2026-09-27T17:47:22.624Z",
+      "projection": {
+        "name": "pipeline-core",
+        "version": "0.7.0+codex.20260927174722.15c963ef"
+      }
+    }
+  ],
+  "hooks": [
+    {
+      "path": "/home/skar667/.gemini/config/hooks.json",
+      "present": true,
+      "sha256": "9977826576d4d4eef6d905d7274865ac063ad797ae2c94f11ceda63dab6f690b",
+      "bytes": 685,
+      "mtime": "2026-09-27T18:42:31.401Z",
+      "projection": {
+        "pipelineCommands": [
+          "node /home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "node /home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/antigravity-start-hint.mjs"
+        ]
+      }
+    },
+    {
+      "path": "/home/skar667/.gemini/config/plugins/agent-pipeline-core/hooks.json",
+      "present": true,
+      "sha256": "3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96",
+      "bytes": 943,
+      "mtime": "2026-09-15T20:18:50.381Z",
+      "projection": {
+        "pipelineCommands": [
+          "node hooks/antigravity-slicing-hint.mjs observe",
+          "node hooks/antigravity-pretool-guard.mjs",
+          "node hooks/antigravity-stop-hook.mjs",
+          "node hooks/antigravity-slicing-hint.mjs deliver",
+          "node hooks/antigravity-start-hint.mjs"
+        ]
+      }
+    },
+    {
+      "path": "/home/skar667/.gemini/config/plugins/agent-pipeline-core/hooks/hooks.json",
+      "present": true,
+      "sha256": "0a64e116d51db1372862e910a78cdbe49cb084a4875924e87682bea5b7896b1e",
+      "bytes": 15057,
+      "mtime": "2026-09-15T20:18:50.379Z",
+      "projection": {
+        "pipelineCommands": []
+      }
+    }
+  ],
+  "fixtureRegistry": {
+    "path": "/home/skar667/src/Rune_Test1_agy_70_113/.agents/plugins.json",
+    "present": false
+  },
+  "locks": [
+    {
+      "path": "/home/skar667/src/Rune_Test1_agy_70_113/.git/agent-pipeline/run/session-47742919-7794-4b81-9338-a1bb3d7dad58/requires-bootstrap.lock",
+      "present": true,
+      "sha256": "2c269356176b70d7d944d53b828c8e09891f75f299d07249da5cc8783c7c665e",
+      "bytes": 69,
+      "mtime": "2026-09-27T19:27:27.928Z",
+      "projection": {
+        "locked": true,
+        "version": "0.6.2+antigravity.20260913103423.c1e799c"
+      }
+    },
+    {
+      "path": "/home/skar667/src/Rune_Test1_agy_70_113/.git/agent-pipeline/run/session-dummy/requires-bootstrap.lock",
+      "present": true,
+      "sha256": "65f0a18098dab291a8c97693fdf9526e2479b86a8e55ea53fe29e4b8b0f577fa",
+      "bytes": 59,
+      "mtime": "2026-09-27T18:43:03.346Z",
+      "projection": {
+        "locked": null,
+        "version": "0.7.0+antigravity.20260927174722.15c963ef"
+      }
+    }
+  ],
+  "limits": {
+    "mutations": false,
+    "liveRunnerExecution": false,
+    "precedenceProven": false,
+    "historicalSessionCoverage": false,
+    "crossRunnerSettingsInspected": false
+  }
+}
