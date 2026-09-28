@@ -64,16 +64,27 @@ The prepared Codex-only first-intake condition returns existing explicit
 consent/capture actions before fresh runtime/restart actions. Recorded consent
 is reused. Runtime plan digests bind verified checkpoint and ordered material
 identities; a last reobservation refuses changes before barrier publication.
-Corrupt or unavailable evidence withholds the action. Five proposed registered
+Corrupt or unavailable evidence withholds the action. Seven proposed registered
 tests pass, plus two Codex marker coordinator fixtures using the corrected
 ordering. No resume-hint call that invents affirmative consent was added.
 
 Evidence and hashes: `scratch/first-restart-intake-preparation-evidence.json`.
 The exact behavior and limits are in
 `scratch/first-restart-intake-integration-contract.md`. Legacy fixture alignment
-is being prepared separately; full corpus, coherent skill/operating-model
-wording, productive integration and actual native Codex restart remain pending.
+has a prepared patch; all 180 project-onboarding cases pass in four shards with
+selected proposed modules. Unselected dependencies and subprocesses remain
+canonical. Full canonical Verify, coherent skill/operating-model wording,
+productive integration and actual native Codex restart remain pending.
 The API cannot prove chat-turn identity from an arbitrary existing chunk, and
 its final recheck is not an atomic transaction with every intake writer. The
 real acceptance test must compare the externally known original request digest
 before and after restart. This item remains open; no new signature was requested.
+
+The fixture review exposed a second path in the proposed correction: the
+historical manual kickoff planner admitted the generic `intake-required`
+observation and could mint continuity before first capture. A targeted fixture
+failed on the exact returned kickoff schema, then passed after the prepared
+plan/apply entry points both withheld the nested `capture-required` condition.
+The seven-case result includes this planner/direct-apply refusal and the actual
+readiness gate's closed observation-envelope validation. This is preparation
+evidence, not a claim that the productive source has been corrected.
