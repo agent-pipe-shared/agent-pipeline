@@ -204,8 +204,17 @@ function compactStdout(input, projectDir) {
     ? authority.state
     : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
   const state = loadStateSafe(join(rootDir, statePath));
-  const { stdout } = decideOutput(input, state, { rootDir });
-  return stdout || null;
+  const { payload } = decideOutput(input, state, { rootDir });
+  if (!payload) return null;
+  // Codex rejects unknown SessionStart wire fields. Keep budget diagnostics in
+  // the local reground result and project only supported context fields here.
+  return JSON.stringify({
+    systemMessage: payload.systemMessage,
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: payload.hookSpecificOutput.additionalContext,
+    },
+  }) + "\n";
 }
 
 function readStdinInput() {
