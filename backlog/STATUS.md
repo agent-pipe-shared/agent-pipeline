@@ -141,6 +141,7 @@
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
 | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity | open | defect | pipeline | none | 2026-09-28 | — | — |
+| pipeline.codex-compact-sessionstart-json-rejects-measurement-fields | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap | closed | defect | pipeline | nova-b | 2026-09-20 | — | — |
@@ -386,6 +387,7 @@
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | closed | defect | pipeline | alfred | 2026-08-07 | 2026-08-21 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | — | 2026-08-16 | — | — |
 | pipeline.lifecycle-inspect-omits-current-plan-spec-digests | open | defect | pipeline | none | 2026-09-28 | — | — |
+| pipeline.lifecycle-read-scope-blocks-host-declared-system-skill | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
@@ -403,6 +405,7 @@
 | pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart | closed | requirement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.model-role-confirmation-prompt-obscures-required-digest | open | workflow-improvement | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.multi-cli-efficiency-pilots | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-09-08 | — |
@@ -735,7 +738,7 @@
 
 ## Counts
 
-- open: 70
+- open: 73
 - in_progress: 0
 - closed: 643
 - rejected: 3

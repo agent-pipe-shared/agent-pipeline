@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e0f28bbb8615b64871b3d6192361c202a32461c69664abf1053051ee7a2ef865"
+    "transitionHead": "ac1238ccd4ae6e763b1ee40720a236379605b19dd725555a4b099b42e02dfaa0"
   },
   "counts": {
-    "open": 70,
+    "open": 73,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -1826,6 +1826,16 @@
       "source": "Controlled ordinary Git Fresh-Start reproduction against the canonical sanctioned identity writer and prepared Codex Advisor namespace helper; source 7a2dcfe7, aggregate 563fbe7b. No operator namespace or model was accessed.",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.codex-compact-sessionstart-json-rejects-measurement-fields",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Repeated PO report after Codex Compact; strict wire-contract reproduction and committed bounded recovery in f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
@@ -5115,6 +5125,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Installed 0.7 recovery guard refused a single read of the host-declared openai-docs SKILL.md with GUARD-READ-SCOPE-OUTSIDE-ROOT while ordinary Implementation admission was valid.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",
       "status": "closed",
       "type": "defect",
@@ -5342,6 +5362,16 @@
       "closureRepository": "self",
       "closureCommit": "9ab96e01fab4a013ea9a8e8cb88fda546be2fe7f",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-vendored-package-sync-closure.md"
+    },
+    {
+      "id": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Attended PO model-role bootstrap: noninteractive Codex shell could not confirm; subsequent terminal input Confirm was rejected; exact displayed digest succeeded and installed bootstrap reused all seven receipts.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault",
