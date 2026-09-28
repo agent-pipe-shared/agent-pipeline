@@ -184,3 +184,15 @@ caller mutation refuse or preserve the admitted snapshot as specified.
 This verifier still binds v1 and does not establish sealed live host authority,
 v2 custody adoption or a timeout for a hanging store dependency. Live callers
 must await and require `result.ok === true`.
+
+Current virtual aggregate
+`cb817e20e9eff56b4c3f6dce0f307e7200b89d38c09159ccac66251d81a799db`
+now includes output custody/helper/test registration and the Journal/identity
+corrections:67 files,59 successful syntax checks, Git dry application, all
+preimages/revisions and twelve independent postimages match. Two actual managed
+Node cases on that exact graph pass after genuine sanctioned fixture identity
+mint creates shared0755. Approved/refused submit one/zero turns; both observe
+complete pipes and independently closed ownership. Source/runtime hashes remain
+stable. Evidence: `scratch/codex-custody-namespace-composition-evidence.json`.
+This does not integrate the separate ordinary store/recipe/binding or create a
+productive Advisor receipt. Formal gates and installed replay remain pending.
