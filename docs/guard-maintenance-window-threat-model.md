@@ -325,7 +325,8 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/antigravity-model-host-observation.mjs`,
   `lib/claude-model-host-observation.mjs`,
   `lib/codex-model-host-observation.mjs`,
-  `lib/design-readiness-host-evidence.mjs`, `lib/advisory-lifecycle-v2.mjs`,
+  `lib/design-readiness-host-evidence.mjs`,
+  `lib/codex-readiness-host-record.mjs`, `lib/codex-host-process-journal.mjs`, `lib/codex-host-process-launcher.mjs`, `lib/codex-host-process-exec-worker.mjs`, `lib/codex-host-process-supervisor.mjs`, `lib/codex-readiness-ownership-verifier.mjs`, `lib/codex-isolated-structured-host.mjs`, `lib/codex-tool-free-design-readiness.mjs`, `lib/design-readiness-hashes.mjs`, `scripts/codex-design-readiness-host.mjs`, `lib/codex-host-output-custody.mjs`, `lib/codex-design-readiness-host-store.mjs`, `lib/codex-readiness-finalization.mjs`, `scripts/codex-design-readiness-bootstrap.mjs`, `scripts/tool-identity.mjs`, `lib/advisory-lifecycle-v2.mjs`,
   `lib/sandboxed-readonly-duty.mjs`, `lib/codex-sandbox-compatibility.mjs`,
   `lib/design-readiness-runner-host-store.mjs`,
   `scripts/codex-sandbox-select.mjs`, and `lib/sandbox-failure.mjs`.

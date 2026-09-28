@@ -1,181 +1,64 @@
 // SPDX-License-Identifier: SUL-1.0
+/** Codex-only, host-observed tool-free readiness. Never a selected-sandbox fallback. */
+import {execFileSync} from 'node:child_process';
+import {lstatSync,realpathSync,readFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {isAbsolute,resolve,join} from 'node:path';
+import {advisoryEvidenceBundleSha256,buildAdvisoryEvidenceBundle} from '../lib/advisory-lifecycle-v2.mjs';
+import {canonicalJson} from '../lib/codex-sandbox-compatibility.mjs';
+import {resolveV3DutyRoute} from '../lib/critic-route-v3.mjs';
+import {resolvePoGateRepositoryTopology,derivePoGateRepositoryFingerprint} from '../lib/po-gate-authority.mjs';
+import {validatePipelineUserV3} from '../lib/runner-profiles-v3.mjs';
+import {parseYaml} from '../lib/yaml-lite.mjs';
+import {createCodexDesignReadinessHostStore} from '../lib/codex-design-readiness-host-store.mjs';
+import {runCodexToolFreeDesignReadiness,verifyCodexToolFreeBindingFromSources} from '../lib/codex-tool-free-design-readiness.mjs';
 
-/** Production composition for one Codex independent design-readiness duty. */
-import { lstatSync, realpathSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
-
-import { advisoryEvidenceBundleSha256, buildAdvisoryEvidenceBundle } from "../lib/advisory-lifecycle-v2.mjs";
-import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
-import { designReadinessReportSha256 } from "../lib/design-readiness-host-evidence.mjs";
-import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
-import { runSpecReadinessHost } from "./spec-readiness-host.mjs";
-import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
-import { invokeCodexReadinessAppServer } from "./codex-readiness-app-server.mjs";
-
-const SOURCE_NAMES = Object.freeze(["input", "prd", "spec", "design", "traceability"]);
-const OID = /^[a-f0-9]{40}$/;
-const SHA256 = /^[a-f0-9]{64}$/;
-const fail = (message) => { throw new Error(message); };
-function exact(value, keys) {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+const NAMES=['input','prd','spec','design','traceability'];
+const OID=/^[a-f0-9]{40}$/,SHA=/^[a-f0-9]{64}$/;
+const exact=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join('\0')===[...keys].sort().join('\0');
+const same=(left,right)=>canonicalJson(left)===canonicalJson(right);
+function unavailable(code){return {status:'unavailable',code,readinessReceipt:null,assurance:{class:'no-usable-review',literal:null}};}
+function currentCandidate(root){
+  const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',timeout:10000,maxBuffer:524288,stdio:['ignore','pipe','pipe']}).trim();
+  return {commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])};
 }
-function sameJson(left, right) { return canonicalJson(left) === canonicalJson(right); }
-
-function validateSources(sources) {
-  if (!exact(sources, SOURCE_NAMES)) fail("readiness source inventory is invalid");
-  for (const name of SOURCE_NAMES) {
-    const source = sources[name];
-    if (!exact(source, ["path", "sha256"]) || typeof source.path !== "string"
-      || source.path.length === 0 || source.path.startsWith("/") || source.path.includes("\\")
-      || source.path.includes(":") || source.path.split("/").some((part) => !part || part === "." || part === "..")
-      || !SHA256.test(source.sha256 ?? "")) fail(`readiness ${name} source is invalid`);
-  }
-  if (new Set(SOURCE_NAMES.map((name) => sources[name].path)).size !== SOURCE_NAMES.length) fail("readiness sources alias each other");
-  return Object.freeze(Object.fromEntries(SOURCE_NAMES.map((name) => [name, Object.freeze({ ...sources[name] })])));
-}
-
-function validateRoute(route, candidateCommit) {
-  if (!exact(route, ["dutyId", "runner", "model", "effort", "state", "sourceSha256", "candidateCommit"])
-    || route.dutyId !== "readiness" || route.runner !== "codex" || route.state !== "default"
-    || typeof route.model !== "string" || route.model.length === 0
-    || typeof route.effort !== "string" || route.effort.length === 0
-    || !SHA256.test(route.sourceSha256 ?? "") || route.candidateCommit !== candidateCommit) fail("V3 readiness route is unavailable");
-  return Object.freeze({ model: route.model, effort: route.effort,
-    sourceSha256: route.sourceSha256, candidateCommit: route.candidateCommit });
-}
-
-function selectedReadinessBridge({ repoRoot, dispatchId, candidate, sources, evidenceBundle, evidenceSha256, route,
-  invokeReadiness = invokeCodexReadinessAppServer } = {}) {
-  const completed = new Map();
-  const launch = async (request) => {
-    if (!exact(request, ["selectionId", "duty", "selection", "requested", "references", "profile", "scratch"])
-      || request.duty !== "readiness" || request.requested?.runner !== "codex" || request.requested?.model !== route.model
-      || !sameJson(request.references, [...SOURCE_NAMES.map((name) => sources[name].path)].sort())
-      || request.selection?.dispatch?.candidateCommit !== candidate.commit
-      || request.selection?.dispatch?.candidateTree !== candidate.tree
-      || request.selection?.dispatch?.referenceSetSha256 !== evidenceSha256
-      || request.scratch?.repoRoot !== repoRoot) fail("selected readiness launch binding drifted");
-    const sandboxTransport = {
-      selectionId: request.selectionId,
-      selectionSha256: sandboxSelectionDigest(request.selection),
-      repoFingerprint: request.selection.repoFingerprint,
-      duty: request.duty,
-      dispatch: structuredClone(request.selection.dispatch),
-      requested: structuredClone(request.requested),
-      toolchain: structuredClone(request.selection.toolchain),
-      profile: structuredClone(request.profile),
-      scratch: structuredClone(request.scratch),
-    };
-    const result = await invokeReadiness({
-      sandboxTransport,
-      dispatchId,
-      candidate,
-      sources,
-      evidenceBundle,
-      route,
-    });
-    const selected = result?.sandboxExecution;
-    const valid = result?.status === "reviewed" && result.identity?.provider === "openai"
-      && result.identity.modelId === route.model && result.identity.effort === route.effort
-      && result.report?.dispatchId === dispatchId && result.report.runner === "codex"
-      && sameJson(result.report.candidate, candidate) && sameJson(result.report.sources, sources)
-      && selected?.schema === "pipeline.codex-sandbox-host-execution.v1"
-      && selected.selectionId === sandboxTransport.selectionId
-      && selected.selectionSha256 === sandboxTransport.selectionSha256
-      && selected.repoFingerprint === sandboxTransport.repoFingerprint
-      && selected.duty === "readiness" && sameJson(selected.dispatch, sandboxTransport.dispatch)
-      && sameJson(selected.observed, { cliSha256: request.selection.toolchain.cliSha256,
-        profileSha256: request.profile.sha256, networkEnabled: true,
-        scratchRootSha256: request.profile.scratchRootSha256 })
-      && sameJson(selected.terminal, { childStarted: true, exitCode: 0, stdioStatus: "complete", cleanupStatus: "complete" });
-    if (!valid) {
-      if (result?.status === "unavailable" && result.childStarted === false) return { childStarted: false };
-      if (selected?.terminal?.childStarted === true || result?.childStarted === true) return { childStarted: true };
-      return { childStarted: undefined };
-    }
-    completed.set(request.selectionId, { result, sandboxTransport });
-    return { childStarted: true, selectionId: request.selectionId };
-  };
-  const finalize = async ({ selection, launched, requested }) => {
-    const held = completed.get(selection?.selectionId);
-    if (!held || launched?.selectionId !== selection.selectionId) fail("selected readiness result is unavailable");
-    const { result, sandboxTransport } = held;
-    if (sandboxTransport.selectionSha256 !== sandboxSelectionDigest(selection)
-      || !sameJson(sandboxTransport.dispatch, selection.dispatch)
-      || !sameJson(sandboxTransport.requested, requested)) fail("selected readiness binding drifted");
-    const execution = {
-      schema: "pipeline.codex-sandbox-execution-receipt.v1",
-      selectionId: selection.selectionId,
-      selectionSha256: sandboxSelectionDigest(selection),
-      repoFingerprint: selection.repoFingerprint,
-      duty: "readiness",
-      dispatch: structuredClone(selection.dispatch),
-      requested: structuredClone(requested),
-      observed: structuredClone(result.sandboxExecution.observed),
-      terminal: structuredClone(result.sandboxExecution.terminal),
-      assurance: structuredClone(selection.assurance),
-      dutyReceipt: { schema: "pipeline.readiness-receipt.v1",
-        sha256: designReadinessReportSha256(result.report), status: "reviewed" },
-      createdAt: new Date().toISOString(),
-    };
-    completed.set(selection.selectionId, { ...held, execution });
-    return execution;
-  };
-  return {
-    hostBridge: { launch, finalize },
-    take(selectionId) {
-      const held = completed.get(selectionId);
-      return held?.execution ? { report: structuredClone(held.result.report), route, execution: structuredClone(held.execution) } : null;
-    },
-  };
-}
-
-/**
- * Build and execute an independent Codex readiness review over exactly the
- * five immutable sources. The V3 route is read from the candidate commit;
- * source bytes are re-read physically before any provider invocation.
- */
-export async function runCodexDesignReadinessHost({ repoRoot, repoFingerprint, dispatchId, dispatch, sources,
-  sandboxRuntime }, dependencies = {}) {
-  if (typeof repoRoot !== "string" || !isAbsolute(repoRoot) || resolve(repoRoot) !== repoRoot) fail("readiness repository root is invalid");
-  const rootIdentity = lstatSync(repoRoot);
-  if (!rootIdentity.isDirectory() || rootIdentity.isSymbolicLink() || realpathSync(repoRoot) !== repoRoot) fail("readiness repository root is not a physical directory");
-  const root = realpathSync(repoRoot);
-  const checkedSources = validateSources(sources);
-  if (!SHA256.test(repoFingerprint ?? "") || typeof dispatchId !== "string"
-    || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(dispatchId)
-    || !exact(dispatch, ["queueRevision", "candidateCommit", "candidateTree", "referenceSetSha256"])
-    || !Number.isSafeInteger(dispatch.queueRevision) || dispatch.queueRevision < 0
-    || !OID.test(dispatch.candidateCommit ?? "") || !OID.test(dispatch.candidateTree ?? "")
-    || !SHA256.test(dispatch.referenceSetSha256 ?? "")) fail("readiness dispatch is invalid");
-  const candidate = { commit: dispatch.candidateCommit, tree: dispatch.candidateTree };
-  const readRoute = dependencies.resolveV3ReadinessRoute ?? resolveV3DutyRoute;
-  const route = validateRoute(readRoute({ rootDir: root, dutyId: "readiness", runner: "codex", candidateCommit: candidate.commit }), candidate.commit);
-  const references = SOURCE_NAMES.map((name) => checkedSources[name].path).sort();
-  const evidenceBundle = buildAdvisoryEvidenceBundle(root, references);
-  const evidenceSha256 = advisoryEvidenceBundleSha256(evidenceBundle);
-  if (evidenceSha256 !== dispatch.referenceSetSha256) fail("readiness evidence bundle differs from the selected dispatch");
-  if (evidenceBundle.references.some((entry) => {
-    const expected = SOURCE_NAMES.map((name) => checkedSources[name]).find((source) => source.path === entry.path);
-    return !expected || expected.sha256 !== entry.sha256;
-  })) fail("readiness source bytes differ from the package binding");
-  const bridge = selectedReadinessBridge({ repoRoot: root, dispatchId, candidate, sources: checkedSources,
-    evidenceBundle, evidenceSha256, route, invokeReadiness: dependencies.invokeCodexReadinessAppServer ?? invokeCodexReadinessAppServer });
-  const readinessDependencies = dependencies.readinessDependencies === undefined
-    ? undefined
-    : { ...dependencies.readinessDependencies, hostBridge: bridge.hostBridge };
-  return runSpecReadinessHost({
-    dispatch,
-    dispatchId,
-    sources: checkedSources,
-    references,
-    repoFingerprint,
-    requested: { runner: "codex", model: route.model },
-    sandboxRuntime,
-    hostBridge: bridge.hostBridge,
-  }, readinessDependencies === undefined ? undefined : {
-    ...readinessDependencies,
-    takeReadinessReport: bridge.take,
-  });
+export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,dispatchId,dispatch,sources,sandboxRuntime},dependencies={}){
+  let inputDirectory=null;
+  try{
+    if(typeof repoRoot!=='string'||!isAbsolute(repoRoot)||resolve(repoRoot)!==repoRoot||realpathSync(repoRoot)!==repoRoot
+      ||!lstatSync(repoRoot).isDirectory()||!SHA.test(repoFingerprint??'')||!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(dispatchId??'')
+      ||!exact(dispatch,['queueRevision','candidateCommit','candidateTree','referenceSetSha256'])
+      ||!Number.isSafeInteger(dispatch.queueRevision)||dispatch.queueRevision<0||!OID.test(dispatch.candidateCommit??'')
+      ||!OID.test(dispatch.candidateTree??'')||!SHA.test(dispatch.referenceSetSha256??'')||!exact(sources,NAMES))return unavailable('CODEX-READINESS-INPUT');
+    // Both standalone host and bootstrap enforce export denial before store creation or provider startup.
+    const config=validatePipelineUserV3(parseYaml(readFileSync(join(repoRoot,'pipeline.user.yaml'),'utf8')),{source:'pipeline.user.yaml'});
+    if(!config.ok||config.advisoryExport?.consent==='declined')return unavailable('CODEX-READINESS-EXPORT-DENIED');
+    const topology=(dependencies.resolveTopology??resolvePoGateRepositoryTopology)(repoRoot);
+    if(derivePoGateRepositoryFingerprint({gitCommonDir:topology.gitCommonDir,primaryRoot:topology.primaryRoot})!==repoFingerprint)return unavailable('CODEX-READINESS-REPOSITORY-MISMATCH');
+    const candidate={commit:dispatch.candidateCommit,tree:dispatch.candidateTree};
+    const selected=(dependencies.resolveV3ReadinessRoute??resolveV3DutyRoute)({rootDir:repoRoot,dutyId:'readiness',runner:'codex',candidateCommit:candidate.commit});
+    if(!exact(selected,['dutyId','runner','model','effort','state','sourceSha256','candidateCommit'])||selected.dutyId!=='readiness'
+      ||selected.runner!=='codex'||selected.state!=='default'||selected.candidateCommit!==candidate.commit
+      ||!SHA.test(selected.sourceSha256??'')||typeof selected.model!=='string'||!selected.model||typeof selected.effort!=='string'||!selected.effort)return unavailable('CODEX-READINESS-ROUTE-UNAVAILABLE');
+    const route=Object.fromEntries(['model','effort','sourceSha256','candidateCommit'].map(key=>[key,selected[key]]));
+    for(const name of NAMES){const source=sources[name];if(!exact(source,['path','sha256'])||typeof source.path!=='string'||!SHA.test(source.sha256??''))return unavailable('CODEX-READINESS-SOURCES');}
+    const bundle=buildAdvisoryEvidenceBundle(repoRoot,NAMES.map(name=>sources[name].path).sort());
+    if(advisoryEvidenceBundleSha256(bundle)!==dispatch.referenceSetSha256||bundle.references.some(entry=>!NAMES.some(name=>sources[name].path===entry.path&&sources[name].sha256===entry.sha256)))return unavailable('CODEX-READINESS-EVIDENCE-MISMATCH');
+    if(sandboxRuntime?.schema!=='pipeline.codex-sandbox-runtime.v1'||sandboxRuntime.repoRoot!==repoRoot
+      ||typeof sandboxRuntime.codexPath!=='string'||!isAbsolute(sandboxRuntime.codexPath))return unavailable('CODEX-READINESS-EXECUTABLE-UNAVAILABLE');
+    const readCandidate=()=> (dependencies.readCandidate??currentCandidate)(repoRoot);
+    if(!same(readCandidate(),candidate))return unavailable('CODEX-READINESS-CANDIDATE-DRIFT');
+    const store=(dependencies.createHostStore??createCodexDesignReadinessHostStore)({gitCommonDir:topology.gitCommonDir,repoFingerprint,trustedExecutablePath:sandboxRuntime.codexPath});
+    inputDirectory=mkdtempSync(join(store.processRoot,'input-'));
+    const result=await (dependencies.runToolFreeReadiness??runCodexToolFreeDesignReadiness)({repoRoot,repoFingerprint,dispatchId,candidate,sources,route,
+      codexPath:sandboxRuntime.codexPath,inputDirectory,store,readCandidate});
+    if(result?.status!=='reviewed'||!result.report)return unavailable(result?.code??'CODEX-READINESS-HOST-UNAVAILABLE');
+    const sourceBytes=Object.fromEntries(NAMES.map(name=>[name,{path:sources[name].path,bytes:readFileSync(join(repoRoot,sources[name].path))}]));
+    const checked=(dependencies.verifyBinding??verifyCodexToolFreeBindingFromSources)({hostExecution:result.report.hostExecution,report:result.report,
+      candidate,sources,route,sourceBytes,store,repoFingerprint});
+    if(!checked.ok||!same(readCandidate(),candidate))return unavailable('CODEX-READINESS-READBACK-FAILED');
+    // Only verified closed ownership authorizes removal of the empty input directory.
+    rmSync(inputDirectory,{recursive:true,force:false});inputDirectory=null;
+    return {status:'reviewed',readinessReceipt:result.report,assurance:{class:'host-observed-tool-free',literal:null}};
+  }catch{return unavailable('CODEX-READINESS-HOST-FAILED');}
+  // On unverified termination retain input and journal for registered recovery.
 }

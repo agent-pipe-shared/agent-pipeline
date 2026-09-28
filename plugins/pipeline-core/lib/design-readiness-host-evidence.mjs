@@ -1,8 +1,13 @@
+import {designReadinessReportSha256,designReadinessRunnerSelectionSha256} from './design-readiness-hashes.mjs';
+import {createCodexDesignReadinessHostStore} from './codex-design-readiness-host-store.mjs';
+import {verifyCodexToolFreeBindingFromSources} from './codex-tool-free-design-readiness.mjs';
 // SPDX-License-Identifier: SUL-1.0
 
 /** Host-observed execution binding for design-readiness reports. */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync, lstatSync } from "node:fs";
+import { isAbsolute } from "node:path";
+import { resolveSystemExecutable } from "./trusted-tool-resolution.mjs";
 import { TextDecoder } from "node:util";
 
 import { ADVISORY_EVIDENCE_BUNDLE_SCHEMA, validateAdvisoryEvidenceBundle } from "./advisory-lifecycle-v2.mjs";
@@ -31,29 +36,10 @@ function exact(value, keys) {
  * Digest the actual bounded readiness report, excluding its non-recursive
  * host binding. This is the duty digest the selected host must persist.
  */
-export function designReadinessReportSha256(receipt) {
-  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("readiness report is invalid");
-  const { hostExecution: _hostExecution, ...report } = receipt;
-  return sha(Buffer.from(canonicalJson(report), "utf8"));
-}
+export { designReadinessReportSha256, designReadinessRunnerSelectionSha256 };
 
 /** Digest the stable, nonrecursive selection fields in a local runner receipt. */
-export function designReadinessRunnerSelectionSha256(receipt) {
-  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("readiness host receipt is invalid");
-  const selection = {
-    schema: "pipeline.design-readiness-runner-selection.v1",
-    receiptId: receipt.receiptId,
-    runner: receipt.runner,
-    repoFingerprint: receipt.repoFingerprint,
-    dispatchId: receipt.dispatchId,
-    candidate: receipt.candidate,
-    sources: receipt.sources,
-    route: receipt.route,
-    executableSha256: receipt.executableSha256,
-    requestSha256: receipt.requestSha256,
-  };
-  return sha(Buffer.from(canonicalJson(selection), "utf8"));
-}
+
 
 /**
  * Validate the model-authored portion of a readiness receipt. The final
@@ -124,6 +110,8 @@ export function verifyDesignReadinessHostExecution({
   sourceBytes,
   storeFactory = createRepositorySandboxSelectionStore,
   runnerStoreFactory = ({ gitCommonDir, repoFingerprint }) => createDesignReadinessRunnerHostStore({ gitCommonDir, repoFingerprint }),
+  codexHostStoreFactory = createCodexDesignReadinessHostStore,
+  resolveCodexExecutable = resolveSystemExecutable,
   resolveTopology = resolvePoGateRepositoryTopology,
   deriveRepositoryFingerprint = derivePoGateRepositoryFingerprint,
   resolveRoute = resolveV3DutyRoute,
@@ -132,7 +120,7 @@ export function verifyDesignReadinessHostExecution({
     || hostExecution.schema !== "pipeline.design-readiness-host-execution.v1"
     || !["claude", "codex", "antigravity"].includes(hostExecution.runner)
     || !SHA256.test(hostExecution.repoFingerprint ?? "")
-    || !(hostExecution.runner === "codex" ? SELECTION_ID : RUNNER_RECEIPT_ID).test(hostExecution.selectionId ?? "")
+    || !(hostExecution.runner === "codex" ? (SELECTION_ID.test(hostExecution.selectionId ?? "") || RUNNER_RECEIPT_ID.test(hostExecution.selectionId ?? "")) : RUNNER_RECEIPT_ID.test(hostExecution.selectionId ?? ""))
     || !SHA256.test(hostExecution.selectionSha256 ?? "")
     || !SHA256.test(hostExecution.executionReceiptSha256 ?? "")
     || !SHA256.test(hostExecution.dutyReceiptSha256 ?? "")
@@ -141,6 +129,23 @@ export function verifyDesignReadinessHostExecution({
     || typeof hostExecution.route.effort !== "string" || hostExecution.route.effort.length === 0
     || !SHA256.test(hostExecution.route.sourceSha256 ?? "")
     || hostExecution.route.candidateCommit !== candidate?.commit) return fail("DWP-READINESS-HOST-BINDING");
+  if (hostExecution.runner === "codex" && RUNNER_RECEIPT_ID.test(hostExecution.selectionId)) {
+    try {
+      const topology = resolveTopology(repoRoot);
+      if (!topology || deriveRepositoryFingerprint({gitCommonDir:topology.gitCommonDir,primaryRoot:topology.primaryRoot}) !== hostExecution.repoFingerprint) return fail('DWP-READINESS-HOST-REPOSITORY-MISMATCH');
+      const resolved = resolveRoute({rootDir:repoRoot,dutyId:'readiness',runner:'codex',candidateCommit:candidate.commit});
+      if (resolved?.state !== 'default' || resolved.runner !== 'codex') return fail('DWP-READINESS-HOST-ROUTE-MISMATCH');
+      const route = Object.fromEntries(['model','effort','sourceSha256','candidateCommit'].map(key=>[key,resolved[key]]));
+      const executable = resolveCodexExecutable('codex');
+      if (typeof executable !== 'string' || !isAbsolute(executable)) return fail('DWP-READINESS-HOST-EXECUTABLE-UNAVAILABLE');
+      const trustedExecutablePath = realpathSync(executable);
+      if (!lstatSync(trustedExecutablePath).isFile()) return fail('DWP-READINESS-HOST-EXECUTABLE-UNAVAILABLE');
+      const store = codexHostStoreFactory({gitCommonDir:topology.gitCommonDir,repoFingerprint:hostExecution.repoFingerprint,trustedExecutablePath});
+      const checked = verifyCodexToolFreeBindingFromSources({hostExecution,report:readinessReceipt,candidate,sources,sourceBytes,
+        route,store,repoFingerprint:hostExecution.repoFingerprint});
+      return checked.ok ? checked : fail('DWP-READINESS-HOST-RECEIPT-MISMATCH');
+    } catch {return fail('DWP-READINESS-HOST-RECEIPT-UNAVAILABLE');}
+  }
   if (hostExecution.runner !== "codex") {
     let topology;
     let store;
