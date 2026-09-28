@@ -75,3 +75,20 @@ binds aggregate patch `da45198b2fabf5a5ab36defc1518865ca9cfde8e86a657029d865fa70
 and assembly source commit `35d2a7d2e6c9d60bf272a9ac38db817759b8e107`.
 This is preparation evidence; source integration, host-budget acceptance and
 candidate qualification remain pending. The item stays open.
+
+## Producer-to-guard summary parity (2026-09-28)
+
+Inspection of the full returned action exposed a further prepared-route gap:
+the coordinator adds `--summary`, while the existing lifecycle qualifier allows
+only root/intent for this derived action. A separate additive patch admits that
+boolean only for `intake-generate-plan`; other commands, duplicates, values,
+unknown flags and a foreign root remain refused.
+
+Two fixtures using the actual coordinator's returned argv pass, and an added
+regular guard-suite case passes after aggregate assembly. The new aggregate is
+`5de8ddca97b83d11c218f4e8d50274e20399c05740e4f0a1bad23e6d283e2029`
+(60 files, 52 syntax checks, Git dry application successful). Exact binding is
+in `scratch/summary-and-advisor-binding-preparation.evidence.json`; the actual
+producer run retains its earlier aggregate/guard hashes in
+`scratch/onboarding-summary-admission-evidence.md`. Direct CLI measurement alone
+does not prove installed-host admission. No productive integration occurred.

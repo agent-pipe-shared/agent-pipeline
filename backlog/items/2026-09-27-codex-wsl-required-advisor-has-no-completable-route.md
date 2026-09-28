@@ -64,3 +64,27 @@ meaning of a route-selection attempt in the attempt-trail contract.
 - The supported runner/platform matrix and skill agree with the tested route.
 
 ## Triage
+
+## Ordinary Codex contract preparation (2026-09-28)
+
+Read-only reconciliation confirms the current source already reads physical
+repository consent and produces the Codex no-child outcome before prompt
+construction/dispatch preparation. An admitted callback still deliberately
+reports `ordinary-consult-host-callback-unavailable`; the ordinary answer path
+remains open. The older Scratch integration handoff predates those source fixes.
+
+New Scratch proposals separate a bounded Advisor-specific request/recipe and
+strict model answer from a metadata-only private host record, exclusive store
+and independent physical-source/Git reconstruction. Twelve request/schema
+cases and twelve record/store cases pass. Six binding cases/subtests use real
+Git/current evidence and an actual registered closed Node fixture process;
+session/model-control fields are synthetic, with no Advisor/model call.
+Verification found and corrected strict-parser null-prototype incompatibility.
+
+`scratch/codex-advisor-ordinary-integration-contract.md` names exact interfaces,
+digests, execution records and remaining ordered work. Current registered
+Advisor isolation and live host admission/route resolution, sealed execution,
+transaction wiring, actual consult attempt/receipt and installed replay remain
+pending. These proposals are separate from the current 0.7 aggregate; neither
+a Readiness receipt nor a synthetic process test qualifies as Advisor PASS.
+The item remains open; no new signature was requested.
