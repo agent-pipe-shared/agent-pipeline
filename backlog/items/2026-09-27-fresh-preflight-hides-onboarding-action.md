@@ -42,3 +42,23 @@ advisory unless it truly prevents the onboarding action.
 
 ## Triage
 
+## Prepared Codex boundary verification (2026-09-28)
+
+Five regular fixture cases pass for the exact proposed preflight bytes. An
+actually empty temporary root is inspected through the real readiness gate:
+under soft plugin refresh it yields `portable-seed-required` and the proposed
+preflight publishes the exact driver action. Canonical preflight instead
+publishes advisory without probing that root. Missing plugin manifest and real
+missing private installed-copy receipt remain hard, exit 2; project readiness
+is not called. A typed injected source mismatch also retains `nextAction:null`.
+
+`scratch/preflight-boundary-evidence.md` records commands, five-case output and
+the proposed SHA-256 `1ca46294e9d2e5765138aa584b4150738c323216cbfdd8f983f6e393168da85d`,
+verified against current virtual metadata. Registry/manifest observations are
+hermetic fixture inputs; this is not native installed-host attestation.
+
+Source audit finds no distinct genuinely-incompatible-plugin classification.
+Version inequality is treated as soft refresh and cannot establish semantic
+incompatibility. Separate refresh advisory publication also remains open when
+the driver becomes the primary action. Productive integration and real host
+acceptance remain pending; current live scope is Codex, no Claude pass claimed.

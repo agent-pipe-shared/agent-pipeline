@@ -50,3 +50,28 @@ full ask and generated target content.
 - The host response remains below its output budget for the same large input.
 
 ## Triage
+
+## Controlled Codex CLI measurement (2026-09-28)
+
+The prepared summary option was measured against a controlled 14,030-byte
+Unicode/CRLF request using six actual CLI main calls. Full-plan output is
+47,815 UTF-8 bytes; summary output is 2,153 bytes, a reduction of 45,662 bytes
+(95.50%). The escaped request occupies 42,789 output bytes across three copies
+in the full response and none in the summary. The explicit returned full-plan
+action reproduces the full response byte-for-byte. All six calls return exit 0
+with empty stderr.
+
+The coordinator's proposed generation action adds `--summary`; a direct CLI
+call without that flag retains the legacy full response. Generated artifacts
+remain byte-identical to the baseline, including the original request once in
+each of design-input, PRD and Spec (45,481 total artifact bytes). This verifies
+unchanged coverage bytes for the controlled input, not independent semantic
+review. Stored duplication and routine `pendingAsks` compaction remain open.
+Native token counts, host output budget and host/display truncation are unknown.
+
+Exact commands, stdout hashes and artifact digests are recorded in
+`scratch/generator-output-measurement-report.md` and its evidence JSON. The run
+binds aggregate patch `da45198b2fabf5a5ab36defc1518865ca9cfde8e86a657029d865fa70de69337`
+and assembly source commit `35d2a7d2e6c9d60bf272a9ac38db817759b8e107`.
+This is preparation evidence; source integration, host-budget acceptance and
+candidate qualification remain pending. The item stays open.

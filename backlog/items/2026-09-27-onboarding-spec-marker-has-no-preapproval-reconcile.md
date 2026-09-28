@@ -91,3 +91,19 @@ contains 55 files, 47 syntax-valid JavaScript files and 297 registered continuit
 cases; Git dry application passes. This supersedes the route-preparation gaps
 above. Canonical integration, full corpus, fresh real Codex onboarding and
 release qualification remain open. No new signature was requested.
+
+## Complete prepared continuity corpus (2026-09-28)
+
+The exact selected proposed modules now pass the complete 297-case continuity
+corpus. The actual regular case-completion writer emitted its FD3 stream;
+the canonical parser confirms 297 declared, 297 disposed, 297 passed, zero
+failures/skips/todos and no completion error. Execution exits 0 in 43,035 ms
+with empty stderr. This closes the prepared full-corpus evidence gap above.
+
+`scratch/proposed-onboarding-continuity.evidence.json` retains the command,
+module hashes, raw-output hashes and completion attestation. It binds aggregate
+`da45198b2fabf5a5ab36defc1518865ca9cfde8e86a657029d865fa70de69337`
+and assembly source commit `35d2a7d2e6c9d60bf272a9ac38db817759b8e107`.
+The loader checks canonical preimages and proposed bytes; unselected imports
+and subprocesses remain canonical. This is neither canonical Full Verify nor
+a release stamp. Source integration and fresh consumer acceptance remain open.
