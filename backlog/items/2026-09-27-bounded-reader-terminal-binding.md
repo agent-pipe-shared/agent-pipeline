@@ -73,3 +73,26 @@ all eight report references and their honest publication provenance, complete
 finding dispositions, actual resolution commits, owner-policy/decision source
 and the eventual protocol transition. Productive integration, canonical tests
 and release qualification remain pending; this item stays open.
+
+### Actual course reconstruction
+
+The read-only Git audit in `scratch/alfred-reader-historical-audit.json`
+resolves four reviewed states and verifies all eight public report blobs are
+unchanged since their first publication. Their correction intervals contain
+2, 6, 1 and 1 covered-input commits. The current covered document/input digest
+equals the final editorial correction at `641b6d17`.
+
+The actual first round used a 15-document scope; `PIPELINE_FLOW.de.md` was
+added before round two. This exposed a mismatch in the first prepared terminal
+implementation, which used today's 16-document set for every historical round.
+The proposal now parses each round's literal committed checker scope as data,
+without executing historical code. Its actual covered bytes and digest are
+bound separately; final/candidate coverage retains the current fixed set.
+A ninth real-Git fixture passes for the 15-to-16 transition and rejects a
+fabricated earlier review of the later-added document.
+
+The fourth public phase-one report differs from its private raw source and
+discloses normalization; phase two is byte-identical to its retained raw source.
+Only private digests are recorded, not raw private report bytes. Individual
+finding/disposition reconstruction and the final committed policy transition
+still remain; this audit is not a passing Alfred Reader binding.
