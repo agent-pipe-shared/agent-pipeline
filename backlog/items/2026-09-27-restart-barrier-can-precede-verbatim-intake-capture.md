@@ -50,3 +50,30 @@ digest readback; a summary remains orientation only.
 
 ## Triage
 
+## Canonical boundary reproduction and prepared Codex correction (2026-09-28)
+
+A controlled 14,110-byte Unicode/CRLF request reproduces the missing boundary:
+portable seed and runtime apply publish the first restart barrier with an
+absent intake checkpoint. A second canonical fixture proves that the existing
+explicit consent/capture CLI stores the exact bytes, deduplicates retry and
+surfaces them after ticket consumption through identified SessionStart. This
+confirms an ordering/precondition gap; it does not establish the historical
+private runner's precise chat sequence or a storage failure.
+
+The prepared Codex-only first-intake condition returns existing explicit
+consent/capture actions before fresh runtime/restart actions. Recorded consent
+is reused. Runtime plan digests bind verified checkpoint and ordered material
+identities; a last reobservation refuses changes before barrier publication.
+Corrupt or unavailable evidence withholds the action. Five proposed registered
+tests pass, plus two Codex marker coordinator fixtures using the corrected
+ordering. No resume-hint call that invents affirmative consent was added.
+
+Evidence and hashes: `scratch/first-restart-intake-preparation-evidence.json`.
+The exact behavior and limits are in
+`scratch/first-restart-intake-integration-contract.md`. Legacy fixture alignment
+is being prepared separately; full corpus, coherent skill/operating-model
+wording, productive integration and actual native Codex restart remain pending.
+The API cannot prove chat-turn identity from an arbitrary existing chunk, and
+its final recheck is not an atomic transaction with every intake writer. The
+real acceptance test must compare the externally known original request digest
+before and after restart. This item remains open; no new signature was requested.
