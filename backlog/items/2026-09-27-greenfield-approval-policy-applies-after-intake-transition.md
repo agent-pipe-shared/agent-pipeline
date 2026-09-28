@@ -78,3 +78,27 @@ Three exact proposed-qualifier tests pass, including existing/new external
 trust-anchor shapes and negative root/enum/policy checks. They do not replace
 full guard/producer replay or the pending driver exit-code reproduction.
 The item remains open; source integration and live Codex readback are pending.
+
+## Actual published first-answer route (2026-09-28)
+
+Two controlled de/en cases now use the real publisher's first
+`pendingAsks[].applyAction`, fill its synthetic PO answers, pass the exact argv
+through the proposed qualifier/actual guard and then execute the public CLI.
+Both exit 0 with `INITIAL-ANSWERS-APPLIED`, record signature preferences and
+selected language, retain the held author and do not repeat those questions.
+The intake checkpoint stays absent: answering preferences does not manufacture
+intake consent. Separate trust setup remains pending and is never executed.
+
+`scratch/onboarding-answer-route-evidence.md` binds aggregate
+`5de8ddca97b83d11c218f4e8d50274e20399c05740e4f0a1bad23e6d283e2029`,
+commands, results and declared substitutions. Child product module bytes are
+unchanged; an explicit OS-home provider hook and controlled Codex stub isolate
+the fixture. This is actual publisher/driver execution, not a fully canonical
+graph or native installed-host qualification. No signature/key ceremony ran.
+
+The source no-progress mechanism is understood, but no current product replay
+confirms the historical successful-signature-readback/exit-1 sequence. The denied
+stdin microreplay was never executed or rerouted. This preparation establishes
+the concrete language-bearing action's admission; historical ordering remains
+unconfirmed and the item stays open. A separately confirmed home dependency
+seam is recorded in `2026-09-28-onboarding-home-override-does-not-bind-machine-plane.md`.

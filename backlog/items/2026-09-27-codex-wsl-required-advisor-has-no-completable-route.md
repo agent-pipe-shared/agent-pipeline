@@ -88,3 +88,15 @@ transaction wiring, actual consult attempt/receipt and installed replay remain
 pending. These proposals are separate from the current 0.7 aggregate; neither
 a Readiness receipt nor a synthetic process test qualifies as Advisor PASS.
 The item remains open; no new signature was requested.
+
+The next model-free admission seam also passes 15 cases: physical bounded
+repository consent, metadata-only host decision, final readiness/route/candidate/
+consent rechecks, missing/refused/denied outcomes and deadline/AbortSignal handling.
+Late callback results do not continue to prompt construction. This proves lazy
+factory ordering, not external host authority. Noncooperative callback side effects
+or blocking synchronous work cannot be forcibly stopped by a Promise deadline.
+
+Independent binding now passes seven cases/subtests including a separately
+selected host executable: the private journal cannot choose the expected binary.
+All host selection and capability dependencies still need sealed live wiring;
+the actual Node fixture remains synthetic Advisor/session evidence.
