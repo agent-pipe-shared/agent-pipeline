@@ -144,6 +144,7 @@
 | pipeline.codex-plugin-validator-host-parity | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
+| pipeline.codex-readiness-private-receipt-omits-output-custody | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.codex-restart-context-loss-needs-a-different-approach | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply). |
 | pipeline.codex-runner-has-no-real-support-on-native-windows | closed | defect | pipeline | — | 2026-08-19 | — | — |
@@ -722,7 +723,7 @@
 
 ## Counts
 
-- open: 58
+- open: 59
 - in_progress: 0
 - closed: 642
 - rejected: 3
