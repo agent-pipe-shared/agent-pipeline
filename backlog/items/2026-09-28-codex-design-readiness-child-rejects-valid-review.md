@@ -105,3 +105,20 @@ inventory was queried with the exact thread ID. These are scratch diagnostics,
 not a production transport, design gate or candidate stamp. The production
 source path remains unverified until a safe fix is integrated and replayed
 without dependency substitution.
+
+Process-supervisor preparation subsequently completed an authenticated Codex
+synthetic turn on source `200014e9`, with closed ownership digests and zero
+remaining owned session members (`scratch/codex-managed-isolated-host-smoke.json`).
+The Linux prototype durably binds a worker PID/starttime before replacing its
+image with Codex, using feature-probed `process.execve`. No model input is
+accepted before post-exec identity readback. Nine focused supervisor fixtures
+cover failed child, live-controller refusal, killed launcher, actual orphan
+recovery with missing post-exec observation, malformed stat, PID-identity drift,
+unsafe journal links and intent without spawn. Terminal observation is bounded;
+interrupted or unverifiable ownership never yields a successful review.
+
+This remains scratch evidence. The production private store, bootstrap
+composition and architecture adoption are not integrated, and the feature
+remains open. `scratch/draft-codex-tool-free-readiness-host.md` proposes the
+explicit readiness-only architecture boundary. The compiled estate reports
+ADR-0039 as proposed; ADR-0041 remains accepted for the separate Advisor route.
