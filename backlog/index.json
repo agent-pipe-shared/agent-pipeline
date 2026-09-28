@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a975ba3145263d0fd22057d828024e7f169b1869c2e1dbc3bdcbad0324c75dd1"
+    "transitionHead": "fe7c1cb22cd128d3bb353a314da105b96c3e5cb31518b608e8f4914ea1dc70e5"
   },
   "counts": {
-    "open": 76,
+    "open": 77,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -5434,6 +5434,16 @@
       "closureRepository": "self",
       "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
       "closureEvidence": "backlog/items/2026-07-20-multi-cli-efficiency-pilots.md"
+    },
+    {
+      "id": "pipeline.native-patch-rename-drops-protected-content-markers",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Source-confirmed guard-apply-patch content scan during the Alfred native EOF correction.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.native-windows-verify-red-suite-class",

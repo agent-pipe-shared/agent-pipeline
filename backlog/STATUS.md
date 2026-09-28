@@ -411,6 +411,7 @@
 | pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.multi-cli-efficiency-pilots | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-09-08 | — |
+| pipeline.native-patch-rename-drops-protected-content-markers | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.native-windows-verify-red-suite-class | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
@@ -741,7 +742,7 @@
 
 ## Counts
 
-- open: 76
+- open: 77
 - in_progress: 0
 - closed: 643
 - rejected: 3
