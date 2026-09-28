@@ -467,6 +467,7 @@
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.plan-result-publishes-no-next-action | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — five of seven builders fixed 2026-08-28 (NVA-D-PLANACTION, NVA-F-PROMOTIONACTION) and the guided init now reaches ready; NOT closed, because two builders still publish applyAction without nextAction |
+| pipeline.plan-submission-must-not-require-separate-po-approval | open | requirement | pipeline | none | 2026-09-28 | — | — |
 | pipeline.plugin-package-should-vendor-canon-references-via-build-step | closed | workflow-improvement | pipeline | — | 2026-08-10 | 2026-08-24 | — |
 | pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair | open | workflow-improvement | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.po-approval-confirmation-missing-intent-digest | closed | defect | pipeline | — | 2026-08-10 | 2026-09-09 | — |
@@ -727,7 +728,7 @@
 
 ## Counts
 
-- open: 63
+- open: 64
 - in_progress: 0
 - closed: 642
 - rejected: 3

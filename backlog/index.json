@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "42cf6903f9f1206494523f2985ac2fad1f9c9db1ece7346a6b784dae4107c400"
+    "transitionHead": "bfee5396f1dcbb09a1a477c5cce253aaf06c9d46b81547a416748d7a7727216b"
   },
   "counts": {
-    "open": 63,
+    "open": 64,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -6237,6 +6237,16 @@
       "closureRepository": "self",
       "closureCommit": "5e43a16f98d0bce277d8000a0623a392023285fc",
       "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.mjs"
+    },
+    {
+      "id": "pipeline.plan-submission-must-not-require-separate-po-approval",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "PO explicitly requires autonomous agent plan submission and at most one happy-path design-to-implementation approval, after Advisor and readiness.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.plugin-package-should-vendor-canon-references-via-build-step",
