@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5af512393c8bc51245de7030a81f2e7100eaea5ada2add909a082086bcde0f49"
+    "transitionHead": "7c69588940258c5cdd366d42d6b51db51a459ab486aa6c2ca15d739de3cbd322"
   },
   "counts": {
-    "open": 59,
+    "open": 61,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -4526,6 +4526,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-v3-trustanchors-gmw-hgo-fix-closure.md"
     },
     {
+      "id": "pipeline.hgo-stale-capability-shadows-current-authorization",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Actual ordinary signed wiring patch refused after genuine replacement authorization; old authenticated drifted capability enumerated before current matching capability.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test",
       "status": "closed",
       "type": "defect",
@@ -5029,6 +5039,16 @@
       "closureRepository": "self",
       "closureCommit": "bf8803ed8383edaa7cc1c46ffc6d071c21d8f53e",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-partial-authority-repair-closure.md"
+    },
+    {
+      "id": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Actual installed guard admission and workspace inspect on candidate 914270f1, independently traced to omitted physical PRD/Spec observations in the inspect callsite.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",

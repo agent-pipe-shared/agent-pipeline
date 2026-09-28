@@ -341,6 +341,7 @@
 | pipeline.hgo-patch-preflight-before-signature | open | workflow-improvement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.hgo-stale-capability-shadows-current-authorization | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | closed | defect | pipeline | — | 2026-08-12 | — | — |
@@ -378,6 +379,7 @@
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | closed | defect | pipeline | alfred | 2026-08-07 | 2026-08-21 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | — | 2026-08-16 | — | — |
+| pipeline.lifecycle-inspect-omits-current-plan-spec-digests | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
@@ -723,7 +725,7 @@
 
 ## Counts
 
-- open: 59
+- open: 61
 - in_progress: 0
 - closed: 642
 - rejected: 3
