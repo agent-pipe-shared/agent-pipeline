@@ -369,7 +369,9 @@ export function validateDesignWorkflowPackage({
     let readinessHost;
     try {
       readinessHost = verifyReadinessExecution({ repoRoot, hostExecution: readinessReceipt.hostExecution,
-        readinessReceipt, candidate: workflowPackage.candidate, sources: workflowPackage.sources, sourceBytes });
+        readinessReceipt, candidate: workflowPackage.candidate, sources: workflowPackage.sources, sourceBytes,
+        advisorObservationRefs: noChildRouteSelection
+          ? { receiptRef: advisor.receipt, routeRef: advisor.attemptTrail } : null });
     } catch { readinessHost = null; }
     if (!readinessHost?.ok) return readinessHost && typeof readinessHost.code === "string"
       ? readinessHost : fail("DWP-READINESS-HOST-UNVERIFIED");

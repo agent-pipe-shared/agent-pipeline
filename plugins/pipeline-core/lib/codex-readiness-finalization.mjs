@@ -1,3 +1,5 @@
+import {validateAdvisoryReceipt} from './advisory-receipt.mjs';
+import {validateAdvisoryRouteSelection} from './advisory-route-selection.mjs';
 // Source-capable private metadata reader and physical source observer; no writer.
 import {constants,lstatSync,fstatSync,openSync,closeSync,readSync,realpathSync} from 'node:fs';
 import {join,resolve} from 'node:path';
@@ -82,3 +84,17 @@ export function readFinalizedReadinessObservation(directory,expected){
   if(!ownership||!same(ownership,v.ownership))return null;return first;
  }catch{return null;}
 }
+
+const obsExact=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&[Object.prototype,null].includes(Object.getPrototypeOf(v))&&Object.keys(v).sort().join('\0')===[...keys].sort().join('\0');
+const obsSafe=p=>typeof p==='string'&&p.length>0&&p.length<=240&&!/[\\:\0]/.test(p)&&p.split('/').every(x=>x&&!x.startsWith('.')&&x!=='scratch'&&x!=='node_modules');
+const obsSha=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v),obsFail=()=>{throw hostFault('readiness-advisor-observation-invalid');};
+function obsRead(root,path){if(typeof root!=='string'||resolve(root)!==root||realpathSync(root)!==root||!obsSafe(path))obsFail();let target=root;for(const part of path.split('/')){target=join(target,part);if(lstatSync(target).isSymbolicLink()||realpathSync(target)!==target)obsFail();}let fd;try{const b=lstatSync(target,{bigint:true});if(!b.isFile()||b.nlink!==1n||b.size>65536n)obsFail();fd=openSync(target,constants.O_RDONLY|constants.O_NOFOLLOW);const fields=['dev','ino','uid','mode','nlink','size','mtimeNs','ctimeNs'],same=s=>fields.every(k=>s[k]===b[k]);if(!same(fstatSync(fd,{bigint:true})))obsFail();const buf=Buffer.alloc(65537);let n=0,c;while(n<buf.length&&(c=readSync(fd,buf,n,buf.length-n,null))>0)n+=c;if(n>65536||BigInt(n)!==b.size||![fstatSync(fd,{bigint:true}),lstatSync(target,{bigint:true})].every(same))obsFail();const bytes=buf.subarray(0,n);return {bytes,value:parseStrictJson(bytes),sha256:hostDigest(bytes)};}finally{if(fd!==undefined)closeSync(fd);}}
+export function readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,receiptRef,routeRef,receiptPath=null,routePath=null}={}){
+ if(!obsExact(candidate,['commit','tree'])||!obsExact(sources,['input','prd','spec','design','traceability'])||!obsExact(sources.design,['path','sha256'])||!obsSha(sources.design.sha256))obsFail();
+ if(receiptRef===undefined&&routeRef===undefined){if(!obsSafe(receiptPath)||!obsSafe(routePath))obsFail();const first=obsRead(repoRoot,receiptPath),second=obsRead(repoRoot,routePath);receiptRef={path:receiptPath,sha256:first.sha256};routeRef={path:routePath,sha256:second.sha256};}
+ if(!obsExact(receiptRef,['path','sha256'])||!obsExact(routeRef,['path','sha256'])||!obsSha(receiptRef.sha256)||!obsSha(routeRef.sha256)||receiptRef.path===routeRef.path)obsFail();
+ const firstReceipt=obsRead(repoRoot,receiptRef.path),firstRoute=obsRead(repoRoot,routeRef.path),secondReceipt=obsRead(repoRoot,receiptRef.path),secondRoute=obsRead(repoRoot,routeRef.path);
+ if(firstReceipt.sha256!==receiptRef.sha256||firstRoute.sha256!==routeRef.sha256||secondReceipt.sha256!==firstReceipt.sha256||secondRoute.sha256!==firstRoute.sha256||!validateAdvisoryReceipt(firstReceipt.value).ok||!validateAdvisoryRouteSelection({selection:firstRoute.value,receipt:firstReceipt.value,receiptBytes:firstReceipt.bytes}).ok||firstReceipt.value.questionSha256!==sources.design.sha256||firstReceipt.value.dispatch.candidateCommit!==candidate.commit||firstReceipt.value.dispatch.candidateTree!==candidate.tree||canonicalJson(firstRoute.value.candidate)!==canonicalJson(candidate))obsFail();
+ return {schema:'pipeline.readiness-advisor-observation.v1',candidate:structuredClone(candidate),receiptRef:structuredClone(receiptRef),routeRef:structuredClone(routeRef),receipt:firstReceipt.value,route:firstRoute.value};
+}
+export function rereadCurrentReadinessAdvisorObservation(repoRoot,observation,sources){if(!obsExact(observation,['schema','candidate','receiptRef','routeRef','receipt','route'])||observation.schema!=='pipeline.readiness-advisor-observation.v1')obsFail();const current=readCurrentReadinessAdvisorObservation({repoRoot,candidate:observation.candidate,sources,receiptRef:observation.receiptRef,routeRef:observation.routeRef});if(canonicalJson(current)!==canonicalJson(observation))obsFail();return current;}

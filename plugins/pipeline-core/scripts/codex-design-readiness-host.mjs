@@ -21,7 +21,7 @@ function currentCandidate(root){
   const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',timeout:10000,maxBuffer:524288,stdio:['ignore','pipe','pipe']}).trim();
   return {commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])};
 }
-export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,dispatchId,dispatch,sources,sandboxRuntime},dependencies={}){
+export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,dispatchId,dispatch,sources,sandboxRuntime,advisorObservationRefs=null},dependencies={}){
   let inputDirectory=null;
   try{
     if(typeof repoRoot!=='string'||!isAbsolute(repoRoot)||resolve(repoRoot)!==repoRoot||realpathSync(repoRoot)!==repoRoot
@@ -50,11 +50,11 @@ export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,disp
     const store=(dependencies.createHostStore??createCodexDesignReadinessHostStore)({gitCommonDir:topology.gitCommonDir,repoFingerprint,trustedExecutablePath:sandboxRuntime.codexPath});
     inputDirectory=mkdtempSync(join(store.processRoot,'input-'));
     const result=await (dependencies.runToolFreeReadiness??runCodexToolFreeDesignReadiness)({repoRoot,repoFingerprint,dispatchId,candidate,sources,route,
-      codexPath:sandboxRuntime.codexPath,inputDirectory,store,readCandidate});
+      codexPath:sandboxRuntime.codexPath,inputDirectory,store,readCandidate,advisorObservationRefs});
     if(result?.status!=='reviewed'||!result.report)return unavailable(result?.code??'CODEX-READINESS-HOST-UNAVAILABLE');
     const sourceBytes=Object.fromEntries(NAMES.map(name=>[name,{path:sources[name].path,bytes:readFileSync(join(repoRoot,sources[name].path))}]));
     const checked=(dependencies.verifyBinding??verifyCodexToolFreeBindingFromSources)({hostExecution:result.report.hostExecution,report:result.report,
-      candidate,sources,route,sourceBytes,store,repoFingerprint});
+      candidate,sources,route,sourceBytes,store,repoFingerprint,repoRoot,advisorObservationRefs});
     if(!checked.ok||!same(readCandidate(),candidate))return unavailable('CODEX-READINESS-READBACK-FAILED');
     // Only verified closed ownership authorizes removal of the empty input directory.
     rmSync(inputDirectory,{recursive:true,force:false});inputDirectory=null;

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { canonicalJson } from './codex-sandbox-compatibility.mjs';
 import { checkedHostDirectory, readHostJournal } from './codex-host-process-journal.mjs';
 import { FINALIZED_READINESS_SCHEMA, FINALIZED_READINESS_FILENAME, validateReadinessFinalization, readReadinessSourceObservation, readFinalizedReadinessObservation } from './codex-readiness-finalization.mjs';
+import { rereadCurrentReadinessAdvisorObservation } from './codex-readiness-finalization.mjs';
 import { parseStrictJson } from './governance-event.mjs';
 import { validateAgainstSchema } from './schema-lite.mjs';
 import { spawnManagedCodexHost } from './codex-host-process-supervisor.mjs';
@@ -76,7 +77,7 @@ function publishFinalizedReadiness(directory,value){
 
 export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort, prompt, outputSchema,
   startupTimeoutMs = 45_000, turnTimeoutMs = 180_000, managedProcess = null,
-  inputContract = null, beforeTurnInput = null, advisorRecipeSha256 = null, inputRecheckTimeoutMs = 5_000, readinessSourceContext = null } = {}) {
+  inputContract = null, beforeTurnInput = null, advisorRecipeSha256 = null, inputRecheckTimeoutMs = 5_000, readinessSourceContext = null, readinessAdvisorObservation = null } = {}) {
   const inputDisposition = { contract: ['readiness', 'advisor'].includes(inputContract) ? inputContract : null, status: 'not-submitted', recheck: 'not-required',
     submissionCount: 0, requestSha256: null, recipeSha256: null };
   const inputRejected = code => ({ ok: false, code, report: null, observed: { ownership: null, inputDisposition } });
@@ -114,6 +115,13 @@ export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort,
     managedProcess = freezeInput({ journalParent: managedProcess.journalParent, receiptId: managedProcess.receiptId,
       binding: { ...managedProcess.binding } });
   } catch { return inputRejected('host-request-snapshot-invalid'); }
+  let supplementaryBefore = null;
+  if (readinessAdvisorObservation !== null) {
+    if (inputContract !== 'readiness' || readinessSourceContext === null) return inputRejected('host-readiness-advisor-context-invalid');
+    try { readinessAdvisorObservation = freezeInput(parseStrictJson(Buffer.from(JSON.stringify(readinessAdvisorObservation))));
+      supplementaryBefore = rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources);
+    } catch {return inputRejected('host-readiness-advisor-context-unavailable');}
+  }
   let sourceBefore = null;
   if (inputContract === 'readiness' && readinessSourceContext !== null) {
     try { readinessSourceContext = freezeInput(parseStrictJson(Buffer.from(JSON.stringify(readinessSourceContext))));
@@ -293,6 +301,7 @@ export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort,
         candidateCommit: managedProcess.binding.candidateCommit, requestSha256, recipeSha256: advisorRecipeSha256 });
       await recheckAdvisorInput(beforeTurnInput, inputMetadata, inputRecheckTimeoutMs, inputDisposition);
     }
+    if (supplementaryBefore !== null && canonicalJson(rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources)) !== canonicalJson(supplementaryBefore)) throw boundedError('host-readiness-advisor-context-drift');
     const turn = await response('turn/start', { threadId, input: [{ type: 'text', text: prompt }],
       model, effort, permissions: profileId, approvalPolicy: 'never', outputSchema });
     turnId = turn.turn?.id;
@@ -354,6 +363,7 @@ export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort,
     && inputContract === 'readiness' && sourceBefore !== null) {
     try {
       const sourceAfter = readReadinessSourceObservation(readinessSourceContext, managedProcess.binding);
+      if (supplementaryBefore !== null && canonicalJson(rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources)) !== canonicalJson(supplementaryBefore)) throw boundedError('host-readiness-advisor-context-drift');
       if (canonicalJson(sourceBefore) !== canonicalJson(sourceAfter)) throw boundedError('host-readiness-source-drift');
       const intent = readHostJournal(managed.directory, 'intent');
       if (!intent) throw boundedError('host-readiness-intent-unavailable');

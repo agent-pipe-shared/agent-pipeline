@@ -87,3 +87,52 @@ test('public package verifier independently resolves trusted executable before f
   codexHostStoreFactory:options=>{assert.equal(options.trustedExecutablePath,process.execPath);return createCodexDesignReadinessHostStore(options);}});
  assert.equal(result.ok,true);assert.equal(resolved,1);
 });
+
+// Separately declared current Advisor runtime evidence; five normative sources stay unchanged.
+import {readCurrentReadinessAdvisorObservation} from './codex-readiness-finalization.mjs';
+import {createAdvisoryRouteSelection} from './advisory-route-selection.mjs';
+import {buildCodexToolFreeReadinessRequest,verifyCodexToolFreeBindingFromSources} from './codex-tool-free-design-readiness.mjs';
+function currentAdvisorObservationFixture(f){
+ const receipt={schema:'pipeline.advisory-receipt.v1',receiptId:'current-advisor',dispatch:{dispatchId:'current-advisor',queueRevision:0,candidateCommit:f.candidate.commit,candidateTree:f.candidate.tree},duty:'advisory',profile:'feature',configuredRoute:{runner:'codex',selector:{kind:'model-id',value:'fixture-model'},effort:'high'},adapter:'consult',observed:{status:'unavailable',identity:null},questionSha256:f.sources.design.sha256,answerSha256:null,fallback:{reason:'consult-unavailable',redactedErrorClass:'unavailable'},emittedAtMs:1000};
+ const receiptBytes=Buffer.from(canonicalJson(receipt)),route=createAdvisoryRouteSelection({receipt,receiptBytes,code:'ordinary-consult-host-callback-unavailable'}),routeBytes=Buffer.from(canonicalJson(route));
+ writeFileSync(join(f.root,'advisor.receipt.json'),receiptBytes);writeFileSync(join(f.root,'advisor.route.json'),routeBytes);
+ const refs={receiptRef:{path:'advisor.receipt.json',sha256:hostDigest(receiptBytes)},routeRef:{path:'advisor.route.json',sha256:hostDigest(routeBytes)}};
+ return {receipt,route,refs,observation:readCurrentReadinessAdvisorObservation({repoRoot:f.root,candidate:f.candidate,sources:f.sources,...refs})};
+}
+test('readiness supplemental Advisor metadata binds real current receipt, route, design question and bounded physical bytes',t=>{
+ const f=readinessFixture(t),a=currentAdvisorObservationFixture(f);
+ assert.equal(a.observation.receipt.observed.status,'unavailable');assert.equal(a.observation.route.childStarted,false);assert.equal(a.observation.route.attemptCount,0);
+ const content=Object.fromEntries(Object.entries(f.sources).map(([n,s])=>[n,{...s,content:readFileSync(join(f.root,s.path),'utf8')}]));
+ const plain=buildCodexToolFreeReadinessRequest({dispatchId:'review',candidate:f.candidate,sources:f.sources,route:f.route,sourceContent:content});
+ const supplied=buildCodexToolFreeReadinessRequest({dispatchId:'review',candidate:f.candidate,sources:f.sources,route:f.route,sourceContent:content,advisorObservation:a.observation});
+ assert.notEqual(plain.requestSha256,supplied.requestSha256);assert.ok(supplied.prompt.includes('SUPPLEMENTAL_UNTRUSTED_ADVISOR_OBSERVATION_JSON'));assert.equal(Object.keys(supplied.outputSchema.properties.sources.properties).length,5);assert.deepEqual(supplied.outputSchema,plain.outputSchema);
+ assert.throws(()=>readCurrentReadinessAdvisorObservation({repoRoot:f.root,candidate:{...f.candidate,commit:'0'.repeat(40)},sources:f.sources,...a.refs}));
+ assert.throws(()=>readCurrentReadinessAdvisorObservation({repoRoot:f.root,candidate:f.candidate,sources:{...f.sources,design:{...f.sources.design,sha256:'0'.repeat(64)}},...a.refs}));
+ assert.throws(()=>readCurrentReadinessAdvisorObservation({repoRoot:f.root,candidate:f.candidate,sources:f.sources,...a.refs,routeRef:{...a.refs.routeRef,sha256:'0'.repeat(64)}}));
+});
+test('readiness supplemental Advisor physical aliases, oversized and duplicate-key observations refuse',t=>{
+ const f=readinessFixture(t),a=currentAdvisorObservationFixture(f),path=join(f.root,a.refs.receiptRef.path),original=readFileSync(path);
+ linkSync(path,join(f.root,'receipt-alias'));assert.throws(()=>readCurrentReadinessAdvisorObservation({repoRoot:f.root,candidate:f.candidate,sources:f.sources,...a.refs}));unlinkSync(join(f.root,'receipt-alias'));
+ writeFileSync(path,Buffer.alloc(65537,32));assert.throws(()=>readCurrentReadinessAdvisorObservation({repoRoot:f.root,candidate:f.candidate,sources:f.sources,...a.refs}));
+ writeFileSync(path,'{"schema":"a","schema":"b"}');assert.throws(()=>readCurrentReadinessAdvisorObservation({repoRoot:f.root,candidate:f.candidate,sources:f.sources,...a.refs}));writeFileSync(path,original);
+});
+test('readiness supplemental Advisor actual managed request and fresh default verifier bind declared runtime context',async t=>{
+ const f=readinessFixture(t),a=currentAdvisorObservationFixture(f),script=join(f.input,'app-server');let child=readFileSync(script,'utf8');
+ child=child.replace('const p=m.params.outputSchema.properties, lit=value=>value.enum[0];',`const p=m.params.outputSchema.properties, lit=value=>value.enum[0];
+const marker='SUPPLEMENTAL_UNTRUSTED_ADVISOR_OBSERVATION_JSON\\n';const raw=m.params.input[0].text.split(marker)[1];
+if(!raw)process.exit(23);const supplied=JSON.parse(raw.slice(raw.indexOf('{')));if(supplied.receipt.observed.status!=='unavailable'||supplied.route.childStarted!==false)process.exit(24);`);
+ writeFileSync(script,child);
+ const result=await runCodexToolFreeDesignReadiness({...f.args,advisorObservationRefs:a.refs});assert.equal(result.status,'reviewed',JSON.stringify(result));
+ const sourceBytes=Object.fromEntries(Object.entries(f.sources).map(([n,s])=>[n,{path:s.path,bytes:readFileSync(join(f.root,s.path))}]));
+ const args={repoRoot:f.root,hostExecution:result.report.hostExecution,readinessReceipt:result.report,candidate:f.candidate,sources:f.sources,sourceBytes,advisorObservationRefs:a.refs,resolveRoute:()=>({state:'default',runner:'codex',...f.route}),resolveCodexExecutable:()=>process.execPath};
+ assert.equal(verifyDesignReadinessHostExecution(args).ok,true);
+ assert.equal(verifyDesignReadinessHostExecution({...args,advisorObservationRefs:null}).ok,false,'fresh verifier cannot silently omit context bound into actual request');
+ assert.equal(verifyCodexToolFreeBindingFromSources({repoRoot:f.root,hostExecution:result.report.hostExecution,report:result.report,candidate:f.candidate,sources:f.sources,sourceBytes,route:f.route,store:f.store,repoFingerprint:f.repoFingerprint,advisorObservationRefs:a.refs}).ok,true);
+ assert.equal(Object.keys(result.report.sources).length,5);assert.equal(Object.hasOwn(result.report,'advisorObservation'),false);assert.equal(a.receipt.observed.identity,null);
+ writeFileSync(join(f.root,'advisor.route.json'),readFileSync(join(f.root,'advisor.route.json'),'utf8')+' ');assert.equal(verifyDesignReadinessHostExecution(args).ok,false);
+});
+test('readiness supplemental Advisor drift after actual turn refuses publication and private readiness record',async t=>{
+ const f=readinessFixture(t),a=currentAdvisorObservationFixture(f),script=join(f.input,'app-server');let child=readFileSync(script,'utf8');
+ child=child.replace("send({method:'turn/completed'",`require('node:fs').appendFileSync(${JSON.stringify(join(f.root,'advisor.receipt.json'))},' ');send({method:'turn/completed'`);
+ writeFileSync(script,child);const result=await runCodexToolFreeDesignReadiness({...f.args,advisorObservationRefs:a.refs});assert.equal(result.status,'unavailable');assert.equal(result.report,null);
+});
