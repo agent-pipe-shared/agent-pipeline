@@ -712,12 +712,13 @@
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | — | 2026-08-11 | — | — |
 | pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name | closed | defect | pipeline | nova-b | 2026-09-02 | — | Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op. |
+| pipeline.worktree-process-start-parser-misreads-spaced-comm | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — a T1 Critic reviewing NVA-B-READCONTAIN-1's symlink-containment fix found that the read-scope lane's new realpath check still admits a `<symlink-inside-root>/../<outside>/<file>` argument, because `path.resolve()` collapses the `..` lexically before any symlink is examined. The write lane's own `isPathWithinRealpathedRoot` — the pattern the read-lane fix was modeled on — opens with the identical `resolve(root, filePath)` call, before its own existence/realpath walk. Whether this is actually exploitable for a WRITE depends on a fact this session could not verify from inside the repository: how the host tool that performs the actual Edit/Write file mutation resolves the same path string. |
 | pipeline.zero-open-design-questions-force-fabricated-answer | open | workflow-improvement | pipeline | nightwing | 2026-09-27 | — | — |
 
 ## Counts
 
-- open: 53
+- open: 54
 - in_progress: 0
 - closed: 642
 - rejected: 3

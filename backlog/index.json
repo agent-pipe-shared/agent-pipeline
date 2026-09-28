@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "252b0af1b06e717d3c5dcd35d56e639b1b1f54ede017b883104c121d1d66f964"
+    "transitionHead": "dd63db30335c8178eb1e95ad1b223836a7d5471b4ffa4a7fe65cca302c60ce72"
   },
   "counts": {
-    "open": 53,
+    "open": 54,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -9606,6 +9606,16 @@
       "closureRepository": "self",
       "closureCommit": "28ca87187ad96fc94d970fa20c178e954371fa25",
       "closureEvidence": "backlog/evidence/2026-09-18-worktree-isolation-matcher-closure.md"
+    },
+    {
+      "id": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Real synthetic Linux process replay on 2026-09-28; scratch/worktree-spaced-process-identity-probe.json, source 200014e939cfab9b8dcf0a82d9030955fb6c599b.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass",
