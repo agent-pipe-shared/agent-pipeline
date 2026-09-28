@@ -60,7 +60,8 @@
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | nightwing | 2026-08-09 | 2026-08-20 | — |
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
-| pipeline.agy-greenfield-run-used-stale-plugin | open | requirement | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.agy-greenfield-run-used-stale-plugin | closed | requirement | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | closed | requirement | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
@@ -206,6 +207,7 @@
 | pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
 | pipeline.design-workflow-package-omits-contract | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.design-workflow-signing-request-schema-drift | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
@@ -345,6 +347,7 @@
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.hgo-stale-capability-shadows-current-authorization | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.historical-plan-cancellation-blocks-current-withdrawal | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | closed | defect | pipeline | — | 2026-08-12 | — | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -420,6 +423,7 @@
 | pipeline.no-sanctioned-way-to-start-over | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.no-technical-gate-enforces-critic-review-before-done | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | Nova B -- PO decision 2026-08-29: real design work needed (detecting when a Critic review was DUE and never ran is not trivial), too large for this candidate. |
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.no-uninstall-path-for-a-repository-that-once-opted-in | open | requirement | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.nonblocking-interaction-continuity | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.nothing-checks-that-a-capability-is-reachable | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three. |
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | closed | workflow-improvement | pipeline | — | 2026-08-16 | — | — |
@@ -458,6 +462,7 @@
 | pipeline.phoenix-merge-re-critic-minor-findings | closed | workflow-improvement | pipeline | nova | 2026-08-27 | — | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed. |
+| pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | — | 2026-08-05 | — | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
@@ -729,8 +734,8 @@
 
 ## Counts
 
-- open: 65
+- open: 69
 - in_progress: 0
-- closed: 642
+- closed: 643
 - rejected: 3
 - deferred: 11

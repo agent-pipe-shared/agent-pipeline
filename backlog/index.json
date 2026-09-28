@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ada55bdaddc668a8d3377c3cca6e1d4e36de3cc8bd17f8899f01fdfc7de1797d"
+    "transitionHead": "2896b59c89a9ca2e43181e622df79ab5ec169c6131f324445afad186e71a7f0d"
   },
   "counts": {
-    "open": 65,
+    "open": 69,
     "in_progress": 0,
-    "closed": 642,
+    "closed": 643,
     "rejected": 3,
     "deferred": 11
   },
@@ -754,11 +754,25 @@
     },
     {
       "id": "pipeline.agy-greenfield-run-used-stale-plugin",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "PO Agy greenfield handover, 2026-09-27; private fixture docs/agent-pipeline-review.md, .claude/settings.json, pipeline.user.yaml, project/pipeline-state.json; installed Antigravity plugin.json and agy plugins list readback.",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-28",
+      "closureRepository": "self",
+      "closureCommit": "d8c2d721e582f12d77cfa159925ea35a652cce0c",
+      "closureEvidence": "backlog/evidence/agy-imported-snapshot-20260928-verification.md"
+    },
+    {
+      "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "PO Claude handover and independent read-only verification, 2026-09-28; backlog/evidence/agy-imported-snapshot-20260928-readback.json and -verification.md. Physical stale copy/current registry and one stale-version fixture lock confirmed; exact load precedence remains pending.",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -2701,6 +2715,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.design-workflow-signing-request-schema-drift",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Source verification during local 0.7 preparation: the canonical presented design-workflow request carries approvalIntent.sha256, whereas sign-intent --request requires top-level intentSha256 before reaching its design-workflow validator. No real key or signing invocation was used to diagnose this mismatch.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
       "status": "closed",
       "type": "defect",
@@ -4569,6 +4593,16 @@
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
+      "id": "pipeline.historical-plan-cancellation-blocks-current-withdrawal",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Actual canonical cancel-submitted-plan terminal b7dcd4 exited 2 with PLAN-CANCEL-ALREADY-CANCELLED and zero mutation. The current submission differs from a historical cancellation receipt retained from 2026-09-20. Source: lib/plan-spec-state-v2.mjs cancelSubmittedPlan.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy",
       "status": "closed",
       "type": "defect",
@@ -5592,6 +5626,16 @@
       "closureEvidence": "backlog/items/2026-08-07-no-test-pins-the-ungoverned-path-rule-stand-down.md"
     },
     {
+      "id": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "PO request 2026-09-28 (read-only diagnosis session): once the Pipeline was activated in a repository, there is no sanctioned way to remove it again without deleting content or leaving something broken. Findings from source reading of scripts/project-reset.mjs, scripts/{pre-push,pre-commit,commit-msg}-hook-install.mjs, lib/project-onboarding-v3.mjs, and the ungoverned-hook probe.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.nonblocking-interaction-continuity",
       "status": "closed",
       "type": "defect",
@@ -6112,6 +6156,16 @@
       "closureRepository": "self",
       "closureCommit": "f91b33da13713849fbd6eb4fe06644af0cefc797",
       "closureEvidence": "backlog/items/2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md"
+    },
+    {
+      "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "PO question 2026-09-28 (read-only diagnosis session): with a global (user-scope) plugin install, must every Pipeline hook stay inert in a repository that never opted in? Measured with backlog/evidence/2026-09-28-ungoverned-hook-probe.mjs (334 hook runs, Claude + Codex + Antigravity wiring, ungoverned git and non-git fixtures, isolated HOME) plus source reading.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions",

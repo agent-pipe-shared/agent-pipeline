@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": false,
-  "updatedAt": "2026-09-28T07:38:15.270Z",
+  "updatedAt": "2026-09-27T19:19:34.288Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -416,6 +416,10 @@
       {
         "phase": "design",
         "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
       }
     ]
   },
@@ -479,7 +483,7 @@
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-alfred-epic",
-    "invalidatedSubmissionSha256": "f9bd8905f3e5aeec92598ef5f6a09b3650915c3d457795c63128d1c648f64d5b",
+    "invalidatedSubmissionSha256": "6c6cdb7c76227f85815c398297fcf2859bc8e0671fa8e4a7c6e4214f6b802112",
     "invalidatedApprovalSha256": null,
     "invalidatedBy": "codex",
     "invalidatedAt": "2026-09-27T19:19:34.288Z",
@@ -530,5 +534,14 @@
       "publication",
       "scope-beyond-bound-plan-and-spec"
     ]
+  },
+  "planPresentation": {
+    "schema": "pipeline.plan-presentation.v2",
+    "submissionSha256": "6c6cdb7c76227f85815c398297fcf2859bc8e0671fa8e4a7c6e4214f6b802112",
+    "presentedBy": "codex",
+    "presentedAt": "2026-09-28T18:13:54.474Z",
+    "designWorkflowPackagePath": "specs/sprint-alfred-epic/evidence/design-workflow-package-f038d96e2a56.json",
+    "designWorkflowPackageSha256": "001799025440419ed2d94f80d221b02fab9cae07860bc234fdf83caaa56a1b03",
+    "designWorkflowApprovalRequestPath": "scratch/design-workflow-approval-request-001799025440419ed2d94f80d221b02fab9cae07860bc234fdf83caaa56a1b03.json"
   }
 }

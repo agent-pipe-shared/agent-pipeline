@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agy-greenfield-run-used-stale-plugin
 type: requirement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-28
+closure_repository: self
+closure_commit: d8c2d721e582f12d77cfa159925ea35a652cce0c
+closure_evidence: backlog/evidence/agy-imported-snapshot-20260928-verification.md
 created: 2026-09-27
 sprint: alfred
 done_when: manual
@@ -39,14 +43,14 @@ approval state and the PO's first-hand observation.
 
 ## Triage
 
-- **Decision:** Supersession authorized by the PO on 2026-09-28, by
+- **Decision:** Closed as superseded, per PO decision on 2026-09-28, by
   [pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin](2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md).
 - **Rationale:** The successor retains this historical evidence classification
   and version-correct acceptance requirement, and adds the independently observed
   managed-copy/registry topology and diagnostic/refresh gaps. This is deduplication,
   not a fixed claim; the old run remains unsuitable as 0.7 acceptance.
 - **Assignment:** Successor item; no separate active acceptance task here.
-  The status transition to `closed` follows the committed successor evidence
-  and receives its exact closure metadata before ledger reconciliation. The
-  temporary `open` status is not a separate delivery assignment.
+  The successor and supersession evidence are committed at the exact closure
+  commit above. This closure records deduplication; the defect is still open
+  under the successor and the old run remains unavailable as 0.7 acceptance.
 - **Date:** 2026-09-28
