@@ -253,6 +253,7 @@
 | pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy | closed | requirement | pipeline | nova | 2026-09-14 | — | — |
 | pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors | closed | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry. |
+| pipeline.first-enrollment-enters-retirement-before-consent | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.first-verify-run-is-red-with-four-failures | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | closed | defect | pipeline | — | 2026-08-12 | — | — |
 | pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -526,6 +527,7 @@
 | pipeline.projection-drift-fault-after-design-implementation-transition-forces-restart | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
+| pipeline.protected-baseline-rejects-canonical-discarded-idle-state | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.publication-authority-lacks-execution-time-criticalproof-reverification | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination | closed | defect | pipeline | — | 2026-08-18 | — | — |
@@ -742,7 +744,7 @@
 
 ## Counts
 
-- open: 77
+- open: 79
 - in_progress: 0
 - closed: 643
 - rejected: 3

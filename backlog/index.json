@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fe7c1cb22cd128d3bb353a314da105b96c3e5cb31518b608e8f4914ea1dc70e5"
+    "transitionHead": "2bc0e398c0a30c659cd92190e520b6a3ee24e5d836e8c4647c992c14a33815ff"
   },
   "counts": {
-    "open": 77,
+    "open": 79,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -3318,6 +3318,16 @@
       "closureRepository": "self",
       "closureCommit": "b1255de9755e6645deb4cd00bd65647761f060a7",
       "closureEvidence": "backlog/evidence/2026-09-18-runner-usage-selectors-closure.md"
+    },
+    {
+      "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Actual public fresh-root onboarding qualification after delivery of the signed retirement writer.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.first-verify-run-is-red-with-four-failures",
@@ -6983,6 +6993,16 @@
       "closureRepository": "self",
       "closureCommit": "765ca6c1b9cf6482b41b4ad8e53d33fabf1e695f",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Actual Guard CLI positives after public onboarding, canonical discard, ready-gate validation and active governance-scope observation.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.publication-authority-lacks-execution-time-criticalproof-reverification",
