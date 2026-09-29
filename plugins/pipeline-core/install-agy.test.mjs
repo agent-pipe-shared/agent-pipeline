@@ -2,12 +2,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { installerUsageLines, postInstallGuidanceLines, selectPluginSource, updateAutonomousSettings, updatePluginRegistry } from "./install-agy.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { installerUsageLines, postInstallGuidanceLines, refreshAntigravityInstallation, selectPluginSource, updateAutonomousSettings, updatePluginRegistry, verifyAntigravityInstallerSource } from "./install-agy.mjs";
 import { resolveAntigravityRegistryInstalledRoot } from "./scripts/installed-plugin-attestation-host.mjs";
+import { observePipelineStartPreflight } from "./scripts/pipeline-start-preflight.mjs";
+import { createGovernanceScopeController } from "./lib/governance-scope.mjs";
 
 test("Agy release-tag checkout creates a named branch without changing the tag commit", (t) => {
   const root = mkdtempSync(join(tmpdir(), "agy-release-tag-checkout-"));
@@ -57,6 +59,27 @@ test("Agy installer guidance verifies the host PATH without normalizing sudo or 
   assert.doesNotMatch(guidance, /sudo\s+ln/u);
   assert.doesNotMatch(guidance, /--yolo/u);
   assert.doesNotMatch(guidance, /SILENTLY FAIL OPEN/u);
+});
+
+test("Agy installer checks Git source before a managed copy can be bound or refreshed", () => {
+  const input = { configRoot: "/config", workspaceRoot: "/empty-project", sourcePluginRoot: "/source/plugins/pipeline-core", scope: "workspace" };
+  let calls = 0;
+  const observeSource = (_runner, roots) => {
+    calls += 1;
+    assert.equal(roots.sourcePluginRoot, input.sourcePluginRoot);
+    assert.equal(roots.installedPluginRoot, input.sourcePluginRoot);
+    return { status: "ready" };
+  };
+  const empty = { source: { status: "observed" }, managed: { status: "absent", candidates: [] } };
+  assert.deepEqual(verifyAntigravityInstallerSource(input, { observeTopology: () => empty, observeSource }), { status: "direct-root" });
+  assert.equal(calls, 0, "an exact direct root needs no external receipt");
+  const managed = { source: { status: "observed" }, managed: { status: "observed", candidates: [{ status: "observed" }] } };
+  assert.deepEqual(verifyAntigravityInstallerSource(input, { observeTopology: () => managed, observeSource }), { status: "attestable-source" });
+  assert.equal(calls, 1);
+  assert.deepEqual(verifyAntigravityInstallerSource({ ...input, scope: "global" }, { observeTopology: () => empty, observeSource }), { status: "attestable-source" });
+  assert.equal(calls, 2);
+  assert.deepEqual(verifyAntigravityInstallerSource(input, { observeTopology: () => managed, observeSource: () => ({ status: "rejected" }) }),
+    { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE" });
 });
 
 test("Agy optional autonomous settings preserve unrelated keys and refuse malformed input", (t) => {
@@ -122,20 +145,72 @@ test("Agy installer shows an invalid source choice as a refusal before touching 
   assert.equal(existsSync(join(root, ".agents", "plugins.json")), false);
 });
 
-test("Agy interactive optional-mode failure leaves malformed consumer settings untouched", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "agy-installer-optional-refusal-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  mkdirSync(join(root, ".agents"));
-  const targetFile = join(root, ".agents", "settings.json");
-  const original = "{broken\n";
-  writeFileSync(targetFile, original);
-  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./install-agy.mjs", import.meta.url))],
-    { cwd: root, input: "1\n1\ny\n", encoding: "utf8" });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /Autonomous settings update refused: Malformed Antigravity settings/u);
-  assert.equal(readFileSync(targetFile, "utf8"), original);
-  assert.deepEqual(JSON.parse(readFileSync(join(root, ".agents", "plugins.json"), "utf8")).entries.length, 1,
-    "the already completed plugin registration is reported separately from optional-mode failure");
+test("Agy source install writes a receipt readable by the first preflight in an empty non-Git workspace", (t) => {
+  const base = mkdtempSync(join(tmpdir(), "agy-first-preflight-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const home = join(base, "home");
+  const configRoot = join(home, ".gemini");
+  const workspaceRoot = join(base, "empty-workspace");
+  const sourceRepo = join(base, "source");
+  const sourcePluginRoot = join(sourceRepo, "plugins", "pipeline-core");
+  const installedPluginRoot = join(configRoot, "config", "plugins", "agent-pipeline-core");
+  const receiptDirectory = join(configRoot, "agent-pipeline", "installed-plugin-attestations");
+  mkdirSync(workspaceRoot);
+  mkdirSync(join(configRoot, "config", "plugins"), { recursive: true });
+  const originalHome = process.env.HOME;
+  process.env.HOME = home;
+  t.after(() => { if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome; });
+  mkdirSync(join(sourcePluginRoot, "hooks"), { recursive: true });
+  mkdirSync(join(sourcePluginRoot, "skills", "critic-review"), { recursive: true });
+  mkdirSync(join(sourcePluginRoot, "scripts"), { recursive: true });
+  writeFileSync(join(sourcePluginRoot, "plugin.json"), '{"name":"agent-pipeline-core","version":"0.7.0","description":"Synthetic test plugin"}\n');
+  writeFileSync(join(sourcePluginRoot, "hooks.json"), '{"pipeline-core":{"PreInvocation":[{"type":"command","command":"node hooks/antigravity-start-hint.mjs"}]}}\n');
+  for (const path of ["hooks/antigravity-pretool-guard.mjs", "hooks/antigravity-start-hint.mjs", "skills/critic-review/SKILL.md", "scripts/pipeline-start-preflight.mjs"]) {
+    writeFileSync(join(sourcePluginRoot, path), "// synthetic fixture\n");
+  }
+  execFileSync("git", ["-C", sourceRepo, "init", "--initial-branch", "main"]);
+  execFileSync("git", ["-C", sourceRepo, "remote", "add", "origin", "https://example.invalid/synthetic-pipeline.git"]);
+  execFileSync("git", ["-C", sourceRepo, "add", "."]);
+  execFileSync("git", ["-C", sourceRepo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"]);
+  assert.equal(existsSync(join(workspaceRoot, ".git")), false);
+  assert.equal(existsSync(join(workspaceRoot, ".agents")), false);
+
+  const controller = createGovernanceScopeController({ hostStateRoot: join(base, "scope-state") });
+  const plan = controller.planDecision({ rootDir: workspaceRoot, decision: "enroll", by: "Fixture Owner" });
+  controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  const runCli = (argv) => {
+    if (argv[0] === "--version") return { status: "ok", version: "1.2.12" };
+    if (argv[1] === "install") {
+      cpSync(sourcePluginRoot, installedPluginRoot, { recursive: true });
+      writeFileSync(join(configRoot, "config", "import_manifest.json"), '{"imports":[{"name":"agent-pipeline-core"}]}\n');
+    }
+    return { status: "ok" };
+  };
+  const result = refreshAntigravityInstallation({
+    configRoot, workspaceRoot, approvedSourceRoot: sourcePluginRoot, scope: "global", globalChangeApproved: true,
+  }, { runCli });
+  assert.equal(result.status, "refreshed", JSON.stringify(result));
+  assert.equal(existsSync(join(workspaceRoot, ".git")), false);
+  assert.equal(existsSync(join(installedPluginRoot, ".git")), false);
+  assert.equal(readdirSync(receiptDirectory).some((name) => name.endsWith(".source.json")), true);
+  assert.equal(readdirSync(receiptDirectory).some((name) => name.endsWith(".json") && !name.endsWith(".source.json")), true);
+
+  const preflight = observePipelineStartPreflight({
+    env: { ANTIGRAVITY_AGENT: "1" }, cwd: workspaceRoot,
+    scriptUrl: pathToFileURL(join(installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
+    antigravityConfigRoot: configRoot,
+    observeGovernanceScopeFn: () => controller.observe({ rootDir: workspaceRoot }),
+    pluginList: () => JSON.stringify({ installed: [] }),
+    observeAntigravityHardEnforcementFn: () => ({ observed: true }),
+    observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
+    observeUnseenPushToRemoteFn: () => ({ state: "not-checked" }),
+    requireProjectOnboardingReadyFn: () => ({ status: "ready" }),
+    observeArchitectureAdoptionOrientationFn: () => ({ status: "not-required" }),
+    inspectEffectiveArchitectureDecisionsFn: () => ({ status: "advisory", projectionSha256: "a".repeat(64), decisions: [], activeExceptions: [], findings: [] }),
+  });
+  assert.equal(preflight.antigravityTopology.loadedKind, "managed-copy");
+  assert.equal(preflight.installedPluginAttestation.status, "verified", JSON.stringify(preflight.installedPluginAttestation));
+  assert.notEqual(preflight.status, "plugin-attestation-required");
 });
 
 function fixture(t) {

@@ -3286,8 +3286,8 @@ export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
  * universally available remediation -- a `git commit ... -m <value>` (or `--message`) whose
  * message text carries a literal newline or carriage return, which the closed grammar can
  * never admit (control characters are refused unconditionally, parseGuardCommand()'s first
- * line, before any tokenization runs). The fix does not depend on the message content: write
- * it to a file, then `git commit -F <file>`.
+ * line, before any tokenization runs). Split the message into single-line -m arguments and
+ * use Git's --trailer switches for the provenance block.
  *
  * It is delivered as MESSAGE TEXT, never as a typed retryAction. AC-047-140 admits an entry
  * into `pipeline.guard-retry-actions.v1` only when "every returned action is a
@@ -3312,9 +3312,11 @@ function commitMessageFileRemediation(command) {
   if (!/^\s*git\s+commit\b/u.test(command)) return null;
   if (!/(?:^|\s)-m(?:[\s"'=]|$)|(?:^|\s)--message\b/u.test(command)) return null;
   if (!/[\r\n]/u.test(command)) return null;
-  return "Remediation: a commit message carrying a newline cannot be passed on the command line. "
-    + "Write the message to a file, then run \"git add -- <paths>\" and "
-    + "\"git commit -F <msgfile> -- <paths>\" as two separate tool calls, naming the same exact paths in both.";
+  return "Remediation: pass each paragraph as a single-line -m argument and provenance as Git --trailer arguments. "
+    + "Run \"git add -- <paths>\" and then "
+    + "\"git commit -m '<type(scope): subject>' -m '<why>' --trailer 'AI-Assisted: true' "
+    + "--trailer 'Dispatch: <task> (<role>)' -- <paths>\" as separate tool calls, "
+    + "naming the same exact paths in both. Include Dispatch only when the repository requires it.";
 }
 
 /**

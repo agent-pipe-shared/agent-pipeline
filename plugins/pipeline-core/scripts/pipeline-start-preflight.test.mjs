@@ -1302,6 +1302,33 @@ test("a Gitless Codex local-development install is ready only with its installer
   assert.equal(mismatch.nextAction, null, "an unresolved registry source cannot produce a host writer action");
 });
 
+test("Agy managed copy missing a receipt has an exact host recovery action from a Git source", () => {
+  const installedRoot = mkdtempSync(join(tmpdir(), "agy-managed-copy-"));
+  const sourceRoot = fileURLToPath(new URL("../", import.meta.url));
+  try {
+    const value = preflight({
+      cwd: process.cwd(), env: { ANTIGRAVITY_AGENT: "1" },
+      read: () => JSON.stringify({ version: "0.7.0+antigravity.test" }),
+      scriptUrl: pathToFileURL(join(installedRoot, "scripts", "pipeline-start-preflight.mjs")).href,
+      observeAntigravityLoadedTopologyFn: ({ loadedPluginRoot }) => ({
+        schema: "pipeline.antigravity-loaded-topology.v1", status: "current",
+        loadedKind: "managed-copy", loadedPluginRoot, sourcePluginRoot: sourceRoot,
+        executingGuardAssurance: "not-established-by-topology",
+      }),
+      verifyLocalInstalledPluginReceiptFn: () => ({
+        schema: "pipeline.installed-plugin-attestation-verification.v1",
+        status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"],
+      }),
+    });
+    assert.equal(value.status, "plugin-attestation-required");
+    assert.equal(value.nextAction?.kind, "host-postinstall");
+    assert.equal(value.nextAction?.argv.includes("write-local"), true);
+    assert.equal(value.nextAction?.argv.includes(sourceRoot), true);
+    assert.equal(value.nextAction?.argv.includes(installedRoot), true);
+    assert.equal(value.nextAction?.requiresPoApproval, false);
+  } finally { rmSync(installedRoot, { recursive: true, force: true }); }
+});
+
 test("Codex attestation source selection binds only a verified checkout and retains sanitized observation codes", () => {
   const plugin = { name: "pipeline-core", version: "0.4.5+test" };
   const registrySourcePluginRoot = "/marketplace/plugins/pipeline-core";

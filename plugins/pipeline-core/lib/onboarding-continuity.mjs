@@ -6443,7 +6443,7 @@ export function applyOnboardingIntakeConsent({
       };
     },
   });
-  const consentOutput = { schema: INTAKE_CONSENT_APPLY_SCHEMA, root: result.paths.root, mutated: result.mutated, checkpoint: result.value };
+  const consentOutput = { schema: INTAKE_CONSENT_APPLY_SCHEMA, status: "applied", root: result.paths.root, mutated: result.mutated, checkpoint: result.value };
   if (text === null || text === undefined) return consentOutput;
   const captureResult = applyOnboardingIntakeCapture({ rootDir, repositoryCapability, text, activate, deps });
   return {

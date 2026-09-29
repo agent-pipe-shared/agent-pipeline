@@ -350,7 +350,7 @@ function topLevelLayout(raw) {
 
 // Field-agnostic byte-surgical postimage: replaces or appends exactly one
 // top-level `key` without reserializing or reordering anything else. Shared
-// by the channel and alpha-ref writers -- the channel wrapper below produces
+// by the channel writer -- the channel wrapper below produces
 // byte-identical output to the pre-refactor implementation (verified by the
 // unchanged channel-writer test suite), so this is a pure extraction, not a
 // behaviour change.
@@ -382,10 +382,6 @@ function fieldPostimage(observation, key, value) {
 
 function channelPostimage(observation, channel) {
   return fieldPostimage(observation, "pipelineUpdateChannel", channel);
-}
-
-function alphaRefPostimage(observation, alphaRef) {
-  return fieldPostimage(observation, "pipelineUpdateAlphaRef", alphaRef);
 }
 
 // Shared duplicate-top-level-key check, applied symmetrically to both
@@ -465,24 +461,16 @@ function trustedTopology({ distributionTopology, selfApplication }) {
 }
 
 /**
- * Resolve project override or the trusted per-project default. `alphaRef`
- * (ADR-0078 D3) is carried alongside the channel string regardless of which
- * channel is actually selected -- it is only consumed by the resolver when
- * the selected channel is `alpha`, so a malformed or absent alpha-ref field
- * never blocks resolving `beta` or `stable`.
+ * Resolve project override or the trusted per-project default. Preserve the
+ * legacy alphaRef readback for migration diagnostics; channel resolution no
+ * longer consumes it, because Alpha follows published main.
  */
 export function resolvePipelineUpdateChannel(options = {}) {
   const projectConfig = options.projectConfig;
   const alphaRefConfig = options.alphaRefConfig;
   const alphaRef = alphaRefConfig?.status === "ready" ? alphaRefConfig.alphaRef : null;
-  // Carry the DISTINCT reason `readProjectPipelineUpdateAlphaRef` already
-  // computed (`channel-unavailable` for an unreadable calibration -- a
-  // transient/environmental failure that invites a retry -- versus
-  // `malformed-configuration`/`invalid-alpha-ref` for a persistent,
-  // operator-fixable value) through to the caller, rather than collapsing
-  // all three into one boolean. A collapsed boolean is exactly what let a
-  // config typo get reported as transient in the first place: the resolver
-  // discarded the very reason it had just computed.
+  // Report the legacy field's distinct diagnostic without letting it select
+  // a branch or change the status of the active channel.
   const alphaRefReason = alphaRefConfig?.status === "unknown" ? alphaRefConfig.reason : null;
   if (projectConfig?.status === "unknown") {
     return { status: "unknown", channel: null, source: "project-config", topology: null, alphaRef, alphaRefReason, reason: "channel-unavailable" };
@@ -518,17 +506,6 @@ function planBinding(repoPath, channel, preimageSha256, postimageSha256) {
   };
 }
 
-function alphaRefPlanBinding(repoPath, alphaRef, preimageSha256, postimageSha256) {
-  return {
-    schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
-    repo: resolve(repoPath),
-    calibrationPath: NEUTRAL_CALIBRATION,
-    alphaRef,
-    preimageSha256,
-    postimageSha256,
-  };
-}
-
 export function planPipelineUpdateChannel(repoPath, channel, deps = {}) {
   if (!isPipelineUpdateChannel(channel)) {
     return { schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA, status: "unknown", reason: "invalid-channel" };
@@ -537,13 +514,7 @@ export function planPipelineUpdateChannel(repoPath, channel, deps = {}) {
   if (observed.status !== "ready") {
     return { schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA, status: "unknown", reason: observed.reason };
   }
-  // Mirrors planPipelineUpdateAlphaRef's own field-local guards (finding F1,
-  // decoupled here): checked unconditionally, before any digest comparison,
-  // so a caller cannot plan against a duplicated or already-invalid channel
-  // key even with a correctly-computed target channel. Symmetric with the
-  // alpha-ref path -- and, unlike the alpha-ref path, deliberately still
-  // blocks THIS field's own plan (an invalid existing channel value staying
-  // a channel-operation refusal is the one coupling worth keeping).
+  // Refuse an ambiguous or invalid existing channel before digest binding.
   if (duplicateFieldKey(observed, "pipelineUpdateChannel")) {
     return { schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA, status: "unknown", reason: "malformed-configuration" };
   }
@@ -579,50 +550,9 @@ export function planPipelineUpdateChannel(repoPath, channel, deps = {}) {
   };
 }
 
-/**
- * Plan/apply pair for the alpha-ref field (ADR-0078 D3), mirroring
- * `planPipelineUpdateChannel`/`applyPipelineUpdateChannel` exactly: same
- * digest binding, same drift/forgery refusal, same shared transaction
- * (`atomicReplaceCalibration`, the writer lock pair, `readCalibration`).
- * Only the postimage and plan binding are field-specific.
- */
-export function planPipelineUpdateAlphaRef(repoPath, alphaRef, deps = {}) {
-  if (!isPipelineUpdateAlphaRef(alphaRef)) {
-    return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: "invalid-alpha-ref" };
-  }
-  const observed = readCalibration(repoPath, deps);
-  if (observed.status !== "ready") {
-    return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: observed.reason };
-  }
-  if (duplicateFieldKey(observed, "pipelineUpdateAlphaRef")) {
-    return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: "malformed-configuration" };
-  }
-  const postimage = alphaRefPostimage(observed, alphaRef);
-  const binding = alphaRefPlanBinding(repoPath, alphaRef, observed.rawSha256, sha256(postimage));
-  const planSha256 = sha256(canonicalJson(binding));
-  const current = observed.raw === postimage;
-  return {
-    ...binding,
-    status: current ? "current" : "ready",
-    planSha256,
-    applyAction: {
-      kind: "command",
-      executable: "node",
-      mutation: !current,
-      requiresConfirmation: !current,
-      executionBoundary: "host-authorized-wsl",
-      argv: [
-        SCRIPT_PATH, "apply", "--repo", binding.repo, "--alpha-ref", alphaRef,
-        "--expected-calibration-sha256", binding.preimageSha256,
-        "--expected-postimage-sha256", binding.postimageSha256,
-        "--plan-sha256", planSha256, "--activate",
-      ],
-      expected: {
-        schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
-        statuses: current ? ["replayed"] : ["applied", "replayed"],
-      },
-    },
-  };
+/** Kept for callers with old imports; Alpha now follows main. */
+export function planPipelineUpdateAlphaRef() {
+  return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: "alpha-ref-retired" };
 }
 
 function transactionFailure(reason, committed = false) {
@@ -819,9 +749,7 @@ export function applyPipelineUpdateChannel(repoPath, options = {}, deps = {}) {
   if (sha256(canonicalJson(binding)) !== options.planSha256) return unknown("invalid-plan");
   const observed = readCalibration(repoPath, deps);
   if (observed.status !== "ready") return unknown(observed.reason);
-  // Mirrors applyPipelineUpdateAlphaRef's own field-local guards, checked
-  // unconditionally before the replay short circuit and before any digest
-  // comparison -- see the identical comment on planPipelineUpdateChannel.
+  // Check the channel field before the replay shortcut or digest comparison.
   if (duplicateFieldKey(observed, "pipelineUpdateChannel")) return unknown("malformed-configuration");
   if (Object.hasOwn(observed.value, "pipelineUpdateChannel")
     && !isPipelineUpdateChannel(observed.value.pipelineUpdateChannel)) return unknown("invalid-channel");
@@ -843,52 +771,13 @@ export function applyPipelineUpdateChannel(repoPath, options = {}, deps = {}) {
   return { ...binding, status: "applied", planSha256: options.planSha256, reason: null };
 }
 
-export function applyPipelineUpdateAlphaRef(repoPath, options = {}, deps = {}) {
-  const unknown = (reason, committed) => ({
+export function applyPipelineUpdateAlphaRef(_repoPath, options = {}) {
+  return {
     schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
     status: "unknown",
     alphaRef: isPipelineUpdateAlphaRef(options.alphaRef) ? options.alphaRef : null,
-    reason,
-    ...(committed === undefined ? {} : { committed }),
-  });
-  if (options.activate !== true) return unknown("activation-required");
-  if (!isPipelineUpdateAlphaRef(options.alphaRef)) return unknown("invalid-alpha-ref");
-  if (![options.expectedCalibrationSha256, options.expectedPostimageSha256, options.planSha256].every((value) => SHA256.test(value ?? ""))) {
-    return unknown("invalid-plan");
-  }
-  const binding = alphaRefPlanBinding(
-    repoPath,
-    options.alphaRef,
-    options.expectedCalibrationSha256,
-    options.expectedPostimageSha256,
-  );
-  if (sha256(canonicalJson(binding)) !== options.planSha256) return unknown("invalid-plan");
-  const observed = readCalibration(repoPath, deps);
-  if (observed.status !== "ready") return unknown(observed.reason);
-  // Mirrors planPipelineUpdateAlphaRef's own guard (finding F1): readCalibration
-  // does not detect a duplicated `pipelineUpdateAlphaRef` key, and this writer's
-  // postimage (`.find()`, first occurrence) and its own subsequent reads
-  // (`JSON.parse`, last occurrence) would otherwise silently address two
-  // different properties. Checked unconditionally, before the replay short
-  // circuit and before any digest comparison, so a caller cannot reach the
-  // write path on such a file even with a correctly-computed digest binding.
-  if (duplicateFieldKey(observed, "pipelineUpdateAlphaRef")) return unknown("malformed-configuration");
-  if (observed.rawSha256 === options.expectedPostimageSha256
-    && observed.value.pipelineUpdateAlphaRef === options.alphaRef) {
-    return { ...binding, status: "replayed", planSha256: options.planSha256, reason: null };
-  }
-  if (observed.rawSha256 !== options.expectedCalibrationSha256) return unknown("calibration-drift");
-  const postimage = alphaRefPostimage(observed, options.alphaRef);
-  if (sha256(postimage) !== options.expectedPostimageSha256) return unknown("plan-drift");
-  const transaction = atomicReplaceCalibration(repoPath, observed, postimage, options, deps);
-  if (!transaction.ok) return unknown(transaction.reason, transaction.committed);
-  const readback = readCalibration(repoPath, deps);
-  if (readback.status !== "ready"
-    || readback.rawSha256 !== options.expectedPostimageSha256
-    || readback.value.pipelineUpdateAlphaRef !== options.alphaRef) {
-    return unknown("readback-failed", true);
-  }
-  return { ...binding, status: "applied", planSha256: options.planSha256, reason: null };
+    reason: "alpha-ref-retired",
+  };
 }
 
 function parseCli(argv) {
@@ -900,18 +789,12 @@ function parseCli(argv) {
     if (token === "--activate" && operation === "apply") parsed.activate = true;
     else if (token === "--repo" && argv[index + 1]) parsed.repo = argv[++index];
     else if (token === "--channel" && argv[index + 1] && operation !== "readback") parsed.channel = argv[++index];
-    else if (token === "--alpha-ref" && argv[index + 1] && operation !== "readback") parsed.alphaRef = argv[++index];
     else if (token === "--expected-calibration-sha256" && argv[index + 1] && operation === "apply") parsed.expectedCalibrationSha256 = argv[++index];
     else if (token === "--expected-postimage-sha256" && argv[index + 1] && operation === "apply") parsed.expectedPostimageSha256 = argv[++index];
     else if (token === "--plan-sha256" && argv[index + 1] && operation === "apply") parsed.planSha256 = argv[++index];
     else return null;
   }
-  if (operation !== "readback") {
-    // `--channel` and `--alpha-ref` select two different writer pairs; a
-    // caller supplying both gets an error, never silent precedence.
-    if (parsed.channel === undefined && parsed.alphaRef === undefined) return null;
-    if (parsed.channel !== undefined && parsed.alphaRef !== undefined) return null;
-  }
+  if (operation !== "readback" && parsed.channel === undefined) return null;
   return parsed;
 }
 
@@ -927,18 +810,14 @@ const isCli = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 if (isCli) {
   const parsed = parseCli(process.argv.slice(2));
   if (!parsed) {
-    process.stderr.write("pipeline-update-channel: use readback, plan (--channel <alpha|beta|stable> | --alpha-ref <ref>), or the exact digest-bound apply action -- never both --channel and --alpha-ref together\n");
+    process.stderr.write("pipeline-update-channel: use readback, plan --channel <alpha|beta|stable>, or the exact digest-bound channel apply action\n");
     process.exit(64);
   }
   const result = parsed.operation === "readback"
     ? readbackResult(parsed.repo)
-    : parsed.alphaRef !== undefined
-      ? (parsed.operation === "plan"
-        ? planPipelineUpdateAlphaRef(parsed.repo, parsed.alphaRef)
-        : applyPipelineUpdateAlphaRef(parsed.repo, parsed))
-      : (parsed.operation === "plan"
-        ? planPipelineUpdateChannel(parsed.repo, parsed.channel)
-        : applyPipelineUpdateChannel(parsed.repo, parsed));
+    : (parsed.operation === "plan"
+      ? planPipelineUpdateChannel(parsed.repo, parsed.channel)
+      : applyPipelineUpdateChannel(parsed.repo, parsed));
   process.stdout.write(`${JSON.stringify(result)}\n`);
   // `readback` carries two independently-typed statuses in one JSON payload
   // -- channel at top level, alphaRef nested -- but the exit code used to

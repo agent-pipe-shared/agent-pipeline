@@ -142,6 +142,7 @@ import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
 import { checkpointAuditRecord, recordCheckpointPushAttempt } from "../lib/checkpoint-push-audit.mjs";
+import { inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
 import { CHECKPOINT_LANE, classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
@@ -1960,12 +1961,15 @@ function checkpointEligibility({ binding, commit, projectDir }) {
   if (failures.length > 0) return { ok: false, failures };
   const tree = spawnSync("git", ["-C", projectDir, "rev-parse", `${commit}^{tree}`], { encoding: "utf8", timeout: 5000 });
   if (tree.status !== 0 || !/^[0-9a-f]{40,64}$/i.test(tree.stdout?.trim() ?? "")) return { ok: false, failures: ["checkpoint candidate tree cannot be resolved"] };
+  const currency = inspectArchitecturePushCurrency({ projectDir, commit, checkpoint: true });
+  if (!currency.ok) return { ok: false, failures: [`architecture map currency cannot be checked: ${currency.reason}`] };
   const record = checkpointAuditRecord({
     commit,
     tree: tree.stdout.trim(),
     remote: binding.remote,
     destination: binding.destination,
     intent: values[0],
+    stalenessDebt: currency.stalenessDebt,
   });
   if (!record) return { ok: false, failures: ["checkpoint audit record cannot be constructed"] };
   return { ok: true, record };
@@ -2012,6 +2016,18 @@ if (pushDestination.lane === CHECKPOINT_LANE) {
     ]);
   }
   allowExit();
+}
+
+// AC-18: an adopted architecture map must cover every declared public contract
+// in the exact pushed candidate. The checkpoint lane above carries typed debt.
+const architectureCurrency = inspectArchitecturePushCurrency({ projectDir: evidenceProjectDir, commit: sourceCommit });
+if (!architectureCurrency.ok || architectureCurrency.stale) {
+  emit(2, [
+    "BLOCKED (guard-push architecture map): final candidate needs a current architecture map.",
+    architectureCurrency.ok
+      ? `${architectureCurrency.staleContracts.length} declared public contract(s) changed after their concept map.`
+      : `Reason: ${architectureCurrency.reason}.`,
+  ]);
 }
 
 /** Reads + JSON-parses an evidence file; returns {ok:true, data} | {ok:false, reason}. */

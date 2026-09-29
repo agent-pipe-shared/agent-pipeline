@@ -17,8 +17,9 @@ import {
   generateAdoptionProposal,
   resolveAdoptionState,
 } from "../scripts/architecture-adoption.mjs";
-import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
+import { evaluateArchitectureFitness, evaluateNavigationCurrency } from "../scripts/architecture-fitness.mjs";
 import { inspectArchitectureReentryPointer, loadMapBundle, resolveModuleForPath } from "../scripts/module-inventory.mjs";
+import { readCheckpointArchitectureDebt } from "./checkpoint-push-audit.mjs";
 import { inspectArchitectureDesign } from "./architecture-design.mjs";
 import { loadPhysicalArchitectureMap } from "./architecture-effective-decisions.mjs";
 import { inspectArchitectureDecisionContinuity } from "./architecture-decision-continuity.mjs";
@@ -106,6 +107,57 @@ function failure(root, code, message, artifacts, disposition, fitness = null, ne
     fitness,
     nextAction: nextAction ?? proposalAction(root),
   };
+}
+
+function checkpointDebtRepairAction(status) {
+  return {
+    kind: "repair-required",
+    code: "ARCHITECTURE-CHECKPOINT-DEBT-REPAIR",
+    path: status === "open" ? "architecture/map/" : ".git/agent-pipeline/feature-checkpoint-audit.jsonl",
+    guidance: status === "open"
+      ? "Update the affected architecture concept file or map index in a descendant commit, ensure the touched contract is represented, and re-run planning readiness. A checkpoint push never grants implementation authority over unresolved map debt."
+      : "Restore readable checkpoint audit evidence through the sanctioned repository recovery route, then re-run planning readiness.",
+  };
+}
+
+function inspectCheckpointDebt(root, map, deps) {
+  // A non-Git directory cannot have received a checkpoint push. This also
+  // preserves architecture inspection for uncommitted greenfield fixtures.
+  if (!existsSync(resolve(root, ".git")) && !deps.readCheckpointArchitectureDebt) {
+    return { status: "clear", openCount: 0, targets: [] };
+  }
+  let result;
+  try {
+    result = (deps.readCheckpointArchitectureDebt ?? readCheckpointArchitectureDebt)({ projectDir: root });
+  } catch {
+    return { status: "unavailable", openCount: 0, targets: [] };
+  }
+  if (!result?.ok || !Array.isArray(result.debt) || !Array.isArray(result.resolvedDebt)) {
+    return { status: "unavailable", openCount: 0, targets: [] };
+  }
+  const open = result.debt.flatMap((record) => record.stalenessDebt ?? []);
+  const provisional = result.resolvedDebt.flatMap((record) => record.stalenessDebt ?? []);
+  if ([...open, ...provisional].some((entry) => entry?.type !== "architecture-map-stale"
+    || typeof entry.contract !== "string" || typeof entry.target !== "string")) {
+    return { status: "unavailable", openCount: 0, targets: [] };
+  }
+  const targets = [...new Set([...open, ...provisional].map((entry) => entry.target))].sort();
+  if (open.length > 0) return { status: "open", openCount: open.length, targets };
+  if (provisional.length > 0) {
+    let currency;
+    try {
+      currency = (deps.evaluateNavigationCurrency ?? evaluateNavigationCurrency)({
+        rootDir: root,
+        inventory: map.modules,
+        touchedContracts: [...new Set(provisional.map((entry) => entry.contract))],
+        mode: "planning",
+      });
+    } catch {
+      return { status: "unavailable", openCount: provisional.length, targets };
+    }
+    if (currency?.outcome !== "pass") return { status: "open", openCount: provisional.length, targets };
+  }
+  return { status: "clear", openCount: 0, targets: [] };
 }
 
 function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
@@ -276,6 +328,21 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
         path: "AGENTS.md",
         guidance: "Add a Markdown link to architecture/map/index.md in the physical root AGENTS.md; do not replace existing project-owned content or follow an alias. Re-run architecture entry readiness afterward.",
       });
+  }
+
+  // Checkpoint pushes are allowed to preserve interrupted work, but the next
+  // planning boundary must consume their typed map debt before implementation
+  // authority. The PO's adoption deferral below affects ordinary fitness
+  // findings; it does not erase a debt recorded by a real checkpoint push.
+  const checkpointDebt = inspectCheckpointDebt(root, map, deps);
+  artifacts.checkpointDebt = checkpointDebt;
+  if (checkpointDebt.status !== "clear") {
+    return failure(root,
+      checkpointDebt.status === "open" ? "ARCHITECTURE-CHECKPOINT-DEBT-OPEN" : "ARCHITECTURE-CHECKPOINT-DEBT-UNAVAILABLE",
+      checkpointDebt.status === "open"
+        ? "checkpoint architecture-map staleness debt remains unresolved at the next planning boundary"
+        : "checkpoint architecture-map staleness debt could not be inspected",
+      artifacts, disposition, null, checkpointDebtRepairAction(checkpointDebt.status));
   }
 
   const surface = planningSurface === undefined

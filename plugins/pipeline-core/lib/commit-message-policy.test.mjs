@@ -39,8 +39,8 @@ check("CMP1 the provider co-author trailer that shipped 74 times is refused", ()
   assert.deepEqual(codes(result), ["GIT-03-CORRELATION-TRAILER", "GIT-03-PROVIDER-COAUTHOR", "GIT-03-SESSION-URL"]);
 });
 
-// CMP2 -- the `-F` route is the one this repository actually uses, so a check that only
-// read `-m` would have missed every commit it was written for.
+// CMP2 -- keep the file route inspected for exceptional message content;
+// ordinary commits use repeated -m and --trailer without a scratch file.
 check("CMP2 a clean message via -F passes", () => {
   files.set("clean.txt", CLEAN);
   assert.deepEqual(codes(run("git commit -F clean.txt")), []);

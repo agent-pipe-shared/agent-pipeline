@@ -157,9 +157,11 @@ codex plugin add pipeline-core@agent-pipeline
 codex plugin list --marketplace agent-pipeline --json
 ```
 
-The `stable` *update channel* (as reported by the Pipeline's own freshness
-check, not by Codex) resolves separately, to the highest final `vX.Y.Z`
-release tag on `main` (ADR-0078 D2) — it was never a branch.
+The Pipeline's update channels resolve separately from Codex's marketplace
+snapshot: `alpha` is the current `main` tip, `beta` is the highest
+`vX.Y.Z-beta.N` tag on `main`, and `stable` is the highest final `vX.Y.Z`
+release tag on `main`. Changing a channel selects a ref for freshness checks;
+it does not install a different plugin by itself.
 
 The final command must report exactly one installed and enabled
 `pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running

@@ -9,7 +9,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import {
-  accessSync, closeSync, constants, fstatSync, lstatSync, mkdtempSync, openSync,
+  accessSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdtempSync, openSync,
   readFileSync, realpathSync, rmSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -37,6 +37,7 @@ import {
   validatePublicationCapabilityPreflight,
 } from "../lib/publication-capability-preflight.mjs";
 import { validateReleasePreflight } from "./release-preflight.mjs";
+import { checkReleaseStateConsistency } from "./check-release-state-consistency.mjs";
 export {
   publicationRemoteFingerprint,
   publicationRepositoryFingerprint,
@@ -559,6 +560,14 @@ export function preparePublicationTransaction({ rootDir, transactionId, channel,
   if (!TRANSACTION.test(transactionId ?? "") || !CHANNELS.has(channel)) fail("PX-INPUT", "publication prepare selection is invalid");
   const runGit = dependencies.runGit ?? nativeGit;
   const repository = physicalRepository(rootDir, runGit);
+  const releaseStatePath = join(repository.root, "docs", "release-state.json");
+  const stateDocPath = join(repository.root, "docs", "state.md");
+  const stateMarkerPresent = existsSync(stateDocPath)
+    && readFileSync(stateDocPath, "utf8").includes("**Release state:**");
+  if (existsSync(releaseStatePath) || stateMarkerPresent) {
+    const releaseState = (dependencies.checkReleaseStateConsistency ?? checkReleaseStateConsistency)({ rootDir: repository.root });
+    if (releaseState.status !== "consistent") fail("PX-RELEASE-STATE", "the previous public release-state projection is stale or unavailable");
+  }
   let capability;
   try { capability = JSON.parse(safeEvidenceBytes(repository.root, preflightPath, "publication capability preflight").toString("utf8")); } catch (error) {
     if (error instanceof PublicationExecutorError) throw error;

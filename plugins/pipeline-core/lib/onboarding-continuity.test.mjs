@@ -3336,6 +3336,7 @@ check("intake checkpoint: validateIntakeCheckpoint round-trips through readOnboa
     activate: true,
   });
   assert.equal(applied.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(applied.status, "applied");
   assert.equal(applied.mutated, true);
   const observed = readOnboardingIntakeCheckpoint({ rootDir: root });
   assert.equal(observed.status, "present");
@@ -3367,6 +3368,7 @@ check("applyOnboardingIntakeConsent: happy path grants consent and fills all thr
     activate: true,
   });
   assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.status, "applied");
   assert.equal(result.mutated, true);
   assert.equal(result.checkpoint.consent.granted, true);
   assert.deepEqual(result.checkpoint.values, {

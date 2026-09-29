@@ -39,7 +39,7 @@ adrReferences:
 Verification runner, test orchestration, suite registration validation, and CI checks.
 
 ## Public Contracts
-- `harness/scripts/verify.mjs`: Main test suite verification runner.
+- `harness/scripts/verify.mjs`: Main test suite verification runner. It includes the staged private-identifier scanner's focused regression suite in the required local candidate checks.
 - `harness/scripts/check-verify-suite-registration.mjs`: Static and declarative suite registration completeness checker.
 - `harness/scripts/check-verify-suite-append.mjs`: TP-13-era Git history and pending-postimage append-only check for the declarative registry.
 - `harness/verify-suites.json`: Declarative suite registry.

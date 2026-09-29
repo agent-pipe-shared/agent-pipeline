@@ -153,6 +153,21 @@ function root() {
   return path;
 }
 
+function activeGitRoot() {
+  const path = root();
+  const initialized = spawnSync("git", ["init", "--quiet", "--template="], {
+    cwd: path, encoding: "utf8", env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/u.test(key))),
+  });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  mkdirSync(join(path, ".agent-pipeline"));
+  writeFileSync(join(path, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-09-29T00:00:00.000Z",
+  }));
+  return path;
+}
+
 function edit(filePath = "src/implementation.mjs") {
   return { tool_name: "Edit", tool_input: { file_path: filePath } };
 }
@@ -2236,7 +2251,7 @@ test("GRAMMARHINT-1 AC-1: the rejected element is named from what the parser alr
 });
 
 test("GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded newline yields no typed action", () => {
-  const path = root();
+  const path = activeGitRoot();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const command = 'git commit -m "line one\n\nline two"';
@@ -2256,7 +2271,8 @@ test("GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded ne
     // ride on the action's shape now rides on the text, where it can still fail).
     const spelling = evaluateLifecycleReadyGuard(bash('git commit --message "one\ntwo"'), { projectDir: path });
     assert.equal(spelling.exitCode, 2);
-    assert.match(spelling.stderr, /git commit -F <msgfile> -- <paths>/u);
+    assert.match(spelling.stderr, /git commit -m /u);
+    assert.match(spelling.stderr, /--trailer 'AI-Assisted: true'/u);
     assert.deepEqual(retryActionsForDeniedCommand('git commit --message "one\ntwo"', path), []);
 
     // An ordinary single-line -m commit carries no control character, so it is neither denied
@@ -2286,8 +2302,8 @@ test("GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded ne
  * The help itself is not the problem and is not withdrawn: it moves into the human-readable
  * message, where a mutating remediation belongs and where no schema promises it is read-only.
  */
-test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the -F shape as text", () => {
-  const path = root();
+test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the structured commit shape as text", () => {
+  const path = activeGitRoot();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const command = 'git commit -m "line one\n\nline two"';
@@ -2311,10 +2327,13 @@ test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and stat
       assert.equal(action.requiresConfirmation, false);
     }
 
-    // The remediation survives as message text, in the exact shape agent-obligations.md SS6
-    // requires: pathspec on both calls, the same paths in each, never a bare commit.
+    // The remediation survives as message text, with pathspec on both calls and
+    // the same paths in each. A message file is unnecessary for this route.
     assert.match(result.stderr, /git add -- <paths>/u);
-    assert.match(result.stderr, /git commit -F <msgfile> -- <paths>/u);
+    assert.match(result.stderr, /git commit -m /u);
+    assert.match(result.stderr, /--trailer 'AI-Assisted: true'/u);
+    assert.match(result.stderr, /--trailer 'Dispatch: <task> \(<role>\)' -- <paths>/u);
+    assert.doesNotMatch(result.stderr, /msgfile/u);
 
     // ...and the printed guarantee about the envelope is true again (guardrails/git.md: a gate
     // states what it actually enforces). "typed" was the weakening that let a mutation in.

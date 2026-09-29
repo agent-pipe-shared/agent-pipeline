@@ -95,7 +95,10 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable'||Object.values(observation.registries).some(r=>r.status==='unavailable'))throw Error('ATR-TOPOLOGY-UNVERIFIABLE');
    const hooks=wiring(observation,configRoot,workspaceRoot),copy=observation.managed.candidates[0];
    if(observation.managed.candidates.length>1||observation.importState.entries.length>1||(!!copy)!==(observation.importState.entries.length===1))throw Error('ATR-MANAGED-IMPORT-AMBIGUOUS');
-   const retire=!!copy&&(scope==='workspace'||copy.content.sha256!==observation.source.content.sha256),install=scope==='global'&&(!copy||retire);
+   // A matching managed copy may remain active even for a workspace binding.
+   // Its external attestation is written below after the exact final readback.
+   // Only a stale copy requires a global lifecycle change.
+   const retire=!!copy&&copy.content.sha256!==observation.source.content.sha256,install=scope==='global'&&(!copy||retire);
    const other=scope==='global'?'workspace':'global';
    if(observation.registries[other].entries.some(e=>e.status==='observed'&&e.root!==observation.source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
    if((retire||install||hooks.some(h=>h.scope==='global'&&h.changes)||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
@@ -119,7 +122,7 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    const hookPlans=wiring(observation,configRoot,workspaceRoot);
    const other=scope==='workspace'?'global':'workspace';
    if(observation.registries[other].entries.some(e=>e.status==='observed'&&e.root!==source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
-   const retire=managed.length===1&&(scope==='workspace'||managed[0].content.sha256!==source.content.sha256);
+   const retire=managed.length===1&&managed[0].content.sha256!==source.content.sha256;
    const install=scope==='global'&&(managed.length===0||retire);
    const globalWiring=hookPlans.some(p=>p.scope==='global'&&p.changes>0);
    if((retire||install||globalWiring||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
@@ -150,8 +153,9 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||final.registries[scope].status!=='observed'||final.registries[scope].entries.filter(e=>e.status==='observed').length!==1||final.registries[scope].entries.find(e=>e.status==='observed').root!==source.root)throw Error('ATR-FINAL-READBACK');
    if(registryPlans.some(({selected})=>final.registries[selected].entries.some(e=>e.status==='observed'&&e.root!==source.root)||final.registries[selected].status!=='observed'))throw Error('ATR-FINAL-READBACK');
    if(wiring(final,configRoot,workspaceRoot).some(p=>p.changes>0))throw Error('ATR-FINAL-WIRING-READBACK');
-   if(scope==='global'){
-    const copy=final.managed.candidates[0];if(!copy||copy.content.sha256!==source.content.sha256)throw Error('ATR-FINAL-READBACK');
+   if(scope==='global'&&!final.managed.candidates[0])throw Error('ATR-FINAL-READBACK');
+   if(final.managed.candidates.length){
+    const copy=final.managed.candidates[0];if(copy.content.sha256!==source.content.sha256)throw Error('ATR-FINAL-READBACK');
     if(typeof writeInstalledReceipt!=='function')throw Error('ATR-ATTESTATION-UNAVAILABLE');
     const r=writeInstalledReceipt({provider:'antigravity',plugin:{name:'pipeline-core',version:source.version},sourcePluginRoot:source.root,installedPluginRoot:copy.root});if(r?.status!=='written')throw Error('ATR-ATTESTATION-FAILED');
    }

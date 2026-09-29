@@ -9,6 +9,8 @@ import { isDirectInvocation } from "./lib/entrypoint.mjs";
 import { writeLocalDevelopmentInstalledPluginReceipt } from "./scripts/installed-plugin-attestation-host.mjs";
 import { homedir } from "node:os";
 import { createAntigravityRefreshHost, resolveAntigravityCliPath } from "./lib/antigravity-topology-refresh-host.mjs";
+import { observeAntigravityPluginTopology } from "./lib/antigravity-plugin-topology.mjs";
+import { observeRunnerPublicCoreIdentity } from "./lib/public-core-observation.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const LOCAL_MARKETPLACE = join(process.env.HOME || process.env.USERPROFILE, "agent-pipeline-local-marketplace");
@@ -204,6 +206,22 @@ export function refreshAntigravityInstallation(options, dependencies = {}) {
   return host.apply(plan);
 }
 
+/** Check that any copy which may execute can receive a source-bound receipt. */
+export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, sourcePluginRoot, scope }, {
+  observeTopology = observeAntigravityPluginTopology,
+  observeSource = observeRunnerPublicCoreIdentity,
+} = {}) {
+  const topology = observeTopology({ configRoot, workspaceRoot, approvedSourceRoot: sourcePluginRoot });
+  if (topology.source.status !== "observed" || topology.managed.status === "unavailable") {
+    return { status: "rejected", reason: "ATR-SOURCE-UNVERIFIABLE" };
+  }
+  if (scope === "workspace" && topology.managed.candidates.length === 0) return { status: "direct-root" };
+  const source = observeSource("antigravity", { sourcePluginRoot, installedPluginRoot: sourcePluginRoot });
+  return source?.status === "ready"
+    ? { status: "attestable-source" }
+    : { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE" };
+}
+
 export function runInteractiveInstaller() {
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 console.log("\n=== Antigravity Pipeline Installer ===\n");
@@ -247,6 +265,8 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     try {
       const configRoot = join(homedir(), ".gemini");
       if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
+      const sourceCheck = verifyAntigravityInstallerSource({ configRoot, workspaceRoot: process.cwd(), sourcePluginRoot: corePluginPath, scope: answer.trim() === "2" ? "global" : "workspace" });
+      if (sourceCheck.status === "rejected") throw new Error(`${sourceCheck.reason}: run this installer from an approved clean Git source checkout`);
       const result = refreshAntigravityInstallation({ configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() });
       console.log(JSON.stringify(result));
       if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");

@@ -182,14 +182,16 @@ function fixture(name) {
   git(root, "config", "user.email", "publication@example.invalid");
   git(root, "config", "user.name", "Publication Fixture");
   writeFileSync(join(root, "base.txt"), "base\n");
-  git(root, "add", "base.txt");
+  writeFileSync(join(root, "VERSION"), "0.4.7\n");
+  git(root, "add", "base.txt", "VERSION");
   git(root, "commit", "--quiet", "-m", "base");
   const base = oid(root, "HEAD");
   const baseTree = oid(root, "HEAD^{tree}");
   git(root, "remote", "add", "origin", remote);
   assert.equal(git(root, "push", "--quiet", "origin", `${base}:refs/heads/main`).status, 0);
   writeFileSync(join(root, "candidate.txt"), "candidate\n");
-  git(root, "add", "candidate.txt");
+  writeFileSync(join(root, "VERSION"), "0.5.6\n");
+  git(root, "add", "candidate.txt", "VERSION");
   git(root, "commit", "--quiet", "-m", "candidate");
   const candidate = oid(root, "HEAD");
   const tree = oid(root, "HEAD^{tree}");
@@ -389,6 +391,27 @@ await check("disposable-remote publication loop: preflight -> prepare -> authori
     tamperedCheck.reasons.includes("published-identity-mismatch"),
     `expected published-identity-mismatch, got ${JSON.stringify(tamperedCheck.reasons)}`,
   );
+});
+
+await check("prepare refuses a stale published release projection before authorization or push", async () => {
+  const value = fixture("stale-release-state");
+  assert.equal(git(value.root, "tag", "v0.4.7", value.base).status, 0);
+  assert.equal(git(value.root, "push", "--quiet", "origin", "v0.4.7").status, 0);
+  mkdirSync(join(value.root, "docs"));
+  const previous = createPublicReleaseState({
+    version: "0.4.7", tag: "v0.4.7", commit: value.base, tree: value.baseTree,
+    publicationStatus: "published", releaseUrlClass: "public-release", observedAt: "2026-08-01T00:00:00.000Z",
+  });
+  writeFileSync(join(value.root, "docs", "release-state.json"), `${JSON.stringify(previous, null, 2)}\n`);
+  writeFileSync(join(value.root, "docs", "state.md"), `**Release state:** version \`0.4.7\` · tag \`v0.4.7\` · commit \`${value.base}\` · tree \`${value.baseTree}\` · status \`published\`\n`);
+  assert.equal(checkReleaseStateConsistency({ rootDir: value.root }).status, "consistent");
+
+  // A newer final tag on the observed main ref makes the projection stale.
+  assert.equal(git(value.root, "tag", "v0.4.8", value.base).status, 0);
+  assert.equal(git(value.root, "push", "--quiet", "origin", "v0.4.8").status, 0);
+  assert.ok(checkReleaseStateConsistency({ rootDir: value.root }).reasons.includes("published-final-tag-stale"));
+  await assert.rejects(() => prepareTransaction(value), { code: "PX-RELEASE-STATE" });
+  assert.equal(oid(value.remote, "refs/heads/main"), value.base, "a stale projection cannot advance remote main");
 });
 
 await check("authorize-apply rejects a tampered plan digest before any effect, even after a genuine authorize-plan preview", async () => {

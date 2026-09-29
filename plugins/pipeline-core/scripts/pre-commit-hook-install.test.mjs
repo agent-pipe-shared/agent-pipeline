@@ -209,6 +209,33 @@ function commit(dir, message, { allowEmpty = false } = {}) {
   return { code: result.status, stderr: result.stderr ?? "", stdout: result.stdout ?? "" };
 }
 
+test("installed pre-commit hook rejects a staged local private pattern before Git commits", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pre-commit-privacy-"));
+  const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 20000 });
+  assert.equal(git("init", "-q", "-b", "main").status, 0);
+  assert.equal(git("config", "user.email", "fixture@example.invalid").status, 0);
+  assert.equal(git("config", "user.name", "Fixture Operator").status, 0);
+  writeFileSync(join(dir, "README.md"), "fixture\n");
+  assert.equal(git("add", "README.md").status, 0);
+  assert.equal(git("commit", "-q", "-m", "initial fixture").status, 0);
+  const initialHead = git("rev-parse", "HEAD").stdout.trim();
+  const governance = createGovernanceScopeController({ hostStateRoot: join(dir, "unused-host") });
+  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "fixture-operator" });
+  assert.equal(governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+  installHook(dir);
+  const privateDir = join(dir, ".git", "agent-pipeline");
+  mkdirSync(privateDir, { recursive: true });
+  writeFileSync(join(privateDir, "private-identity-patterns.json"), JSON.stringify([
+    { category: "local-pattern", value: "SYNTHETIC-PRIVATE-MARKER" },
+  ]));
+  writeFileSync(join(dir, "note.txt"), "SYNTHETIC-PRIVATE-MARKER\n");
+  assert.equal(git("add", "note.txt").status, 0);
+  const blocked = git("commit", "-m", "fixture staged private content");
+  assert.notEqual(blocked.status, 0);
+  assert.match(blocked.stderr, /private local identifiers/u);
+  assert.equal(git("rev-parse", "HEAD").stdout.trim(), initialHead);
+});
+
 // ---- staged-path enumeration (pure helper, real generated impl) -----------------------
 
 test("stagedPaths: lists a newly staged file relative to HEAD", async () => {

@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
+**Release state:** version `0.6.3` · tag `v0.6.3` · commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` · tree `6821503f8f4fd72ed31459cb843d97bf8bfaa049` · status `published`
 
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
@@ -17,21 +17,18 @@ Planfreigabe gilt; Advisor-Ausnahme akzeptiert, kein Advisor-PASS.
 Installed Recovery: `f9ebdd5b` / `20260928194946.0cace08c`; kein finaler Kandidat.
 
 Quellintegration `26fef9e7`: 244 Dateien im signierten Qualitätspaket committet.
-Die 1,66-MB-Datei `backlog/transitions.ndjson` blieb nur wegen des 1-MB-Puffers
-im Autorisierer aus diesem Paket; sie und die anschließende Registrierung eines
-neuen HGO-Befunds werden im nächsten lokalen Commit nachgeführt. Kein
-geschützter Quellpatch steht mehr aus. Pipeline-State-Test grün;
-Onboarding-Vollsuite 216/216 in zwei Blöcken mit je sechs Shards grün.
-Verify-Registrierung 692/692 und Case-Completion 247 Einträge gültig.
-Build-Stempel, kandidatengebundene Gesamtqualifikation und Installation sind
-noch offen. Keine weitere Reader-Korrekturrunde. Release-Push, Tag und
+Der PO hat die anschließenden Claude-Befunde ausdrücklich für den nächsten
+lokalen Kandidaten freigegeben. Die aktuelle, noch uncommittete Korrekturserie
+enthält Windows- und Agy-Greenfield-Reparaturen, drei Main-basierte
+Update-Kanäle, private-Identifier-Pre-Commit-Prüfung, Release-State-Abgleich,
+scratchfreie Commit-Hinweise und AC-18-Push-/Checkpoint-Schuldenlogik.
+Die betroffenen OKF-Modulkonzepte und die generierte Übersicht sind nachgeführt.
+Onboarding-Init 43/43, AC-18-Push 5/5 und Planungsprüfung 16/16 grün;
+Verify-Registrierung 696/696. Der PO hat die eng begrenzte Registrierung der
+drei AC-18-Tests im geschützten Verify-Gate signiert. Voller Verify, Security,
+Critic, Build-Stempel, kandidatengebundene Gesamtqualifikation und Installation
+sind noch offen. Keine weitere Reader-Korrekturrunde. Release-Push, Tag und
 Veröffentlichung haben keine Freigabe.
-
-Nach dem nächsten lokalen Kandidaten: die PO-Übergabe
-`/mnt/d/Dev/scratchpad/claude_issues/uebergabe-alfred-code-befunde-2026-09-29.md`
-vollständig ab Abschnitt 0 lesen, jeden Befund am dann aktuellen Stand prüfen
-und André erst einen Bericht mit A/B/C-Einordnung vorlegen. Umsetzung erst nach
-seiner Freigabe.
 
 ## Historischer Übergang — lokaler 0.7-Kandidat, 2026-09-27
 

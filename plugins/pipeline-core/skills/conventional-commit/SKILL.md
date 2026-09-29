@@ -52,6 +52,14 @@ rationale the diff does not support.
 
 ## 5. Output — propose only, never commit
 
-Present the full message as a single fenced block, ready for the caller to pass to `git commit -m`
-(or `-F`) themselves. State explicitly: "Proposed message — review and commit yourself; this skill
-does not run `git commit`." Never invoke `git commit` — `allowed-tools` intentionally excludes it.
+Present the full message as a single fenced block. For a normal commit, give the
+caller the scratch-free form `git commit -m '<subject>' -m '<body paragraph>'
+--trailer 'AI-Assisted: true' -- <paths>`, adding a grounded `Dispatch:` trailer
+when the repository requires one. Name the same exact paths in `git add -- <paths>`
+and in the commit. Keep each argument on one line; use repeated `-m` for separate
+body paragraphs. Use `-F` only when the content cannot safely be represented as
+single-line arguments. Render argument quoting for the actual shell (single
+quotes in POSIX shells and PowerShell; double quotes in `cmd.exe`) and never
+interpolate unreviewed shell syntax. State explicitly: "Proposed message — review and commit
+yourself; this skill does not run `git commit`." Never invoke `git commit` —
+`allowed-tools` intentionally excludes it.

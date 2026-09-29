@@ -847,6 +847,23 @@ check("D0 parser accepts NUL porcelain without path guessing", () => {
   assert.deepEqual(parsed, [{ path: "/repo", HEAD: "a".repeat(40), branch: "refs/heads/main" }]);
 });
 
+check("Git worktree porcelain paths are native and physical at discovery", () => {
+  const { primary } = repoFixture();
+  const spy = (_cmd, args, options) => {
+    const result = spawnSync("git", args, options);
+    if (args.includes("--porcelain")) {
+      // Git for Windows reports slash-separated paths even though Node uses
+      // backslashes; this fixture forces that Git representation on Windows.
+      const slashPath = primary.replaceAll("\\", "/");
+      result.stdout = String(result.stdout).replaceAll(primary, slashPath);
+    }
+    return result;
+  };
+  const repo = discoverRepository(primary, { spawn: spy });
+  assert.equal(repo.worktrees[0].path, resolve(primary));
+  assert.equal(repo.worktrees[0].path, repo.start);
+});
+
 check("WT-LOCAL-WINDOWS-ASSURANCE auto-remediates a pre-existing insecure directory instead of only failing closed", () => {
   const base = mkdtempSync(join(tmpdir(), "wt-lifecycle-win-assure-"));
   fixtureRoots.push(base);

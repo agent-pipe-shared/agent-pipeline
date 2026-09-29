@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,cpSync,existsSync,symlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {createAntigravityRefreshHost} from './antigravity-topology-refresh-host.mjs';
+import {createAntigravityRefreshHost,observeAntigravityLoadedTopologyWithWiring} from './antigravity-topology-refresh-host.mjs';
 import {observeAntigravityLoadedTopology} from './antigravity-plugin-topology.mjs';
 function fixture(t){
  const base=mkdtempSync(join(tmpdir(),'agy-refresh-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
@@ -42,9 +42,24 @@ test('sealed fixture refresh converges managed/import/global/workspace/wiring an
  assert.equal(observeAntigravityLoadedTopology({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
  const count=f.calls.length,r2=host.refresh();assert.equal(r2.status,'refreshed');assert.equal(r2.changed,false);assert.equal(f.calls.length,count+1,'only finite read-only version check on repeated converged refresh');
 });
-test('workspace intent refuses global retirement; explicit global scope enables registry-only retirement',t=>{
+test('workspace intent refuses stale global retirement; explicit global approval enables registry-only retirement',t=>{
  const f=fixture(t),before=readFileSync(f.global);let r=createAntigravityRefreshHost({...f.args,scope:'workspace',globalChangeApproved:false}).refresh();assert.equal(r.reason,'ATR-GLOBAL-SCOPE');assert.deepEqual(readFileSync(f.global),before);assert.equal(f.calls.length,1);
  r=createAntigravityRefreshHost({...f.args,scope:'workspace'}).refresh();assert.equal(r.status,'refreshed');assert.equal(existsSync(f.old),false);assert.equal(JSON.parse(readFileSync(f.local)).entries.at(-1).path,f.approvedSourceRoot);
+});
+test('empty workspace binds an existing matching managed copy and attests its exact source',t=>{
+ const f=fixture(t);rmSync(f.old,{recursive:true});cpSync(f.approvedSourceRoot,f.old,{recursive:true});
+ rmSync(join(f.workspaceRoot,'.agents'),{recursive:true});
+ const receipts=[];
+ const host=createAntigravityRefreshHost({...f.args,scope:'workspace',globalChangeApproved:false,writeInstalledReceipt:input=>{receipts.push(input);return {status:'written'};}});
+ const plan=host.prepare();assert.equal(plan.status,'prepared',JSON.stringify(plan));
+ assert.equal(plan.actions.some(action=>action.kind==='cli'),false);
+ const result=host.apply(plan);assert.equal(result.status,'refreshed',JSON.stringify(result));
+ assert.deepEqual(f.calls,[['--version'],['--version']]);
+ assert.equal(existsSync(f.old),true);
+ assert.equal(JSON.parse(readFileSync(f.local)).entries.at(-1).path,f.approvedSourceRoot);
+ assert.deepEqual(receipts,[{provider:'antigravity',plugin:{name:'pipeline-core',version:'0.7.0'},sourcePluginRoot:f.approvedSourceRoot,installedPluginRoot:f.old}]);
+ assert.equal(observeAntigravityLoadedTopology({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
+ assert.equal(observeAntigravityLoadedTopologyWithWiring({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
 });
 test('CLI interruption stops after actual partial uninstall; new explicit invocation recovers without hand-editing import metadata',t=>{
  const f=fixture(t);f.setFailure('install');const r=createAntigravityRefreshHost(f.args).refresh();assert.equal(r.status,'partial');assert.deepEqual(r.completed,['uninstall','validate']);assert(!existsSync(f.old));assert.equal(f.calls.length,4);
@@ -104,7 +119,7 @@ test('prepared source, actual hook bytes and registry preimages are bound before
 });
 
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 11) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 12) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

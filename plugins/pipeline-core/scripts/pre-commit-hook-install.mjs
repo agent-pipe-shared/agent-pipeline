@@ -709,6 +709,20 @@ async function main() {
   }
   if (paths.length === 0) return; // nothing staged (e.g. an --allow-empty commit) -- nothing to check
 
+  // Check the exact staged addition set before any commit can publish local
+  // operator identifiers. The scanner emits categories and scrubbed paths only.
+  try {
+    const privacyModule = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-private-identifiers.mjs")).href);
+    const privacy = privacyModule.scanChangedContent(projectRoot, { scopes: ["staged"] });
+    if (!privacy.ok) {
+      block(["staged content contains private local identifiers (category/count only): " + JSON.stringify(privacy.findings)]);
+      return;
+    }
+  } catch {
+    block(["private-identifier inspection is unavailable; the staged commit cannot be admitted."]);
+    return;
+  }
+
   let gateStrengthRuleFor;
   let loadProtectedTestPathRules;
   let protectedTestPathRuleFor;

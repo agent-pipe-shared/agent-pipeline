@@ -257,7 +257,14 @@ export function discoverRepository(startPath, options = {}) {
   const commonDir = realpathSync(commonRaw);
   if (basename(commonDir) !== ".git") fail("WT-GIT-COMMON-DIR", "primary checkout must have a physical .git common directory");
   const primaryRoot = assertExistingDirectoryPhysical(dirname(commonDir), "primary checkout");
-  const records = parseWorktreePorcelain(runGit(start, ["worktree", "list", "--porcelain", "-z"], options).stdout);
+  // Git for Windows emits forward slashes in porcelain even when Node's
+  // resolved/physical paths use backslashes. Canonicalize every row at this
+  // boundary so all consumers compare paths in the host's native form.
+  const records = parseWorktreePorcelain(runGit(start, ["worktree", "list", "--porcelain", "-z"], options).stdout)
+    .map((entry) => {
+      const nativePath = resolve(entry.path);
+      return { ...entry, path: existsSync(nativePath) ? realpathSync(nativePath) : nativePath };
+    });
   const primaryRecord = records.find((entry) => {
     try { return realpathSync(entry.path) === primaryRoot; } catch { return false; }
   });

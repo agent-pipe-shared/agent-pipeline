@@ -1214,6 +1214,11 @@ export function observePipelineStartPreflight({
         ])],
       }
     : rawInstalledPluginAttestation;
+  const antigravityAttestationSource = runner === "antigravity"
+    && antigravityTopology?.status === "current"
+    && typeof antigravityTopology.sourcePluginRoot === "string"
+    && pluginRootHasSelfApplicationGit(antigravityTopology.sourcePluginRoot)
+    ? antigravityTopology.sourcePluginRoot : null;
   const installedPluginAttestationCommand = installedPluginAttestationBase.status === "unavailable"
     && runner === "codex" && codexAttestationSource !== null
     && codexAttestationSource.status !== "unavailable"
@@ -1223,7 +1228,14 @@ export function observePipelineStartPreflight({
         installedPluginRoot: pluginRoot,
         launcher: resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
       })
-    : null;
+    : installedPluginAttestationBase.status === "unavailable" && antigravityAttestationSource !== null
+      ? installedPluginAttestationSetupCommand({
+          provider: "antigravity", version,
+          sourcePluginRoot: antigravityAttestationSource,
+          installedPluginRoot: pluginRoot,
+          launcher: resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
+        })
+      : null;
   const installedPluginAttestation = installedPluginAttestationCommand !== null
     ? {
         ...installedPluginAttestationBase,
@@ -1241,7 +1253,7 @@ export function observePipelineStartPreflight({
           templateId: "installed-plugin-attestation-setup",
           builderId: "installed-plugin-attestation-setup",
           revision: 1,
-          values: { provider: "codex", version, installedPluginRoot: pluginRoot },
+          values: { provider: runner, version, installedPluginRoot: pluginRoot },
         },
       }
     : installedPluginAttestationBase;

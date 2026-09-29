@@ -1094,6 +1094,27 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     const output = normalizeOnboardingDriverOutput(stepResult.output, root);
     const nextAction = output && typeof output === "object" ? output.nextAction : undefined;
 
+    // A mutation's advertised contract is the point at which a driver must
+    // stop. Replanning after an unexpected status can replay an identical
+    // digest-bound write indefinitely (or hide a rolled-back transaction).
+    if (!isAnchorStep && attemptedAction?.mutation === true
+      && Array.isArray(attemptedAction.expected?.statuses)
+      && (output?.schema !== attemptedAction.expected.schema
+        || !attemptedAction.expected.statuses.includes(output?.status))) {
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "error",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        error: { faultCode: "unexpected-mutation-outcome", exitCode: stepResult.exitCode, stderr: stepResult.stderr ?? null, stdout: stepResult.stdout ?? null },
+        blockedAction: { action: attemptedAction, priorStatus: lastAnchorOutput?.status ?? null, diagnostics: Array.isArray(output?.diagnostics) ? output.diagnostics : [] },
+        final: output,
+      };
+    }
+
     const wasAnchorStep = isAnchorStep;
     isAnchorStep = false;
     if (wasAnchorStep) {

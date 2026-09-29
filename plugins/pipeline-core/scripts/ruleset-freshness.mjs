@@ -162,7 +162,7 @@ function selectedTagFromRemote(output, channel) {
     current[field] = oid;
     tags.set(ref, current);
   }
-  if (ambiguous) return { selected: null, reason: "channel-unavailable" };
+  if (ambiguous) return { selected: null, reason: "channel-ambiguous" };
   const candidates = [...tags.values()]
     .map((tag) => ({ ref: tag.ref, version: tag.version, commit: tag.peeled ?? tag.commit }))
     .filter((tag) => OID.test(tag.commit ?? ""));
@@ -178,65 +178,22 @@ function selectedTagFromRemote(output, channel) {
       : { selected: null, reason: "channel-unavailable" };
   }
 
-  // Beta follows the highest observed beta core line. A final tag is eligible
-  // only when it is the exact final promotion of that same X.Y.Z line; an
-  // unrelated, numerically higher final must never hijack the beta channel.
   const betas = candidates.filter((tag) => validTag(tag.ref)?.beta !== null);
   betas.sort(descending);
-  const highestBeta = betas[0];
-  if (!highestBeta) return { selected: null, reason: "channel-unavailable" };
-  const core = validTag(highestBeta.ref).core;
-  const promoted = candidates.find((tag) => tag.ref === `refs/tags/v${core}`);
-  return { selected: promoted ?? highestBeta, reason: null };
+  return betas[0]
+    ? { selected: betas[0], reason: null }
+    : { selected: null, reason: "channel-unavailable" };
 }
 
 /**
- * `channel` here is the full resolved channel-config object (ADR-0078), not
- * a bare string: `alpha`'s resolution needs `alphaRef`/`alphaRefReason`
- * alongside `channel.channel`.
+ * `channel` is the full resolved channel-config object. Alpha follows main,
+ * beta selects a prerelease tag on main, and stable selects a final tag.
  */
 function selectedChannelTarget(remoteUrl, channel, options) {
-  if (channel.channel === "beta") {
-    // D4: beta is a reserved, currently-inactive update channel.
-    // `channel-inactive` is a deliberate, current product state -- distinct
-    // from `channel-unavailable` (a transient/environmental failure that
-    // invites a retry). It invites none, so no network call is ever
-    // attempted for it: collapsing the two into one reason would tell an
-    // operator to retry their way out of a decision. When beta activates,
-    // its mechanism is already implemented below (`selectedTagFromRemote`'s
-    // beta branch) -- activation only needs to stop short-circuiting here.
-    return { selected: null, reason: "channel-inactive" };
-  }
-  if (channel.channel === "alpha") {
-    // D3: alpha never resolves through a hardcoded refs/heads/main. It
-    // resolves only from the persisted project field naming a branch (any
-    // branch, `main` included, is a legitimate configuration). When no ref
-    // is configured -- or the configured value is malformed -- there is
-    // nothing honest to compare against, so alpha reports a typed result
-    // rather than fabricating a comparison against an arbitrary ref.
-    if (channel.alphaRefReason === "channel-unavailable") {
-      // The calibration file itself could not be read at all -- genuinely
-      // transient/environmental (ADR-0078 D3), so this is the one alphaRef
-      // failure that legitimately shares channel-unavailable's meaning.
-      return { selected: null, reason: "channel-unavailable" };
-    }
-    if (channel.alphaRefReason) {
-      // "malformed-configuration" (a duplicate `pipelineUpdateAlphaRef` key)
-      // or "invalid-alpha-ref" (a syntactically bad ref value): a
-      // persistent, operator-fixable configuration error, NOT a transient or
-      // environmental failure. Reporting it as channel-unavailable would
-      // invite a retry that a config fix -- not a retry -- can resolve. Keep
-      // this distinction: the same reasoning D4 already carries for
-      // channel-inactive vs channel-unavailable. Passing the computed reason
-      // straight through (rather than collapsing it again) is the fix.
-      return { selected: null, reason: channel.alphaRefReason };
-    }
-    if (!channel.alphaRef) {
-      return { selected: null, reason: "local-no-remote-claim" };
-    }
-  }
-  const selector = channel.channel === "alpha" ? `refs/heads/${channel.alphaRef}` : "refs/tags/*";
-  const remote = run("git", ["ls-remote", remoteUrl, selector], {
+  const selectors = channel.channel === "alpha"
+    ? ["refs/heads/main"]
+    : ["refs/heads/main", "refs/tags/*"];
+  const remote = run("git", ["ls-remote", remoteUrl, ...selectors], {
     ...options,
     timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
@@ -245,14 +202,34 @@ function selectedChannelTarget(remoteUrl, channel, options) {
     return { selected: null, reason: remote.error?.code === "ETIMEDOUT" || remote.signal ? "timeout" : "remote-unavailable" };
   }
   if (channel.channel === "alpha") {
-    const ref = `refs/heads/${channel.alphaRef}`;
-    const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-    const line = String(remote.stdout ?? "").trim().match(new RegExp(`^([0-9a-f]{40})\\s+${escapedRef}$`, "imu"));
+    const ref = "refs/heads/main";
+    const line = String(remote.stdout ?? "").trim().match(/^([0-9a-f]{40})\s+refs\/heads\/main$/imu);
     return line
       ? { selected: { ref, version: null, commit: line[1].toLowerCase() }, reason: null }
       : { selected: null, reason: "channel-unavailable" };
   }
-  return selectedTagFromRemote(remote.stdout, channel.channel);
+  if (channel.channel === "beta" || channel.channel === "stable") {
+    const prefix = channel.channel;
+    const mainLines = String(remote.stdout ?? "").trim().split("\n")
+      .filter((line) => line.endsWith("\trefs/heads/main"));
+    if (mainLines.length !== 1) {
+      return { selected: null, reason: mainLines.length ? `${prefix}-main-ambiguous` : `${prefix}-main-unavailable` };
+    }
+    const main = mainLines[0].match(/^([0-9a-f]{40})\s+refs\/heads\/main$/iu);
+    if (!main) return { selected: null, reason: `${prefix}-main-ambiguous` };
+    const tag = selectedTagFromRemote(remote.stdout, channel.channel);
+    if (!tag.selected) {
+      const reason = channel.channel === "beta"
+        ? tag.reason === "channel-ambiguous" ? "beta-tag-ambiguous" : "beta-tag-unavailable"
+        : tag.reason;
+      return { selected: null, reason };
+    }
+    return {
+      selected: tag.selected,
+      baseline: { ref: "refs/heads/main", version: null, commit: main[1].toLowerCase() },
+      reason: null,
+    };
+  }
 }
 
 /**
@@ -335,6 +312,16 @@ function compareLoadedToMarketplace(temporary, env, loaded, marketplace, options
     : { status: "unknown", reason: "loaded-comparison-unavailable" };
 }
 
+function tagMainRelation(temporary, env, channel, options) {
+  const counts = run("git", [
+    "--git-dir", temporary, "rev-list", "--left-right", "--count",
+    "refs/pipeline/marketplace...refs/pipeline/channel-main",
+  ], { ...options, env });
+  const match = String(counts.stdout ?? "").trim().match(/^(\d+)\s+(\d+)$/u);
+  if (counts.status !== 0 || !match) return `${channel}-ancestry-unavailable`;
+  return Number(match[1]) === 0 ? null : `${channel}-tag-outside-main`;
+}
+
 export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
   const repo = resolve(repoPath);
   const loaded = loadedIdentity(options);
@@ -399,6 +386,7 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
       "--no-write-fetch-head",
       remoteUrl,
       `${selected.commit}:refs/pipeline/marketplace`,
+      ...(target.baseline ? [`${target.baseline.commit}:refs/pipeline/channel-main`] : []),
     ], {
       ...options,
       timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -420,6 +408,17 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
       version: options.marketplaceVersion ?? selected.version ?? readMarketplaceVersion(temporary, env, options),
       commit: selected.commit,
     };
+    if (target.baseline) {
+      const ancestryReason = tagMainRelation(temporary, env, channel.channel, options);
+      if (ancestryReason) {
+        return result("unknown", {
+          loaded, marketplace, channel,
+          selected: { ...selected, version: marketplace.version },
+          policyDisposition: evaluateRulesetUpdatePolicy(policy, loaded),
+          reason: ancestryReason,
+        });
+      }
+    }
     const compared = compareLoadedToMarketplace(temporary, env, loaded, marketplace, options);
     const policyDisposition = evaluateRulesetUpdatePolicy(policy, loaded);
     return result(compared.status, {

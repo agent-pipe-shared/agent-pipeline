@@ -255,17 +255,14 @@ test("self-application topology keeps alpha when the loaded cache is outside its
   assert.equal(resolvePipelineUpdateChannelConfig(source, {
     pluginRoot: cachePluginRoot,
   }).channel, "stable");
-  // ADR-0078 D3: with no persisted alpha-ref field configured, alpha reports
-  // the typed "local, no remote claim" result rather than fabricating a
-  // comparison against an arbitrary ref (it must never resolve through the
-  // hardcoded refs/heads/main this scenario exercised pre-ADR-0078).
+  // Alpha now follows main even without a persisted alpha-ref field.
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote, pluginRoot: cachePluginRoot, policy: null, selfApplication: true,
   });
   assert.equal(value.channel, "alpha");
-  assert.equal(value.ref, null);
-  assert.equal(value.status, "unknown");
-  assert.equal(value.reason, "local-no-remote-claim");
+  assert.equal(value.ref, "refs/heads/main");
+  assert.equal(value.status, "current");
+  assert.equal(value.reason, null);
 });
 
 test("persisted project channel config is closed, read-only, and takes precedence", () => {
@@ -284,16 +281,14 @@ test("persisted project channel config is closed, read-only, and takes precedenc
       pluginRoot, selfApplication: true,
     }).channel, channel);
     if (channel === "alpha") {
-      // No pipelineUpdateAlphaRef is configured in this fixture (only
-      // pipelineUpdateChannel), so ADR-0078 D3's "local, no remote claim"
-      // result applies -- alpha never falls back to refs/heads/main.
+      // Alpha follows main regardless of the legacy alpha-ref field.
       const value = inspectPipelineUpdateAvailability(source, {
         remoteUrl: remote, pluginRoot, policy: null, selfApplication: true,
       });
       assert.equal(value.channel, "alpha");
-      assert.equal(value.ref, null);
-      assert.equal(value.status, "unknown");
-      assert.equal(value.reason, "local-no-remote-claim");
+      assert.equal(value.ref, "refs/heads/main");
+      assert.equal(value.status, "current");
+      assert.equal(value.reason, null);
       assert.equal(JSON.stringify(value).includes("example.invalid"), false);
     }
   }
@@ -311,7 +306,7 @@ test("persisted project channel config is closed, read-only, and takes precedenc
   assert.equal(unavailable.ref, null);
 });
 
-test("alpha observes only the configured branch ref, main included (ADR-0078 D3/AC-2)", () => {
+test("alpha observes only main and ignores release tags", () => {
   const { root, remote, source, pluginRoot } = fixture("alpha-main");
   const publisher = join(root, "publisher");
   git(root, "clone", "-q", remote, publisher);
@@ -321,10 +316,6 @@ test("alpha observes only the configured branch ref, main included (ADR-0078 D3/
   git(publisher, "tag", "v9.0.0");
   git(publisher, "push", "-q", "origin", "v9.0.0");
 
-  // Naming "main" as the configured alpha ref is a legitimate configuration
-  // (ADR-0078 D3), not a special case -- it must behave exactly like any
-  // other configured branch name, resolved only through the field, never
-  // through a hardcoded fallback.
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
     pluginRoot,
@@ -337,11 +328,11 @@ test("alpha observes only the configured branch ref, main included (ADR-0078 D3/
   assert.equal(value.version, "0.4.8");
   assert.equal(value.status, "update-available");
   // The v9.0.0 tag must never leak into an alpha resolution -- alpha reads
-  // only refs/heads/<configured ref>, never refs/tags/*.
+  // only refs/heads/main, never refs/tags/*.
   assert.notEqual(value.version, "9.0.0");
 });
 
-test("alpha resolves a non-main configured branch, proving field-driven resolution rather than a hardcoded fallback (ADR-0078 D3/AC-1)", () => {
+test("alpha ignores a legacy configured branch and follows main", () => {
   const { root, remote, source, pluginRoot } = fixture("alpha-feature-branch");
   const publisher = join(root, "publisher");
   git(root, "clone", "-q", remote, publisher);
@@ -349,9 +340,7 @@ test("alpha resolves a non-main configured branch, proving field-driven resoluti
   git(publisher, "checkout", "-q", "-b", "feat/sprint-nova-codex-v046");
   commitVersion(publisher, "0.4.8", "feature-branch-next");
   git(publisher, "push", "-q", "origin", "feat/sprint-nova-codex-v046");
-  // main stays at the older, unmoved version -- if alpha still fell back to
-  // refs/heads/main this test would observe "current"/0.4.7, not
-  // "update-available"/0.4.8.
+  // main stays at the older version; a legacy feature ref cannot select it.
 
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
@@ -363,12 +352,12 @@ test("alpha resolves a non-main configured branch, proving field-driven resoluti
     },
   });
   assert.equal(value.channel, "alpha");
-  assert.equal(value.ref, "refs/heads/feat/sprint-nova-codex-v046");
-  assert.equal(value.version, "0.4.8");
-  assert.equal(value.status, "update-available");
+  assert.equal(value.ref, "refs/heads/main");
+  assert.equal(value.version, "0.4.7");
+  assert.equal(value.status, "current");
 });
 
-test("a configured alpha ref that does not exist on the remote is typed channel-unavailable (ADR-0078 D3/AC-6)", () => {
+test("a nonexistent legacy alpha ref does not affect main resolution", () => {
   const { remote, source, pluginRoot } = fixture("alpha-missing-branch");
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
@@ -379,12 +368,12 @@ test("a configured alpha ref that does not exist on the remote is typed channel-
       status: "ready", alphaRef: "feat/does-not-exist", source: "project-config", reason: null,
     },
   });
-  assert.equal(value.status, "unknown");
-  assert.equal(value.reason, "channel-unavailable");
-  assert.equal(value.ref, null);
+  assert.equal(value.status, "current");
+  assert.equal(value.reason, null);
+  assert.equal(value.ref, "refs/heads/main");
 });
 
-test("a malformed or non-string configured alpha ref is typed invalid-alpha-ref, a persistent config error distinct from channel-unavailable (finding 1 / AC-1)", () => {
+test("an invalid legacy alpha ref does not affect main resolution", () => {
   const { remote, source, pluginRoot } = fixture("alpha-malformed-ref");
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
@@ -395,14 +384,12 @@ test("a malformed or non-string configured alpha ref is typed invalid-alpha-ref,
       status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref",
     },
   });
-  assert.equal(value.status, "unknown");
-  // Not channel-unavailable: a bad ref value is the operator's to fix, and
-  // channel-unavailable invites a retry that can never fix it.
-  assert.equal(value.reason, "invalid-alpha-ref");
-  assert.equal(value.ref, null);
+  assert.equal(value.status, "current");
+  assert.equal(value.reason, null);
+  assert.equal(value.ref, "refs/heads/main");
 });
 
-test("a duplicate pipelineUpdateAlphaRef key is typed malformed-configuration, distinct from channel-unavailable (finding 1 / AC-1)", () => {
+test("a duplicate legacy alpha-ref key does not affect main resolution", () => {
   const { remote, source, pluginRoot } = fixture("alpha-duplicate-key");
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
@@ -413,12 +400,12 @@ test("a duplicate pipelineUpdateAlphaRef key is typed malformed-configuration, d
       status: "unknown", alphaRef: null, source: "project-config", reason: "malformed-configuration",
     },
   });
-  assert.equal(value.status, "unknown");
-  assert.equal(value.reason, "malformed-configuration");
-  assert.equal(value.ref, null);
+  assert.equal(value.status, "current");
+  assert.equal(value.reason, null);
+  assert.equal(value.ref, "refs/heads/main");
 });
 
-test("a genuinely unreadable calibration keeps reporting channel-unavailable for the alpha-ref path too (AC-2)", () => {
+test("a legacy alpha-ref read error does not affect main resolution", () => {
   const { remote, source, pluginRoot } = fixture("alpha-ref-calibration-unreadable");
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
@@ -429,12 +416,12 @@ test("a genuinely unreadable calibration keeps reporting channel-unavailable for
       status: "unknown", alphaRef: null, source: "project-config", reason: "channel-unavailable",
     },
   });
-  assert.equal(value.status, "unknown");
-  assert.equal(value.reason, "channel-unavailable");
-  assert.equal(value.ref, null);
+  assert.equal(value.status, "current");
+  assert.equal(value.reason, null);
+  assert.equal(value.ref, "refs/heads/main");
 });
 
-test("no alpha ref configured at all is typed local-no-remote-claim, never a fabricated comparison (ADR-0078 D3/AC-3)", () => {
+test("alpha follows main without a legacy ref setting", () => {
   const { remote, source, pluginRoot } = fixture("alpha-unconfigured");
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
@@ -443,32 +430,91 @@ test("no alpha ref configured at all is typed local-no-remote-claim, never a fab
     projectConfig: { status: "ready", updateChannel: "alpha" },
     alphaRefConfig: { status: "absent", alphaRef: null, source: null, reason: null },
   });
-  assert.equal(value.status, "unknown");
-  assert.equal(value.reason, "local-no-remote-claim");
-  assert.equal(value.ref, null);
-  assert.equal(value.version, null);
-  assert.equal(value.commit, null);
+  assert.equal(value.status, "current");
+  assert.equal(value.reason, null);
+  assert.equal(value.ref, "refs/heads/main");
+  assert.equal(value.version, "0.4.7");
+  assert.match(value.commit, /^[0-9a-f]{40}$/u);
 });
 
-test("beta reports the typed channel-inactive state without ever attempting a network call (ADR-0078 D4/AC-4/AC-6)", () => {
-  const { source, pluginRoot } = fixture("beta-inactive");
-  // A deliberately unreachable remote: if beta attempted any network call at
-  // all, this would surface as "remote-unavailable" or "timeout" instead --
-  // proving the short-circuit precedes any git ls-remote attempt, which is
-  // the whole point of the channel-inactive/channel-unavailable distinction
-  // (channel-unavailable invites a retry, channel-inactive must not).
-  const unreachableRemote = join(source, "definitely-does-not-exist.git");
-  const value = inspectPipelineUpdateAvailability(source, {
-    remoteUrl: unreachableRemote,
-    pluginRoot,
-    policy: null,
+test("beta resolves the highest prerelease tag on main", () => {
+  const { root, remote, source, pluginRoot } = fixture("beta-main");
+  const inspect = () => inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote, pluginRoot, policy: null,
     projectConfig: { status: "ready", updateChannel: "beta" },
   });
-  assert.equal(value.channel, "beta");
+  git(source, "tag", "v0.4.8-beta.1");
+  git(source, "push", "-q", "public", "v0.4.8-beta.1");
+  const before = snapshot(source);
+  const equal = inspect();
+  assert.equal(equal.channel, "beta");
+  assert.equal(equal.status, "current");
+  assert.equal(equal.reason, null);
+  assert.equal(equal.ref, "refs/tags/v0.4.8-beta.1");
+  assert.equal(equal.commit, before.head);
+  assert.equal(equal.updateAvailable, false);
+
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", remote, publisher);
+  configure(publisher);
+  commitVersion(publisher, "0.4.8-beta.2", "tagged-beta");
+  const tagged = git(publisher, "rev-parse", "HEAD");
+  git(publisher, "tag", "v0.4.8-beta.2");
+  git(publisher, "push", "-q", "origin", "main", "--tags");
+  const beta = inspect();
+  assert.equal(beta.status, "update-available");
+  assert.equal(beta.reason, null);
+  assert.equal(beta.ref, "refs/tags/v0.4.8-beta.2");
+  assert.equal(beta.commit, tagged);
+  assert.equal(beta.version, "0.4.8-beta.2");
+  assert.deepEqual(snapshot(source), before);
+});
+
+test("beta reports missing tag, missing main, tag outside main, and remote failure as unknown", () => {
+  const missing = fixture("beta-missing-tag");
+  const inspect = (remote = missing.remote) => inspectPipelineUpdateAvailability(missing.source, {
+    remoteUrl: remote, pluginRoot: missing.pluginRoot, policy: null,
+    projectConfig: { status: "ready", updateChannel: "beta" },
+  });
+  assert.equal(inspect().reason, "beta-tag-unavailable");
+  assert.equal(inspect(join(missing.root, "absent.git")).reason, "remote-unavailable");
+
+  git(missing.source, "checkout", "-q", "-b", "side");
+  commitVersion(missing.source, "0.4.9-beta.1", "side-beta");
+  git(missing.source, "tag", "v0.4.9-beta.1");
+  git(missing.source, "push", "-q", "public", "v0.4.9-beta.1");
+  git(missing.source, "checkout", "-q", "main");
+  const diverged = inspect();
+  assert.equal(diverged.status, "unknown");
+  assert.equal(diverged.reason, "beta-tag-outside-main");
+  assert.equal(diverged.ref, "refs/tags/v0.4.9-beta.1");
+
+  git(missing.remote, "update-ref", "-d", "refs/heads/main");
+  const noMain = inspect();
+  assert.equal(noMain.status, "unknown");
+  assert.equal(noMain.reason, "beta-main-unavailable");
+});
+
+test("beta rejects conflicting remote tag observations before fetching objects", () => {
+  const { remote, source, pluginRoot } = fixture("beta-ambiguous-tag");
+  git(source, "tag", "v0.4.8-beta.1");
+  git(source, "push", "-q", "public", "v0.4.8-beta.1");
+  const competing = "f".repeat(40);
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote, pluginRoot, policy: null,
+    projectConfig: { status: "ready", updateChannel: "beta" },
+    spawn: (command, args, options) => {
+      const observed = spawnSync(command, args, options);
+      if (args[0] !== "ls-remote") return observed;
+      return {
+        ...observed,
+        stdout: `${observed.stdout}${competing}\trefs/tags/v0.4.8-beta.1\n`,
+      };
+    },
+  });
   assert.equal(value.status, "unknown");
-  assert.equal(value.reason, "channel-inactive");
-  assert.notEqual(value.reason, "channel-unavailable");
-  assert.equal(value.ref, null);
+  assert.equal(value.reason, "beta-tag-ambiguous");
+  assert.equal(value.commit, null);
 });
 
 test("stable selects only the highest final release tag and invalid or absent tags fail typed", () => {
@@ -505,6 +551,52 @@ test("stable selects only the highest final release tag and invalid or absent ta
   assert.equal(unavailable.reason, "channel-unavailable");
   assert.equal(unavailable.ref, null);
   assert.equal(unavailable.commit, null);
+});
+
+test("stable fails closed when the highest final tag is outside main or main is absent", () => {
+  const { remote, source, pluginRoot } = fixture("stable-outside-main");
+  const inspect = () => inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote, pluginRoot, policy: null,
+    projectConfig: { status: "ready", updateChannel: "stable" },
+  });
+  git(source, "tag", "v0.4.8");
+  git(source, "push", "-q", "public", "v0.4.8");
+  git(source, "checkout", "-q", "-b", "side");
+  commitVersion(source, "0.4.9", "side-final");
+  git(source, "tag", "v0.4.9");
+  git(source, "push", "-q", "public", "v0.4.9");
+  git(source, "checkout", "-q", "main");
+
+  const outside = inspect();
+  assert.equal(outside.status, "unknown");
+  assert.equal(outside.reason, "stable-tag-outside-main");
+  assert.equal(outside.ref, "refs/tags/v0.4.9");
+  assert.equal(outside.updateAvailable, false);
+
+  git(remote, "update-ref", "-d", "refs/heads/main");
+  const noMain = inspect();
+  assert.equal(noMain.status, "unknown");
+  assert.equal(noMain.reason, "stable-main-unavailable");
+  assert.equal(noMain.updateAvailable, false);
+});
+
+test("stable fails closed when tag ancestry cannot be determined", () => {
+  const { remote, source, pluginRoot } = fixture("stable-ancestry-unavailable");
+  git(source, "tag", "v0.4.8");
+  git(source, "push", "-q", "public", "v0.4.8");
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote, pluginRoot, policy: null,
+    projectConfig: { status: "ready", updateChannel: "stable" },
+    spawn: (command, args, options) => {
+      if (args.includes("refs/pipeline/marketplace...refs/pipeline/channel-main")) {
+        return { status: 1, stdout: "", stderr: "simulated ancestry failure" };
+      }
+      return spawnSync(command, args, options);
+    },
+  });
+  assert.equal(value.status, "unknown");
+  assert.equal(value.reason, "stable-ancestry-unavailable");
+  assert.equal(value.updateAvailable, false);
 });
 
 test("older loaded Pipeline is update-available but ordinary repository writes stay permitted", () => {

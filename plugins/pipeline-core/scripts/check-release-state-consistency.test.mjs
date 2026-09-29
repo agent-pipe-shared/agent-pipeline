@@ -10,7 +10,7 @@ import { checkReleaseStateConsistency } from "./check-release-state-consistency.
 const root = mkdtempSync(join(tmpdir(), "release-state-")); mkdirSync(join(root, "docs"));
 const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
 assert.equal(git("init", "--quiet", "-b", "main").status, 0); git("config", "user.email", "release-state@example.invalid"); git("config", "user.name", "Release State Fixture");
-writeFileSync(join(root, "release.txt"), "released\n"); git("add", "release.txt"); assert.equal(git("commit", "--quiet", "-m", "release").status, 0); assert.equal(git("tag", "v0.4.7").status, 0);
+writeFileSync(join(root, "release.txt"), "released\n"); writeFileSync(join(root, "VERSION"), "0.4.7\n"); git("add", "release.txt", "VERSION"); assert.equal(git("commit", "--quiet", "-m", "release").status, 0); assert.equal(git("tag", "v0.4.7").status, 0);
 const commit = git("rev-parse", "v0.4.7^{commit}").stdout.trim(); const tree = git("rev-parse", "v0.4.7^{tree}").stdout.trim();
 const projection = createPublicReleaseState({ version: "0.4.7", tag: "v0.4.7", commit, tree, publicationStatus: "published", releaseUrlClass: "public-release", observedAt: "2026-08-01T00:00:00.000Z" });
 const write = (record, status = record.publicationStatus) => {
@@ -26,4 +26,8 @@ assert.deepEqual(checkReleaseStateConsistency({ rootDir: root }, { observeTag: (
 write(projection, "unpublished");
 assert.deepEqual(checkReleaseStateConsistency({ rootDir: root }, { observeTag: () => ({ commit, tree }) }).reasons, ["state-projection-mismatch"]);
 write(projection);
-rmSync(root, { recursive: true, force: true }); console.log("release-state-consistency: 4 tests passed");
+writeFileSync(join(root, "VERSION"), "0.4.8\n"); git("add", "VERSION"); assert.equal(git("commit", "--quiet", "-m", "next release").status, 0); assert.equal(git("tag", "v0.4.8").status, 0);
+assert.deepEqual(checkReleaseStateConsistency({ rootDir: root }).reasons, ["published-final-tag-stale"]);
+assert.equal(git("tag", "-d", "v0.4.8").status, 0);
+assert.equal(checkReleaseStateConsistency({ rootDir: root }).status, "consistent");
+rmSync(root, { recursive: true, force: true }); console.log("release-state-consistency: 6 tests passed");

@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-three-main-update-channels",
+  "title": "Three update channels on the published main line",
+  "status": "proposed",
+  "digest": "0a3401d235d0fd122f8749456da364ec617545e31ae5fccadb2bc6e8790f021b",
+  "scope": "global",
+  "date": "2026-09-29"
+}

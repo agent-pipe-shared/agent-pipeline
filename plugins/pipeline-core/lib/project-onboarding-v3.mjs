@@ -6852,7 +6852,11 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
     if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withAllPendingOnboardingAsksAttached(v4Inspection(rootDir, fs, intent, runner), fs);
-    applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
+    const applied = applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
+    // A failed transaction is an outcome, not an inspection hint. In
+    // particular, re-inspecting after rollback would advertise the same seed
+    // plan and cause automatic drivers to repeat the failed mutation.
+    if (applied.status !== "applied") return applied;
     return withAllPendingOnboardingAsksAttached(v4Inspection(rootDir, fs, intent, runner), fs);
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);

@@ -21,7 +21,7 @@
  * 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess.md).
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,6 +34,7 @@ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "..
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
 import { projectConfirmedIntakeLanguage } from "../lib/onboarding-later-language.mjs";
 import { readMachinePlane } from "../lib/machine-plane.mjs";
+import { applyProjectOnboardingLifecycleV4, planProjectOnboardingLifecycleV4 } from "../lib/project-onboarding-v3.mjs";
 
 const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 
@@ -107,6 +108,50 @@ const GREENFIELD_MACHINE_STATES = [
   { name: "no-registered-key", env: FIXTURE_ENV, hasKey: false },
   { name: "valid-registered-key", env: FIXTURE_ENV_WITH_KEY, hasKey: true },
 ];
+const MATRIX_CELL_ENV = "PIPELINE_ONBOARDING_TEST_MATRIX_CELL";
+const MATRIX_CELL = process.env[MATRIX_CELL_ENV];
+const MATRIX_CASES = {
+  convergence: GREENFIELD_RUNNERS.flatMap((runner) =>
+    GREENFIELD_MACHINE_STATES.map((machine) => `${runner}/${machine.name}`)),
+  approval: GREENFIELD_RUNNERS.flatMap((runner) => ["signature", "chat"].map((mode) => `${runner}/${mode}`)),
+  rollback: ["setup", "repository-pointer-readback", "machine-write", "machine-readback",
+    "policy-write", "policy-readback", "existing-pem-policy-write"],
+};
+
+function runMatrixCell(group, cell) {
+  return new Promise((resolve, reject) => {
+    const childEnv = { ...process.env, [MATRIX_CELL_ENV]: `${group}:${cell}` };
+    // node:test marks its own file worker; a nested --test otherwise exits zero
+    // after skipping every file as a recursive run.
+    delete childEnv.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, [
+      "--test", "--test-reporter=tap", "--test-name-pattern", "^isolated onboarding matrix cell$",
+      fileURLToPath(import.meta.url),
+    ], {
+      env: childEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => { output += chunk; });
+    child.stderr.on("data", (chunk) => { output += chunk; });
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
+      if (code === 0 && /# tests 1\b/u.test(output) && /# pass 1\b/u.test(output)) resolve();
+      else reject(new Error(`${group}/${cell}: node --test exited ${code ?? signal}\n${output}`));
+    });
+  });
+}
+
+async function runMatrix(group) {
+  // A bounded process pool lets synchronous CLI walks overlap without sharing roots or
+  // test fixtures. Each child runs exactly one named cell and reports its own failure.
+  const cells = MATRIX_CASES[group];
+  for (let offset = 0; offset < cells.length; offset += 3) {
+    const settled = await Promise.allSettled(cells.slice(offset, offset + 3).map((cell) => runMatrixCell(group, cell)));
+    const failures = settled.filter((result) => result.status === "rejected").map((result) => result.reason.message);
+    assert.deepEqual(failures, [], failures.join("\n"));
+  }
+}
 
 // NVA-B-CIGREEN-1. The driver executes the selected runner's OWN executable, so
 // this fixture silently depended on the host having `codex`/`claude`/
@@ -124,6 +169,7 @@ const RUNNER_STUB_DIR = mkdtempSync(join(tmpdir(), "onboarding-init-runner-stubs
 for (const runner of GREENFIELD_RUNNERS) {
   writeFileSync(join(RUNNER_STUB_DIR, runner), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
 }
+after(() => dispose(RUNNER_STUB_DIR));
 const PATH_DELIMITER = process.platform === "win32" ? ";" : ":";
 const STUBBED_RUNNER_PATH = [RUNNER_STUB_DIR, process.env.PATH]
   .filter((entry) => typeof entry === "string" && entry.length > 0)
@@ -176,12 +222,13 @@ function recordAnsweredOnboardingValues(root, runner, env) {
   }
 }
 
-test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh no-key/valid-key homes without ambient drift or repeated answered asks", () => {
+function checkConvergenceCell(selectedCell) {
   const roots = [];
   const firstShapes = [];
   try {
     for (const runner of GREENFIELD_RUNNERS) {
       for (const machine of GREENFIELD_MACHINE_STATES) {
+        if (selectedCell !== `${runner}/${machine.name}`) continue;
         const root = freshRoot();
         roots.push(root);
         const label = `${runner}/${machine.name}`;
@@ -189,14 +236,14 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh 
         const first = driveOnboardingInit({ rootDir: root, runner, env });
 
         assert.equal(first.schema, SCHEMA, label);
-        assert.equal(first.outcome, "pending-asks", `${label}: first stable stop is genuine published human input: ${JSON.stringify(first)}`);
-        assert.equal(first.final?.status, "runtime-initialization-required", `${label}: runner choice must not alter the stable boundary`);
-        assert.equal(first.final?.nextAction?.kind, "command", `${label}: pending asks accompany the unchanged real next command`);
+        assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", `${label}: first stable stop is genuine published human input: ${JSON.stringify(first)}`);
+        assert.equal(first.final?.status, runner === "codex" ? "intake-required" : "runtime-initialization-required", `${label}: runner-specific intake boundary must be explicit`);
+        assert.equal(first.final?.nextAction?.kind, runner === "codex" ? "collect-input" : "command", `${label}: the primary action remains visible alongside pending asks`);
         assert.ok(first.pendingAsks.length > 0, `${label}: the boundary must carry real asks`);
         assertPinnedRunner(first, runner, label);
         firstShapes.push({ schema: first.schema, outcome: first.outcome, status: first.final.status, nextActionKind: first.final.nextAction.kind });
 
-        const askNames = first.pendingAsks.flatMap(actionInputNames);
+        const askNames = [...first.pendingAsks.flatMap(actionInputNames), ...actionInputNames(first.collectInput)];
         assert.equal(askNames.includes("trustAnchorPointerRepairAcknowledged"), false, `${label}: a fresh or valid key is never a broken pointer`);
         assert.equal(askNames.includes("trustAnchorPolicyRepairAcknowledged"), false, `${label}: a valid policy is never an external repair failure`);
         if (machine.hasKey) {
@@ -216,7 +263,7 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh 
         // be asked again, while unrelated unresolved asks remain a truthful stopping point.
         recordAnsweredOnboardingValues(root, runner, env);
         const reentrant = driveOnboardingInit({ rootDir: root, runner, env });
-        assert.equal(reentrant.outcome, "pending-asks", `${label}: unrelated genuine asks remain surfaced`);
+        assert.equal(reentrant.outcome, runner === "codex" ? "collect-input" : "pending-asks", `${label}: unrelated genuine asks remain surfaced`);
         assertPinnedRunner(reentrant, runner, `${label}/reentrant`);
         const reentrantNames = [
           ...reentrant.pendingAsks.flatMap(actionInputNames),
@@ -227,10 +274,14 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh 
         }
       }
     }
-    assert.equal(new Set(firstShapes.map((shape) => JSON.stringify(shape))).size, 1, "all six cells converge to one driver outcome shape");
+    assert.equal(firstShapes.length, 1, `${selectedCell}: exactly one runner/key cell runs`);
   } finally {
     for (const root of roots) dispose(root);
   }
+}
+
+test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh no-key/valid-key homes without ambient drift or repeated answered asks", async () => {
+  if (!MATRIX_CELL) await runMatrix("convergence");
 });
 
 test("initial answer CLI refuses absent or invalid language before any source or receipt write", () => {
@@ -594,7 +645,7 @@ test("host-managed recovery refuses changed answers and foreign post-interruptio
   } finally { dispose(root); dispose(home); }
 });
 
-test("public onboarding driver keeps chat keyless and reaches a separate signature-anchor action", () => {
+function checkApprovalCell(selectedCell) {
   const fixtures = [];
   try {
     const cases = [
@@ -604,6 +655,7 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
       ]),
     ];
     for (const { runner, pushApproval } of cases) {
+      if (selectedCell !== `${runner}/${pushApproval}`) continue;
       const root = freshRoot();
       const home = freshHome();
       const sourceDirectory = mkdtempSync(join(tmpdir(), "onboarding-init-existing-source-"));
@@ -618,7 +670,7 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
       }, runner);
 
       const first = driveOnboardingInit({ rootDir: root, runner, env });
-      assert.equal(first.outcome, "pending-asks", runner);
+      assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
       const initialAsk = first.pendingAsks[0];
       assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"],
@@ -756,6 +808,10 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
   } finally {
     for (const path of fixtures) dispose(path);
   }
+}
+
+test("public onboarding driver keeps chat keyless and reaches a separate signature-anchor action", async () => {
+  if (!MATRIX_CELL) await runMatrix("approval");
 });
 
 test("a failed separate signature-anchor action preserves the completed initial chat-free transaction", () => {
@@ -826,7 +882,7 @@ test("new-key bootstrap omits an existing-key operand, requires durable pointer 
       runner: "codex",
       env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
     });
-    assert.equal(seeded.outcome, "pending-asks");
+    assert.equal(seeded.outcome, "collect-input");
     let setupCalls = 0;
     const runSetup = (_executable, argv) => {
       setupCalls += 1;
@@ -897,7 +953,7 @@ test("new-key bootstrap omits an existing-key operand, requires durable pointer 
   }
 });
 
-test("first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary", () => {
+function checkRollbackCell(selectedCell) {
   const failures = [
     {
       name: "setup",
@@ -940,12 +996,13 @@ test("first-anchor transaction restores exact repository, machine, and pointer p
     },
   ];
   for (const failure of failures) {
+    if (selectedCell !== failure.name) continue;
     const root = freshRoot();
     const home = freshHome();
     const destination = join(home, `authority-${failure.name}`);
     try {
       const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
-      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "collect-input");
       const policyPath = join(root, "project", "critical-human-proof.json");
       const policyPreimage = readFileSync(policyPath, "utf8");
       const pointerPath = join(root, ".git", "agent-pipeline", "po-key-directory.json");
@@ -999,6 +1056,10 @@ test("first-anchor transaction restores exact repository, machine, and pointer p
       dispose(home);
     }
   }
+}
+
+test("first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary", async () => {
+  if (!MATRIX_CELL) await runMatrix("rollback");
 });
 
 test("a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice", () => {
@@ -1229,6 +1290,52 @@ test("driveOnboardingInit: the step cap fires on a chain that never converges", 
   } finally {
     dispose(root);
   }
+});
+
+test("driveOnboardingInit: failed portable seed stops at its first unexpected mutation outcome", () => {
+  const root = freshRoot();
+  try {
+    let calls = 0;
+    const run = () => {
+      calls += 1;
+      if (calls === 1) return respond({
+        schema: "pipeline.project-onboarding.v4",
+        status: "portable-seed-required",
+        nextAction: {
+          kind: "command", executable: "node", argv: ["/plugin/scripts/project-onboarding-v3.mjs", "apply-portable-seed", "--root", root, "--plan-sha256", "a".repeat(64), "--activate"],
+          mutation: true, requiresConfirmation: true,
+          expected: { schema: "pipeline.project-onboarding.v4", statuses: ["runtime-initialization-required"] },
+        },
+      });
+      return respond({
+        schema: "pipeline.project-onboarding-plan.v3",
+        status: "rolled-back",
+        diagnostics: [{ path: "$.transaction", code: "apply_failed", message: "synthetic failure" }],
+      });
+    };
+    const result = driveOnboardingInit({ rootDir: root, runner: "claude", run });
+    assert.equal(result.outcome, "error");
+    assert.equal(result.error.faultCode, "unexpected-mutation-outcome");
+    assert.equal(result.final.status, "rolled-back");
+    assert.equal(result.blockedAction.diagnostics[0].code, "apply_failed");
+    assert.equal(calls, 2);
+  } finally { dispose(root); }
+});
+
+test("portable lifecycle apply returns its rollback instead of replanning the same seed", () => {
+  const root = freshRoot();
+  try {
+    const plan = planProjectOnboardingLifecycleV4({ rootDir: root, runner: "claude", operation: "portable" });
+    const argv = plan.nextAction.argv;
+    const digest = argv[argv.indexOf("--plan-sha256") + 1];
+    const result = applyProjectOnboardingLifecycleV4({
+      rootDir: root, runner: "claude", operation: "portable", planSha256: digest, activate: true,
+      deps: { writeFileSync: () => { throw new Error("synthetic seed write failure"); } },
+    });
+    assert.equal(result.status, "rolled-back");
+    assert.equal(result.diagnostics[0].code, "apply_failed");
+    assert.equal(existsSync(join(root, ".git")), false);
+  } finally { dispose(root); }
 });
 
 // The four tests below use a synthetic responder, same idiom as the non-converging
@@ -1854,3 +1961,15 @@ test("DEFAULT_STEP_CAP is a small, positive constant", () => {
   assert.ok(DEFAULT_STEP_CAP > 0);
   assert.ok(DEFAULT_STEP_CAP < 1000, "the cap must be a small constant, not effectively unbounded");
 });
+
+if (MATRIX_CELL) {
+  test("isolated onboarding matrix cell", () => {
+    const separator = MATRIX_CELL.indexOf(":");
+    const group = MATRIX_CELL.slice(0, separator);
+    const cell = MATRIX_CELL.slice(separator + 1);
+    assert.ok(MATRIX_CASES[group]?.includes(cell), `unknown onboarding matrix cell: ${MATRIX_CELL}`);
+    if (group === "convergence") checkConvergenceCell(cell);
+    else if (group === "approval") checkApprovalCell(cell);
+    else checkRollbackCell(cell);
+  });
+}

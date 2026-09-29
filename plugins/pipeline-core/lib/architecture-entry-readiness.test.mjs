@@ -79,6 +79,52 @@ test("a PO-deferred adoption reports complete fitness observations without enfor
   assert.equal(result.artifacts.baseline.status, "current");
   assert.equal(result.disposition.disposition, "deferred");
 });
+
+test("checkpoint map debt blocks the next planning boundary even during adoption deferral", () => {
+  const debt = { type: "architecture-map-stale", target: "architecture/map/pipeline-core.md",
+    contract: "plugins/pipeline-core/scripts/architecture-fitness.mjs" };
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    deps: {
+      checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
+      readCheckpointArchitectureDebt: () => ({ ok: true, debt: [{ stalenessDebt: [debt] }], resolvedDebt: [] }),
+    },
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "ARCHITECTURE-CHECKPOINT-DEBT-OPEN");
+  assert.equal(result.nextAction.kind, "repair-required");
+  assert.equal(result.nextAction.path, "architecture/map/");
+  assert.equal(result.artifacts.checkpointDebt.openCount, 1);
+  assert.deepEqual(result.artifacts.checkpointDebt.targets, [debt.target]);
+});
+
+test("a descendant map repair consumes checkpoint debt only after class-7 passes", () => {
+  const debt = { type: "architecture-map-stale", target: "architecture/map/pipeline-core.md",
+    contract: "plugins/pipeline-core/scripts/architecture-fitness.mjs" };
+  const reader = () => ({ ok: true, debt: [], resolvedDebt: [{ stalenessDebt: [debt] }] });
+  const common = { rootDir: repoRoot, planningSurface: { planPath: "specs/architecture-entry.md",
+    paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] }, deps: {
+    checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
+    readCheckpointArchitectureDebt: reader,
+  } };
+  const repaired = inspectArchitectureEntryReadiness(common);
+  assert.equal(repaired.status, "ready", repaired.code);
+  assert.deepEqual(repaired.artifacts.checkpointDebt, { status: "clear", openCount: 0, targets: [] });
+  const stillStale = inspectArchitectureEntryReadiness({ ...common, deps: {
+    ...common.deps,
+    evaluateNavigationCurrency: () => ({ outcome: "finding" }),
+  } });
+  assert.equal(stillStale.code, "ARCHITECTURE-CHECKPOINT-DEBT-OPEN");
+});
+
+test("unreadable checkpoint debt fails closed with a typed repair route", () => {
+  const result = inspectArchitectureEntryReadiness({ rootDir: repoRoot, deps: {
+    checkPlanningAdoptionDisposition: readyDisposition,
+    readCheckpointArchitectureDebt: () => ({ ok: false, debt: [], reason: "fixture unavailable" }),
+  } });
+  assert.equal(result.code, "ARCHITECTURE-CHECKPOINT-DEBT-UNAVAILABLE");
+  assert.equal(result.nextAction.code, "ARCHITECTURE-CHECKPOINT-DEBT-REPAIR");
+});
 test("approved greenfield design defers missing physical surfaces without fabricating fitness pass", () => {
   const design = { ok: true, status: "materialized", disposition: "approved-scoped",
     scope: ["plugins/", "architecture/"], authority: "approved-design-package",
