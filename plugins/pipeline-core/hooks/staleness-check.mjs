@@ -22,6 +22,11 @@ import { inspectPipelineUpdateAvailability } from "../scripts/ruleset-freshness.
 // Static import, matching NVA-STALENESSTLA-1's discipline above: this call is synchronous
 // end to end (spawnSync throughout), so no dynamic import is needed here either.
 import { runBootstrapScratchLifecycle } from "../scripts/pipeline-start-preflight.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 export const PLUGIN_ID = "pipeline-core@agent-pipeline";
 export const BOOTSTRAP_LINE = "Agent-Pipeline: run /pipeline-core:pipeline-start before any work";
@@ -282,6 +287,7 @@ export function resolveSessionIdFromInput(parsedInput) {
  * discipline -- never inside a function a test calls.
  */
 export function runScratchLifecycleForSessionStart(deps = {}) {
+  if (!observeGovernanceScope({ rootDir: deps.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return null;
   const rootDir = deps.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
   const parsedInput = deps.stdinPayload ?? null;
   const sessionId = resolveSessionIdFromInput(parsedInput);
@@ -300,6 +306,7 @@ export function runScratchLifecycleForSessionStart(deps = {}) {
 
 export function runSync(deps = {}) {
   const projectDir = deps.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+  if (!observeGovernanceScope({ rootDir: projectDir }).requiresEnforcement) return { exitCode: 0, decision: { stdout: "" }, scratchLifecycle: null };
   const observed = inspectSessionStartUpdateAvailabilitySync(projectDir, deps);
   const decision = decideOutput(observed);
   (deps.stdout ?? process.stdout).write(decision.stdout);

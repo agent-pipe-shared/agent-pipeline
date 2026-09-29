@@ -17,6 +17,17 @@ const json = value => `${JSON.stringify(value, null, 2)}\n`;
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
 function requireValue(value, code) { if (!value) throw new Error(code); }
+function rejectField(code, field, expected, value) {
+  const error = new Error(code);
+  error.field = field;
+  error.expected = expected;
+  error.rejectedValue = typeof value === "string" && /^[A-Za-z0-9_./*-]{0,96}$/u.test(value)
+    ? value : "[redacted]";
+  throw error;
+}
+function requireField(value, code, field, expected, rejectedValue) {
+  if (!value) rejectField(code, field, expected, rejectedValue);
+}
 function bounded(value) {
   return typeof value === "string" && value.length > 0 && !/[\\:\x00-\x1f*?]/u.test(value)
     && !value.startsWith("/") && value.split("/").every(part => part && part !== "." && part !== "..");
@@ -40,42 +51,73 @@ export function parseArchitectureDesign(prd) {
   const blocks = [...prd.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
   requireValue(blocks.length === 1, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED");
   const input = JSON.parse(blocks[0][1]);
-  requireValue(exact(input, ["schema", "repositoryKind", "disposition", "modules", "implementationSurface", "fitnessModel", "baseline"])
+  requireValue(input && typeof input === "object" && !Array.isArray(input)
+    && ["schema", "repositoryKind", "disposition", "modules", "implementationSurface", "fitnessModel"]
+      .every(key => Object.hasOwn(input, key))
+    && Object.keys(input).every(key => ["schema", "repositoryKind", "disposition", "modules", "implementationSurface", "fitnessModel", "baseline"].includes(key))
     && input.schema === ARCHITECTURE_DESIGN_SCHEMA && input.repositoryKind === "greenfield", "ARCHITECTURE-DESIGN-PACKAGE-INVALID");
   requireValue(exact(input.disposition, ["decision", "scope", "rationale"])
     && input.disposition.decision === "approved-scoped" && input.disposition.rationale?.trim()
-    && Array.isArray(input.disposition.scope) && input.disposition.scope.length > 0
-    && input.disposition.scope.every(p => bounded(p.replace(/\/$/u, ""))), "ARCHITECTURE-DESIGN-DISPOSITION-INVALID");
+    && Array.isArray(input.disposition.scope) && input.disposition.scope.length > 0,
+  "ARCHITECTURE-DESIGN-DISPOSITION-INVALID");
+  input.disposition.scope.forEach((path, index) => requireField(
+    typeof path === "string" && bounded(path.replace(/\/$/u, "")),
+    "ARCHITECTURE-DESIGN-DISPOSITION-INVALID", `disposition.scope[${index}]`,
+    "bounded repository-relative path or directory prefix ending in /; use tests/, not tests/**", path,
+  ));
   requireValue(Array.isArray(input.modules) && input.modules.length > 0, "ARCHITECTURE-DESIGN-MODULES-REQUIRED");
   const ids = new Set();
-  for (const module of input.modules) {
+  for (const [index, module] of input.modules.entries()) {
     requireValue(validateAgainstSchema(module, moduleSchema).valid && !module.provisional && !module.candidateBinding
       && /^[a-z][a-z0-9-]*$/u.test(module.id)
       && module.id !== "index" && !ids.has(module.id) && module.responsibility.trim()
       && module.ownedPaths.length > 0 && module.publicContracts.length > 0 && module.verificationEntryPoints.length > 0,
     "ARCHITECTURE-DESIGN-MODULE-INVALID");
     ids.add(module.id);
-    requireValue(module.ownedPaths.every(p => bounded(p.replace(/\/\*\*?$/u, "")))
-      && [...module.publicContracts, ...module.verificationEntryPoints].every(bounded), "ARCHITECTURE-DESIGN-PATH-INVALID");
+    module.ownedPaths.forEach((path, pathIndex) => requireField(
+      typeof path === "string" && bounded(path.replace(/\/\*\*?$/u, "")),
+      "ARCHITECTURE-DESIGN-PATH-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,
+      "bounded repository-relative path or owned prefix ending in /**", path,
+    ));
+    for (const key of ["publicContracts", "verificationEntryPoints"]) {
+      module[key].forEach((path, pathIndex) => requireField(
+        bounded(path), "ARCHITECTURE-DESIGN-PATH-INVALID", `modules[${index}].${key}[${pathIndex}]`,
+        "bounded repository-relative file path without glob", path,
+      ));
+    }
   }
   requireValue(input.modules.every(module => module.allowedDependencies.every(id => ids.has(id))), "ARCHITECTURE-DESIGN-DEPENDENCY-INVALID");
   requireValue(Array.isArray(input.implementationSurface) && input.implementationSurface.length > 0
     && input.implementationSurface.every(p => bounded(p) && resolveModuleForPath(p, input.modules)), "ARCHITECTURE-DESIGN-SURFACE-INVALID");
   const model = input.fitnessModel;
   requireValue(model?.schema === "pipeline.fitness-model.v1" && model.profileId?.trim() && model.revision === 1
-    && Array.isArray(model.modules) && model.modules.length === input.modules.length
     && Array.isArray(model.allowedBoundaryCrossings) && model.antiFragmentationPolicy
-    && input.modules.every(module => {
-      const row = model.modules.find(item => item.id === module.id);
-      return row && ["ownedPaths", "allowedDependencies", "authorityEffects", "verificationEntryPoints"]
-        .every(key => JSON.stringify(row[key]) === JSON.stringify(module[key]));
-    }), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
-  requireValue(exact(input.baseline, ["schema", "baselineRevision", "acceptedViolations", "ratchetMetrics"])
-    && input.baseline.schema === "pipeline.architecture-baseline.v1" && input.baseline.baselineRevision === 1
-    && Array.isArray(input.baseline.acceptedViolations) && input.baseline.acceptedViolations.length === 0
-    && exact(input.baseline.ratchetMetrics, ["totalAcceptedViolations", "cycleCount", "boundaryCrossingsCount"])
-    && Object.values(input.baseline.ratchetMetrics).every(value => value === 0), "ARCHITECTURE-DESIGN-GREENFIELD-DEBT-INVALID");
-  return input;
+    && (model.modules === undefined || Array.isArray(model.modules)), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
+  const moduleRows = input.modules.map(module => ({ id: module.id,
+    ownedPaths: module.ownedPaths, allowedDependencies: module.allowedDependencies,
+    authorityEffects: module.authorityEffects, verificationEntryPoints: module.verificationEntryPoints }));
+  if (model.modules !== undefined) {
+    requireField(model.modules.length === moduleRows.length, "ARCHITECTURE-DESIGN-FITNESS-MISMATCH",
+      "fitnessModel.modules", "omit redundant modules or provide one matching row per declared module", model.modules.length);
+    moduleRows.forEach((derived, index) => {
+      const explicit = model.modules.find(row => row?.id === derived.id);
+      for (const [key, value] of Object.entries(derived)) {
+        requireField(JSON.stringify(explicit?.[key]) === JSON.stringify(value), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH",
+          `fitnessModel.modules[${index}].${key}`, "same value as canonical modules declaration, or omit fitnessModel.modules", explicit?.[key]);
+      }
+      requireField(Object.keys(explicit).length === Object.keys(derived).length,
+        "ARCHITECTURE-DESIGN-FITNESS-MISMATCH", `fitnessModel.modules[${index}]`,
+        "only canonical module fields, or omit fitnessModel.modules", explicit);
+    });
+  }
+  const baseline = input.baseline === undefined ? { schema: "pipeline.architecture-baseline.v1", baselineRevision: 1,
+    acceptedViolations: [], ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } : input.baseline;
+  requireValue(exact(baseline, ["schema", "baselineRevision", "acceptedViolations", "ratchetMetrics"])
+    && baseline.schema === "pipeline.architecture-baseline.v1" && baseline.baselineRevision === 1
+    && Array.isArray(baseline.acceptedViolations) && baseline.acceptedViolations.length === 0
+    && exact(baseline.ratchetMetrics, ["totalAcceptedViolations", "cycleCount", "boundaryCrossingsCount"])
+    && Object.values(baseline.ratchetMetrics).every(value => value === 0), "ARCHITECTURE-DESIGN-GREENFIELD-DEBT-INVALID");
+  return { ...input, fitnessModel: { ...model, modules: moduleRows }, baseline };
 }
 
 export function architectureDesignTargets(input) {
@@ -137,13 +179,9 @@ export function inspectArchitectureDesign(rootDir, taskScope = null) {
       && covers(input.disposition.scope, "architecture/baseline.json")
       && input.implementationSurface.every(p => covers(input.disposition.scope, p))
       && (!taskScope || covers(input.disposition.scope, taskScope)), "ARCHITECTURE-DESIGN-SCOPE-MISMATCH");
-    // Contracts and executable verification surfaces are authored during design;
-    // the materializer never generates implementation or a passing test stub.
-    for (const module of input.modules) {
-      for (const name of [...module.publicContracts, ...module.verificationEntryPoints]) {
-        requireValue(bytes(root, name).trim().length > 0, "ARCHITECTURE-DESIGN-CONTRACT-MISSING");
-      }
-    }
+    // Architecture materialization establishes design authority. Physical
+    // contracts and tests are authored by their implementation owners later.
+    // A materialized design is never proof that those files exist or pass.
     const targets = architectureDesignTargets(input);
     const receipt = { schema: "pipeline.architecture-design-materialization.v1", featureId: state.activeFeature.id,
       planPath: authority.planPath, ...observation, designSha256: hash(json(input)),
@@ -152,8 +190,13 @@ export function inspectArchitectureDesign(rootDir, taskScope = null) {
     if (existsSync(physical(root, receiptPath))) {
       requireValue(bytes(root, receiptPath) === json(receipt), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
       requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+      const pendingPhysicalSurfaces = [...new Set(input.modules.flatMap(module =>
+        [...module.publicContracts, ...module.verificationEntryPoints]))].filter(name => {
+        try { return bytes(root, name).trim().length === 0; } catch { return true; }
+      });
       return { ok: true, status: "materialized", input, targets, receipt, scope: input.disposition.scope,
-        disposition: "approved-scoped", authority: "approved-design-package", planningSurface: { planPath: authority.planPath, paths: input.implementationSurface } };
+        disposition: "approved-scoped", authority: "approved-design-package", pendingPhysicalSurfaces,
+        planningSurface: { planPath: authority.planPath, paths: input.implementationSurface } };
     }
     const scaffold = initialGreenfieldMapTargets("fresh");
     requireValue(scaffold.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-BROWNFIELD-PROPOSAL-REQUIRED");
@@ -162,7 +205,8 @@ export function inspectArchitectureDesign(rootDir, taskScope = null) {
     for (const target of targets) physical(root, target.path);
     return { ok: true, status: "materialization-required", input, targets, receipt, scope: input.disposition.scope };
   } catch (error) {
-    return { ok: false, status: "design-required", code: error.message };
+    return { ok: false, status: "design-required", code: error.message,
+      ...(error.field ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
   }
 }
 

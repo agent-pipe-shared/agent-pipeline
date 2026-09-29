@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.enrollment-retirement-coordinator.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "root",
+    "rootIdentity",
+    "commonIdentity",
+    "scopeKey",
+    "barrierSha256",
+    "priorGenerationSha256",
+    "by",
+    "at",
+    "generationSha256",
+    "archiveSha256",
+    "phase",
+    "retiredStateSha256",
+    "retiredIntakeSha256",
+    "retiredConsentSha256",
+    "freshIntakeSha256",
+    "activeScopeSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.enrollment-retirement-coordinator.v1"
+    },
+    "root": {
+      "type": "string"
+    },
+    "rootIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dev",
+        "ino"
+      ],
+      "properties": {
+        "dev": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "ino": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        }
+      }
+    },
+    "commonIdentity": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dev",
+            "ino"
+          ],
+          "properties": {
+            "dev": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "ino": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scopeKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "barrierSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "priorGenerationSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "by": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generationSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "archiveSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "phase": {
+      "enum": [
+        "prepared",
+        "state-retired",
+        "intake-retired",
+        "consent-retired",
+        "pending",
+        "active"
+      ]
+    },
+    "retiredStateSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "retiredIntakeSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "retiredConsentSha256": {
+      "type": "null"
+    },
+    "freshIntakeSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "activeScopeSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

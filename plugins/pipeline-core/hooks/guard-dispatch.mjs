@@ -63,6 +63,11 @@ import { dispatchBudgetBinding, dispatchFindings } from "../lib/dispatch-policy.
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 // Recover `{ agentType: '...', prompt: `...` }`-shaped dispatches embedded in a Workflow
 // script body. Regex-based, not a JS parser: it only claims the statically-obvious case.

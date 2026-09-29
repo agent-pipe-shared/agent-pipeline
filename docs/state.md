@@ -7,12 +7,10 @@
 
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
-**Arbeitsauftrag des PO:** Bis heute Abend autonom den gesamten genehmigten
-Backlog-Umfang umsetzen; disjunkte Dateien parallel bearbeiten. Patches bauen,
-ohne Signatur zulässige Änderungen integrieren und prüfen. Geschützte Patches
-mit Zweck und Belegen in [der Abend-Liste](../scratch/0.7-evening-signature-queue-20260929.md)
-sammeln. Der PO ist AFK, ohne Signaturen. Signierbefehle erst bei Rückkehr;
-unabhängige Arbeit fortsetzen.
+**PO-Auftrag:** Genehmigten Backlog autonom und in disjunkten Dateien parallel
+umsetzen. Zulässige Patches integrieren und prüfen; Signaturpatches mit Belegen
+in [der Abend-Liste](../scratch/0.7-evening-signature-queue-20260929.md) sammeln.
+Während PO-AFK unabhängig weiterarbeiten.
 
 Reguläre **Implementation**, Revision 13, gilt seit 2026-09-28; Autorität:
 `project/pipeline-state.json` und das unveränderte
@@ -20,25 +18,24 @@ Reguläre **Implementation**, Revision 13, gilt seit 2026-09-28; Autorität:
 Planfreigabe gilt; Advisor-Ausnahme akzeptiert, kein Advisor-PASS.
 Installed Recovery: `f9ebdd5b` / `20260928194946.0cace08c`; kein finaler Kandidat.
 
-Aktivierung/Hook-Scope, Agy und Deinstallation sind im Scope; frühere Fixes
-bleiben enthalten. 135 Quell-, 26 Testdateien und neun geschützte Dateien
-sind geliefert, letztere nach zwei PO-Signaturen.
-Backlog `7bbbd69a`; Produktintegration uncommittet. 26 isolierte Suiten: 193 Fälle,
-kein Source-Verify-PASS. Modellbestätigung: 16 Source-Fälle, vom PO bestätigt.
-Prüfregistrierung: 658/241/246, keine Befunde; VCR 30/30.
-Kernel: 325 Pfade, frischer Source-Beleg 7/7. Reaktivierung: 38 frühere Fälle
-und fünf frische Writer-Kontrollen bestanden. Rename-Marker-Fix: fünf Kontrollen.
-
-Continuity-Checkpoint 298/298, vor weiteren Host-Korrekturen.
-Scope: 53 Befunde plus zwei registrierte Defekte.
-Guard: Source 26/28; OBC298 und Baseline-Patch warten auf Signatur.
-Reader/Aktivierung repariert; Scope 23/23. Onboarding: 143 PASS, 8 FAIL,
-33 unbeobachtet nach 900s-Timeout; frühere Läufe bleiben erhalten.
-Git-/Hook-Fixtures und Recovery-Hinweise geprüft; Host-Korrektur läuft.
-Semgrep-Minimal-Scan: Versionsabfrage verursacht Timeout; Fix läuft.
-Danach Verify, bounded Critic und Stamps. Keine weitere Reader-Runde.
+61 Items: 60 aktive Befunde und ein geschlossener Agy-Vorgänger.
+PO: manuelle frische Critics erlaubt; Befunde parallel korrigieren.
+[Qualitätscheckpoint](../scratch/0.7-quality-critic-checkpoint-20260929.md).
+HEAD `e71892e1`; Qualität in Source geliefert, Index-Vorbereitung erhalten.
+Reader-Historie/Scannerbindung korrigiert:9/9+24/24. Kein Release-PASS.
+Governance: Volllauf21/23+2/2, Temp offen; Hooks9/9. Uninstall7/7.
+Advisor-Fehlerkurs/Null-Child/Owner-Successor:7/7+10/10+3/3+1/1.
+PO-Helfer21/21+27/27+V2-Paket1/1; geschützter Hauptwriter als Patch gehalten.
+Claude/Agy-Kursroute mit ehrlicher Unavailable-Ausnahme geliefert;
+echte Answered-Abnahme offen. Governance-Kurs beendet, letzte Alias-Korrektur4/4.
+Readiness-Provenienz/Max:33+1 Fälle; Critic3 ohne Befund; Kernel-Closure7/7.
+Onboarding216: Parent-FD/Callback-IPC,16 Kontrollen und drei echte Fälle bestanden;
+Checker30/30. Vollständiger216-Lauf erst am integrierten Kandidaten.
+Neun-Dateien-Hold v3 mit neuen Maps; v2-Registry659/247 gültig.
+Baseline separat; alte Signaturen abgelaufen, keine AFK-Anfrage oder Lieferung.
+245/265-Freeze historisch; neue Source-Bindung, Gesamtqualifikation, Commit und Stamps offen.
+Keine weitere Reader-Runde oder Backlog-Schließung.
 Der PO installiert; Push, Tag und Veröffentlichung brauchen spätere Freigaben.
-Ältere Checkpoints: historisch.
 
 ## Historischer Übergang — lokaler 0.7-Kandidat, 2026-09-27
 

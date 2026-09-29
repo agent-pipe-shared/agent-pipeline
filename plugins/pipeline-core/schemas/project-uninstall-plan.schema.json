@@ -1,0 +1,685 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.project-uninstall-plan.v1",
+  "description": "Closed structural contract. Digest/preimage/ownership and stage-prefix binding remain enforced by the controller; schema admission alone authorizes no mutation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "root",
+    "rootIdentity",
+    "scopeKey",
+    "scopeState",
+    "scopeObservation",
+    "git",
+    "footprint",
+    "workspace",
+    "privateArchives",
+    "conflicts",
+    "controls",
+    "preserveContent",
+    "planSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.project-uninstall-plan.v1"
+    },
+    "root": {
+      "type": "string"
+    },
+    "rootIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dev",
+        "ino"
+      ],
+      "properties": {
+        "dev": {
+          "type": "string"
+        },
+        "ino": {
+          "type": "string"
+        }
+      }
+    },
+    "scopeKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scopeState": {
+      "enum": [
+        "active",
+        "inactive",
+        "declined",
+        "unverifiable-active"
+      ]
+    },
+    "scopeObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "state",
+        "root",
+        "scopeKey",
+        "repositoryKind",
+        "provenance",
+        "diagnostics",
+        "requiresEnforcement",
+        "hintAllowed"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pipeline.governance-scope.v1"
+        },
+        "state": {
+          "enum": [
+            "active",
+            "inactive",
+            "declined",
+            "unverifiable-active"
+          ]
+        },
+        "root": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scopeKey": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repositoryKind": {
+          "enum": [
+            "git",
+            "non-git",
+            "unavailable"
+          ]
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "refs"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "sha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requiresEnforcement": {
+          "type": "boolean"
+        },
+        "hintAllowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "git": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "root",
+            "rootIdentity",
+            "commonDir",
+            "commonIdentity",
+            "worktrees",
+            "hooks"
+          ],
+          "properties": {
+            "schema": {
+              "const": "pipeline.git-hook-footprint.v1"
+            },
+            "root": {
+              "type": "string"
+            },
+            "rootIdentity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "dev",
+                "ino"
+              ],
+              "properties": {
+                "dev": {
+                  "type": "string"
+                },
+                "ino": {
+                  "type": "string"
+                }
+              }
+            },
+            "commonDir": {
+              "type": "string"
+            },
+            "commonIdentity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "dev",
+                "ino"
+              ],
+              "properties": {
+                "dev": {
+                  "type": "string"
+                },
+                "ino": {
+                  "type": "string"
+                }
+              }
+            },
+            "worktrees": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "hooks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "hookPath",
+                  "state",
+                  "markerPath",
+                  "implPath",
+                  "status",
+                  "hook",
+                  "marker",
+                  "impl"
+                ],
+                "properties": {
+                  "name": {
+                    "enum": [
+                      "pre-commit",
+                      "commit-msg",
+                      "pre-push"
+                    ]
+                  },
+                  "hookPath": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "markerPath": {
+                    "type": "string"
+                  },
+                  "implPath": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "owned",
+                      "owned-partial",
+                      "absent",
+                      "conflict"
+                    ]
+                  },
+                  "hook": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "sha256",
+                          "identity",
+                          "mode"
+                        ],
+                        "properties": {
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "identity": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dev",
+                              "ino"
+                            ],
+                            "properties": {
+                              "dev": {
+                                "type": "string"
+                              },
+                              "ino": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "mode": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 511
+                          }
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "marker": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "sha256",
+                          "identity"
+                        ],
+                        "properties": {
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "identity": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dev",
+                              "ino"
+                            ],
+                            "properties": {
+                              "dev": {
+                                "type": "string"
+                              },
+                              "ino": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "impl": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "sha256",
+                          "identity"
+                        ],
+                        "properties": {
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "identity": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dev",
+                              "ino"
+                            ],
+                            "properties": {
+                              "dev": {
+                                "type": "string"
+                              },
+                              "ino": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "footprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "source",
+        "observations",
+        "actions",
+        "conflicts",
+        "preserve"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pipeline.content-preserving-footprint.v1"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "sha256"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256",
+              "identity"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "identity": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dev",
+                  "ino"
+                ],
+                "properties": {
+                  "dev": {
+                    "type": "string"
+                  },
+                  "ino": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "kind",
+              "beforeSha256",
+              "beforeIdentity",
+              "afterSha256",
+              "mode"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))[^/]+(?:/[^/]+)*$"
+              },
+              "kind": {
+                "enum": [
+                  "owned-keys",
+                  "retained-metadata"
+                ]
+              },
+              "beforeSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "beforeIdentity": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dev",
+                  "ino"
+                ],
+                "properties": {
+                  "dev": {
+                    "type": "string"
+                  },
+                  "ino": {
+                    "type": "string"
+                  }
+                }
+              },
+              "afterSha256": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 511
+              },
+              "ownedKeys": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "code"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "preserve": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "status",
+        "path",
+        "sha256",
+        "ownedIndexes",
+        "foreignIndexes"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pipeline.antigravity-workspace-bindings.v1"
+        },
+        "status": {
+          "enum": [
+            "absent",
+            "observed",
+            "unavailable"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ownedIndexes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "foreignIndexes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "privateArchives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "identity",
+          "names"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dev",
+              "ino"
+            ],
+            "properties": {
+              "dev": {
+                "type": "string"
+              },
+              "ino": {
+                "type": "string"
+              }
+            }
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "code"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "controls": {
+      "type": "string"
+    },
+    "preserveContent": {
+      "const": true
+    },
+    "planSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

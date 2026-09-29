@@ -46,6 +46,7 @@ import {
   KICKOFF_GOAL_MAX_BYTES,
   KICKOFF_PROMOTION_PLAN_SCHEMA,
   observeBootstrapBindAcknowledgement,
+  planOnboardingIntakeSpecMarker,
   observeOnboardingBootstrapAcknowledgementSignature,
   planOnboardingBootstrapAcknowledgementChat,
   planOnboardingContinuityRepair,
@@ -53,6 +54,7 @@ import {
   planOnboardingKickoffPromotion,
   planOnboardingSessionCleanupPrivatization,
   readOnboardingIntakeCheckpoint,
+  readOnboardingIntakeMaterialInput,
   reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
 } from "./onboarding-continuity.mjs";
@@ -108,6 +110,8 @@ import { discoverRepository, listActiveSessionDescriptors } from "./worktree-lif
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
+import { recordGovernanceEnrollmentAfterOnboarding, readGovernanceEnrollmentRetirement, prepareGovernanceEnrollmentBeforeIntake, governanceEnrollmentRecoveryAction, observeGovernanceScope, planGovernanceScopeDecision, applyGovernanceScopeDecision } from "./governance-scope.mjs";
+import { observeOnboardingEnrollmentHistory } from "./onboarding-continuity.mjs";
 
 // Wave 4 onboarding coordinator, step 6 (design SSa.4/SSe; NVA-W5-COORD-STEP6-1).
 // The three new v4Inspection statuses a genuinely fresh repo now settles into
@@ -333,7 +337,7 @@ function deps(overrides = {}) {
     linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
     spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer,
     initializePoGateProfileReceipt, publishPoGateProfileReceipt,
-    homedir, readMachinePlane, environment: process.env,
+    homedir, readMachinePlane: () => readMachinePlane({ homedirFn: overrides.homedir ?? homedir }), environment: process.env,
     ...overrides,
   };
 }
@@ -2605,7 +2609,7 @@ function intakeDesignQuestionsAction(root, runner) {
     input: { name: "answersJson", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 65_536, singleLine: false, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: `ask the PO the ONE bundled round of design questions this project still needs answered. Replace exactly ${INTAKE_DESIGN_ANSWERS_PLACEHOLDER} in applyAction.argv with the JSON array of {question, answer} objects as one argv data element, then execute that exact returned action; never reconstruct the command or ask a second round.`,
+    guidance: `ask the PO the ONE bundled round of design questions this project still needs answered. If there are genuinely no open design questions, ask for an explicit affirmative no-open-questions disposition. Replace exactly ${INTAKE_DESIGN_ANSWERS_PLACEHOLDER} in applyAction.argv with either the JSON array of {question, answer} objects or {"disposition":"no-open-questions"} as one argv data element. Never invent an answer, reconstruct the command, or ask a second round.`,
     applyAction: commandAction(
       [ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", root, "--answers-json", INTAKE_DESIGN_ANSWERS_PLACEHOLDER, "--activate", "--runner", runner],
       true, true, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA, ["applied"],
@@ -2622,9 +2626,9 @@ function intakeDesignQuestionsAction(root, runner) {
 // derives the staging bytes from the checkpoint's own already-durable content.
 function intakeGeneratePlanAction(root, runner, intent) {
   return commandAction(
-    lifecycleArgv([ONBOARDING_SCRIPT, "intake-generate-plan", "--root", root], runner, intent),
+    lifecycleArgv([ONBOARDING_SCRIPT, "intake-generate-plan", "--root", root, "--summary"], runner, intent),
     false, false,
-    INTAKE_GENERATE_PLAN_SCHEMA,
+    "pipeline.onboarding-intake-generate-plan-summary.v1",
     ["intake-design-questions-required"],
   );
 }
@@ -3239,6 +3243,34 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       // previously re-opened the unauthenticated `approve-plan --by` path.
       const needsAcknowledgement = acknowledgement !== null
         && acknowledgement.acknowledged === false;
+      if (needsAcknowledgement) {
+        let markerPlan;
+        try {
+          markerPlan = (fs.planOnboardingIntakeSpecMarker ?? planOnboardingIntakeSpecMarker)({
+            rootDir: root, repositoryCapability: repository.mode, spawn: fs.spawnSync,
+            runner, intent,
+          });
+          if (!markerPlan || !["repair-required", "already-current"].includes(markerPlan.status)
+            || (markerPlan.status === "repair-required" && !markerPlan.nextAction)) {
+            throw new Error("invalid marker observation");
+          }
+        } catch {
+          return lifecycleResult({status: "bootstrap-binding-required", root, runner, intent,
+            repository, runtime, continuity, appServer, nextAction: null,
+            diagnostics: [lifecycleDiagnostic("$.continuity", "intake_spec_marker_observation_unavailable",
+              "the staging PRD/Spec marker could not be verified before PO acknowledgement",
+              "run the read-only intake-spec-marker-plan action to obtain the exact mechanical repair or its typed refusal")],
+          });
+        }
+        if (markerPlan.status === "repair-required") {
+          return lifecycleResult({status: "bootstrap-binding-required", root, runner, intent,
+            repository, runtime, continuity, appServer, nextAction: markerPlan.nextAction,
+            diagnostics: [lifecycleDiagnostic("$.continuity", "intake_spec_marker_repair_required",
+              "the technical Spec marker is stale after design edits",
+              "apply the returned digest-bound mechanical repair, then inspect again before requesting PO acknowledgement")],
+          });
+        }
+      }
       let signatureObservation = null;
       let signatureMode = false;
       if (needsAcknowledgement) {
@@ -4465,7 +4497,70 @@ function repositoryFailureResult(rootDir, fs, intent, repository, runner) {
   });
 }
 
+// Fresh Codex onboarding must retain project material before publishing or
+// displaying its first restart. The API cannot inspect chat: this proves the
+// supplied checkpoint bytes, never that an agent selected the right chat turn.
+function firstRestartIntakeBoundary(observed, fs) {
+  if (observed.runner !== "codex" || !observed.root
+    || !["runtime-initialization-required", "runtime-attestation-required", "projection-drift", "restart-required"].includes(observed.status)) return observed;
+  const options = {rootDir: observed.root, repositoryCapability: observed.repository.mode, spawn: fs.spawnSync};
+  try {
+    const continuity = (fs.classifyOnboardingContinuity ?? classifyOnboardingContinuity)(options);
+    if (continuity.status === "valid") return observed;
+    if (continuity.status !== "absent-pristine") throw new Error("continuity is damaged or unavailable");
+    const checkpoint = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)(options);
+    let action = null;
+    if (checkpoint.status === "absent" || checkpoint.value?.consent === null) {
+      const firstAnswers = initialAnswersReceipt(observed.root, fs, observed.repository.mode);
+      action = observed.repository.mode === "host-managed" && firstAnswers === null
+        ? hostManagedFirstAnswersAction(observed.root, observed.runner, observed.repository, fs)
+        : intakeConsentAction(observed.root, observed.runner, checkpoint,
+          unresolvedAuthorIdentityKeys(observed.root, observed.repository.mode !== "local", fs), firstAnswers?.language ?? null);
+    } else if (checkpoint.status !== "present") throw new Error("intake checkpoint observation unavailable");
+    else if (checkpoint.value.materialInput.length === 0) action = intakeCaptureAction(observed.root, observed.runner);
+    if (action) {
+      action = {...action, guidance: action.guidance + " Before the first Codex restart, reuse the original project request already supplied in this session, including its multiline bytes and trailing whitespace. Do not ask the PO to repeat it, substitute a summary, or infer affirmative consent. Read the captured material back before retrying runtime initialization."};
+      return {...observed, status: "intake-required", nextAction: action,
+        runtime: {...observed.runtime, firstRestartIntake: {status: "capture-required"}},
+        diagnostics: [lifecycleDiagnostic("$.continuity", "first_restart_material_capture_required",
+          "original project material has not been verified in the private intake checkpoint before the first Codex restart",
+          "use the exact returned consent/capture action with the existing original input, then inspect again")]};
+    }
+    const material = (fs.readOnboardingIntakeMaterialInput ?? readOnboardingIntakeMaterialInput)(options);
+    const after = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)(options);
+    if (after.status !== "present" || after.sha256 !== checkpoint.sha256 || material.status !== "present"
+      || material.chunks.length !== checkpoint.value.materialInput.length || material.chunks.length === 0) throw new Error("intake changed during readback");
+    const chunks = material.chunks.map((chunk, index) => {
+      const entry = checkpoint.value.materialInput[index];
+      if (typeof chunk.text !== "string" || sha256(Buffer.from(chunk.text, "utf8")) !== entry.sha256
+        || Buffer.byteLength(chunk.text, "utf8") !== entry.byteLength) throw new Error("intake material identity mismatch");
+      return {sha256: entry.sha256, byteLength: entry.byteLength};
+    });
+    return {...observed, runtime: {...observed.runtime, firstRestartIntake: {status: "captured", binding: {
+      schema: "pipeline.first-restart-intake-binding.v1", checkpointSha256: checkpoint.sha256,
+      checkpointRevision: checkpoint.value.revision, chunks,
+    }}}};
+  } catch (error) {
+    return {...observed, status: "continuity-observation-unavailable", nextAction: null,
+      runtime: {...observed.runtime, firstRestartIntake: {status: "unavailable"}},
+      diagnostics: [lifecycleDiagnostic("$.continuity", "first_restart_material_observation_unavailable",
+        "the original project material could not be verified before the first Codex restart",
+        "preserve the original input and inspect the private intake checkpoint and evidence before retrying")]};
+  }
+}
+
+function firstRestartBoundPlanDigest(plan, observed) {
+  const runtimePlanSha256 = lifecyclePlanDigest(plan);
+  return observed.runtime.firstRestartIntake?.status === "captured"
+    ? sha256(JSON.stringify(stable({runtimePlanSha256, firstRestartIntake: observed.runtime.firstRestartIntake.binding})))
+    : runtimePlanSha256;
+}
+
 function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
+  return firstRestartIntakeBoundary(v4InspectionWithoutFirstIntakeBoundary(rootDir, fs, intent, runner), fs);
+}
+
+function v4InspectionWithoutFirstIntakeBoundary(rootDir, fs, intent = "onboarding", runner) {
   requireRunner(runner, "v4Inspection");
   try {
     const requestedRoot = resolve(rootDir);
@@ -5061,6 +5156,19 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
     withPendingOnboardingAsksOnNextActionOnly(v4Inspection(rootDir, fs, intent, runner), fs),
     fs,
   );
+  // A rejected physical layout has no admitted enrollment owner to inspect.
+  if (result.root === null || result.status === "unsafe") return result;
+  const enrollmentResult=Object.fromEntries(PROJECT_ONBOARDING_BASE_RESULT_KEYS.map(key=>[key,result[key]]));
+  let retired;try{retired = readGovernanceEnrollmentRetirement({rootDir: result.root ?? rootDir});}catch(error){
+    if(!["GS-NONGIT-RETAINED-HISTORY","GS-HOST-MANAGED-RETAINED-HISTORY"].includes(error.code))throw error;
+    return {...enrollmentResult,status:"enrollment-history-recovery-required",nextAction:governanceEnrollmentRecoveryAction({rootDir:result.root??rootDir,runner})};
+  }
+  if (retired !== null && retired.phase !== "active") {
+    const checkpoint = readOnboardingIntakeCheckpoint({rootDir: result.root ?? rootDir});
+    if (retired.phase !== "pending") return {...enrollmentResult, status: "enrollment-retirement-required", nextAction: {kind: "command", executable: process.execPath, argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "retire-enrollment", "--root", retired.root, "--scope-key", retired.scopeKey, "--barrier-sha256", retired.barrierSha256, "--by", retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["retired"]}}};
+    if (checkpoint.value?.retiredEnrollmentGenerationSha256 !== retired.generationSha256 || checkpoint.value.consent === null) return {...enrollmentResult, status: "intake-required", nextAction: intakeConsentAction(result.root ?? rootDir, runner, checkpoint, [], null)};
+    if (result.status === "ready") return {...enrollmentResult,status:"enrollment-activation-required",nextAction:{kind:"command",executable:process.execPath,argv:[fileURLToPath(new URL("../scripts/pipeline-state.mjs",import.meta.url)),"activate-enrollment","--root",retired.root,"--scope-key",retired.scopeKey,"--barrier-sha256",retired.barrierSha256,"--by",retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["active"]}}};
+  }
   if (intent === "session" && result?.status === "ready") {
     try {
       clearConsentMarker({ rootDir: result.root ?? rootDir, reason: "onboarding-complete" });
@@ -5643,6 +5751,8 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     if (root !== state.root) throw new Error("apply root differs from authenticated onboarding plan root");
     ensurePreimage(root, state.state, fs);
     for (const target of state.targets) safePath(root, target.path, fs);
+    const enrollmentHistory=observeOnboardingEnrollmentHistory({rootDir:root,repositoryCapability:state.hostManaged?"host-managed":"local",spawn:fs.spawnSync});
+    if(state.initializesGit&&enrollmentHistory.retained)return {schema:PLAN_SCHEMA,status:"activation-required",root,diagnostics:[diagnostic("$.enrollment","retained_enrollment_history","retained history requires explicit Git-creation recovery before portable bootstrap","inspect the public onboarding recovery action")],nextAction:governanceEnrollmentRecoveryAction({rootDir:root,runner:state.runner})};
     const git = state.hostManaged ? { ok: true } : gitCapability(fs, root); if (!git.ok) throw new Error(git.reason);
     if (state.initializesGit) {
       gitWasExpectedAbsent = true;
@@ -5652,6 +5762,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
       if (!gitIdentity) throw new Error("created Git control directory identity is unavailable");
       gitTree = physicalTreeSnapshot(join(root, ".git"), fs);
     }
+    if(enrollmentHistory.retained&&!state.hostManaged&&observeGovernanceScope({rootDir:root}).state!=="active")prepareGovernanceEnrollmentBeforeIntake({rootDir:root,controller:fs.governanceScopeController});
     for (const target of state.targets) {
       const path = safePath(root, target.path, fs);
       if (fs.existsSync(path)) throw new Error(`target appeared during activation: ${target.path}`);
@@ -5667,6 +5778,15 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     if (source.status !== "ready" || source.sourceKind !== "v3") throw new Error("post-apply portable source validation was not ready");
     const manifest = loadManifest(root);
     if (manifest.status !== "ok") throw new Error("post-apply canonical manifest validation was not ready");
+    // Explicit authenticated --activate is enrollment, not plan approval.
+    // Preserve existing source/projection provenance; reverse a prior decline.
+    // This runs before Git hooks are installed, inside the existing rollback boundary.
+    const retiredEnrollment=readGovernanceEnrollmentRetirement({rootDir:root});
+    // Portable scaffold activation never supplies a retired generation's
+    // fresh consent or its later activation event on the human's behalf.
+    const governanceEnrollment = retiredEnrollment!==null&&retiredEnrollment.phase!=="active"
+      ? {...observeGovernanceScope({rootDir:root}),enrollmentStatus:"fresh-consent-required"}
+      : recordGovernanceEnrollmentAfterOnboarding({rootDir: root, activate: true, controller: fs.governanceScopeController});
     // NVA-R9-PREPUSHHOOK (backlog: pipeline.pre-push-hook-is-offered-not-installed): the
     // git-porcelain pre-push backstop is installed-by-default here -- the same place
     // `.gitignore` is auto-seeded above -- rather than merely offered behind a separate
@@ -5738,9 +5858,9 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     const missingIgnorePatterns = state.hostManaged ? [] : missingProjectIgnorePatterns(readProjectIgnoreText(root, fs));
     const projectIgnoreGap = missingIgnorePatterns.length > 0 ? { projectIgnoreGapAction: collectProjectIgnoreGapAction(missingIgnorePatterns) } : {};
     if (missingIdentity.length > 0) {
-      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
+      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, governanceEnrollment, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
     }
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, diagnostics: [], ...projectIgnoreGap };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, governanceEnrollment, diagnostics: [], ...projectIgnoreGap };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
@@ -6058,7 +6178,7 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner, op
       : operation === "repair"
         ? "apply-repair"
         : "apply-readback";
-    return { ...observed, nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, applyCommand, "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], observed.runner, intent), true, true, SCHEMA, statuses) };
+    return { ...observed, nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, applyCommand, "--root", plan.root, "--plan-sha256", firstRestartBoundPlanDigest(plan, observed), "--activate"], observed.runner, intent), true, true, SCHEMA, statuses) };
   }
   return observed;
 }
@@ -6798,7 +6918,7 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
   // runtime apply, not a private overlay activation. See its comment.
   const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime", overlayCalibration: false });
   const expectedPlanStatus = operation === "readback" ? "noop" : "ready";
-  if (plan.status !== expectedPlanStatus || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs, intent, runner);
+  if (plan.status !== expectedPlanStatus || firstRestartBoundPlanDigest(plan, beforeApply) !== planSha256) return v4Inspection(rootDir, fs, intent, runner);
   const runtimeTargets = plan.targets.filter((target) => target.kind === "runtime" && target.path.startsWith(".codex/")).map((target) => ({
     path: target.path, beforeSha256: target.before.sha256, afterSha256: target.after.sha256,
   })).sort((left, right) => left.path.localeCompare(right.path));
@@ -6832,6 +6952,13 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     try {
       // The barrier is durable before the target transaction begins. A crash in
       // either direction therefore blocks rather than claiming a loaded runtime.
+      const materialReadback = firstRestartIntakeBoundary(beforeApply, fs);
+      if (materialReadback.status !== beforeApply.status) return materialReadback;
+      if (JSON.stringify(materialReadback.runtime.firstRestartIntake ?? null) !== JSON.stringify(beforeApply.runtime.firstRestartIntake ?? null)) {
+        return {...materialReadback, status: "recovery-required", nextAction: null,
+          diagnostics: [lifecycleDiagnostic("$.continuity", "first_restart_material_plan_drift",
+            "intake changed after runtime planning and before restart-barrier publication", "inspect and use a fresh digest-bound runtime plan")]};
+      }
       persisted = (fs.persistRestartBarrier ?? persistRestartBarrier)({
         rootDir: plan.root,
         repositoryCapability: beforeApply.repository.mode,
@@ -6932,7 +7059,8 @@ export function planProjectOnboardingKickoffV4({
   // requires continuity.status === "absent-pristine", which is exactly what
   // all four of these statuses share, so this widening adds no new case the
   // inner layer would not already accept on its own terms.
-  if (!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status)) return observed;
+  if (observed.runtime.firstRestartIntake?.status === "capture-required"
+    || !KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status)) return observed;
   return planOnboardingKickoff({
     rootDir: observed.root,
     goal,
@@ -6983,7 +7111,8 @@ export function applyProjectOnboardingKickoffV4({
   // whether a language change also happens to occur -- so the repair this
   // admission was justified on actually always runs.
   const admittedProjectionDrift = observed.status === "projection-drift";
-  if ((!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status) && observed.status !== "ready" && !admittedProjectionDrift)
+  if (observed.runtime.firstRestartIntake?.status === "capture-required"
+    || (!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status) && observed.status !== "ready" && !admittedProjectionDrift)
     || !["absent-pristine", "valid"].includes(observed.continuity.status)) {
     return observed;
   }
@@ -7057,4 +7186,114 @@ export function applyProjectOnboardingKickoffPromotionV4({
     correctPromotedLanguage(observed.root, plan.authority.poLanguage, fs);
   }
   return v4Inspection(rootDir, fs, "onboarding", runner);
+}
+
+/** Explicit local Git creation for retained non-Git history. No host capability is inferred. */
+const ENROLLMENT_GIT_PLANS=new WeakMap();
+export const ENROLLMENT_GIT_CREATION_SCHEMA='pipeline.enrollment-git-creation.v1';
+function enrollmentGitBarrier(root,fs){
+ const path=safePath(root,'.agent-pipeline/enrollment-git-creation.json',fs);if(!fs.existsSync(path))return {path,raw:null,value:null};
+ const st=fs.lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||st.size>6291456)throw Error('ER-GIT-BARRIER-FILE');const raw=fs.readFileSync(path),v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
+ if(Object.keys(v).sort().join('|')!=='gitIdentity|phase|plan|root|rootIdentity|schema'||v.schema!=='pipeline.enrollment-git-creation-barrier.v1'||v.root!==root||!sameDirectoryIdentity(v.rootIdentity,root,fs)||!['requested','created','retired'].includes(v.phase)||v.plan?.root!==root||v.plan?.planSha256!==sha256(JSON.stringify(Object.fromEntries(Object.entries(v.plan).filter(([k])=>k!=='planSha256')))))throw Error('ER-GIT-BARRIER-BINDING');return {path,raw,value:v};
+}
+function publishEnrollmentGitBarrier(root,prior,value,fs){
+ const directory=join(root,'.agent-pipeline');if(!fs.existsSync(directory))fs.mkdirSync(directory,{mode:0o700});safePath(root,'.agent-pipeline/enrollment-git-creation.json',fs);
+ const actual=enrollmentGitBarrier(root,fs);if((actual.raw===null?null:sha256(actual.raw))!==(prior.raw===null?null:sha256(prior.raw)))throw Error('ER-GIT-BARRIER-CAS');
+ const temporary=prior.path+'.'+process.pid+'.'+Date.now()+'.tmp',bytes=Buffer.from(JSON.stringify(value)+'\n');fs.writeFileSync(temporary,bytes,{flag:'wx',mode:0o600});let fd=fs.openSync(temporary,'r');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+ if((enrollmentGitBarrier(root,fs).raw===null?null:sha256(enrollmentGitBarrier(root,fs).raw))!==(prior.raw===null?null:sha256(prior.raw)))throw Error('ER-GIT-BARRIER-CAS');fs.renameSync(temporary,prior.path);fd=fs.openSync(directory,'r');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}const next=enrollmentGitBarrier(root,fs);if(!next.raw.equals(bytes))throw Error('ER-GIT-BARRIER-READBACK');publishEnrollmentGitRemovalMarker(root,next.value,fs);return next;
+}
+function publishEnrollmentGitRemovalMarker(root,value,fs){
+ const path=safePath(root,'.agent-pipeline/enrollment-git-creation-barrier.json',fs),marker={schema:'pipeline.enrollment-git-removal-barrier.v1',root,rootIdentity:value.rootIdentity,planSha256:value.plan.planSha256,phase:value.phase};
+ if(fs.existsSync(path)){const prior=JSON.parse(fs.readFileSync(path,'utf8'));if(Object.keys(prior).sort().join('|')!=='phase|planSha256|root|rootIdentity|schema'||prior.root!==root||prior.planSha256!==marker.planSha256||prior.schema!==marker.schema)throw Error('ER-GIT-MARKER-CAS');}
+ const temporary=path+'.'+process.pid+'.'+Date.now()+'.tmp',bytes=Buffer.from(JSON.stringify(marker)+'\n');fs.writeFileSync(temporary,bytes,{flag:'wx',mode:0o600});let fd=fs.openSync(temporary,'r');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}fs.renameSync(temporary,path);fd=fs.openSync(dirname(path),'r');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}if(!fs.readFileSync(path).equals(bytes))throw Error('ER-GIT-MARKER-READBACK');
+}
+function enrollmentGitRetainedSnapshot(root,fs){
+ const rows=[];let budget=0;
+ for(const relative of ['project/pipeline-state.json','.claude/pipeline-state.json','.agent-pipeline/onboarding-consent.json','pipeline.user.yaml','project/pipeline.yaml','project/pipeline.json','.claude/pipeline.yaml','.claude/pipeline.json']){
+  const path=safePath(root,relative,fs);if(!fs.existsSync(path)){rows.push({path:relative,status:'absent',identity:null,sha256:null,bytesBase64:null});continue;}
+  const before=fs.lstatSync(path);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>1048576)throw Error('ER-GIT-RETAINED-FILE');
+  const bytes=fs.readFileSync(path),after=fs.lstatSync(path);budget+=bytes.length;if(budget>4194304||before.dev!==after.dev||before.ino!==after.ino||before.mtimeMs!==after.mtimeMs||before.ctimeMs!==after.ctimeMs||bytes.length!==after.size)throw Error('ER-GIT-RETAINED-DRIFT');
+  rows.push({path:relative,status:'present',identity:{dev:String(after.dev),ino:String(after.ino)},sha256:sha256(bytes),bytesBase64:bytes.toString('base64')});
+ }
+ return rows;
+}
+function enrollmentGitCreationRefusal(root,code){return {schema:ENROLLMENT_GIT_CREATION_SCHEMA,status:'refused',root,code,plan:null,nextAction:null};}
+function withEnrollmentGitCreationLock(root,planSha256,fs,operation){
+ const directory=join(root,'.agent-pipeline');if(!fs.existsSync(directory))fs.mkdirSync(directory,{mode:0o700});const path=safePath(root,'.agent-pipeline/enrollment-git-creation.lock',fs),rootIdentity=directoryIdentity(fs.lstatSync(root));
+ const value={schema:'pipeline.enrollment-git-creation-lock.v1',root,rootIdentity,planSha256,pid:process.pid};let fd;
+ try{fd=fs.openSync(path,'wx',0o600);}catch(error){
+  if(error.code!=='EEXIST')throw error;const before=fs.lstatSync(path);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>4096)throw Error('ER-GIT-LOCK');const raw=fs.readFileSync(path),prior=JSON.parse(raw.toString('utf8'));
+  if(Object.keys(prior).sort().join('|')!=='pid|planSha256|root|rootIdentity|schema'||prior.schema!==value.schema||prior.root!==root||prior.planSha256!==planSha256||!sameDirectoryIdentity(prior.rootIdentity,root,fs)||!Number.isSafeInteger(prior.pid)||prior.pid<=0)throw Error('ER-GIT-LOCK');
+  try{process.kill(prior.pid,0);throw Error('ER-GIT-LIVE-LOCK');}catch(e){if(e.code!=='ESRCH')throw e;}
+  const recovery=path+'.recover',guard=fs.openSync(recovery,'wx',0o600);
+  try{const after=fs.lstatSync(path);if(after.dev!==before.dev||after.ino!==before.ino||!fs.readFileSync(path).equals(raw))throw Error('ER-GIT-LOCK-CAS');fs.unlinkSync(path);fd=fs.openSync(path,'wx',0o600);}finally{fs.closeSync(guard);fs.unlinkSync(recovery);}
+ }
+ const identity=fs.lstatSync(path);try{fs.writeFileSync(fd,JSON.stringify(value)+'\n');fs.fsyncSync(fd);return operation();}
+ finally{fs.closeSync(fd);const actual=fs.lstatSync(path);if(actual.dev!==identity.dev||actual.ino!==identity.ino)throw Error('ER-GIT-LOCK-CAS');fs.unlinkSync(path);const parent=fs.openSync(directory,'r');try{fs.fsyncSync(parent);}finally{fs.closeSync(parent);}}
+}
+export function planEnrollmentGitCreation({rootDir,runner,deps:overrides={}}={}){
+ const fs=deps(overrides);let root;
+ try{
+  requireRunner(runner);root=safeRoot(rootDir,fs);if(root!==resolve(rootDir))return enrollmentGitCreationRefusal(root,'ER-GIT-ROOT-ALIAS');
+  const barrier=enrollmentGitBarrier(root,fs);
+  if(barrier.value!==null&&barrier.value.phase!=='retired'){
+   if(barrier.value.plan.runner!==runner)return enrollmentGitCreationRefusal(root,'ER-GIT-RUNNER-CAS');
+   const plan=barrier.value.plan;ENROLLMENT_GIT_PLANS.set(plan,{root,fs,unsigned:Object.fromEntries(Object.entries(plan).filter(([k])=>k!=='planSha256')),resume:barrier.value.phase});
+   return enrollmentGitCreationPlanned(root,runner,plan);
+  }
+  if(fs.existsSync(join(root,'.git')))return enrollmentGitCreationRefusal(root,'ER-GIT-CONTROL-PRESENT');
+  // A mounted/host-managed private history cannot become a local authority merely
+  // because its control mount is currently missing. Keep that history untouched.
+  if(fs.existsSync(safePath(root,'.claude/.runtime/agent-pipeline/onboarding',fs)))return enrollmentGitCreationRefusal(root,'ER-GIT-HOST-PRIVATE-HISTORY');
+  const scope=(fs.enrollmentObserve??observeGovernanceScope)({rootDir:root});if(scope.root!==root||scope.repositoryKind!=='non-git')return enrollmentGitCreationRefusal(root,'ER-GIT-SCOPE');
+  if(scope.state==='active')return {schema:ENROLLMENT_GIT_CREATION_SCHEMA,status:'retained',root,code:null,plan:null,nextAction:null};
+  if(scope.state==='unverifiable-active')return enrollmentGitCreationRefusal(root,'ER-GIT-UNVERIFIABLE-AUTHORITY');
+  const git=gitCapability(fs,root);if(!git.ok)return enrollmentGitCreationRefusal(root,'ER-GIT-CAPABILITY');
+  const rootIdentity=directoryIdentity(fs.lstatSync(root)),retained=enrollmentGitRetainedSnapshot(root,fs),entries=fs.readdirSync(root).sort();
+  const unsigned={schema:'pipeline.enrollment-git-creation-plan.v1',root,rootIdentity,runner,gitVersion:git.version,scopeSha256:sha256(JSON.stringify(scope)),retained,entries};
+  const plan={...unsigned,planSha256:sha256(JSON.stringify(unsigned))};ENROLLMENT_GIT_PLANS.set(plan,{root,fs,unsigned});
+  return enrollmentGitCreationPlanned(root,runner,plan);
+ }catch(error){return enrollmentGitCreationRefusal(root??resolve(rootDir),error.code??error.message);}
+}
+function enrollmentGitCreationPlanned(root,runner,plan){return {schema:ENROLLMENT_GIT_CREATION_SCHEMA,status:'planned',root,code:null,plan,nextAction:{kind:'external-operator',guidance:"Run this exact command in your own attended terminal. Confirm the displayed plan digest to explicitly create local Git while preserving retained enrollment history. This confirmation is separate from plan approval. The agent must not execute this step or supply terminal input. After it succeeds, resume public onboarding inspection at the same project root.",executable:process.execPath,argv:[fileURLToPath(new URL('../scripts/project-onboarding-v3.mjs',import.meta.url)),'apply-enrollment-git-creation','--root',root,'--runner',runner,'--plan-sha256',plan.planSha256,'--request-create-git','--activate'],mutation:true,requiresConfirmation:true,expected:{schema:ENROLLMENT_GIT_CREATION_SCHEMA,statuses:['created','retained','refused']}}};}
+export function applyEnrollmentGitCreation({plan,planSha256,requestCreateGit=false,activate=false}={}){
+ const known=ENROLLMENT_GIT_PLANS.get(plan);if(!known||activate!==true||requestCreateGit!==true||planSha256!==plan.planSha256||sha256(JSON.stringify(known.unsigned))!==plan.planSha256)return enrollmentGitCreationRefusal(plan?.root??null,'ER-GIT-EXPLICIT-REQUEST');
+ const {root,fs}=known;let created=false,barrier;
+ const current=planEnrollmentGitCreation({rootDir:root,runner:plan.runner,deps:fs});if(current.status!=='planned'||current.plan.planSha256!==planSha256)return enrollmentGitCreationRefusal(root,'ER-GIT-CAS');
+ try{return withEnrollmentGitCreationLock(root,planSha256,fs,()=>{
+ try{
+  barrier=enrollmentGitBarrier(root,fs);
+  if(barrier.value===null){if(JSON.stringify(enrollmentGitRetainedSnapshot(root,fs))!==JSON.stringify(plan.retained))throw Error('ER-GIT-CAS');barrier=publishEnrollmentGitBarrier(root,barrier,{schema:'pipeline.enrollment-git-creation-barrier.v1',root,rootIdentity:plan.rootIdentity,plan,phase:'requested',gitIdentity:null},fs);}
+  if(barrier.value.plan.planSha256!==planSha256)throw Error('ER-GIT-BARRIER-CAS');
+  publishEnrollmentGitRemovalMarker(root,barrier.value,fs);
+  // The existing sanctioned scope owner publishes the durable removal barrier
+  // before Git creation; no state/consent/intake mutation is performed here.
+  if(!fs.existsSync(join(root,'.git'))){
+  if(fs.enrollmentDecline)fs.enrollmentDecline(root);
+  else{const decline=planGovernanceScopeDecision({rootDir:root,decision:'decline',by:'explicit-enrollment-git-creation'});applyGovernanceScopeDecision(decline,{activate:true,planSha256:decline.planSha256});}
+  const declined=(fs.enrollmentObserve??observeGovernanceScope)({rootDir:root});if(declined.state!=='declined'||declined.root!==root||declined.repositoryKind!=='non-git')throw Error('ER-GIT-DECLINE-READBACK');
+  if(!sameDirectoryIdentity(plan.rootIdentity,root,fs)||fs.existsSync(join(root,'.git'))||JSON.stringify(enrollmentGitRetainedSnapshot(root,fs))!==JSON.stringify(plan.retained)||JSON.stringify(fs.readdirSync(root).filter(name=>name!=='.agent-pipeline'||plan.entries.includes(name)).sort())!==JSON.stringify(plan.entries))throw Error('ER-GIT-CAS');
+  const initialized=fs.spawnSync('git',['init','--initial-branch=main'],{cwd:root,encoding:'utf8'});if(!isSuccessfulSpawn(initialized))throw Error('ER-GIT-CREATION-FAILED');created=true;
+  }
+  const control=join(root,'.git'),gitIdentity=directoryIdentity(fs.lstatSync(control));if(!gitIdentity||fs.realpathSync(control)!==control||!sameDirectoryIdentity(plan.rootIdentity,root,fs))throw Error('ER-GIT-PRESERVATION-READBACK');
+  if(barrier.value.gitIdentity!==null&&!sameDirectoryIdentity(barrier.value.gitIdentity,control,fs))throw Error('ER-GIT-CONTROL-CAS');
+  const topology=fs.spawnSync('git',['rev-parse','--show-toplevel'],{cwd:root,encoding:'utf8'}),common=fs.spawnSync('git',['rev-parse','--path-format=absolute','--git-common-dir'],{cwd:root,encoding:'utf8'});if(!isSuccessfulSpawn(topology)||!isSuccessfulSpawn(common)||String(topology.stdout).trim()!==root||String(common.stdout).trim()!==control)throw Error('ER-GIT-LOCAL-TOPOLOGY');
+  if(barrier.value.phase==='requested'){if(JSON.stringify(enrollmentGitRetainedSnapshot(root,fs))!==JSON.stringify(plan.retained))throw Error('ER-GIT-PRESERVATION-READBACK');barrier=publishEnrollmentGitBarrier(root,barrier,{...barrier.value,phase:'created',gitIdentity},fs);}
+  // Establish this selected Git scope's own decline, then invoke the canonical
+  // enrollment coordinator. Its private State writer remains separately gated.
+  if(fs.enrollmentPrepare)fs.enrollmentPrepare(root);
+  else{
+   const observed=observeGovernanceScope({rootDir:root});
+   if(observed.state!=='active'){
+    if(observed.state!=='declined'||observed.provenance.kind!=='explicit-local-decision'){const decline=planGovernanceScopeDecision({rootDir:root,decision:'decline',by:'explicit-enrollment-git-creation'});applyGovernanceScopeDecision(decline,{activate:true,planSha256:decline.planSha256});}
+    const enroll=planGovernanceScopeDecision({rootDir:root,decision:'enroll',by:'explicit-enrollment-git-creation'});applyGovernanceScopeDecision(enroll,{activate:true,planSha256:enroll.planSha256});
+   }
+  }
+  barrier=publishEnrollmentGitBarrier(root,barrier,{...barrier.value,phase:'retired'},fs);
+  // Capture creation identity before returning. Retirement itself remains an
+  // explicit next action under the selected Git scope's sanctioned owner.
+  ENROLLMENT_GIT_PLANS.delete(plan);
+  return {schema:ENROLLMENT_GIT_CREATION_SCHEMA,status:'created',root,code:null,plan:null,nextAction:{kind:'command',executable:process.execPath,argv:lifecycleArgv([fileURLToPath(new URL('../scripts/project-onboarding-v3.mjs',import.meta.url)),'inspect','--root',root],plan.runner),mutation:false,requiresConfirmation:false,expected:{schema:SCHEMA,statuses:['enrollment-retirement-required','intake-required','ready','partial','continuity-damaged','bootstrap-binding-required']}}};
+ }catch(error){return {...enrollmentGitCreationRefusal(root,error.code??error.message),code:(created?'ER-GIT-CREATED-RECOVERY:':'')+(error.code??error.message)};}
+ });}catch(error){return enrollmentGitCreationRefusal(root,error.code??error.message);}
 }

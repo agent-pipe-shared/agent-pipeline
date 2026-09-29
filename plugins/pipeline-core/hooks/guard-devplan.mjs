@@ -162,6 +162,11 @@ import {
 import { rebaseAuthorityPermitsPath } from "../lib/rebase-authority.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 // ---- PHX-LEDGERAUTH: restored read-time ledger resolution -----------------------------
 // Restored from 998a609:plugins/pipeline-core/hooks/guard-devplan.mjs (lines 138-145 and

@@ -8,7 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { coordinateDesignAdvisory, exportNoChildDesignAdvisoryEvidence } from "./design-advisory-coordinator.mjs";
+// Historical v1 bridge diagnostics retain their actual two-source contract.
+import { coordinateLegacyDesignAdvisory as coordinateDesignAdvisory, exportNoChildDesignAdvisoryEvidence } from "./design-advisory-coordinator.mjs";
 import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
 import { runAdvisoryHostBridge } from "../scripts/advisory-host-bridge.mjs";
 

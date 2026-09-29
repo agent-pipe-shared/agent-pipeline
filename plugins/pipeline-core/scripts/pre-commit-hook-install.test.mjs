@@ -15,10 +15,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync, unlinkSync, symlinkSync }  from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   renderShim,
@@ -31,7 +31,10 @@ import {
   applyDecline,
   DECLINE_MARKER_SCHEMA,
 } from "./pre-commit-hook-install.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
 
@@ -56,7 +59,7 @@ function implModule() {
   return implModulePromise;
 }
 
-function freshRepo(prefix, { commitInitial = true } = {}) {
+function freshRepo(prefix, { commitInitial = true, pipelineEnrollment = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), `pre-commit-hook-${prefix}-`));
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 20000 });
   git("init", "-q", "-b", "main");
@@ -67,6 +70,26 @@ function freshRepo(prefix, { commitInitial = true } = {}) {
     git("add", "README.md");
     git("commit", "-q", "-m", "init");
   }
+  // These original guard fixtures model an explicitly opted-in Pipeline repository.
+  // The catalog-only callback selects an ordinary ungoverned repository instead.
+  const governance = createGovernanceScopeController({hostStateRoot: join(dir, "unused-host")});
+  const inactive = governance.observe({rootDir: dir});
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const configBefore = readFileSync(join(dir, ".git", "config"));
+  if (pipelineEnrollment) {
+    const plan = governance.planDecision({rootDir: dir, decision: "enroll", by: "disposable-precommit-fixture"});
+    const active = governance.applyDecision(plan, {activate: true, planSha256: plan.planSha256});
+    assert.equal(active.state, "active");
+    assert.equal(active.requiresEnforcement, true);
+    assert.equal(governance.observe({rootDir: dir}).state, "active");
+  } else {
+    assert.deepEqual(readFileSync(join(dir, ".git", "config")), configBefore, "opted-out fixture keeps its Git config exact");
+    assert.equal(governance.observe({rootDir: dir}).requiresEnforcement, false);
+  }
+  assert.equal(existsSync(join(dir, "project", "pipeline-state.json")), false, "enrollment creates no plan approval or lifecycle State");
+  assert.equal(existsSync(join(dir, ".claude", "pipeline-state.json")), false);
+  assert.equal(existsSync(join(dir, "unused-host")), false, "local enrollment never creates host authority");
   return { dir, git };
 }
 
@@ -577,12 +600,58 @@ test("applyInstall: refuses to overwrite a pre-existing foreign hook", () => {
   assert.equal(readFileSync(hookPath, "utf8"), before, "foreign hook content must be untouched");
 });
 
-test("applyInstall then applyRemoval: removes exactly what was installed", () => {
-  const { dir } = freshRepo("install-remove-roundtrip");
+test("applyInstall then applyRemoval: removes exactly what was installed", async () => {
+  const { dir } = freshRepo("install-remove-roundtrip", {pipelineEnrollment: false});
   const install = applyInstall({ rootDir: dir, ...PLUGIN_DIRS });
   assert.equal(install.status, "installed");
   assert.ok(existsSync(install.hookPath));
   assert.ok(existsSync(install.implPath));
+  const installedPluginLibDir = JSON.parse(readFileSync(install.markerPath, "utf8")).pluginLibDir;
+  const snapshotRoot = join(installedPluginLibDir, "..");
+  const catalogPath = join(snapshotRoot, "protected-baseline.json");
+  const catalogBytes = readFileSync(join(PLUGIN_ROOT, "protected-baseline.json"));
+  assert.deepEqual(readFileSync(catalogPath), catalogBytes, "installed snapshot retains the exact shipped catalog");
+  const inventory = JSON.parse(readFileSync(join(snapshotRoot, "snapshot.json"), "utf8"));
+  assert.equal(inventory.inventory.find(row => row.path === "protected-baseline.json").sha256,
+    createHash("sha256").update(catalogBytes).digest("hex"));
+  const snapshotDigest = createHash("sha256").update(readFileSync(join(snapshotRoot, "snapshot.json"))).digest("hex");
+  const installedBaseline = await import(pathToFileURL(join(installedPluginLibDir, "protected-baseline.mjs")).href);
+  const loaded = installedBaseline.loadShippedProtectedBaseline();
+  assert.equal(loaded.ok, true, JSON.stringify(loaded.diagnostics));
+  assert.deepEqual(loaded.baseline, JSON.parse(catalogBytes.toString("utf8")));
+  // Execute the actual emitted admission validator against the installed snapshot.
+  // This fixture has no enrollment; validating its catalog grants no authority.
+  const admissionCode = 'import {pathToFileURL} from "node:url";\n'
+    + renderGitHookSnapshotAdmission({root: snapshotRoot, manifestSha256: snapshotDigest})
+    + '\nexport {admitPipelineScope};\n';
+  const admission = await import('data:text/javascript;base64,' + Buffer.from(admissionCode).toString('base64'));
+  assert.equal(await admission.admitPipelineScope(dir), false, "valid root catalog reaches the canonical inactive scope observation");
+  writeFileSync(catalogPath, "{}\n");
+  assert.throws(() => verifyGitHookRuntimeSnapshot({snapshotRoot, manifestSha256: snapshotDigest}), {code: "GHS-CONTENT"});
+  await assert.rejects(admission.admitPipelineScope(dir), /GHA-CONTENT/);
+  writeFileSync(catalogPath, catalogBytes);
+  unlinkSync(catalogPath);
+  symlinkSync(join(PLUGIN_ROOT, "protected-baseline.json"), catalogPath);
+  assert.throws(() => verifyGitHookRuntimeSnapshot({snapshotRoot, manifestSha256: snapshotDigest}), {code: "PU-ALIAS"});
+  await assert.rejects(admission.admitPipelineScope(dir), /GHA-ALIAS/);
+  unlinkSync(catalogPath);
+  writeFileSync(catalogPath, catalogBytes, {mode: 0o600});
+  assert.equal(verifyGitHookRuntimeSnapshot({snapshotRoot, manifestSha256: snapshotDigest}).status, "verified");
+  assert.equal(await admission.admitPipelineScope(dir), false, "restoring exact catalog bytes grants no enrollment");
+  // A minimal physical input cannot silently invent the missing shipped catalog.
+  const minimalRoot = mkdtempSync(join(tmpdir(), "pre-commit-hook-minimal-plugin-"));
+  const minimalLib = join(minimalRoot, "lib"), stateDir = join(minimalRoot, "state");
+  mkdirSync(minimalLib); mkdirSync(stateDir);
+  cpSync(join(PLUGIN_LIB_DIR, "governance-scope.mjs"), join(minimalLib, "governance-scope.mjs"));
+  assert.throws(() => publishGitHookRuntimeSnapshot({pluginLibDir: minimalLib, stateDir}), {code: "GHS-BASELINE-MISSING"});
+  symlinkSync(join(PLUGIN_ROOT, "protected-baseline.json"), join(minimalRoot, "protected-baseline.json"));
+  assert.throws(() => publishGitHookRuntimeSnapshot({pluginLibDir: minimalLib, stateDir}), {code: "PU-ALIAS"});
+  unlinkSync(join(minimalRoot, "protected-baseline.json"));
+  writeFileSync(join(minimalRoot, "protected-baseline.json"), catalogBytes);
+  writeFileSync(join(minimalRoot, "unrelated-public.json"), "{}\n");
+  const minimal = publishGitHookRuntimeSnapshot({pluginLibDir: minimalLib, stateDir});
+  assert.deepEqual(readFileSync(join(minimal.root, "protected-baseline.json")), catalogBytes);
+  assert.equal(existsSync(join(minimal.root, "unrelated-public.json")), false, "root copying stays explicitly bounded");
   const removal = applyRemoval({ rootDir: dir });
   assert.equal(removal.status, "removed");
   assert.equal(existsSync(install.hookPath), false);
@@ -820,10 +889,12 @@ test("installed hook: the handover-size measurement module is broken -- commit r
   // AC-4 (module cannot be loaded): the same fail-closed doctrine this file's protected-path
   // import already used before this dispatch, now also covering the handover-config import.
   const { dir, git } = freshRepo("e2e-handover-module-broken");
-  const brokenLibDir = mkdtempSync(join(tmpdir(), "pre-commit-hook-broken-handover-lib-"));
-  cpSync(PLUGIN_LIB_DIR, brokenLibDir, { recursive: true });
+  const brokenPluginRoot = mkdtempSync(join(tmpdir(), "pre-commit-hook-broken-handover-plugin-"));
+  for (const name of ["lib", "hooks", "scripts", "config", "schemas", "protected-baseline.json"])
+    cpSync(join(PLUGIN_ROOT, name), join(brokenPluginRoot, name), { recursive: true });
+  const brokenLibDir = join(brokenPluginRoot, "lib");
   writeFileSync(join(brokenLibDir, "handover-rotation.mjs"), "throw new Error('intentionally broken for NVA-B-HANDOVERPATH fail-closed test');\n");
-  const install = applyInstall({ rootDir: dir, pluginLibDir: brokenLibDir, pluginHooksDir: PLUGIN_HOOKS_DIR, pluginScriptsDir: PLUGIN_SCRIPTS_DIR });
+  const install = applyInstall({ rootDir: dir, pluginLibDir: brokenLibDir, pluginHooksDir: join(brokenPluginRoot, "hooks"), pluginScriptsDir: join(brokenPluginRoot, "scripts") });
   assert.equal(install.status, "installed");
   writeFileSync(join(dir, "notes.txt"), "anything, not even the handover file\n");
   git("add", "notes.txt");

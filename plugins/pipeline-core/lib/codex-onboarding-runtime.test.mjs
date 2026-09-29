@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { EventEmitter } from "node:events";
 import * as nativeFs from "node:fs";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
@@ -12,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { PassThrough, Writable } from "node:stream";
 
 import {
-  HELPER_PATH, authenticateLaunchTicket, canonicalJson, canonicalSha256, consumeRuntimeReadback, fingerprintIdentity,
+  resolveOnboardingIntakeScope, resolveOnboardingPrivateState, HELPER_PATH, authenticateLaunchTicket, canonicalJson, canonicalSha256, consumeRuntimeReadback, fingerprintIdentity,
   issueLaunchTicket, persistRestartBarrier, prepareRuntimeRestartBinding, readCurrentRuntimeReadback, readRestartBarrier,
   repositoryFingerprint, requiresNativeRuntimeReadback, resolveRuntimeExecutable, sha256, validateRuntimeTargets,
 } from "./codex-onboarding-runtime.mjs";
@@ -28,8 +29,110 @@ import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TEST_RUNTIME_EXECUTABLE = realpathSync(process.execPath);
+const CASE_IDS_BY_NAME = new Map([
+  [
+    "the PATH resolver selects the first symlinked Codex entry and binds its physical executable",
+    "COR001"
+  ],
+  [
+    "native Windows resolution admits only a physical codex.exe through controlled PATHEXT",
+    "COR002"
+  ],
+  [
+    "Linux and macOS retain the direct physical extensionless executable contract",
+    "COR003"
+  ],
+  [
+    "native Windows restart state consumes owner-DACL assurance instead of projected mode bits",
+    "COR004"
+  ],
+  [
+    "unavailable or insecure Windows private-state assurance fails before barrier publication",
+    "COR005"
+  ],
+  [
+    "the launch wrapper preserves the interactive Codex process contract without exposing its token",
+    "COR006"
+  ],
+  [
+    "a barrier permits only one live issued ticket while expired history remains non-blocking",
+    "COR007"
+  ],
+  [
+    "failed initial barrier persistence restores the complete tree preimage at every write stage",
+    "COR008"
+  ],
+  [
+    "failed persistence never removes an identity-drifted private directory and sanitizes rollback failure",
+    "COR009"
+  ],
+  [
+    "duplicate, malformed, and unsafe ticket-set entries fail authentication and consumption without mutation",
+    "COR010"
+  ],
+  [
+    "a runtime barrier is canonical, blocks same-process observation, and clears only through a fresh ticket receipt",
+    "COR011"
+  ],
+  [
+    "readback publication refuses a concurrently replaced ticket or barrier without claiming ready",
+    "COR012"
+  ],
+  [
+    "the strict host helper requires a bound executable, ticket, fresh generation, config origin, and agent postimages",
+    "COR013"
+  ],
+  [
+    "native config/read admits exact Codex 0.145 config warnings and requires the remote-control status",
+    "COR014"
+  ],
+  [
+    "the productive main performs native config/read without a config/evidence seam and clears a launch ticket",
+    "COR015"
+  ],
+  [
+    "expired tickets and unchanged barrier replays fail closed",
+    "COR016"
+  ],
+  [
+    "a stale launcher binding is replaced even when source and runtime targets are unchanged",
+    "COR017"
+  ],
+  [
+    "wrong identity, origin, same-generation, timeout, oversize, and absent transport remain typed and do not consume",
+    "COR018"
+  ],
+  [
+    "the barrier exemption is a closed membership test that fails closed for every unnamed runner",
+    "COR019"
+  ],
+  [
+    "fingerprintIdentity folds a WSL default-mount path and the native Windows spelling of the same directory to one identity",
+    "COR020"
+  ],
+  [
+    "repositoryFingerprint folds a WSL-mount-shaped real path the same way, and still differs for a genuinely different directory",
+    "COR021"
+  ],
+  [
+    "selected worktree intake paths differ while restart barrier ownership is unchanged",
+    "COR022"
+  ],
+  [
+    "selected intake rejects an aliased physical root before creating state",
+    "COR023"
+  ],
+  [
+    "selected intake scope remains stable and creation never edits foreign scope bytes",
+    "COR024"
+  ]
+]);
 const cases = [];
-function test(name, run) { cases.push([name, run]); }
+function test(name, run) {
+  const id = CASE_IDS_BY_NAME.get(name);
+  assert.ok(id, `undeclared runtime case: ${name}`);
+  cases.push({ id, name, run });
+}
 function root() { return mkdtempSync(join(tmpdir(), "codex onboarding runtime matrix with spaces-")); }
 function runtimeTestBin(rootDir) {
   const bin = join(rootDir, "runtime-test-bin");
@@ -1165,16 +1268,16 @@ test("repositoryFingerprint folds a WSL-mount-shaped real path the same way, and
   assert.equal(repositoryFingerprint(dirA), repositoryFingerprint(dirA));
 });
 
-let passed = 0; const failures = [];
-for (const [name, run] of cases) {
-  try {
-    await run();
-    passed += 1;
-    console.log(`PASS  ${name}`);
-  } catch (error) {
-    failures.push(`${name}: ${error.message}`);
-    console.log(`FAIL  ${name} -- ${error.message}`);
-  }
-}
-console.log(`\ncodex-onboarding-runtime: ${passed} passed, ${failures.length} failed`);
-if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
+test("selected worktree intake paths differ while restart barrier ownership is unchanged", () => {
+ const base=root();try{const a=join(base,'a'),b=join(base,'b'),common=join(base,'common');mkdirSync(a);mkdirSync(b);mkdirSync(common);const spawn=()=>({status:0,stdout:common+'\n'});
+ const first=resolveOnboardingIntakeScope(a,'local',{spawn}),second=resolveOnboardingIntakeScope(b,'local',{spawn});assert.notEqual(first.scopeKey,second.scopeKey);assert.notEqual(first.directory,second.directory);assert.equal(first.legacyDirectory,second.legacyDirectory);assert.equal(resolveOnboardingPrivateState(a,'local',{spawn}).barrier,resolveOnboardingPrivateState(b,'local',{spawn}).barrier);assert.deepEqual(treeSnapshot(base).map(e=>e.path),['','a','b','common']);
+ }finally{dispose(base);}
+});
+test("selected intake rejects an aliased physical root before creating state",()=>{const base=root();try{const actual=join(base,'actual'),alias=join(base,'alias');mkdirSync(actual);symlinkSync(actual,alias);assert.throws(()=>resolveOnboardingIntakeScope(alias,'local',{spawn:()=>({status:0,stdout:base+'\n'}),create:true}),/physical directory|physically exact/);assert.deepEqual(readdirSync(actual),[]);}finally{dispose(base);}});
+test("selected intake scope remains stable and creation never edits foreign scope bytes",()=>{const base=root();try{const a=join(base,'a'),b=join(base,'b'),common=join(base,'common');mkdirSync(a);mkdirSync(b);mkdirSync(common);const spawn=()=>({status:0,stdout:common+'\n'}),first=resolveOnboardingIntakeScope(a,'local',{spawn,create:true});writeFileSync(join(first.directory,'sentinel'),'foreign exact bytes');const before=treeSnapshot(first.directory);const selected=resolveOnboardingIntakeScope(b,'local',{spawn,create:true});assert.deepEqual(treeSnapshot(first.directory),before);assert.equal(resolveOnboardingIntakeScope(b,'local',{spawn}).scopeKey,selected.scopeKey);}finally{dispose(base);}});
+
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? nativeFs.openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+assert.equal(cases.length, CASE_IDS_BY_NAME.size, "every declared runtime callback must register");
+registerTestCaseCompletion({ cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

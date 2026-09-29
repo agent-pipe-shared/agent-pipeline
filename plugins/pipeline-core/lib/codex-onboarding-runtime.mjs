@@ -915,3 +915,25 @@ export function consumeRuntimeReadback({ rootDir, repositoryCapability = "local"
     return { barrier: cleared, barrierSha256, ticket: consumed, readbackSha256: receiptSha256 };
   }, fs);
 }
+
+/** Intake v2 selects one physical root without moving runner restart barriers. */
+export function resolveOnboardingIntakeScope(rootDir,repositoryCapability='local',{
+ create=false,spawn=spawnSync,fs=NATIVE_FS,
+}={}){
+ const root=canonicalRoot(rootDir,fs);
+ if(root!==resolve(rootDir))throw runtimeError('intake-scope-alias','private-root-assurance','selected root must be physically exact');
+ const legacy=resolveOnboardingPrivateState(root,repositoryCapability,{create,spawn,fs});
+ const rootIdentity=directoryIdentity(root,fs);
+ const common=repositoryCapability==='local'?readGitCommonDirectory(root,spawn,fs):null;
+ const commonIdentity=common===null?null:directoryIdentity(common,fs);
+ const scopeKey=canonicalSha256({schema:'pipeline.onboarding-intake-scope.v2',rootIdentity,commonIdentity});
+ const parts=['scopes',scopeKey],directory=create?ensurePrivateDirectory(legacy.directory,parts,[],[],fs):safeJoin(legacy.directory,...parts);
+ if(!create&&fs.existsSync(directory)){
+  for(const part of [safeJoin(legacy.directory,'scopes'),directory]){
+   physicalDirectory(part,'selected intake directory',fs);
+   if(runtimePlatform(fs)==='win32')windowsAssurance(part,false,fs,'selected intake directory');
+   else if((fs.lstatSync(part).mode&0o777)!==0o700)throw runtimeError('intake-scope-private-mode','private-root-assurance','selected intake directory must remain private');
+  }
+ }
+ return {schema:'pipeline.onboarding-intake-scope.v2',root,rootIdentity,commonIdentity,scopeKey,directory,legacyDirectory:legacy.directory};
+}

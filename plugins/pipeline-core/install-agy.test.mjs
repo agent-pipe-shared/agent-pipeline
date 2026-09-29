@@ -145,14 +145,20 @@ function fixture(t) {
   const newRoot = join(root, "new", "plugins", "pipeline-core");
   const otherRoot = join(root, "other-plugin");
   for (const path of [oldRoot, newRoot, otherRoot]) mkdirSync(path, { recursive: true });
-  for (const path of [oldRoot, newRoot]) writeFileSync(join(path, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
+  for (const path of [oldRoot, newRoot]) {
+    writeFileSync(join(path, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
+    writeFileSync(join(path, "hooks.json"), "{}\n");
+  }
   const registryFile = join(root, ".agents", "plugins.json");
   mkdirSync(join(root, ".agents"));
-  return { oldRoot, newRoot, otherRoot, registryFile, root };
+  const configRoot = join(root, "gemini");
+  mkdirSync(join(configRoot, "config", "plugins"), { recursive: true });
+  writeFileSync(join(otherRoot, "plugin.json"), JSON.stringify({ name: "foreign-plugin", version: "1" }));
+  return { oldRoot, newRoot, otherRoot, registryFile, root, configRoot };
 }
 
 test("Agy upgrade replaces the old physical root and survives its removal", (t) => {
-  const { oldRoot, newRoot, otherRoot, registryFile } = fixture(t);
+  const { oldRoot, newRoot, otherRoot, registryFile, root, configRoot } = fixture(t);
   const unrelated = { path: otherRoot, enabled: false };
   writeFileSync(registryFile, JSON.stringify({ entries: [{ path: oldRoot }, unrelated], custom: { keep: true } }, null, 2));
 
@@ -163,8 +169,8 @@ test("Agy upgrade replaces the old physical root and survives its removal", (t) 
   rmSync(oldRoot, { recursive: true });
   const readback = readFileSync(registryFile, "utf8");
   assert.equal(readback, bytes);
-  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: newRoot, registryPayloads: [readback] }), newRoot);
-  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: oldRoot, registryPayloads: [readback] }), null);
+  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: newRoot, configRoot, workspaceRoot: root }), newRoot);
+  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: oldRoot, configRoot, workspaceRoot: root }), null);
   updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
   assert.equal(readFileSync(registryFile, "utf8"), bytes);
 });
@@ -203,13 +209,15 @@ test("Agy installer refuses malformed existing registry without changing bytes",
 });
 
 test("Agy installer rejects unsafe new roots and resolver retains exact non-symlink binding", (t) => {
-  const { newRoot, registryFile, root } = fixture(t);
+  const { newRoot, registryFile, root, configRoot } = fixture(t);
   const alias = join(root, "alias");
   symlinkSync(newRoot, alias);
   assert.throws(() => updatePluginRegistry({ targetFile: registryFile, corePluginPath: alias }));
   assert.throws(() => updatePluginRegistry({ targetFile: registryFile, corePluginPath: `${root}/new/../new/plugins/pipeline-core` }));
-  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: newRoot, registryPayloads: [JSON.stringify({ entries: [{ path: alias }] })] }), null);
-  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: newRoot, registryPayloads: [JSON.stringify({ entries: [{ path: newRoot }] })] }), newRoot);
+  writeFileSync(registryFile, JSON.stringify({ entries: [{ path: alias }] }));
+  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: newRoot, configRoot, workspaceRoot: root }), null);
+  writeFileSync(registryFile, JSON.stringify({ entries: [{ path: newRoot }] }));
+  assert.equal(resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: newRoot, configRoot, workspaceRoot: root }), newRoot);
 });
 
 test("Agy installer rejects directories without a valid physical Pipeline manifest before registry publication", (t) => {

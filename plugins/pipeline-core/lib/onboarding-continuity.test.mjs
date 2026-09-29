@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import {main as markerOnboardingCliMain} from "../scripts/project-onboarding-v3.mjs";
+import {isSanctionedLifecycleCommand, evaluateLifecycleReadyGuard} from "../hooks/guard-lifecycle-ready.mjs";
+import {ProjectOnboardingReadyError} from "./project-onboarding-ready-gate.mjs";
 import {
   chmodSync,
   existsSync,
   lstatSync,
+  linkSync,
   mkdirSync,
   openSync,
   readdirSync,
@@ -48,6 +52,8 @@ import {
   applyOnboardingBootstrapBind,
   applyOnboardingBootstrapAcknowledgement,
   planOnboardingBootstrapBind,
+  planOnboardingIntakeSpecMarker,
+  applyOnboardingIntakeSpecMarker,
   planOnboardingBootstrapAcknowledgementChat,
   applyOnboardingContinuityRepair,
   applyOnboardingIntakeCapture,
@@ -67,6 +73,7 @@ import {
   planOnboardingKickoffPromotion,
   planOnboardingKickoffPromotionCleanupRecovery,
   readOnboardingIntakeCheckpoint,
+  observeOnboardingEnrollmentHistory,
   readOnboardingIntakeMaterialInput,
   readOnboardingSessionCleanupBinding,
   reconstructOnboardingKickoffPlan,
@@ -2251,6 +2258,8 @@ check("a crash after the handover publication rolls forward, never backward", ()
   }));
 
   const crashed = readFileSync(handoverPath, "utf8");
+  assert.equal(crashed.includes("SUPERSEDED.md"), false,
+    "handover publication precedes optional marker publication");
   assert.equal(digest(crashed), plan.targets.handover.afterSha256, "the handover reached its postimage");
   assert.ok(!crashed.includes(basename(dirname(seed.kickoff.targets.prd.path))));
   assert.notEqual(JSON.parse(readFileSync(seed.statePath, "utf8")).continuity.featureId, seed.request.featureId,
@@ -2338,6 +2347,8 @@ check("an already-cleaned provisional location survives inspection and replay", 
   }).status, "replayed");
   assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
   assert.equal(existsSync(provisionalDirectory(seed)), false);
+  assert.equal(readFileSync(join(seed.root, "docs", "state.md"), "utf8").includes("SUPERSEDED.md"), false,
+    "an absent provisional directory cannot support a physical marker assertion");
 });
 
 check("an already-marked provisional location is never overwritten by the promotion", () => {
@@ -2351,6 +2362,8 @@ check("an already-marked provisional location is never overwritten by the promot
     plan, expectedPlanSha256: plan.planSha256, activate: true,
   }).status, "applied");
   assert.equal(readFileSync(marker, "utf8"), original);
+  assert.equal(readFileSync(join(seed.root, "docs", "state.md"), "utf8").includes("SUPERSEDED.md"), false,
+    "an existing unrelated annotation does not establish this successor");
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
   assert.equal(applyOnboardingKickoffPromotion({
     plan, expectedPlanSha256: plan.planSha256, activate: true,
@@ -3658,6 +3671,21 @@ check("applyOnboardingIntakeDesignQuestions: rejects an empty answer set", () =>
   }));
 });
 
+check("applyOnboardingIntakeDesignQuestions: affirmative zero-open disposition is distinct from missing input and replays exactly", () => {
+  const root = fixture("intake-design-questions-none-open");
+  captureIntakeMaterial(root);
+  const disposition = { disposition: "no-open-questions" };
+  const first = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: disposition, activate: true });
+  assert.equal(first.mutated, true);
+  assert.deepEqual(first.checkpoint.designQuestions, []);
+  assert.equal(first.checkpoint.transactionState, "ready-to-generate");
+  const replay = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: disposition, activate: true });
+  assert.equal(replay.mutated, false);
+  assert.equal(replay.checkpoint.revision, first.checkpoint.revision);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-EMPTY", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [], activate: true,
+  }));
+});
 check("applyOnboardingIntakeDesignQuestions: requires at least one captured material-input chunk first", () => {
   const root = fixture("intake-design-questions-precondition");
   grantIntakeConsent(root);
@@ -4305,6 +4333,8 @@ check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path bi
   assert.equal(history.transactions[0].kind, "bootstrap-binding");
   assert.equal(history.transactions[0].featureId, featureId);
   assert.equal(readFileSync(join(root, plan.targets.handover.path), "utf8"), plan.targets.handover.content);
+  assert.equal(plan.targets.handover.content.includes("SUPERSEDED.md"), false,
+    "direct intake has no provisional kickoff package to supersede");
 });
 
 check("applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay", () => {
@@ -4763,7 +4793,184 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
 });
 
-assert.equal(cases.length, 286, "the complete onboarding continuity corpus must be registered before execution begins");
+function specMarkerSeed(name) {
+  const root = readyToGenerateRoot("spec-marker-" + name);
+  const generation = planOnboardingIntakeGenerate({rootDir: root});
+  applyOnboardingIntakeGenerate({rootDir: root, expectedPlanSha256: generation.planSha256, activate: true});
+  const prdPath = join(root, generation.targets.prd.path), specPath = join(root, generation.targets.spec.path);
+  writeFileSync(specPath, readFileSync(specPath, "utf8") + "\nDesign elaboration — 日本語.\n");
+  return {root, prdPath, specPath};
+}
+
+check("mechanical Spec marker repair preserves all other document and checkpoint bytes", () => {
+  const seed = specMarkerSeed("exact");
+  const beforePrd = readFileSync(seed.prdPath, "utf8"), beforeSpec = readFileSync(seed.specPath);
+  const checkpoint = readOnboardingIntakeCheckpoint({rootDir: seed.root});
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.equal(plan.status, "repair-required");
+  const result = applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true});
+  assert.equal(result.status, "applied");
+  assert.equal(readFileSync(seed.prdPath, "utf8"), beforePrd.replace(/(?<=<!-- technical-spec-sha256: )[a-f0-9]{64}(?= -->)/u, digest(beforeSpec)));
+  assert.deepEqual(readFileSync(seed.specPath), beforeSpec);
+  assert.equal(readOnboardingIntakeCheckpoint({rootDir: seed.root}).sha256, checkpoint.sha256);
+  assert.equal(classifyOnboardingContinuity({rootDir: seed.root}).status, "absent-pristine");
+  const current = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.equal(current.status, "already-current");
+  assert.equal(applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: current.planSha256, activate: true}).mutated, false);
+});
+
+check("mechanical Spec marker repair rejects stale PRD and Spec before any replacement", () => {
+  for (const name of ["prdPath", "specPath"]) {
+    const seed = specMarkerSeed("stale-" + name), plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+    writeFileSync(seed[name], readFileSync(seed[name], "utf8") + "Foreign design edit.\n");
+    const prd = readFileSync(seed.prdPath);
+    expectKickoffError("INTAKE-SPEC-MARKER-PLAN-DRIFT", () => applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true}));
+    assert.deepEqual(readFileSync(seed.prdPath), prd);
+  }
+});
+
+check("mechanical Spec marker repair refuses acknowledged or bound authority", () => {
+  // This fixture invokes the existing sanctioned acknowledgement writer.
+  const acknowledged = bootstrapBindReadyRoot("spec-marker-ack");
+  expectKickoffError("INTAKE-SPEC-MARKER-ACKNOWLEDGED", () => planOnboardingIntakeSpecMarker({rootDir: acknowledged.root}));
+  const bound = bootstrapBindReadyRoot("spec-marker-bound");
+  const bind = planOnboardingBootstrapBind({rootDir: bound.root});
+  applyOnboardingBootstrapBind({rootDir: bound.root, expectedPlanSha256: bind.planSha256, activate: true});
+  expectKickoffError("INTAKE-SPEC-MARKER-AUTHORITY", () => planOnboardingIntakeSpecMarker({rootDir: bound.root}));
+});
+
+check("mechanical Spec marker repair refuses malformed duplicate and invalid UTF8 input", () => {
+  for (const kind of ["missing", "duplicate", "encoding"]) {
+    const seed = specMarkerSeed(kind), text = readFileSync(seed.prdPath, "utf8");
+    if (kind === "missing") writeFileSync(seed.prdPath, text.replace(/^<!-- technical-spec-sha256: [a-f0-9]{64} -->\n/mu, ""));
+    if (kind === "duplicate") writeFileSync(seed.prdPath, text + "\n<!-- technical-spec-sha256: " + "a".repeat(64) + " -->\n");
+    if (kind === "encoding") writeFileSync(seed.specPath, Buffer.from([0xff, 0xfe]));
+    expectKickoffError(kind === "encoding" ? "INTAKE-SPEC-MARKER-ENCODING" : "INTAKE-SPEC-MARKER-GRAMMAR",
+      () => planOnboardingIntakeSpecMarker({rootDir: seed.root}));
+  }
+});
+
+check("mechanical Spec marker repair rejects an edit between temporary fsync and publication", () => {
+  const seed = specMarkerSeed("publication"), plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  const before = readFileSync(seed.prdPath);
+  expectKickoffError("INTAKE-SPEC-MARKER-PLAN-DRIFT", () => applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: {fault(point) {if (point === "before-publish") writeFileSync(seed.specPath, "A concurrently rewritten Spec.\n");}}}));
+  assert.deepEqual(readFileSync(seed.prdPath), before);
+  assert.equal(readdirSync(dirname(seed.prdPath)).some(name => name.includes(".spec-marker-")), false);
+});
+
+check("mechanical Spec marker repair reports committed readback drift without a success receipt", () => {
+  const seed = specMarkerSeed("readback"), plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.throws(() => applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: {fault(point) {if (point === "before-readback") writeFileSync(seed.specPath, "Changed after publication.\n");}}}),
+    error => error.code === "INTAKE-SPEC-MARKER-READBACK" && error.committed === true);
+});
+
+check("mechanical Spec marker repair rejects symlink and hardlink staging aliases", () => {
+  for (const kind of ["symlink", "hardlink"]) {
+    const seed = specMarkerSeed("alias-" + kind), alias = join(seed.root, "spec-alias.md");
+    if (kind === "symlink") {
+      writeFileSync(alias, readFileSync(seed.specPath));
+      rmSync(seed.specPath); symlinkSync(alias, seed.specPath);
+    } else linkSync(seed.specPath, alias);
+    expectKickoffError(kind === "symlink" ? "KICKOFF-PATH-UNSAFE" : "INTAKE-SPEC-MARKER-FILE",
+      () => planOnboardingIntakeSpecMarker({rootDir: seed.root}));
+  }
+});
+
+check("mechanical Spec marker repair preserves BOM CRLF Unicode and final blank lines", () => {
+  const seed = specMarkerSeed("encoding-preservation");
+  const before = "\ufeff" + readFileSync(seed.prdPath, "utf8").replaceAll("\n", "\r\n") + "\r\n日本語 — Ergänzung\r\n\r\n";
+  writeFileSync(seed.prdPath, before);
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true});
+  const expected = before.replace(/(?<=<!-- technical-spec-sha256: )[a-f0-9]{64}(?= -->)/u, digest(readFileSync(seed.specPath)));
+  assert.deepEqual(readFileSync(seed.prdPath), Buffer.from(expected, "utf8"));
+});
+
+check("mechanical Spec marker route publishes CLI argv admitted in bootstrap-binding phase", () => {
+  const seed = specMarkerSeed("cli-route");
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root, runner: "codex", intent: "session"});
+  assert.equal(plan.nextAction.requiresConfirmation, false);
+  assert.equal(plan.nextAction.mutation, true);
+  const command = [plan.nextAction.executable, ...plan.nextAction.argv].map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(" ");
+  assert.equal(isSanctionedLifecycleCommand(command, seed.root), true, command);
+  const denial = () => {throw new ProjectOnboardingReadyError("PORG-NOT-READY", "fixture", {intent: "session", lifecycleStatus: "bootstrap-binding-required"});};
+  const verdict = evaluateLifecycleReadyGuard({tool_name: "Bash", tool_input: {command}}, {
+    projectDir: seed.root, requireProjectOnboardingReadyFn: denial,
+  });
+  assert.equal(verdict.exitCode, 0, verdict.stderr);
+  let plannedOutput = "";
+  assert.equal(markerOnboardingCliMain(["intake-spec-marker-plan", "--root", seed.root, "--runner", "codex", "--intent", "session"], {
+    write: value => {plannedOutput += value;},
+    deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})},
+  }), 0, plannedOutput);
+  assert.equal(JSON.parse(plannedOutput).planSha256, plan.planSha256);
+  let stdout = "", stderr = "";
+  const result = markerOnboardingCliMain(plan.nextAction.argv.slice(1), {
+    write: value => {stdout += value;}, writeError: value => {stderr += value;},
+    deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})},
+  });
+  assert.equal(result, 0, stdout + stderr);
+  const receipt = JSON.parse(stdout);
+  assert.equal(receipt.status, "applied");
+  assert.equal(receipt.spec.sha256, digest(readFileSync(seed.specPath)));
+  const current = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.equal(current.status, "already-current");
+  assert.equal(current.nextAction, null);
+  let currentOutput = "";
+  assert.equal(markerOnboardingCliMain(["intake-spec-marker-apply", "--root", seed.root,
+    "--plan-sha256", current.planSha256, "--activate", "--runner", "codex"], {
+    write: value => {currentOutput += value;},
+    deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})},
+  }), 0, currentOutput);
+  assert.equal(JSON.parse(currentOutput).status, "already-current");
+});
+
+check("mechanical Spec marker route parser and guard refuse incomplete or expanded argv", () => {
+  const seed = specMarkerSeed("cli-invalid");
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root, runner: "codex"});
+  const before = readFileSync(seed.prdPath);
+  for (const tail of [
+    ["intake-spec-marker-apply", "--root", seed.root, "--activate", "--runner", "codex"],
+    ["intake-spec-marker-apply", "--root", seed.root, "--plan-sha256", plan.planSha256, "--runner", "codex"],
+  ]) {
+    let error = "";
+    assert.notEqual(markerOnboardingCliMain(tail, {write: value => {error += value;}, writeError: value => {error += value;},
+      deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})}}), 0);
+    assert.ok(error.length > 0);
+    assert.deepEqual(readFileSync(seed.prdPath), before);
+  }
+  const expanded = [...plan.nextAction.argv, "--text", "unrequested-content"];
+  const command = [plan.nextAction.executable, ...expanded].map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(" ");
+  assert.equal(isSanctionedLifecycleCommand(command, seed.root), false);
+  for (const extra of [["--intent", "invalid"], ["--intent", "session", "--intent", "session"]]) {
+    const invalid = [plan.nextAction.executable, ...plan.nextAction.argv, ...extra]
+      .map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(" ");
+    assert.equal(isSanctionedLifecycleCommand(invalid, seed.root), false, invalid);
+  }
+});
+
+export function runFreshEnrollmentHistoryRegression() {
+  const root=mkdtempTestScratch("fresh-enrollment-history-");
+  const git=(args,cwd=root)=>{const run=spawnSync("git",args,{cwd,encoding:"utf8"});assert.equal(run.status,0,run.stderr);};
+  try {
+    assert.deepEqual(observeOnboardingEnrollmentHistory({rootDir:root}).paths,[]);
+    git(["init","--initial-branch=main"]);
+    assert.equal(observeOnboardingEnrollmentHistory({rootDir:root}).retained,false);
+    applyOnboardingIntakeConsent({rootDir:root,granted:true,language:"en",profile:"feature",activate:true});
+    const prior=readOnboardingIntakeCheckpoint({rootDir:root}),priorBytes=readFileSync(prior.paths.checkpoint);
+    assert.equal(observeOnboardingEnrollmentHistory({rootDir:root}).retained,true);
+    git(["-c","user.name=Disposable Fixture","-c","user.email=fixture@example.invalid","commit","--allow-empty","-m","fixture"]);
+    const selected=join(root,"selected-worktree");git(["worktree","add","-b","selected-fixture",selected]);
+    assert.equal(observeOnboardingEnrollmentHistory({rootDir:selected}).retained,false,"foreign shared intake cannot make a new physical worktree a re-enrollment");
+    assert.deepEqual(readFileSync(prior.paths.checkpoint),priorBytes);
+    assert.equal(readOnboardingIntakeCheckpoint({rootDir:root}).sha256,prior.sha256);
+  } finally {rmSync(root,{recursive:true,force:true});}
+}
+check("first enrollment history reads stay empty and ignore foreign shared worktree intake",runFreshEnrollmentHistoryRegression);
+
+assert.equal(cases.length, 298, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

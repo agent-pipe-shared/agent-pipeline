@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalJson } from "../../plugins/pipeline-core/scripts/release-preflight.mjs";
+import { TERMINAL_READER_SCHEMA, parseTerminalReaderRecord, verifyTerminalReaderCourse } from "./doc-reader-terminal-binding.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
@@ -155,6 +156,32 @@ export function snapshotReaderDocumentation({ root = DEFAULT_ROOT, candidate, fe
   });
 }
 
+/** Historical rounds bind the literal committed checker scope, never execute old code. */
+export function snapshotHistoricalReaderDocumentation({ root = DEFAULT_ROOT, candidate, featureId } = {}) {
+  const safeFeatureId = validateFeatureId(featureId), resolvedRoot = resolve(root);
+  const candidateCommit = gitCommit(resolvedRoot, candidate);
+  const source = decoder.decode(readBlob(resolvedRoot, candidateCommit, "harness/scripts/check-doc-reader-binding.mjs", MAX_INPUT_BYTES));
+  const match = source.match(/export const READER_REVIEW_PATHS = Object\.freeze\(\[([\s\S]*?)\]\);/);
+  if (!match) throw new ReaderBindingError("binding", "historical Reader scope declaration is missing");
+  let paths;
+  try { paths = JSON.parse("[" + match[1].replace(/,\s*$/, "") + "]"); }
+  catch { throw new ReaderBindingError("binding", "historical Reader scope is not a literal array"); }
+  if (!Array.isArray(paths) || paths.length < 1 || paths.length > READER_REVIEW_PATHS.length
+    || new Set(paths).size !== paths.length || !sameJson(paths, [...paths].sort())
+    || paths.some(path => !READER_REVIEW_PATHS.includes(path))) {
+    throw new ReaderBindingError("binding", "historical Reader scope is duplicated, unordered or outside the current public scope");
+  }
+  let total = 0;
+  const coverage = paths.map(path => {
+    const bytes = readBlob(resolvedRoot, candidateCommit, path, MAX_DOCUMENT_BYTES); total += bytes.length;
+    if (total > MAX_DOCUMENT_SET_BYTES) throw new ReaderBindingError("binding", "historical Reader docset exceeds its byte limit");
+    return {path, sha256: sha256(bytes)};
+  });
+  const inputs = inputsForCommit(resolvedRoot, candidateCommit);
+  return Object.freeze({ schema: SNAPSHOT_SCHEMA, candidateCommit, featureId: safeFeatureId, coverage, inputs,
+    docsetSha256: docsetSha256(coverage, inputs), assurance: "committed-state-and-evidence-presence-only" });
+}
+
 function recordPath(featureId) { return `specs/${featureId}/evidence/reader-review/record.json`; }
 function reportPath(featureId, phase, round, extension) { return `specs/${featureId}/evidence/reader-review/${phase}/${round}.${extension}`; }
 function validateDigest(value, label) { if (typeof value !== "string" || !SHA256.test(value)) throw new ReaderBindingError("binding", `${label} must be a sha256 digest`); }
@@ -239,6 +266,16 @@ export function checkReaderBinding({ root = DEFAULT_ROOT, candidate, featureId }
     safeFeatureId = validateFeatureId(featureId);
     const resolvedRoot = resolve(root);
     candidateCommit = gitCommit(resolvedRoot, candidate);
+    const stored = readUtf8Json(resolvedRoot, candidateCommit, recordPath(safeFeatureId), MAX_RECORD_BYTES, "reader binding record");
+    if (stored.value.schema === TERMINAL_READER_SCHEMA) {
+      let terminalRecord;
+      try { terminalRecord = parseTerminalReaderRecord(stored.bytes); }
+      catch { throw new ReaderBindingError("binding", "terminal Reader: invalid or duplicate-key record JSON"); }
+      const terminal = verifyTerminalReaderCourse({ root: resolvedRoot, candidateCommit, featureId: safeFeatureId,
+        record: terminalRecord, api: { ReaderBindingError, git, gitTree, readBlob, sha256, sameJson,
+          snapshotReaderDocumentation, snapshotHistoricalReaderDocumentation, READER_REVIEW_PATHS, READER_REVIEW_INPUT_PATHS } });
+      reviewedCommit = terminal.reviewedCommit; docset = terminal.docsetSha256;
+    } else {
     const { record, round } = readAndValidateRecord(resolvedRoot, candidateCommit, safeFeatureId);
     reviewedCommit = record.reviewedCommit;
     const ancestor = git(resolvedRoot, ["merge-base", "--is-ancestor", reviewedCommit, candidateCommit], "utf8");
@@ -249,6 +286,7 @@ export function checkReaderBinding({ root = DEFAULT_ROOT, candidate, featureId }
     docset = current.docsetSha256;
     if (record.docsetSha256 !== reviewed.docsetSha256 || record.docsetSha256 !== current.docsetSha256 || !sameJson(record.coverage, reviewed.coverage) || !sameJson(record.coverage, current.coverage) || !sameJson(record.inputs, reviewed.inputs) || !sameJson(record.inputs, current.inputs)) throw new ReaderBindingError("binding", "record does not bind identical reviewed and candidate documentation inputs");
     validateEvidence(resolvedRoot, candidateCommit, safeFeatureId, record, round);
+    }
   } catch (error) {
     const kind = error instanceof ReaderBindingError ? error.kind : "environment";
     findings.push(`${kind.toUpperCase()} ${error.message}`);

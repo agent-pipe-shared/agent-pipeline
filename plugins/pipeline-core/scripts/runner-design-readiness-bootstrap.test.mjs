@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync,spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +15,14 @@ import {
   runRunnerDesignReadinessBootstrap,
 } from "./runner-design-readiness-bootstrap.mjs";
 import { verifyDesignReadinessHostExecution } from "../lib/design-readiness-host-evidence.mjs";
+import {advisorHostFixture} from '../lib/codex-advisor-host.fixture.mjs';
+import {createNativeInitialAdvisorExecution} from '../lib/native-initial-advisor-execution.mjs';
+import {coordinateInitialDesignAdvisory} from '../lib/design-advisory-coordinator-v2.mjs';
+import {loadRunnerProfilesV3Registry} from '../lib/runner-profiles-v3.mjs';
+import {designAdvisorValueSha256} from '../lib/design-advisor-course.mjs';
+import {exportCodexDesignAdvisorArtifacts} from './codex-design-advisor-bootstrap.mjs';
+import {readDesignReadinessPreparationFromRepository} from '../lib/design-workflow-package-v2.mjs';
+import {canonicalJson} from '../lib/codex-sandbox-compatibility.mjs';
 
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 const NAMES = ["input", "prd", "spec", "design", "traceability"];
@@ -160,6 +168,33 @@ test("Claude and Antigravity bootstraps publish host-observed receipts bound to 
     });
     assert.equal(verification.ok, true, runner);
     assert.equal(verification.assurance, "host-observed-local", runner);
+    // Actual Source preparation/private course and actual bounded Node stdin
+    // child; launcher/model controls are synthetic capabilities, not providers.
+    const f=advisorHostFixture(t);
+    writeFileSync(join(f.root,'pipeline.user.yaml'),readFileSync(new URL('../../../pipeline.user.yaml',import.meta.url)));
+    const advisorRoute={model:null,effort:null,sourceSha256:designAdvisorValueSha256(loadRunnerProfilesV3Registry()),candidateCommit:f.candidate.commit};
+    const failure=await coordinateInitialDesignAdvisory({repoRoot:f.root,runner,featureId:'advisor-feature',authoringDispatchId:'elephant-author',sources:f.sources,reason:'risk-review',profile:'feature',dispatch:f.args.dispatch,route:advisorRoute,hostExecution:createNativeInitialAdvisorExecution({runner})});
+    assert.equal(failure.status,'unavailable-pending-final-approval',JSON.stringify(failure));
+    mkdirSync(join(f.root,'evidence/design'),{recursive:true});const artifacts=exportCodexDesignAdvisorArtifacts(f.root,'evidence/design/failure',failure);
+    const preparation={schema:'pipeline.design-readiness-preparation.v2',featureId:'advisor-feature',authoringDispatchId:'elephant-author',candidate:f.candidate,sources:f.sources,advisor:{status:'unavailable',runner,profile:'feature',route:advisorRoute,initialContext:artifacts.initial,courseBinding:failure.courseBinding,consultation:null,hostReceipt:null,receipt:null,report:null,disposition:null,revisions:[],failureEvidence:artifacts.failure,proposedException:{kind:'advisor-unavailable',approval:'final',oneTime:true,rationale:'Synthetic proposed exception, not acceptance.'}},createdAt:new Date().toISOString()};
+    const preparationPath='evidence/design/preparation.json';writeFileSync(join(f.root,preparationPath),canonicalJson(preparation));
+    const context=readDesignReadinessPreparationFromRepository({repoRoot:f.root,packagePath:preparationPath});assert.equal(context.ok,true,JSON.stringify(context));
+    const nativeFx={root:f.root,sources:Object.fromEntries(NAMES.map(name=>[name,{path:f.sources[name].path,bytes:readFileSync(join(f.root,f.sources[name].path))}])),receiptPath:'evidence/design/native-readiness.json'};
+    const nativeDeps=dependencies(nativeFx,runner);nativeDeps.deriveRepositoryFingerprintFn=()=>f.repoFingerprint;
+    const childPath=join(f.input,'native-readiness.cjs');
+    nativeDeps.invokeRunnerFn=input=>{
+      const value=report(input.expected),script=`const assert=require('node:assert/strict'),fs=require('node:fs');const prompt=fs.readFileSync(0,'utf8');const context=JSON.parse(prompt.split('SUPPLEMENTAL_UNTRUSTED_ADVISOR_OBSERVATION_JSON\\n\\n')[1].split('\\n\\n').slice(1).join('\\n\\n'));assert.deepEqual(context,${JSON.stringify(context.advisorObservation)});const value=${JSON.stringify(value)};${runner==='claude'?"console.log(JSON.stringify({type:'result',is_error:false,structured_output:value}));":`console.log(JSON.stringify({event:'init',conversation_id:'synthetic-native-context',init:{model:${JSON.stringify(input.model)}}}));console.log(JSON.stringify({event:'result',result:{conversation_id:'synthetic-native-context',status:'SUCCESS',response:JSON.stringify(value)}}));`}`;
+      writeFileSync(childPath,script);
+      return invokeRunnerReadinessChild({...input,spawnFn:(_executable,_argv,options)=>spawnSync(process.execPath,[childPath],options)});
+    };
+    const nativeResult=await runRunnerDesignReadinessBootstrap([...bootstrapArgs(nativeFx,runner),'--advisor-preparation',preparationPath],nativeDeps);assert.equal(nativeResult.ok,true,JSON.stringify(nativeResult));
+    const nativeReceipt=JSON.parse(readFileSync(join(f.root,nativeFx.receiptPath),'utf8')),nativeSourceBytes=Object.fromEntries(NAMES.map(name=>[name,{path:nativeFx.sources[name].path,bytes:nativeFx.sources[name].bytes}]));
+    const nativeVerify={repoRoot:f.root,hostExecution:nativeReceipt.hostExecution,readinessReceipt:nativeReceipt,candidate:f.candidate,sources:f.sources,sourceBytes:nativeSourceBytes,advisorObservation:context.advisorObservation,resolveTopology:()=>({gitCommonDir:join(f.root,'.git'),primaryRoot:f.root}),deriveRepositoryFingerprint:()=>f.repoFingerprint,resolveRoute:({candidateCommit})=>nativeDeps.resolveRouteFn({candidateCommit})};
+    assert.equal(verifyDesignReadinessHostExecution(nativeVerify).ok,true,'actual privately bound native supplemental request is reconstructible');
+    const changed=structuredClone(context.advisorObservation);changed.advisor.proposedException.rationale='Changed valid disposition';assert.equal(verifyDesignReadinessHostExecution({...nativeVerify,advisorObservation:changed}).code,'DWP2-READINESS-SUPPLEMENTAL-REQUEST-MISMATCH');
+    const reordered={...nativeVerify,sources:Object.fromEntries([...Object.entries(f.sources)].reverse())};assert.equal(verifyDesignReadinessHostExecution(reordered).ok,true,'v2 native request is independent of JSON object member order');
+    const originalInvoke=nativeDeps.invokeRunnerFn;nativeDeps.invokeRunnerFn=input=>{const answer=originalInvoke(input);const drift=structuredClone(preparation);drift.advisor.proposedException.rationale='Material disposition changed during the native turn';writeFileSync(join(f.root,preparationPath),canonicalJson(drift));return answer;};
+    nativeFx.receiptPath='evidence/design/native-readiness-drift.json';await assert.rejects(()=>runRunnerDesignReadinessBootstrap([...bootstrapArgs(nativeFx,runner),'--advisor-preparation',preparationPath],nativeDeps),/Advisor observation or disposition changed/u);assert.equal(existsSync(join(f.root,nativeFx.receiptPath)),false);
   }
 });
 

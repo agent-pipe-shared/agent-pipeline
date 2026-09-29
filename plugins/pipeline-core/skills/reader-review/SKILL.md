@@ -92,6 +92,15 @@ basenames never select source-bound mode.
    reports and disposition. Derive `record.json` from a fresh checker snapshot,
    commit it last, and run the checker without `--snapshot` against that exact
    commit. Accept only `status: passed` with no findings.
+7. After the fourth review, use the source protocol's separate terminal record:
+   preserve all eight public reports and their publication provenance, bind
+   each reviewed snapshot and correction batch, record every finding's exact
+   resolution or existing owner acceptance, and bind the final committed state.
+   Disclose normalized reports and any protocol transition. Derive the owner
+   record from existing policy or the actual course decision; do not invent a
+   new approval or ask the PO merely to finish this quality step. Commit the
+   record last and require the checker to pass. Do not dispatch a fifth reader
+   or label the final correction as freshly reviewed.
 
 The coordinator writes reports only after receiving them from the fresh
 readers. Reader subagents remain read-only and never edit documentation,

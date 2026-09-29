@@ -417,8 +417,14 @@ import {
 } from "../lib/external-push-ledger.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+import {parse} from 'node:path';
+import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs';
+import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
+import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
+import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
+import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
-import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
+import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
 import {
   createDesignWorkflowPackageApprovalRequest,
   DESIGN_WORKFLOW_APPROVAL_SCHEMA,
@@ -439,6 +445,7 @@ import {
   LEGACY_V2_REVOCATION_RECOVERY_CLASS,
   planLegacyV2RevocationRecovery,
   reopenPlanDesign,
+  retireEnrollmentPlan,
   revokePlanV2,
   sealCurrentPlanApproval,
   sha256CanonicalJson,
@@ -701,6 +708,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "materialize-architecture",
   "inspect",
   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+  "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
@@ -3886,6 +3894,20 @@ function mixedPlanRecoveryObservation(state) {
   }
 }
 
+// Inspect observes the same current Plan/Spec authority as the write guard.
+// Missing/unreadable paths are explicit null observations, never omitted and
+// mistaken for the structural-only "current" projection.
+function inspectPlanLifecycle(dir, state) {
+  const submitted = state.planSubmission;
+  const authority = state.planApproval?.poGateAuthority;
+  const planPath = typeof submitted?.planPath === 'string' ? submitted.planPath : authority?.planPath;
+  const specPath = typeof submitted?.specPath === 'string' ? submitted.specPath : authority?.specPath;
+  return derivePlanLifecycle(state, {
+    ...(typeof planPath === 'string' ? { planSha256: physicalRebindFile(dir, planPath)?.sha256 ?? null } : {}),
+    ...(typeof specPath === 'string' ? { specSha256: physicalRebindFile(dir, specPath)?.sha256 ?? null } : {}),
+  });
+}
+
 function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
   const mixed = mixedPlanRecoveryObservation(state);
   if (mixed !== null) {
@@ -3922,6 +3944,18 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
     };
   }
+  if (lifecycle.nextAction === 'reopen-design') {
+    const by = resolveLocalGitUserName(dir, deps);
+    const rendered = boundedCopySafeCommand({ executable: process.execPath,
+      argv: [fileURLToPath(import.meta.url), 'reopen-design', '--by', by ?? placeholder("<recovery actor's name>")] });
+    const action = { kind: 'command', ...rendered, mutation: true, requiresConfirmation: true };
+    return by !== null ? action : {
+      kind: 'collect-input', inputs: [{ name: 'by', encoding: 'utf8', trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+      mutation: false, requiresConfirmation: false,
+      guidance: 'Current Plan/Spec authority is stale or unavailable. Collect the recovery actor, then confirm the returned sanctioned reopen-design action before resubmission or approval.',
+      applyAction: action, expected: { schema: INSPECT_SCHEMA, statuses: ['draft'] },
+    };
+  }
   if (!lifecycle.ok || lifecycle.status === null) return null;
   if (lifecycle.status === "draft") {
     const profileAction = resolveDraftProfileReceiptAction(dir, deps);
@@ -3934,7 +3968,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         executable: process.execPath,
         argv: [scriptPath, "submit-plan", "--by", derived.by, "--profile", derived.profile],
         mutation: true,
-        requiresConfirmation: true,
+        requiresConfirmation: false,
       };
     }
     const inputs = [];
@@ -3988,7 +4022,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         return {
           kind: "collect-input", inputs, mutation: false, requiresConfirmation: false,
           guidance: "Before one final PO decision, assemble and validate a complete design-workflow package containing the original input, current PRD/Spec, revised design, traceability, completed Advisor route (normal plus governed fallback if needed), and independent readiness. No intermediate presentation locks approval. Then fill the exact package path and run the returned present-plan action; it will show the complete bounded review and create the exact signature request.",
-          applyAction: { kind: "command", ...command, mutation: true, requiresConfirmation: true },
+          applyAction: { kind: "command", ...command, mutation: true, requiresConfirmation: false },
           expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
         };
       }
@@ -3998,7 +4032,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
           executable: process.execPath,
           argv: [scriptPath, "present-plan", "--by", by],
           mutation: true,
-          requiresConfirmation: true,
+          requiresConfirmation: false,
         };
       }
       const byRender = "<submitter's name>";
@@ -4031,6 +4065,18 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // observed in a fresh Antigravity project.
     let humanMode;
     try { humanMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn }); } catch { humanMode = null; }
+    if (requiresWorkflowPackage && humanMode?.mode === "signature") {
+      const signed = observeDesignWorkflowSignatureApproval({ dir, presentation: state.planPresentation, submission, authority: {
+        planPath: submission.planPath, planSha256: submission.planSha256,
+        specPath: submission.specPath, specSha256: submission.specSha256,
+      }, deps });
+      if (!signed.ok) return { kind: "collect-input", mutation: false, requiresConfirmation: false,
+        guidance: `The final complete package requires its exact PO signature (${signed.code}). In the PO terminal, run: ${process.execPath} ${fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url))} sign-intent --repo-root <absolute-repo> --request ${state.planPresentation.designWorkflowApprovalRequestPath}. The review includes any proposed Advisor-only exception. Then inspect again.`,
+        expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] } };
+      return { kind: "command", executable: process.execPath,
+        argv: [scriptPath, "approve-plan", "--design-workflow-approval-request", state.planPresentation.designWorkflowApprovalRequestPath],
+        mutation: true, requiresConfirmation: false, expected: { schema: INSPECT_SCHEMA, statuses: ["approved"] } };
+    }
     // A committed repository-wide policy always owns plan approval. A default
     // signature policy owns it too *once* a bootstrap receipt proves that the
     // project actually took the signed onboarding route. That distinction
@@ -4039,7 +4085,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // valid proof but inspection reopened `approve-plan --by`.
     const bootstrapReceiptRequired = humanMode?.mode === "signature"
       || state.bootstrapAcknowledgementRequired === true;
-    if (humanMode !== null
+    if (!requiresWorkflowPackage && humanMode !== null
       && (humanMode?.scope === "global" || humanMode?.scope === "default")
       && bootstrapReceiptRequired) {
       let acknowledgement;
@@ -8591,6 +8637,7 @@ function observeDesignWorkflowSignatureApproval({ dir, presentation, submission,
     specPath: authority.specPath,
     specSha256: authority.specSha256,
     readCandidate: () => designWorkflowGitCandidate(dir, deps),
+    trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
     allowUnrelatedCommits: true,
   });
   return verified.ok
@@ -9535,6 +9582,134 @@ export function checkPoGateAuthority(request = {}, deps = {}) {
   };
 }
 
+// Canonical enrollment commands: configuration lock -> State lock -> intake/consent owner locks.
+// This code belongs only to pipeline-state.mjs; it is never an alternate State writer.
+function retirementPhysicalAbsent(path) {
+ let cursor=parse(path).root;
+ for(const name of path.slice(cursor.length).split(sep).filter(Boolean)){
+  cursor=join(cursor,name);let st;try{st=lstatSync(cursor);}catch(e){if(e.code==='ENOENT')return true;throw e;}
+  if(st.isSymbolicLink()||realpathSync(cursor)!==cursor)throw Error('ER-ALIAS');
+ }
+ return false;
+}
+function retirementReadFile(path,max=4194304){
+ if(retirementPhysicalAbsent(path))return null;
+ const before=lstatSync(path);if(!before.isFile()||before.nlink!==1||before.size>max)throw Error('ER-FILE');
+ const bytes=readFileSync(path),after=lstatSync(path);
+ if(before.dev!==after.dev||before.ino!==after.ino||before.mtimeMs!==after.mtimeMs||before.ctimeMs!==after.ctimeMs||bytes.length!==after.size)throw Error('ER-READ-DRIFT');
+ return bytes;
+}
+function enrollmentTransactionPaths(root,create=false){
+ const selected=resolveOnboardingIntakeScope(root,'local',{create}),paths={directory:selected.directory};
+ return {directory:paths.directory,journal:join(paths.directory,'enrollment-retirement.json'),archiveDirectory:join(paths.directory,'enrollment-retirement-archives')};
+}
+function enrollmentJournal(root){
+ const paths=enrollmentTransactionPaths(root),raw=retirementReadFile(paths.journal);
+ if(raw===null)return {paths,raw:null,value:null};
+ const value=parseStrictJson(raw.toString('utf8'));if(!validateRetirementJournal(value)||value.root!==root)throw Error('ER-JOURNAL');
+ return {paths,raw,value};
+}
+function enrollmentPublishJournal(root,prior,value,nonce){
+ const paths=enrollmentTransactionPaths(root,true),current=retirementReadFile(paths.journal);
+ if((current===null?null:sha256Bytes(current))!==(prior===null?null:sha256Bytes(prior)))throw Error('ER-JOURNAL-CAS');
+ if(!validateRetirementJournal(value))throw Error('ER-JOURNAL-INVALID');
+ const bytes=Buffer.from(JSON.stringify(value)+'\n');
+ const written=writeRebindFile(paths.journal,bytes,0o600,nonce,(fd,b)=>replaceFdContents(fd,b),renameSync,syncDirectory);
+ if(!written.ok||!retirementReadFile(paths.journal).equals(bytes))throw Error('ER-JOURNAL-READBACK');
+ return bytes;
+}
+function enrollmentPublishArchive(paths,archive,nonce){
+ if(!validateRetirementArchive(archive))throw Error('ER-ARCHIVE');
+ if(retirementPhysicalAbsent(paths.archiveDirectory)){mkdirSync(paths.archiveDirectory,{mode:0o700});if(!syncDirectory(paths.directory).ok)throw Error('ER-ARCHIVE-DURABILITY');}
+ const entries=readdirSync(paths.archiveDirectory);if(entries.length>=64&&!entries.includes(archive.generationSha256+'.json'))throw Error('ER-ARCHIVE-LIMIT');
+ const target=join(paths.archiveDirectory,archive.generationSha256+'.json'),bytes=Buffer.from(JSON.stringify(archive)+'\n'),prior=retirementReadFile(target);
+ if(prior!==null){if(!prior.equals(bytes))throw Error('ER-ARCHIVE-COLLISION');return;}
+ const temporary=target+'.'+nonce+'.tmp',fd=openSync(temporary,'wx',0o600);
+ try{replaceFdContents(fd,bytes);}finally{closeSync(fd);}
+ try{linkSync(temporary,target);}catch(e){const held=retirementReadFile(target);if(held===null||!held.equals(bytes))throw e;}finally{unlinkSync(temporary);}
+ if(!syncDirectory(paths.archiveDirectory).ok||!retirementReadFile(target).equals(bytes))throw Error('ER-ARCHIVE-READBACK');
+}
+function enrollmentReadArchive(paths,journal){
+ const raw=retirementReadFile(join(paths.archiveDirectory,journal.generationSha256+'.json'));
+ if(raw===null)throw Error('ER-ARCHIVE-MISSING');const archive=parseStrictJson(raw.toString('utf8'));
+ if(!validateRetirementArchive(archive)||retirementValueSha256(archive)!==journal.archiveSha256||archive.generationSha256!==journal.generationSha256||archive.barrierSha256!==journal.barrierSha256)throw Error('ER-ARCHIVE-BINDING');
+ return archive;
+}
+function enrollmentStateSnapshot(root){
+ const path=statePath(root),bytes=retirementReadFile(path,1048576);
+ if(bytes===null)return {slot:'state',path,bytes:null,identity:null,state:null};
+ const state=parseStrictJson(bytes.toString('utf8')),read=readState(root);
+ if(read.status!=='ok'||sha256CanonicalJson(state)!==sha256CanonicalJson(read.state))throw Error('ER-STATE-MALFORMED');
+ const st=lstatSync(path);return {slot:'state',path,bytes,identity:{dev:String(st.dev),ino:String(st.ino)},state};
+}
+function runEnrollmentRetirement(sub,rest){
+ const flags=parseExactFlags(rest,new Set(['root','scope-key','barrier-sha256','by']));
+ if(!flags.ok||Object.keys(flags.value).length!==4)return 2;
+ const root=resolve(flags.value.root),scopeKey=flags.value['scope-key'],barrierSha256=flags.value['barrier-sha256'],by=flags.value.by;
+ if(!SHA256_RE.test(scopeKey??'')||!SHA256_RE.test(barrierSha256??'')||isBlank(by)||by.length>256||/[\x00-\x1f]/u.test(by)||realpathSync(root)!==root)return 2;
+ try{
+  const prior=enrollmentJournal(root),resumeActive=sub==='activate-enrollment'?prior.value?.activeScopeSha256:null;
+  return withGovernanceRetirementScopeLock({rootDir:root,scopeKey,barrierSha256,activeScopeSha256:resumeActive},scope=>{
+   return withEnrollmentRetirementIntakeLock({rootDir:root},capability=>{
+   const lock=acquireContinuityLock(root,'pipeline-enrollment-retirement-v1');if(!lock.ok)return 2;
+   try{
+    let current=enrollmentJournal(root),journal=current.value,raw=current.raw;
+    const publish=next=>{raw=enrollmentPublishJournal(root,raw,next,lock.ownerNonce);journal=next;};
+    if(journal!==null&&journal.phase!=='active'&&(journal.barrierSha256!==barrierSha256||journal.scopeKey!==scopeKey))throw Error('ER-PENDING-DRIFT');
+    if(sub==='retire-enrollment'&&(journal===null||journal.phase==='active')){
+     if(scope.state!=='declined')throw Error('ER-DECLINED-REQUIRED');
+     const state=enrollmentStateSnapshot(root),intake=observeEnrollmentRetirementIntake({rootDir:root}),consent=observeEnrollmentRetirementConsent({rootDir:root});
+     const prepared=prepareEnrollmentRetirement({root,rootIdentity:scope.rootIdentity,commonIdentity:scope.commonIdentity,scopeKey,barrierSha256,priorGenerationSha256:journal?.generationSha256??null,by,at:new Date().toISOString(),entries:[retirementArchiveEntry(state),retirementArchiveEntry({slot:'intake',...intake}),retirementArchiveEntry({slot:'consent',...consent})]});
+     const paths=enrollmentTransactionPaths(root,true);enrollmentPublishArchive(paths,prepared.archive,lock.ownerNonce);publish(prepared.journal);
+    }
+    if(journal===null||journal.scopeKey!==scopeKey||JSON.stringify(journal.rootIdentity)!==JSON.stringify(scope.rootIdentity)||JSON.stringify(journal.commonIdentity)!==JSON.stringify(scope.commonIdentity))throw Error('ER-GENERATION-BINDING');
+    const archive=enrollmentReadArchive(enrollmentTransactionPaths(root),journal);
+    const archived=slot=>archive.entries.find(e=>e.slot===slot);
+    if(sub==='activate-enrollment'){
+     if(journal.phase==='active'){console.log(JSON.stringify(retirementResult(journal,'active')));return 0;}
+     if(journal.phase!=='pending')throw Error('ER-NOT-RETIRED');
+     const state=enrollmentStateSnapshot(root),life=state.state===null?null:derivePlanLifecycle(state.state);
+     if((journal.retiredStateSha256!==null&&(state.bytes===null?null:sha256Bytes(state.bytes))!==journal.retiredStateSha256)||(life!==null&&(!life.ok||life.approvalCurrent||life.submissionCurrent)))throw Error('ER-STATE-REACTIVATION');
+     const intake=observeEnrollmentRetirementIntake({rootDir:root});
+     const bound=bindEnrollmentFreshConsent(journal,intake.value,intake.sha256),expected=sha256Bytes(Buffer.from(scope.activePostimage({by:journal.by,at:journal.at})));
+     if(journal.activeScopeSha256!==null&&journal.activeScopeSha256!==expected)throw Error('ER-ACTIVATION-CAS');
+     publish({...bound,activeScopeSha256:expected});
+     if(scope.state!=='active')scope.activate({by:journal.by,at:journal.at,expectedSha256:expected});
+     publish(advanceEnrollmentRetirement(journal,{phase:'active',postimageSha256:expected}));
+     console.log(JSON.stringify(retirementResult(journal,'active')));return 0;
+    }
+    if(journal.phase==='prepared'){
+     const state=enrollmentStateSnapshot(root),entry=archived('state');
+     if(state.bytes===null){if(entry.sha256!==null)throw Error('ER-STATE-MISSING');publish(advanceEnrollmentRetirement(journal,{phase:'state-retired'}));}
+     else{
+      const planned=retireEnrollmentPlan({state:state.state,expectedStateSha256:sha256CanonicalJson(state.state),by:journal.by,at:journal.at});if(!planned.ok)throw Error(planned.code);
+      const post=planned.replay?planned.state:clearGateEstimateForMutation({...planned.state,updatedAt:journal.at});
+      const archiveState=entry.bytesBase64===null?null:parseStrictJson(Buffer.from(entry.bytesBase64,'base64').toString('utf8'));
+      if(archiveState===null)throw Error('ER-STATE-APPEARED');
+      const original=retireEnrollmentPlan({state:archiveState,expectedStateSha256:sha256CanonicalJson(archiveState),by:journal.by,at:journal.at});if(!original.ok)throw Error(original.code);
+      const expected=original.replay?archiveState:clearGateEstimateForMutation({...original.state,updatedAt:journal.at});
+      if(sha256Bytes(state.bytes)!==entry.sha256&&sha256CanonicalJson(state.state)!==sha256CanonicalJson(expected))throw Error('ER-STATE-CAS');
+      if(sha256Bytes(state.bytes)===entry.sha256&&!planned.replay){const result=writeState(root,undefined,state.state,{reuseLock:lock,requirePhysicalReadback:true,transition:()=>({...planned,state:post}),beforeCommit:()=>({ok:sha256Bytes(retirementReadFile(statePath(root)))===entry.sha256})});if(!stateWriteSucceeded(result))throw Error('ER-STATE-WRITE');}
+      const readback=enrollmentStateSnapshot(root),lifecycle=derivePlanLifecycle(readback.state);if(!lifecycle.ok||lifecycle.approvalCurrent||lifecycle.submissionCurrent||sha256CanonicalJson(readback.state)!==sha256CanonicalJson(expected))throw Error('ER-STATE-READBACK');
+      publish(advanceEnrollmentRetirement(journal,{phase:'state-retired',postimageSha256:sha256Bytes(readback.bytes)}));
+     }
+    }
+    if(journal.phase==='state-retired'){const result=retireEnrollmentIntake({rootDir:root,generationSha256:journal.generationSha256,expectedSha256:archived('intake').sha256,at:journal.at,capability});publish(advanceEnrollmentRetirement(journal,{phase:'intake-retired',postimageSha256:result.sha256}));}
+    if(journal.phase==='intake-retired'){retireEnrollmentConsent({rootDir:root,expectedSha256:archived('consent').sha256});publish(advanceEnrollmentRetirement(journal,{phase:'consent-retired'}));}
+    if(journal.phase==='consent-retired'){
+     const state=enrollmentStateSnapshot(root),intake=observeEnrollmentRetirementIntake({rootDir:root}),consent=observeEnrollmentRetirementConsent({rootDir:root});
+     if((state.bytes===null?null:sha256Bytes(state.bytes))!==journal.retiredStateSha256||intake.sha256!==journal.retiredIntakeSha256||consent.sha256!==null)throw Error('ER-RETIRED-POSTIMAGES');
+     publish(advanceEnrollmentRetirement(journal,{phase:'pending'}));
+    }
+    if(journal.phase!=='pending')throw Error('ER-PHASE');
+    // No retirement step runs on a pending replay: freshly collected consent survives.
+    console.log(JSON.stringify(retirementResult(journal,'retired')));return 0;
+   }finally{releaseContinuityLock(lock);}
+   });
+  });
+ }catch(error){console.error(`Enrollment retirement refused: ${error.code??error.message}`);return 2;}
+}
+
 export function run(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
   const now = deps.now ?? (() => new Date().toISOString());
@@ -9544,6 +9719,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
+  if (sub === "retire-enrollment" || sub === "activate-enrollment") return runEnrollmentRetirement(sub, rest);
+  if (sub === "inspect-enrollment-retirement") {
+    const exact = parseExactFlags(rest, new Set(["root"]));
+    if (!exact.ok || Object.keys(exact.value).length !== 1) return 2;
+    try { console.log(JSON.stringify({ schema: "pipeline.enrollment-retirement-inspection.v1", journal: enrollmentJournal(resolve(exact.value.root)).value })); return 0; } catch { return 2; }
+  }
 
   if (sub === "po-authority-rebind-plan" || sub === "po-authority-rebind-apply") {
     return runPoAuthorityRebindCommand(sub, rest, {
@@ -9907,17 +10088,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedSpecSha256 = authority.value.specSha256;
       let submittedAt;
       let submittedBriefing;
-      // NVA-CF-PUSHDRIVERFINISH: `poGateAuthority({ repoRoot: dir })` above
-      // (no expected digests) never enforces the PO acknowledgement marker --
-      // `validatePoGateAuthority()`'s own `requireAcknowledgement` is only true
-      // when at least one expected digest is passed. A real
-      // PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING is therefore only ever caught
-      // inside `beforeCommit` below, whose failure otherwise propagates
-      // through `writeState()` as a bare `{code}` with the rich
-      // `reason`/`repair` text `poGateAuthority()` already computed thrown
-      // away -- captured here so the specific handling after `writeState()`
-      // returns can build a genuine structured ask instead of guessing prose.
-      let acknowledgementMissingDetail = null;
+      if (profileName === "mini") {
+        const historical = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
+        if (!historical?.ok) {
+          console.log(JSON.stringify({ schema: SUBMIT_PLAN_STOP_SCHEMA, command: "submit-plan", code: historical?.code ?? "PO-GATE-AUTHORITY-INVALID",
+            nextAction: { kind: "collect-input", mutation: false, requiresConfirmation: false,
+              guidance: `The mini plan at ${authority.value.planPath} (sha256 ${expectedPlanSha256}) and specification at ${authority.value.specPath} (sha256 ${expectedSpecSha256}) require their historical acknowledgement. ${historical?.reason ?? ""} ${historical?.repair ?? ""}` } }));
+          return 2;
+        }
+      }
+      // Submission records agent-authored content; human judgement belongs only to final approval.
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           submittedAt = now();
@@ -9947,16 +10127,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           return { ...transition, state: { ...transition.state, updatedAt: submittedAt, planApprovalBriefing: submittedBriefing } };
         },
         beforeCommit: () => {
-          const nextAuthority = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
+          const nextAuthority = poGateAuthority({ repoRoot: dir, ...(profileName === "mini" ? { expectedPlanSha256, expectedSpecSha256 } : {}) });
           const nextProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
-          const generatorExempt = !nextAuthority?.ok
-            && nextAuthority?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"
-            && exactGeneratorAcknowledgementExemption({ dir, authority: authority.value, deps });
-          if (!nextAuthority?.ok && nextAuthority?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING") {
-            acknowledgementMissingDetail = { reason: nextAuthority.reason ?? null, repair: nextAuthority.repair ?? null };
-          }
-          return (nextAuthority?.ok || generatorExempt)
-            && (generatorExempt || JSON.stringify(nextAuthority.value) === JSON.stringify(authority.value))
+          return nextAuthority?.ok
+            && JSON.stringify(nextAuthority.value) === JSON.stringify(authority.value)
             && nextProfile?.ok
             && sha256CanonicalJson(nextProfile.value) === profileSha256
             ? { ok: true }
@@ -9964,48 +10138,6 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         },
         allowContinuityAdvance: true,
       });
-      // NVA-CF-PUSHDRIVERFINISH (backlog:
-      // 2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
-      // "Re-verification, 2026-08-29"): checked BEFORE stateWriteSucceeded()
-      // below, and deliberately never falls into it for this one code --
-      // stateWriteSucceeded() itself unconditionally emits its own generic
-      // console.error the moment `!written.ok`, so calling it first would
-      // print that raw stderr line regardless of what this handler does
-      // afterward. This specific code used to fall straight into that
-      // generic console.error+exit 2 path -- a raw, non-JSON stderr crash a
-      // blind driver following only structural `nextAction`/JSON output
-      // cannot interpret. Publish a structured collect-input-shaped stop
-      // instead, adapting collectPrdAcknowledgementAction()'s pattern
-      // (lib/project-onboarding-v3.mjs): no `input`/`inputs` field (there is
-      // nothing an agent may fill in on the PO's behalf), the PRD/spec named
-      // by path and sha256, and the exact reason/repair text
-      // `poGateAuthority()` itself already computed -- that text is the one
-      // place that correctly distinguishes a still-freely-editable PRD (the
-      // PO adds the marker line themselves) from an already kickoff-
-      // promotion-bound one (the sanctioned po-authority-acknowledge-plan/
-      // -apply ceremony, itself gated to an attended PO terminal) rather
-      // than guessing which applies here.
-      if (!written.ok && written.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING" && acknowledgementMissingDetail !== null) {
-        const stop = {
-          schema: SUBMIT_PLAN_STOP_SCHEMA,
-          command: "submit-plan",
-          code: "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING",
-          nextAction: {
-            kind: "collect-input",
-            mutation: false,
-            requiresConfirmation: false,
-            guidance: "submit-plan requires the PO's own acknowledgement that the active plan is content-sound and"
-              + " consistent with its neighboring specification -- an agent must never supply this on the PO's"
-              + ` behalf. The active PRD is at ${authority.value.planPath} (sha256 ${expectedPlanSha256}); its`
-              + ` neighboring specification is at ${authority.value.specPath} (sha256 ${expectedSpecSha256}).`
-              + `${acknowledgementMissingDetail.reason ? ` ${acknowledgementMissingDetail.reason}` : ""}`
-              + `${acknowledgementMissingDetail.repair ? ` ${acknowledgementMissingDetail.repair}` : ""}`,
-            expected: { schema: SUBMIT_PLAN_STOP_SCHEMA, statuses: ["draft"] },
-          },
-        };
-        console.log(JSON.stringify(stop, null, 2));
-        return 2;
-      }
       if (!stateWriteSucceeded(written)) {
         console.error(`Error: submit-plan failed before commit (${written.code}); no submission was recorded.`);
         return 2;
@@ -10159,6 +10291,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           specPath: submitted.specPath,
           specSha256: submitted.specSha256,
           readCandidate: () => designWorkflowGitCandidate(dir, deps),
+          trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
           ...(typeof deps.verifyDesignReadinessHostExecution === "function"
             ? { verifyReadinessExecution: deps.verifyDesignReadinessHostExecution } : {}),
         });
@@ -10286,7 +10419,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             : transition;
         },
         beforeCommit: () => {
-          const current = poGateAuthority({ repoRoot: dir, expectedPlanSha256: expectedAuthority.planSha256, expectedSpecSha256: expectedAuthority.specSha256 });
+          const current = poGateAuthority({ repoRoot: dir });
           return current?.ok && sameJson(current.value, expectedAuthority)
             ? { ok: true }
             : { ok: false, code: current?.code ?? "PLAN-APPROVAL-SEAL-AUTHORITY-STALE" };
@@ -10431,6 +10564,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           packagePath: designWorkflowPackagePath,
           readCandidate: () => designWorkflowGitCandidate(dir, deps),
           requireCurrentCandidate: false,
+          trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
           ...(typeof deps.verifyDesignReadinessHostExecution === "function"
             ? { verifyReadinessExecution: deps.verifyDesignReadinessHostExecution } : {}),
         });
@@ -10461,10 +10595,31 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // bootstrapAcknowledgementRequired existed.  Otherwise an old-shaped
       // state in a signature repository could accept `--by` and bypass the
       // signed PRD/Spec acknowledgement entirely.
-      const usesSharedPolicy = approvalMode?.scope === "global"
-        && (approvalMode.mode === "signature" || base.bootstrapAcknowledgementRequired === true);
+      // A verified bootstrap receipt activates the default signature route as
+      // well. Inspection already selects it; approval must enforce the same
+      // choice instead of accepting a legacy --by invocation.
+      let defaultBootstrapAcknowledgement = null;
+      if (!advisorRequired && approvalMode?.mode === "signature" && approvalMode?.scope === "default") {
+        try {
+          defaultBootstrapAcknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
+            rootDir: dir,
+            authority: { planPath: authority.value.planPath, specPath: authority.value.specPath },
+            deps,
+          });
+        } catch { defaultBootstrapAcknowledgement = { status: "unavailable" }; }
+      }
+      const usesSharedPolicy = !advisorRequired && (
+        (approvalMode?.scope === "global"
+          && (approvalMode.mode === "signature" || base.bootstrapAcknowledgementRequired === true))
+        || (approvalMode?.scope === "default" && approvalMode.mode === "signature"
+          && (defaultBootstrapAcknowledgement?.status === "verified" || base.bootstrapAcknowledgementRequired === true))
+      );
       let by = approvalFlags.by;
       const receiptFlag = approvalFlags["bootstrap-acknowledgement-receipt"];
+      if (advisorRequired && receiptFlag !== undefined) {
+        console.error("Error: the final complete package is the Epic/Feature PO decision; do not supply a bootstrap acknowledgement receipt.");
+        return 2;
+      }
       // A global human-approval policy has exactly one policy-selected human
       // decision. This applies to global chat as well as signature: allowing
       // either posture to fall through to legacy `--by` would let an agent
@@ -10476,14 +10631,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           console.error("Error: approve-plan under the shared human-approval policy requires the exact bootstrap receipt; signature mode forbids --by, while chat mode requires the PO's explicit actor name.");
           return 2;
         }
-        let acknowledgement;
-        try {
-          acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
-            rootDir: dir,
-            authority: { planPath: authority.value.planPath, specPath: authority.value.specPath },
-            deps,
-          });
-        } catch { acknowledgement = { status: "unavailable" }; }
+        let acknowledgement = defaultBootstrapAcknowledgement;
+        if (!acknowledgement) {
+          try {
+            acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
+              rootDir: dir,
+              authority: { planPath: authority.value.planPath, specPath: authority.value.specPath },
+              deps,
+            });
+          } catch { acknowledgement = { status: "unavailable" }; }
+        }
         const expectedStatus = approvalMode.mode === "signature" ? "verified" : "chat";
         if (acknowledgement?.status !== expectedStatus
           || acknowledgement.receiptPath !== receiptFlag) {
@@ -10528,13 +10685,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             intentSha256: signed.intentSha256,
             proofSha256: signed.proofSha256,
             proof: signed.proof,
+            ...(signed.advisorException ? { advisorException: signed.advisorException } : {}),
           };
         } else {
-          const challenge = `approve-${designWorkflowPackageSha256.slice(0, 12)}`;
+          const advisorException = designWorkflowAdvisorExceptionBinding(designWorkflowPackageRead);
+          const challenge = `${advisorException ? "approve-advisor-exception" : "approve"}-${designWorkflowPackageSha256.slice(0, 12)}`;
           const confirmation = requireAttendedChatGateConfirmation({
             summaryLines: [
               "FINAL DESIGN-WORKFLOW PACKAGE APPROVAL -- inspect the complete package before confirming:",
               JSON.stringify(designWorkflowPackageRead.approvalReview, null, 2),
+              ...(advisorException ? ["This final decision accepts the recorded one-time Advisor-only exception for this exact package.", JSON.stringify(advisorException, null, 2)] : []),
               `actor: ${by}`,
               `confirmation value: ${challenge}`,
               "This is the single final PO approval for the presented package; it does not authorize implementation to begin, push, release or publication.",
@@ -10555,6 +10715,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             intentSha256: null,
             proofSha256: null,
             proof: null,
+            ...(advisorException ? { advisorException } : {}),
           };
         }
       } else if (approvalFlags["design-workflow-approval-request"] !== undefined) {
@@ -10596,17 +10757,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             : transition;
         },
         beforeCommit: () => {
-          const observed = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
+          const observed = poGateAuthority({ repoRoot: dir });
           const observedProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
-          const generatorExempt = !observed?.ok
-            && observed?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"
-            && exactGeneratorAcknowledgementExemption({ dir, authority: authority.value, deps });
           const finalPackageStillValid = !advisorRequired || (() => {
             const currentPackage = readDesignWorkflowPackageFromRepository({
               repoRoot: dir,
               packagePath: designWorkflowPackagePath,
               readCandidate: () => designWorkflowGitCandidate(dir, deps),
               requireCurrentCandidate: false,
+              trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
               ...(typeof deps.verifyDesignReadinessHostExecution === "function"
                 ? { verifyReadinessExecution: deps.verifyDesignReadinessHostExecution } : {}),
             });
@@ -10621,8 +10780,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             }
             return designWorkflowApproval?.mode === "chat";
           })();
-          return finalPackageStillValid && (observed?.ok || generatorExempt)
-            && (generatorExempt || JSON.stringify(observed.value) === JSON.stringify(authority.value))
+          return finalPackageStillValid && observed?.ok
+            && JSON.stringify(observed.value) === JSON.stringify(authority.value)
             && observedProfile?.ok
             && sha256CanonicalJson(observedProfile.value) === profileSha256
             ? { ok: true }
@@ -11807,7 +11966,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     // `docs/state.md`, so the returned text is byte-identical to what a fresh
     // read of that file's section would show, without a second read.
     case "inspect": {
-      const lifecycle = derivePlanLifecycle(base);
+      const lifecycle = inspectPlanLifecycle(dir, base);
       const payload = {
         schema: INSPECT_SCHEMA,
         generatedAt: now(),
@@ -11830,7 +11989,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
         nextAction: buildInspectNextAction(dir, base, lifecycle, deps),
-        nextActionText: nextActionSection(base),
+        nextActionText: lifecycle.nextAction === "reopen-design"
+          ? "Current Plan/Spec authority is stale or unavailable. Use the returned sanctioned reopen-design action before resubmission or approval."
+          : nextActionSection(base),
       };
       console.log(JSON.stringify(payload, null, 2));
       return 0;

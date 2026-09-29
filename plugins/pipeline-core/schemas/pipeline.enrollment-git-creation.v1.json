@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.enrollment-git-creation.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "root",
+    "code",
+    "plan",
+    "nextAction"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.enrollment-git-creation.v1"
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "created",
+        "retained",
+        "refused"
+      ]
+    },
+    "root": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "plan": {
+      "anyOf": [
+        {
+          "$ref": "pipeline.enrollment-git-creation-plan.v1.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nextAction": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "executable",
+            "argv",
+            "mutation",
+            "requiresConfirmation",
+            "expected"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "command",
+                "external-operator"
+              ]
+            },
+            "executable": {
+              "type": "string"
+            },
+            "argv": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "mutation": {
+              "type": "boolean"
+            },
+            "requiresConfirmation": {
+              "type": "boolean"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schema",
+                "statuses"
+              ],
+              "properties": {
+                "schema": {
+                  "type": "string"
+                },
+                "statuses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "guidance": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

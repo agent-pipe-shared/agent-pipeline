@@ -5,7 +5,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import test from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
+const completionCases = [];
+function test(name, run) {
+  if (arguments.length !== 2 || typeof run !== "function") throw new TypeError("Required completion expects the preserved sibling callback registration");
+  completionCases.push({ id: "ADF" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+}
 
 import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
 import { materializeArchitectureDesignFixture } from "./architecture-design-test-fixture.mjs";
@@ -49,3 +55,11 @@ test("real test-only design materialization reaches architecture entry without a
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// Register each original sibling callback directly with the canonical recorder.
+if (completionCases.length !== 1) throw new Error("Required completion case count drift");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

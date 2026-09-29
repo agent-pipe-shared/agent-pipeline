@@ -30,6 +30,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  readSync,
   realpathSync,
   renameSync,
   rmdirSync,
@@ -53,7 +54,9 @@ import {
   releaseContinuitySessionCleanup,
   validateContinuityState,
 } from "./continuity-state.mjs";
-import { resolveOnboardingPrivateState } from "./codex-onboarding-runtime.mjs";
+import { resolveOnboardingPrivateState, resolveOnboardingIntakeScope } from "./codex-onboarding-runtime.mjs";
+import {observeGovernanceScope} from "./governance-scope.mjs";
+import {validateRetirementJournal} from "./enrollment-retirement-coordinator.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 import {
@@ -4275,7 +4278,7 @@ function handoverContent(goal, featureId, prdPath, specPath) {
  * `resume-hint.mjs inspect` returned absent. Naming the design input here gives a
  * re-grounding session one durable pointer to the actual brief.
  */
-function promotionHandoverContent({ featureId, prdPath, specPath, designInputPath, profile }) {
+function promotionHandoverContent({ featureId, prdPath, specPath, designInputPath, profile, hasKickoffPredecessor }) {
   return [
     "# Project state",
     "",
@@ -4286,9 +4289,10 @@ function promotionHandoverContent({ featureId, prdPath, specPath, designInputPat
     `Technical specification: \`${specPath}\`.`,
     `Design input this package was promoted from: \`${designInputPath}\`.`,
     "",
-    "The provisional kickoff PRD and specification are superseded; their directory",
-    "carries a `SUPERSEDED.md` naming this package as their successor.",
-    "",
+    ...(hasKickoffPredecessor ? [
+      "This active package replaces the provisional kickoff PRD and specification.",
+      "",
+    ] : []),
     "## Next action",
     "",
     "Review the PRD and specification, then submit the plan for PO approval:",
@@ -4502,6 +4506,7 @@ function replayHandoverTarget(entry, input, authority) {
   const content = promotionHandoverContent({
     featureId: input.featureId, prdPath: authority.prd.path, specPath: authority.spec.path,
     designInputPath: authority.designInput.path, profile: input.profile,
+    hasKickoffPredecessor: entry.kind === "kickoff-promotion",
   });
   if (sha256(Buffer.from(content, "utf8")) !== entry.handover?.afterSha256) {
     fail("KICKOFF-PROMOTION-REPLAY", "promotion handover does not match the exact completed postimage");
@@ -5525,6 +5530,7 @@ function buildCoordinatorSourcedPromotionPlan({
   const handoverContentBytes = promotionHandoverContent({
     featureId, prdPath: authority.prd.path, specPath: authority.spec.path,
     designInputPath: authority.designInput.path, profile: input.profile,
+    hasKickoffPredecessor: false,
   });
   const handoverTarget = {
     path: observed.handoverPath,
@@ -5733,6 +5739,7 @@ function buildKickoffPromotionPlan({
   const handoverContentBytes = promotionHandoverContent({
     featureId: input.featureId, prdPath: authority.prd.path, specPath: authority.spec.path,
     designInputPath: authority.designInput.path, profile: input.profile,
+    hasKickoffPredecessor: true,
   });
   const handoverTarget = {
     path: observed.handoverPath,
@@ -6086,15 +6093,16 @@ function validateIntakeCheckpoint(root, value) {
   if (!exactKeys(value, new Set([
     "schema", "root", "revision", "createdAt", "updatedAt", "consent", "values",
     "materialInput", "designQuestions", "transactionState", "generated", "contentSha256",
-  ]))) return false;
+    ...(Object.hasOwn(value, "retiredEnrollmentGenerationSha256") ? ["retiredEnrollmentGenerationSha256"] : []),
+  ])) || (Object.hasOwn(value, "retiredEnrollmentGenerationSha256") && !SHA256_RE.test(value.retiredEnrollmentGenerationSha256))) return false;
   if (value.schema !== INTAKE_CHECKPOINT_SCHEMA || value.root !== root) return false;
   if (!Number.isSafeInteger(value.revision) || value.revision < 0) return false;
   if (!canonicalIsoTimestamp(value.createdAt) || !canonicalIsoTimestamp(value.updatedAt)) return false;
   if (!validIntakeConsent(value.consent) || !validIntakeValues(value.values)) return false;
   if (!Array.isArray(value.materialInput) || !value.materialInput.every(validIntakeMaterialInputEntry)) return false;
   if (value.designQuestions !== null && (!Array.isArray(value.designQuestions)
-    || value.designQuestions.length === 0
-    || !value.designQuestions.every(validIntakeDesignQuestionEntry))) return false;
+    || !value.designQuestions.every(validIntakeDesignQuestionEntry)
+    || (value.designQuestions.length === 0 && !["ready-to-generate", "generated", "bound"].includes(value.transactionState)))) return false;
   if (!INTAKE_TRANSACTION_STATES.has(value.transactionState)) return false;
   if (!validIntakeGenerated(value.generated)) return false;
   if (!SHA256_RE.test(value.contentSha256)) return false;
@@ -6119,18 +6127,17 @@ function defaultIntakeCheckpoint(root, nowIso) {
   return { ...unsigned, contentSha256: canonicalSha256(unsigned) };
 }
 
-export function resolveIntakeCheckpointPaths({
-  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn, create = false,
-} = {}) {
-  const root = physicalRoot(rootDir);
-  const privatePaths = resolvePrivate(root, repositoryCapability, { create, spawn });
-  return {
-    root,
-    directory: privatePaths.directory,
-    checkpoint: join(privatePaths.directory, INTAKE_CHECKPOINT_BASENAME),
-    evidenceDirectory: join(privatePaths.directory, INTAKE_CHECKPOINT_EVIDENCE_DIRNAME),
-    lock: join(privatePaths.directory, INTAKE_CHECKPOINT_LOCK_BASENAME),
-  };
+export function resolveIntakeCheckpointPaths({rootDir,repositoryCapability='local',spawn=defaultGitSpawn,create=false,forceScoped=false}={}) {
+ const root=physicalRoot(rootDir),selected=resolveOnboardingIntakeScope(root,repositoryCapability,{create:false,spawn});
+ const scoped=intakePathsForDirectory(root,selected.directory),legacy=intakePathsForDirectory(root,selected.legacyDirectory);
+ const current=readIntakeCheckpointRaw(scoped.checkpoint);
+ if(current.status==='present'){if(!validateIntakeCheckpoint(root,current.value))fail('INTAKE-CHECKPOINT-MALFORMED','selected intake is malformed');return scoped;}
+ const prior=readIntakeCheckpointRaw(legacy.checkpoint);
+ if(prior.status==='present'){
+  if(!validateIntakeCheckpoint(prior.value?.root,prior.value))fail('INTAKE-CHECKPOINT-MALFORMED','legacy intake is unresolved');
+  if(prior.value.root===root&&!forceScoped)return legacy;
+ }
+ if(create)resolveOnboardingIntakeScope(root,repositoryCapability,{create:true,spawn});return scoped;
 }
 
 function readIntakeCheckpointRaw(path) {
@@ -6154,6 +6161,26 @@ export function readOnboardingIntakeCheckpoint({
     fail("INTAKE-CHECKPOINT-MALFORMED", "intake checkpoint is malformed");
   }
   return { paths, ...observed };
+}
+
+/** Read-only first-enrollment boundary; missing history never creates a retirement generation. */
+export function observeOnboardingEnrollmentHistory({rootDir,repositoryCapability="local",spawn=defaultGitSpawn}={}) {
+  const root=physicalRoot(rootDir),paths=[];
+  for(const path of [NEUTRAL_STATE,LEGACY_STATE,"pipeline.user.yaml",NEUTRAL_MANIFEST,".claude/pipeline.yaml",".claude/pipeline.json",".agent-pipeline/onboarding-consent.json",".agent-pipeline/enrollment-git-creation-barrier.json",".agent-pipeline/enrollment-git-creation.json",".claude/.runtime/agent-pipeline/onboarding"]){
+    const full=absoluteProjectPath(root,path,"enrollment history");assertPhysicalChain(root,full);
+    if(existsSync(full)){const info=lstatSync(full);if(info.isSymbolicLink()||(!info.isFile()&&!info.isDirectory()))fail("ER-HISTORY-UNSAFE","retained enrollment history is not physical");paths.push(path);}
+  }
+  // A common Git directory can retain other worktrees' intake. Only this
+  // selected physical root's checkpoint/journal counts as its history.
+  if(repositoryCapability==="local"&&existsSync(join(root,".git"))){
+    const selected=resolveOnboardingIntakeScope(root,"local",{spawn,create:false});
+    const intake=readOnboardingIntakeCheckpoint({rootDir:root,spawn});
+    if(intake.status==="present")paths.push(intake.paths.checkpoint);
+    for(const name of ["enrollment-retirement.json","enrollment-retirement-archives"]){const path=join(selected.directory,name);if(existsSync(path)){const info=lstatSync(path);if(info.isSymbolicLink()||(!info.isFile()&&!info.isDirectory()))fail("ER-HISTORY-UNSAFE","retained retirement history is not physical");paths.push(path);}}
+    const scope=observeGovernanceScope({rootDir:root});
+    if(["declined","unverifiable-active"].includes(scope.state))paths.push("selected-governance-"+scope.state);
+  }
+  return {root,retained:paths.length>0,paths};
 }
 
 /**
@@ -6255,8 +6282,16 @@ function applyIntakeCheckpointMutation({
   rootDir, repositoryCapability = "local", deps = {}, mutate,
 } = {}) {
   const spawn = deps.spawn ?? defaultGitSpawn;
-  const initialPaths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: false });
+  if(deps.retirementOwnerLock!==undefined&&(!RETIREMENT_INTAKE_LOCKS.has(deps.retirementOwnerLock)||deps.retirementOwnerLock.root!==physicalRoot(rootDir)))fail("ER-INTAKE-LOCK","invalid sealed owner lock");
+  const initialPaths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: false, forceScoped: deps.retirementOwnerLock!==undefined });
   const initial = readIntakeCheckpointRaw(initialPaths.checkpoint);
+  if(deps.retirementOwnerLock===undefined){
+    const pendingPath=join(resolveOnboardingIntakeScope(rootDir,repositoryCapability,{spawn}).directory,"enrollment-retirement.json");
+    if(existsSync(pendingPath)){const pending=JSON.parse(readPhysicalFile(pendingPath,"enrollment retirement coordinator").toString("utf8"));
+      if(pending.root!==physicalRoot(rootDir)||!validateRetirementJournal(pending))fail("ER-INTAKE-JOURNAL","invalid retirement coordinator");
+      if(!["pending","active"].includes(pending.phase))fail("ER-INTAKE-RETIREMENT-BUSY","retirement must resume before fresh intake");
+    }
+  }
   const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
   const token = `intake-checkpoint-${sha256(Buffer.from(initialPaths.checkpoint, "utf8")).slice(0, 32)}`;
   if (mutate(initial) === null) {
@@ -6267,7 +6302,7 @@ function applyIntakeCheckpointMutation({
     // exists: acquireLock() reclaims only this schema/token after its normal
     // stale-age check.  A live, foreign, malformed, or otherwise unrecoverable
     // lock remains untouched and must not make an idempotent read path fail.
-    if (existsSync(initialPaths.lock)) {
+    if (deps.retirementOwnerLock===undefined && existsSync(initialPaths.lock)) {
       let recoveredLock = null;
       try {
         recoveredLock = acquireLock(initialPaths.lock, INTAKE_CHECKPOINT_LOCK_SCHEMA, token, lockOptions);
@@ -6281,8 +6316,8 @@ function applyIntakeCheckpointMutation({
     return { mutated: false, paths: initialPaths, value: initial.value };
   }
 
-  const paths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: true });
-  const lock = acquireLock(paths.lock, INTAKE_CHECKPOINT_LOCK_SCHEMA, token, lockOptions);
+  const paths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: true, forceScoped: deps.retirementOwnerLock!==undefined });
+  const lock = deps.retirementOwnerLock?.lock ?? acquireLock(paths.lock, INTAKE_CHECKPOINT_LOCK_SCHEMA, token, lockOptions);
   const fault = (point) => {
     if (deps.crashAt === point) throw new SimulatedIntakeCrash(point);
     (deps.fault ?? (() => {}))(point);
@@ -6346,7 +6381,7 @@ function applyIntakeCheckpointMutation({
     if (error instanceof KickoffError) throw error;
     fail("INTAKE-CHECKPOINT-WRITE-FAILED", "intake checkpoint write failed before commit", { committed });
   } finally {
-    if (!simulatedCrash && !releaseLock(lock)) {
+    if (deps.retirementOwnerLock===undefined && !simulatedCrash && !releaseLock(lock)) {
       // A retained lock fails the next writer closed, same disposition as
       // every other lock in this file.
     }
@@ -6477,7 +6512,8 @@ export function applyOnboardingIntakeCapture({
 }
 
 /**
- * Step 3: writes the ONE bundled design-question round's answers into
+ * Step 3: writes the ONE bundled design-question round's answers, or the
+ * PO's explicit no-open-questions disposition, into
  * designQuestions, flips transactionState to "ready-to-generate" (design
  * SSa.5 point 3). Requires at least one captured material-input chunk
  * (transactionState already "design-questions-pending") and existing
@@ -6491,9 +6527,13 @@ export function applyOnboardingIntakeDesignQuestions({
   rootDir, repositoryCapability = "local", answers, replace = false, activate = false, deps = {},
 } = {}) {
   if (activate !== true) fail("INTAKE-DESIGN-QUESTIONS-ACTIVATION-REQUIRED", "intake design-questions apply requires explicit activation");
-  if (!Array.isArray(answers) || answers.length === 0) fail("INTAKE-DESIGN-QUESTIONS-EMPTY", "intake design-questions apply requires at least one question/answer pair");
+  const noneOpen = exactKeys(answers, new Set(["disposition"]))
+    && answers.disposition === "no-open-questions";
+  if (!noneOpen && (!Array.isArray(answers) || answers.length === 0)) {
+    fail("INTAKE-DESIGN-QUESTIONS-EMPTY", "intake design-questions apply requires answered questions or an explicit no-open-questions disposition");
+  }
   const nowIso = deps.now ? deps.now() : new Date().toISOString();
-  const candidateEntries = answers.map((entry) => ({
+  const candidateEntries = (noneOpen ? [] : answers).map((entry) => ({
     question: entry?.question,
     answer: entry?.answer,
     answeredAt: nowIso,
@@ -6696,7 +6736,8 @@ function renderIntakeMaterialInputSection(chunks) {
 }
 
 function renderIntakeDesignQuestionsSection(designQuestions) {
-  if (!designQuestions || designQuestions.length === 0) return "(no design questions answered)\n";
+  if (designQuestions === null) return "(design questions not yet answered)\n";
+  if (designQuestions.length === 0) return "No open design questions were affirmed at intake.\n";
   return designQuestions.map((entry, index) => [
     `### Q${index + 1}: ${entry.question}`,
     "",
@@ -7061,6 +7102,145 @@ function resolveBootstrapBindInputs({ rootDir, repositoryCapability = "local", s
 }
 
 // NVA-R-STAGINGACK: coordinator-sourced binding (bootstrap-bind-apply) is the
+function specMarkerFile(root, relativePath) {
+  const path = absoluteProjectPath(root, relativePath, "staging marker document");
+  assertPhysicalChain(root, path, { leafMayBeAbsent: false });
+  const identity = (info) => ({ dev: String(info.dev), ino: String(info.ino), mode: info.mode,
+    nlink: info.nlink, size: info.size, mtimeMs: info.mtimeMs, ctimeMs: info.ctimeMs });
+  const before = lstatSync(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1
+    || before.size > 16 * 1024 * 1024) fail("INTAKE-SPEC-MARKER-FILE", "staging document is not a bounded single-link regular file");
+  let fd;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || canonicalJson(identity(opened)) !== canonicalJson(identity(before))) {
+      fail("INTAKE-SPEC-MARKER-IDENTITY", "staging document changed before read");
+    }
+    const buffer = Buffer.alloc(before.size + 1);
+    let used = 0;
+    while (used < buffer.length) {
+      const count = readSync(fd, buffer, used, buffer.length - used, used);
+      if (count === 0) break;
+      used += count;
+    }
+    const bytes = buffer.subarray(0, used);
+    assertPhysicalChain(root, path, { leafMayBeAbsent: false });
+    if (bytes.length !== before.size || canonicalJson(identity(fstatSync(fd))) !== canonicalJson(identity(before))
+      || canonicalJson(identity(lstatSync(path))) !== canonicalJson(identity(before))) {
+      fail("INTAKE-SPEC-MARKER-IDENTITY", "staging document changed during read");
+    }
+    let text;
+    try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
+    catch { fail("INTAKE-SPEC-MARKER-ENCODING", "staging document is not valid UTF-8"); }
+    return {path: relativePath, sha256: sha256(bytes), identity: identity(before), bytes, text};
+  } finally { if (fd !== undefined) closeSync(fd); }
+}
+
+function specMarkerObservation(options) {
+  const detailed = observeDetailed(options);
+  if (detailed.continuity.status !== "absent-pristine") {
+    fail("INTAKE-SPEC-MARKER-AUTHORITY", "mechanical staging repair requires absent-pristine continuity");
+  }
+  const resolved = resolveBootstrapBindInputs(options);
+  const checkpoint = readOnboardingIntakeCheckpoint(options);
+  const selected = authorityPaths(resolved.root);
+  const calibration = specMarkerFile(resolved.root, selected.calibration);
+  const prd = specMarkerFile(resolved.root, resolved.prdPath);
+  const spec = specMarkerFile(resolved.root, resolved.specPath);
+  if ([...prd.text.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length !== 0) {
+    fail("INTAKE-SPEC-MARKER-ACKNOWLEDGED", "mechanical repair cannot alter an acknowledged staging PRD");
+  }
+  const matches = [...prd.text.matchAll(TECHNICAL_SPEC_MARKER)];
+  const declarations = [...prd.text.matchAll(/<!--\s*technical-spec-sha256\s*:/gu)];
+  if (matches.length !== 1 || declarations.length !== 1) {
+    fail("INTAKE-SPEC-MARKER-GRAMMAR", "staging PRD requires exactly one valid technical Spec marker");
+  }
+  const match = matches[0], offset = match.index + match[0].indexOf(match[1]);
+  const next = Buffer.from(prd.text.slice(0, offset) + spec.sha256 + prd.text.slice(offset + 64), "utf8");
+  const publicFile = file => ({path: file.path, sha256: file.sha256, identity: file.identity});
+  const binding = {schema: "pipeline.onboarding-intake-spec-marker-plan.v1", root: resolved.root,
+    repositoryCapability: options.repositoryCapability ?? "local", featureId: resolved.featureId,
+    checkpoint: {revision: checkpoint.value.revision, sha256: checkpoint.sha256},
+    continuity: detailed.continuity, calibration: publicFile(calibration),
+    prd: {...publicFile(prd), postSha256: sha256(next)}, spec: publicFile(spec)};
+  return {binding, planSha256: canonicalSha256(binding), next, checkpointPaths: checkpoint.paths};
+}
+
+export function planOnboardingIntakeSpecMarker(options = {}) {
+  const observed = specMarkerObservation(options);
+  const repair = observed.binding.prd.sha256 !== observed.binding.prd.postSha256;
+  const argv = [DEFAULT_ONBOARDING_SCRIPT, "intake-spec-marker-apply", "--root", observed.binding.root,
+    "--plan-sha256", observed.planSha256, "--activate"];
+  if (options.runner !== undefined) {
+    if (!["codex", "claude", "antigravity"].includes(options.runner)) fail("INTAKE-SPEC-MARKER-RUNNER", "marker action runner is invalid");
+    argv.push("--runner", options.runner);
+  }
+  if (options.intent !== undefined && options.intent !== "onboarding") {
+    if (!["bootstrap", "session", "dispatch"].includes(options.intent)) fail("INTAKE-SPEC-MARKER-INTENT", "marker action intent is invalid");
+    argv.push("--intent", options.intent);
+  }
+  return {...observed.binding, planSha256: observed.planSha256,
+    status: repair ? "repair-required" : "already-current",
+    nextAction: repair ? {kind: "command", executable: process.execPath, argv, mutation: true,
+      requiresConfirmation: false, executionBoundary: "local-process", invocation: "agent-tool-call",
+      expected: {schema: "pipeline.onboarding-intake-spec-marker-apply.v1", statuses: ["applied", "already-current"]}} : null};
+}
+
+export function applyOnboardingIntakeSpecMarker({rootDir, expectedPlanSha256, activate = false,
+  repositoryCapability = "local", spawn = defaultGitSpawn, deps = {}} = {}) {
+  if (activate !== true) fail("INTAKE-SPEC-MARKER-ACTIVATION", "mechanical repair requires explicit activation");
+  if (!SHA256_RE.test(expectedPlanSha256 ?? "")) fail("INTAKE-SPEC-MARKER-PLAN", "mechanical repair requires a valid plan digest");
+  const options = {rootDir, repositoryCapability, spawn};
+  const initial = specMarkerObservation(options);
+  if (initial.planSha256 !== expectedPlanSha256) fail("INTAKE-SPEC-MARKER-PLAN-DRIFT", "the marker repair plan is stale");
+  const root = initial.binding.root, selected = authorityPaths(root);
+  const state = absoluteProjectPath(root, selected.state, "Pipeline State");
+  assertPhysicalChain(root, state);
+  const lockOptions = {nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30000};
+  const token = "intake-spec-marker-" + expectedPlanSha256.slice(0,32);
+  const locks = [];
+  let temporaryRecord, committed = false;
+  try {
+    locks.push(acquireLock(state + ".lock", "pipeline.continuity-lock.v0", token, lockOptions));
+    locks.push(acquireLock(join(initial.checkpointPaths.directory, ".kickoff-writer.lock"),
+      "pipeline.codex-onboarding-kickoff-lock.v1", token, lockOptions));
+    locks.push(acquireLock(initial.checkpointPaths.lock, INTAKE_CHECKPOINT_LOCK_SCHEMA, token, lockOptions));
+    const current = specMarkerObservation(options);
+    if (current.planSha256 !== expectedPlanSha256) fail("INTAKE-SPEC-MARKER-PLAN-DRIFT", "the marker repair plan changed under writer locks");
+    if (current.binding.prd.sha256 !== current.binding.prd.postSha256) {
+      const target = absoluteProjectPath(root, current.binding.prd.path, "staging PRD");
+      const temporary = join(dirname(target), "." + basename(target) + ".spec-marker-" + randomUUID() + ".tmp");
+      temporaryRecord = writeExclusiveSynced(temporary, current.next, current.binding.prd.identity.mode & 0o777);
+      (deps.fault ?? (() => {}))("before-publish");
+      if (specMarkerObservation(options).planSha256 !== expectedPlanSha256) {
+        fail("INTAKE-SPEC-MARKER-PLAN-DRIFT", "the marker repair preimage changed before publication");
+      }
+      renameSync(temporary, target); temporaryRecord = null; committed = true;
+      fsyncDirectory(dirname(target));
+    }
+    (deps.fault ?? (() => {}))("before-readback");
+    const after = specMarkerObservation(options);
+    const expected = {...current.binding, prd: after.binding.prd};
+    if (after.binding.prd.sha256 !== current.binding.prd.postSha256
+      || after.binding.prd.postSha256 !== current.binding.prd.postSha256
+      || canonicalJson(after.binding) !== canonicalJson(expected)) {
+      fail("INTAKE-SPEC-MARKER-READBACK", "marker repair readback changed", {committed});
+    }
+    return {schema: "pipeline.onboarding-intake-spec-marker-apply.v1",
+      status: committed ? "applied" : "already-current", mutated: committed,
+      root, featureId: current.binding.featureId, planSha256: expectedPlanSha256,
+      prd: {path: after.binding.prd.path, sha256: after.binding.prd.sha256},
+      spec: {path: after.binding.spec.path, sha256: after.binding.spec.sha256}};
+  } catch (error) {
+    if (committed) error.committed = true;
+    throw error;
+  } finally {
+    if (temporaryRecord) { try { unlinkOwned(temporaryRecord); } catch {} }
+    for (const lock of locks.reverse()) releaseLock(lock);
+  }
+}
+
 export function planOnboardingBootstrapBind({
   rootDir, runner = "codex", repositoryCapability = "local",
   onboardingScript = DEFAULT_ONBOARDING_SCRIPT, spawn = defaultGitSpawn,
@@ -8480,4 +8660,83 @@ export function applyOnboardingKickoffPromotionCleanupRecovery({
     if (!simulatedCrash && privateLock) releaseLock(privateLock);
     if (!simulatedCrash) releaseLock(stateLock);
   }
+}
+
+/** Owner-derived exact consumed intake snapshot; material evidence stays retained. */
+export function observeEnrollmentRetirementIntake({rootDir}={}) {
+ const observed=readOnboardingIntakeCheckpoint({rootDir});
+ if(observed.status==='absent')return {path:observed.paths.checkpoint,bytes:null,identity:null,value:null,sha256:null};
+ readIntakeMaterialInputChunks(observed.paths,observed.value);
+ const bytes=readPhysicalFile(observed.paths.checkpoint,'enrollment retirement intake'),st=lstatSync(observed.paths.checkpoint);
+ return {path:observed.paths.checkpoint,bytes,identity:{dev:String(st.dev),ino:String(st.ino)},value:observed.value,sha256:sha256(bytes)};
+}
+/** This owner retires only an exact archived checkpoint into the pending generation. */
+export function retireEnrollmentIntake({rootDir,generationSha256,expectedSha256,at,capability}={}) {
+ migrateOwnedRetirementIntake({rootDir,expectedSha256,capability});
+ if(!SHA256_RE.test(generationSha256??'')||!(expectedSha256===null||SHA256_RE.test(expectedSha256??''))||!canonicalIsoTimestamp(at))fail('ER-INTAKE-REQUEST','invalid retirement intake request');
+ const reset=defaultIntakeCheckpoint(physicalRoot(rootDir),at);
+ const unsigned={...reset,retiredEnrollmentGenerationSha256:generationSha256};delete unsigned.contentSha256;
+ const result=applyIntakeCheckpointMutation({rootDir,deps:{retirementOwnerLock:capability},mutate:observed=>{
+  if(observed.status==='present'&&observed.value.retiredEnrollmentGenerationSha256===generationSha256){
+   const expected={...unsigned,contentSha256:canonicalSha256(unsigned)};
+   if(canonicalJson(observed.value)!==canonicalJson(expected))fail('ER-INTAKE-FRESH-DRIFT','fresh intake must never be cleared by retirement replay');
+   return null;
+  }
+  if((observed.status==='absent'?null:observed.sha256)!==expectedSha256)fail('ER-INTAKE-CAS','archived intake changed');
+  return unsigned;
+ }});
+ const readback=observeEnrollmentRetirementIntake({rootDir});
+ if(readback.value?.retiredEnrollmentGenerationSha256!==generationSha256||readback.value.consent!==null)fail('ER-INTAKE-READBACK','retirement reset mismatch');
+ return {sha256:readback.sha256,mutated:result.mutated};
+}
+
+const RETIREMENT_INTAKE_LOCKS=new WeakSet();
+function intakePathsForDirectory(root,directory){return {root,directory,checkpoint:join(directory,INTAKE_CHECKPOINT_BASENAME),evidenceDirectory:join(directory,INTAKE_CHECKPOINT_EVIDENCE_DIRNAME),lock:join(directory,INTAKE_CHECKPOINT_LOCK_BASENAME)};}
+/** Config lock is held by the canonical coordinator before this owner takes intake locks. */
+export function withEnrollmentRetirementIntakeLock({rootDir},operation){
+ const scope=observeGovernanceScope({rootDir});
+ if(scope.root!==physicalRoot(rootDir))fail('ER-INTAKE-DECLINED','physical root differs');
+ if(scope.state!=='declined'){const selected=resolveOnboardingIntakeScope(rootDir,'local'),path=join(selected.directory,'enrollment-retirement.json');
+  const pending=existsSync(path)?JSON.parse(readPhysicalFile(path,'enrollment retirement coordinator').toString('utf8')):null;
+  if(scope.state!=='active'||!validateRetirementJournal(pending)||!['pending','active'].includes(pending.phase)||pending.activeScopeSha256===null||pending.activeScopeSha256!==scope.provenance.refs[0]?.sha256)fail('ER-INTAKE-DECLINED','durable physical decline or exact activation resume is required');
+ }
+ const selected=resolveOnboardingIntakeScope(rootDir,'local',{create:true}),legacy=intakePathsForDirectory(selected.root,selected.legacyDirectory),current=intakePathsForDirectory(selected.root,selected.directory),held=[];
+ try{
+  for(const paths of [legacy,current])held.push(acquireLock(paths.lock,INTAKE_CHECKPOINT_LOCK_SCHEMA,`intake-checkpoint-${sha256(Buffer.from(paths.checkpoint,'utf8')).slice(0,32)}`,{nowMs:Date.now,lockStaleMs:30000}));
+  const capability={root:selected.root,paths:current,legacyPaths:legacy,lock:held[1]};RETIREMENT_INTAKE_LOCKS.add(capability);
+  try{return operation(capability);}finally{RETIREMENT_INTAKE_LOCKS.delete(capability);}
+ }finally{for(const lock of held.reverse())releaseLock(lock);}
+}
+function migrateOwnedRetirementIntake({rootDir,expectedSha256,capability}){
+ if(!RETIREMENT_INTAKE_LOCKS.has(capability)||capability.root!==physicalRoot(rootDir))fail('ER-INTAKE-LOCK','intake migration needs its sealed owner lock');
+ const destination=readIntakeCheckpointRaw(capability.paths.checkpoint);
+ if(destination.status==='present'){
+  if(destination.sha256!==expectedSha256&&destination.value?.retiredEnrollmentGenerationSha256===undefined)fail('ER-INTAKE-MIGRATION-COLLISION','selected checkpoint differs');
+  const old=readIntakeCheckpointRaw(capability.legacyPaths.checkpoint);
+  if(old.status==='present'&&old.value?.root===capability.root){if(old.sha256!==expectedSha256)fail('ER-INTAKE-MIGRATION-CAS','owned legacy checkpoint drifted');unlinkSync(capability.legacyPaths.checkpoint);fsyncDirectory(capability.legacyPaths.directory);}return;
+ }
+ const prior=readIntakeCheckpointRaw(capability.legacyPaths.checkpoint);
+ if(prior.status==='absent')return;
+ if(!validateIntakeCheckpoint(prior.value?.root,prior.value))fail('ER-INTAKE-LEGACY-MALFORMED','legacy intake is malformed');
+ if(prior.value.root!==capability.root)return; // Foreign consent stays in its original slot.
+ if(prior.sha256!==expectedSha256)fail('ER-INTAKE-MIGRATION-CAS','owned legacy intake differs from the archived bytes');
+ const bytes=readPhysicalFile(capability.legacyPaths.checkpoint,'owned legacy intake migration');
+ readIntakeMaterialInputChunks(capability.legacyPaths,prior.value);
+ for(const chunk of prior.value.materialInput){
+  const bytes=readPhysicalFile(join(capability.legacyPaths.directory,chunk.evidencePath),'retained intake material');
+  if(sha256(bytes)!==chunk.sha256||bytes.length!==chunk.byteLength)fail('ER-INTAKE-MATERIAL-CAS','material evidence differs');
+  const evidence=writeIntakeCheckpointEvidence(capability.paths,bytes);
+  if(!prior.value.materialInput.some(e=>e.sha256===evidence.sha256&&e.byteLength===evidence.byteLength))fail('ER-INTAKE-EVIDENCE','material byte identity changed');
+ }
+ if(readIntakeCheckpointRaw(capability.legacyPaths.checkpoint).sha256!==prior.sha256)fail('ER-INTAKE-MIGRATION-CAS','legacy intake changed under lock');
+ const temporary=join(capability.paths.directory,'.intake-migration-'+randomUUID()+'.tmp');
+ const owned=writeExclusiveSynced(temporary,bytes,0o600);
+ try{
+  if(existsSync(capability.paths.checkpoint))fail('ER-INTAKE-MIGRATION-COLLISION','selected checkpoint appeared');
+  renameSync(temporary,capability.paths.checkpoint);fsyncDirectory(capability.paths.directory);
+ }catch(e){try{unlinkOwned(owned);}catch{}throw e;}
+ if(readIntakeCheckpointRaw(capability.paths.checkpoint).sha256!==prior.sha256)fail('ER-INTAKE-MIGRATION-READBACK','selected intake readback differs');
+ // Legacy bytes remain retained in the archive and evidence store; only the exact owned current slot moves.
+ if(readIntakeCheckpointRaw(capability.legacyPaths.checkpoint).sha256!==prior.sha256)fail('ER-INTAKE-MIGRATION-CAS','legacy intake changed before retirement');
+ unlinkSync(capability.legacyPaths.checkpoint);fsyncDirectory(capability.legacyPaths.directory);
 }

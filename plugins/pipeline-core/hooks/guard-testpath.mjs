@@ -133,6 +133,12 @@ import {
   protectedTestPathRuleFor,
 } from "../lib/protected-test-paths.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { scratchLivePluginRoots } from "../lib/physical-scratch-boundary.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -182,7 +188,12 @@ function emit(code, lines) {
  * Fail-closed everywhere: an override that cannot be read, validated or consumed leaves
  * the refusal exactly as it was.
  */
-const matched = protectedTestPathRuleFor(PROTECTED_PATHS, filePath);
+const matched = protectedTestPathRuleFor(PROTECTED_PATHS, filePath, {
+  rootDir: projectDir,
+  // Include the executing hook even when its helper is loaded from another
+  // public source root. An active plugin under scratch remains protected.
+  liveRoots: [...scratchLivePluginRoots(), PLUGIN_ROOT],
+});
 if (matched) {
   const denials = [{ guard: "guard-testpath.mjs", reason: `${matched.id}: ${matched.reason}` }];
 

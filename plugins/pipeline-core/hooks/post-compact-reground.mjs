@@ -22,6 +22,11 @@ import {
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 const OUTER_SCHEMA = "pipeline.state.v0";
 
@@ -285,6 +290,7 @@ export function decideOutput(input, state, { rootDir = null } = {}) {
 
 /** Real hook boundary. It always exits zero and never writes repository state. */
 export function run() {
+  if (!observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return;
   const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   let input;
   try {

@@ -1290,6 +1290,11 @@ function attendedFeaturePlanDeps(root, deps) {
   const specPath = `specs/${featureId}/spec.md`;
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
   commitGlobalHumanApproval(root, "chat");
+  let bootstrapObservations = 0;
+  deps.observeOnboardingBootstrapPlanApproval = () => { bootstrapObservations++; return { status: "stale" }; };
+  const historical = JSON.parse(readFileSync(statePath(root), "utf8"));
+  historical.bootstrapAcknowledgementRequired = true;
+  writeFileSync(statePath(root), JSON.stringify(historical, null, 2) + "\n");
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
   assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(deps), deps)).result, 0);
   const inspected = capturedStdout(() => run(["inspect"], deps));
@@ -1314,6 +1319,7 @@ function attendedFeaturePlanDeps(root, deps) {
     kind: "plan",
     by: "PO",
   });
+  assert.equal(bootstrapObservations, 0, "the exact final Feature package chat decision cannot require a stale bootstrap acknowledgement");
 }
 
 // NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was
@@ -1415,7 +1421,7 @@ function attendedFeaturePlanDeps(root, deps) {
       };
     },
   };
-  const attempt = invokeCaptured(["submit-plan", "--by", "coordinator", "--profile", "feature"], ackMissingDeps);
+  const attempt = invokeCaptured(["submit-plan", "--by", "coordinator", "--profile", "mini"], ackMissingDeps);
   assert.equal(attempt.status, 2, attempt.err);
   assert.equal(attempt.err, "",
     `the acknowledgement-missing stop must be structured JSON on stdout, never a raw stderr crash: ${attempt.err}`);
@@ -1597,42 +1603,21 @@ function awaitingApprovalFixture() {
   const featureId = "widget-approvereach";
   const planPath = `specs/${featureId}/prd.md`;
   const specPath = `specs/${featureId}/spec.md`;
-  const root = mktempProjectDir();
   const localNow = "2026-08-28T12:00:00.000Z";
-  assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], { dir: root, now: () => localNow }), 0);
-  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  state.planSubmission = {
-    schema: "pipeline.plan-submission.v1",
-    featureId, planPath,
-    planSha256: sha256Hex(`plan:${planPath}`),
-    specPath,
-    specSha256: sha256Hex(`spec:${specPath}`),
-    profile: "mini",
-    profileSha256: sha256Hex("profile"),
-    submittedBy: "coordinator", submittedAt: localNow,
-  };
-  // NVA-CF-PRESENTPLANDRIVER: bind a matching planPresentation record so this
-  // fixture correctly reaches the approve-plan collect-input stage under the
-  // new present-plan-first sequencing (approve-plan itself already refuses
-  // unseen content without one -- case "approve-plan", ~line 8364-8365).
-  state.planPresentation = {
-    schema: "pipeline.plan-presentation.v1",
-    submissionSha256: sha256CanonicalJson(state.planSubmission),
-    presentedBy: "coordinator",
-    presentedAt: localNow,
-  };
-  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const seeded = planAuthorityFixture({ featureId, planPath, specPath, now: localNow });
+  const { root } = seeded;
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "mini"], seeded.deps), 0);
+  assert.equal(run(["present-plan", "--by", "coordinator"], seeded.deps), 0);
   return {
     root,
     deps: {
-      dir: root,
-      now: () => localNow,
-      designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+      ...seeded.deps,
+      readHumanApprovalMode: () => null,
     },
     planPath,
     specPath,
-    planSha256: state.planSubmission.planSha256,
-    specSha256: state.planSubmission.specSha256,
+    planSha256: seeded.planSha256,
+    specSha256: seeded.specSha256,
   };
 }
 
@@ -1655,10 +1640,14 @@ function awaitingApprovalFixture() {
   const inspected = capturedStdout(() => run(["inspect"], deps));
   const action = JSON.parse(inspected.lines.join("\n")).nextAction;
   assert.equal(action.kind, "collect-input");
-  assert.equal(action.input?.name, "by");
+  assert.equal(action.input, undefined, "signature mode must request the exact final package proof, not PO-name attribution");
   assert.equal(action.inputs, undefined, "a second Advisor choice must not precede the package's one final PO approval");
-  assert.ok(action.applyAction.argv.includes("--design-workflow-approval-request"));
+  assert.match(action.guidance, /sign-intent.*--request/u);
   signPresentedFeaturePlan(authorityFixture.root, deps);
+  const ready = capturedStdout(() => run(["inspect"], deps));
+  const readyAction = JSON.parse(ready.lines.join("\n")).nextAction;
+  assert.equal(readyAction.kind, "command");
+  assert.ok(readyAction.argv.includes("--design-workflow-approval-request"));
   const approved = capturedStderr(() => run(approveFeaturePlanArgs(authorityFixture.root, "PO"), {
     ...attendedFeaturePlanDeps(authorityFixture.root, deps),
     designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }),
@@ -1671,12 +1660,18 @@ function awaitingApprovalFixture() {
 // Mini is deliberately Advisor-free even where an Advisor dependency itself
 // is unavailable; its ordinary plan-approval action remains visible.
 {
-  const { root, deps } = awaitingApprovalFixture();
-  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  state.planSubmission.profile = "mini";
-  state.planPresentation.submissionSha256 = sha256CanonicalJson(state.planSubmission);
-  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
-  const absentAdvisor = { ...deps, designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }) };
+  const { root, deps } = planAuthorityFixture({
+    featureId: "mini-advisor-unavailable",
+    planPath: "specs/mini-advisor-unavailable/prd.md",
+    specPath: "specs/mini-advisor-unavailable/spec.md",
+  });
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "mini"], deps), 0);
+  assert.equal(run(["present-plan", "--by", "coordinator"], deps), 0);
+  const absentAdvisor = {
+    ...deps,
+    readHumanApprovalMode: () => null,
+    designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }),
+  };
   const inspected = capturedStdout(() => run(["inspect"], absentAdvisor));
   const action = JSON.parse(inspected.lines.join("\n")).nextAction;
   assert.equal(action.input?.name, "by");

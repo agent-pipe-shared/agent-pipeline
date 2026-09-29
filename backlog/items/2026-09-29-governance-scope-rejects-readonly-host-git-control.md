@@ -47,6 +47,8 @@ not silently erase history or imply a local retirement capability exists.
 - Existing local Git and non-Git history assertions remain intact.
 - No `.git` writes or false candidate/native acceptance claims are introduced.
 
+## Triage — implementation tracking
+
 The implementation design is frozen in
 `scratch/0.7-host-managed-governance-integration-20260929/design.json`, SHA
 `f9d805471e957902c4aae847a32c8659826536052501480b3f2322afa77431dd`.

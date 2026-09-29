@@ -121,6 +121,7 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
         specPath,
         specSha256,
         readCandidate,
+        advisorExceptionBinding: approval.designWorkflowApproval?.advisorException ?? null,
       });
       if (!workflow.ok) return { ok: false, code: workflow.code ?? "DWP-APPROVAL-INVALID" };
       const packageApproval = approval.designWorkflowApproval;

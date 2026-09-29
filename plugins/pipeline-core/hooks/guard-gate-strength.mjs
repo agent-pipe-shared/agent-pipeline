@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
 // SPDX-License-Identifier: SUL-1.0
 /**
  * Refuse agent edits to the configuration that decides how strong a gate is.
@@ -89,6 +90,11 @@ import { buildAppendIntent, buildOverrideDecisions, requestDecisionId } from "..
 // mirroring the identical adoption already landed in guard-lifecycle-ready.mjs
 // and guard-testpath.mjs (NVA-W12-COPYSAFE).
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
@@ -368,6 +374,7 @@ export function insideLivePlugin(absolute, roots = livePluginRoots()) {
 
 /** Repository-relative, forward-slashed, case-insensitive — matching the sibling guards. */
 export function gateStrengthRuleFor(filePath, projectDir) {
+  if (isPhysicalScratchTarget(filePath, { rootDir: projectDir, liveRoots: livePluginRoots() })) return null;
   if (typeof filePath !== "string" || filePath.length === 0) return null;
   const root = resolve(projectDir);
   const absolute = isAbsolute(filePath) ? resolve(filePath) : resolve(root, filePath);

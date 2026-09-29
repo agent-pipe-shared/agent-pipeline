@@ -538,11 +538,18 @@ function ownerDigest(ownerNonce) {
   return rawSha256(Buffer.from(ownerNonce));
 }
 
+function linuxProcessStartTicks(stat) {
+  if (typeof stat !== "string" || !/^\d+ \(/u.test(stat)) return null;
+  const closing = stat.lastIndexOf(")");
+  if (closing < 0 || stat[closing + 1] !== " ") return null;
+  const fields = stat.slice(closing + 2).trim().split(/\s+/u);
+  return fields.length >= 20 && /^\d+$/u.test(fields[19] ?? "") ? fields[19] : null;
+}
+
 function localProcessStartIdentity(pid) {
   if (!Number.isSafeInteger(pid) || pid < 1 || process.platform !== "linux") return null;
   try {
-    const fields = readFileSync(`/proc/${pid}/stat`, "utf8").trim().split(" ");
-    return /^\d+$/u.test(fields[21] ?? "") ? fields[21] : null;
+    return linuxProcessStartTicks(readFileSync(`/proc/${pid}/stat`, "utf8"));
   } catch {
     return null;
   }
@@ -900,7 +907,12 @@ function processIdentityAlive(pid, startId) {
     if (error?.code === "ESRCH") return false;
     return true;
   }
-  return processStartIdentity(pid) === startId;
+  try {
+    return processStartIdentity(pid) === startId;
+  } catch {
+    // Unavailable Linux identity is not evidence that an owner is dead.
+    return true;
+  }
 }
 
 function validateVerifyRunLock(resource, { requireClosed = false } = {}) {
@@ -1295,12 +1307,11 @@ export function createDetachedWorktree(startPath, purpose, oidish, fields = {}, 
 
 function processStartIdentity(pid) {
   if (process.platform !== "linux") return `pid-${pid}`;
-  try {
-    const fields = readFileSync(`/proc/${pid}/stat`, "utf8").trim().split(" ");
-    return fields[21] || `pid-${pid}`;
-  } catch {
-    return `pid-${pid}`;
-  }
+  let observed = null;
+  try { observed = linuxProcessStartTicks(readFileSync(`/proc/${pid}/stat`, "utf8")); }
+  catch { /* the required creation identity remains unavailable */ }
+  if (observed === null) fail("WT-PROCESS-IDENTITY-UNAVAILABLE", "Linux process start identity is unavailable");
+  return observed;
 }
 
 function validateResourcePhysical(repo, resource, { requireCleanWorktree = true, allowScratchTreeRefresh = false } = {}) {

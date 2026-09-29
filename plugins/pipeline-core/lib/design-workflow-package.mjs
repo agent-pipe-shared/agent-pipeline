@@ -9,6 +9,8 @@
  * re-read that approval at the implementation boundary.
  */
 import { createHash } from "node:crypto";
+import { readDesignWorkflowPackageV2FromRepository } from "./design-workflow-package-v2.mjs";
+import { canonicalizeJson } from "./governance-event.mjs";
 import {
   closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, realpathSync,
 } from "node:fs";
@@ -111,6 +113,13 @@ function sameIdentity(left, right) {
     && left.dev === right.dev && left.ino === right.ino && left.mode === right.mode
     && left.nlink === right.nlink && left.size === right.size && left.mtimeNs === right.mtimeNs;
 }
+function sameParentIdentity(left, right) {
+  // Directory entry changes outside the admitted file do not change its parent
+  // identity. Keep physical type, inode/device and mode checks; file metadata
+  // and byte equality remain checked separately before/after every read.
+  return left.isDirectory() && right.isDirectory()
+    && left.dev === right.dev && left.ino === right.ino && left.mode === right.mode;
+}
 function physicalBytes(root, repositoryPath, maxBytes) {
   if (!safeRepoPath(repositoryPath)) return null;
   const rootPath = resolve(root);
@@ -144,7 +153,7 @@ function physicalBytes(root, repositoryPath, maxBytes) {
       || !samePath(realpathSync(target), target)) return null;
     for (const parent of parents) {
       const after = lstatSync(parent.path, { bigint: true });
-      if (!sameIdentity(parent.identity, after) || !after.isDirectory() || after.isSymbolicLink()
+      if (!sameParentIdentity(parent.identity, after) || !after.isDirectory() || after.isSymbolicLink()
         || !samePath(realpathSync(parent.path), parent.path)) return null;
     }
     return Buffer.from(UTF8.decode(data), "utf8");
@@ -449,6 +458,7 @@ export function readDesignWorkflowPackageFromRepository({
   requireCurrentCandidate = true,
   requireReadinessExecution = true,
   verifyReadinessExecution = verifyDesignReadinessHostExecution,
+  trustedAdvisorExecutablePath,
 } = {}) {
   if (typeof readCandidate !== "function" || !safeRepoPath(packagePath)) {
     return fail("DWP-READER-INPUT");
@@ -458,6 +468,9 @@ export function readDesignWorkflowPackageFromRepository({
   const packageFile = strictJsonFile(repoRoot, packagePath, MAX_PACKAGE_BYTES);
   if (!packageFile || !object(packageFile.value)) return fail("DWP-PACKAGE-PHYSICAL");
   const workflowPackage = packageFile.value;
+  if (workflowPackage.schema === "pipeline.design-workflow-package.v2") {
+    return readDesignWorkflowPackageV2FromRepository({ repoRoot, packagePath, requireCurrentCandidate, requireReadinessExecution, verifyReadinessExecution, trustedAdvisorExecutablePath });
+  }
   if (!validSources(workflowPackage.sources) || !object(workflowPackage.advisor)
     || !exact(workflowPackage.advisor.receipt, ["path", "sha256"])
     || !exact(workflowPackage.readiness, ["path", "sha256", "dispatchId"])) return fail("DWP-PACKAGE-REFERENCES");
@@ -536,12 +549,14 @@ export function readApprovedDesignWorkflowPackage({
   specPath,
   specSha256,
   readCandidate,
+  trustedAdvisorExecutablePath,
+  advisorExceptionBinding = null,
 } = {}) {
   if (!SHA256.test(packageSha256 ?? "") || !ID.test(featureId ?? "")
     || !safeRepoPath(planPath) || !SHA256.test(planSha256 ?? "")
     || !safeRepoPath(specPath) || !SHA256.test(specSha256 ?? "")) return fail("DWP-APPROVAL-BINDING");
   const result = readDesignWorkflowPackageFromRepository({
-    repoRoot, packagePath, readCandidate, requireCurrentCandidate: false, requireReadinessExecution: false,
+    repoRoot, packagePath, readCandidate, requireCurrentCandidate: false, requireReadinessExecution: false, trustedAdvisorExecutablePath,
   });
   if (!result.ok) return result;
   const workflowPackage = result.workflowPackage;
@@ -551,5 +566,19 @@ export function readApprovedDesignWorkflowPackage({
     || workflowPackage.sources.spec.path !== specPath || workflowPackage.sources.spec.sha256 !== specSha256) {
     return fail("DWP-APPROVAL-PLAN-SPEC-MISMATCH");
   }
+  const expectedException = designWorkflowAdvisorExceptionBinding(result);
+  if (canonicalizeJson(expectedException) !== canonicalizeJson(advisorExceptionBinding)) return fail("DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING");
   return { ...result, approvedBinding: true };
 }
+
+/** Only v2 unavailable evidence adds a narrow exception to the exact final PO decision. */
+export function designWorkflowAdvisorExceptionBinding(packageRead) {
+  const pkg = packageRead?.workflowPackage;
+  if (pkg?.schema !== "pipeline.design-workflow-package.v2" || pkg.advisor?.status !== "unavailable") return null;
+  return { kind: "advisor-unavailable", oneTime: true, packageSha256: packageRead.packageSha256,
+    courseId: pkg.advisor.courseBinding.courseId, initialContextSha256: pkg.advisor.courseBinding.initialContextSha256,
+    failureEvidenceSha256: pkg.advisor.failureEvidence.sha256, rationale: pkg.advisor.proposedException.rationale };
+}
+
+/** Structural readiness contract reused by explicit v2 package validation. */
+export function validateDesignReadinessReceipt(receipt) { return validateReadiness(receipt); }

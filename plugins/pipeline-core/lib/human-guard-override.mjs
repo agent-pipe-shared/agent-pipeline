@@ -1383,6 +1383,28 @@ function lifecycleCoDenialSummary(denials, lifecycleDenial) {
   return `Additional active guard denials: ${summaries.join(", ")}${additional > 0 ? `; ${additional} more` : ""}.`;
 }
 
+// Transport only existing fixed guidance. Unknown text, dynamic paths and
+// command/action payloads never become recovery telemetry or new admission.
+function lifecycleRecoveryGuidance(denial) {
+  if (denial.guard !== "guard-lifecycle-ready.mjs") return [];
+  const lines = String(denial.reason).split(/\r?\n/u);
+  const header = lines.shift();
+  const prefix = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: ";
+  if (!header.startsWith(prefix)) return [];
+  const status = header.slice(prefix.length).match(/^Pipeline session readiness is ([a-z-]+)\.$/u)?.[1] ?? null;
+  const allowed = new Set(["Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.","Re-run the typed project-onboarding-v3 inspection and use only its returned nextAction.","Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction."]);
+  if (status === "intake-required" || status === "intake-design-questions-required") allowed.add("A scratch write stays admitted during intake: creating the repository's own scratch directory (mkdir or mkdir -p, including a nested path inside it) and any Edit/Write/NotebookEdit write whose resolved path is inside it.");
+  const guidance = [];
+  let bytes = 0;
+  for (const line of lines) {
+    if (!allowed.has(line) || guidance.includes(line)) continue;
+    const size = Buffer.byteLength(line, "utf8");
+    if (guidance.length === 4 || bytes + size > 2048) break;
+    guidance.push(line); bytes += size;
+  }
+  return guidance;
+}
+
 function lifecycleNotReadyRecovery(denials) {
   const lifecycleDenial = Array.isArray(denials)
     ? denials.find(({ reason }) => new RegExp(`\\b${LIFECYCLE_NOT_READY_CODE}\\b`, "u").test(String(reason)))
@@ -1392,6 +1414,7 @@ function lifecycleNotReadyRecovery(denials) {
     status: "non-liftable-recovery-required",
     code: "HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY",
     cause: String(lifecycleDenial.reason).split(/\r?\n/u, 1)[0].slice(0, 500),
+    recoveryGuidance: lifecycleRecoveryGuidance(lifecycleDenial),
     coDenialSummary: lifecycleCoDenialSummary(denials, lifecycleDenial),
     nextAction: {
       kind: "repair-required",
@@ -4106,6 +4129,7 @@ export function consumeHumanGuardOverride({
   const currentDenialDigests = denialDigests(denials);
   const files = [];
   let replanRequired = false;
+  let driftReplanRequired = false;
   // NVA-SIGDISCLOSE-1 Finding 6: a capability file this process cannot read or validate
   // at all (unreadable, malformed JSON, a stale/wrong schema version, a bad MAC) is
   // SKIPPED and RECORDED here, never treated as a whole-store failure. Before this fix,
@@ -4113,9 +4137,9 @@ export function consumeHumanGuardOverride({
   // `return`, hiding every other, otherwise-valid armed capability that happened to sort
   // after it -- a single leftover v1 file could silence a perfectly good v2 one. A record
   // that IS read and validated successfully but simply does not match this call (wrong
-  // tool, wrong input, expired, drifted, wrong denials) is untouched by this change and
-  // stays exactly as strict as before: only a record this process cannot even validate
-  // is now skipped rather than poisoning the whole store.
+  // tool, wrong input, expired, drifted, wrong denials) never becomes usable merely
+  // because enumeration continues. Expired/drifted matching records are separately
+  // authenticated, refused and audited before later candidates are considered.
   const skippedInvalidRecords = [];
   try {
     files.push(...readdirSync(paths.capabilities).filter((name) => name.endsWith(".json")).sort());
@@ -4184,7 +4208,10 @@ export function consumeHumanGuardOverride({
           replanRequired = true;
           continue;
         }
-        return { status: "replan", code: "HGO-DRIFT" };
+        // An authenticated stale match is refused and audited, but cannot hide
+        // a separately authorized matching capability later in the store.
+        driftReplanRequired = true;
+        continue;
       }
       const consumedCore = {
         ...capability,
@@ -4216,7 +4243,8 @@ export function consumeHumanGuardOverride({
     }
   }
   return {
-    ...(replanRequired ? { status: "replan", code: "HGO-EXPIRED" } : { status: "absent" }),
+    ...(driftReplanRequired ? { status: "replan", code: "HGO-DRIFT" }
+      : replanRequired ? { status: "replan", code: "HGO-EXPIRED" } : { status: "absent" }),
     ...(skippedInvalidRecords.length ? { skippedInvalidRecords } : {}),
   };
 }

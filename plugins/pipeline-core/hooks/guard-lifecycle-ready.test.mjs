@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import {linkSync} from "node:fs";
+import {PO_PLAN_ACKNOWLEDGEMENT_MARKER} from "../lib/onboarding-staging-authoring.mjs";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
@@ -2770,6 +2772,7 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     for (const status of [
       "portable-seed-required", "kickoff-required", "intake-required",
+      "bootstrap-binding-required",
       "migration-required", "partial",
     ]) {
       const nonReady = {
@@ -2796,6 +2799,14 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
       admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner claude`);
       admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 10`);
       admit(`node '${DRIVER_SCRIPT}' --step-cap 5 --root '${path}' --runner antigravity`);
+      for (const language of ["de", "en"]) {
+        admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language ${language}`);
+        admit(`node '${DRIVER_SCRIPT}' --language ${language} --human-approval signature --git-author-email fixture@example.invalid --runner codex --root '${path}' --git-author-name Fixture`);
+      }
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language fr`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --language en`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --language de`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --git-author-name Fixture`);
       const externalDirectory = join(tmpdir(), "guard-first-anchor-directory");
       const externalKey = join(tmpdir(), "guard-existing-po-key.pem");
       for (const runner of ["claude", "codex", "antigravity"]) {
@@ -3079,7 +3090,7 @@ test("GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivatio
     // legitimately extend it, but never by accident -- this assertion has to be edited
     // deliberately alongside the table.
     assert.deepEqual([...derived].sort(), [
-      "bootstrap-bind-plan", "intake-generate-plan", "plan", "plan-manifest-repair", "plan-partial-authority",
+      "bootstrap-bind-plan", "intake-generate-plan", "intake-spec-marker-plan", "plan", "plan-manifest-repair", "plan-partial-authority",
       "plan-readback", "plan-reinstall", "plan-repair", "plan-runtime", "plan-source-recovery",
     ]);
     // Every derived name really is admitted by the real guard in the bare lifecycleArgv
@@ -3101,6 +3112,24 @@ test("GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivatio
       assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${entry.name} --root '${path}'`, path), false, entry.name);
       assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${entry.name} --root '${path}' --runner claude --intent session`, path), false, entry.name);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("SUMMARYADMIT-1: only intake-generate-plan accepts the optional boolean summary flag", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const invoke = (subcommand, tail = "") => `node '${ONBOARDING_SCRIPT}' ${subcommand} --root '${path}' --runner codex --intent session${tail}`;
+    assert.equal(isSanctionedLifecycleCommand(invoke("intake-generate-plan"), path), true);
+    assert.equal(isSanctionedLifecycleCommand(invoke("intake-generate-plan", " --summary"), path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-generate-plan --summary --intent session --runner codex --root '${path}'`, path), true);
+    for (const tail of [" --summary --summary", " --summary true", " --summary false", " --summary=true", " --summary --unknown"]) {
+      assert.equal(isSanctionedLifecycleCommand(invoke("intake-generate-plan", tail), path), false, tail);
+    }
+    for (const subcommand of [...automatedLifecycleArgvCommands().filter((name) => name !== "intake-generate-plan"), "inspect", "intake-generate-apply"]) {
+      assert.equal(isSanctionedLifecycleCommand(invoke(subcommand, " --summary"), path), false, subcommand);
+    }
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-generate-plan --root '${path}-foreign' --runner codex --intent session --summary`, path), false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -3621,6 +3650,7 @@ test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is a
         "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Correct it." }]),
       },
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
+      "intake-spec-marker-apply": { "--plan-sha256": "d".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
@@ -3658,6 +3688,7 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
         "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Correct it." }]),
       },
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
+      "intake-spec-marker-apply": { "--plan-sha256": "d".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
@@ -4340,7 +4371,7 @@ test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the f
     const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
 
     // AC-1/AC-2: both admitted mkdir shapes.
-    for (const command of ["mkdir scratch", "mkdir -p scratch"]) {
+    for (const command of ["mkdir scratch", "mkdir -p scratch", "mkdir -p scratch/nested"]) {
       assert.equal(evaluateLifecycleReadyGuard(bash(command), partialDeps).exitCode, 0, command);
     }
 
@@ -4348,7 +4379,6 @@ test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the f
     // flag still refuses.
     for (const command of [
       "mkdir somethingelse",
-      "mkdir -p scratch/nested",
       "mkdir scratch extra",
       "mkdir -p -v scratch",
       "mkdir scratch -p",
@@ -4366,10 +4396,8 @@ test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the f
 
     // AC-5: exact, not a directory or a glob -- any other filename or path still refuses.
     for (const input of [
-      write("scratch/other-file.md"),
       write("incident-report.md"),
       edit("incident-report.md"),
-      write("scratch/nested/incident-report.md"),
       write("scratch"),
     ]) {
       const result = evaluateLifecycleReadyGuard(input, partialDeps);
@@ -4394,8 +4422,7 @@ test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the f
       edit("scratch/incident-report.md"),
     ]) {
       const result = evaluateLifecycleReadyGuard(input, continuityDamagedDeps);
-      assert.equal(result.exitCode, 2, `continuity-damaged/${input.tool_name}`);
-      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `continuity-damaged/${input.tool_name}`);
+      assert.equal(result.exitCode, 0, `continuity-damaged/${input.tool_name}`);
     }
 
     // AC-7: an exactly-ready session's behaviour for both operations is unchanged -- the new
@@ -4535,12 +4562,11 @@ test("NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matc
     const continuityDamagedDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("continuity-damaged"); } };
     for (const input of [write("scratch/design.md"), write("scratch/nested/deep/notes.md")]) {
       const result = evaluateLifecycleReadyGuard(input, continuityDamagedDeps);
-      assert.equal(result.exitCode, 2, `continuity-damaged/${input.tool_input.file_path}`);
-      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+      assert.equal(result.exitCode, 0, `continuity-damaged/${input.tool_input.file_path}`);
     }
     const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
     const partialNested = evaluateLifecycleReadyGuard(write("scratch/nested/deep/notes.md"), partialDeps);
-    assert.equal(partialNested.exitCode, 2, "partial/scratch/nested/deep/notes.md");
+    assert.equal(partialNested.exitCode, 0, "partial/scratch/nested/deep/notes.md");
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -8008,6 +8034,103 @@ test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, an
   }
 });
 
+test("greenfield Claude acknowledgement argv: emitted session intent is admitted narrowly", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const cases = [
+      ["bootstrap-acknowledge-plan", {}],
+      ["bootstrap-acknowledge-apply", { "--plan-sha256": "a".repeat(64), "--proof": "scratch/ack-proof.json" }],
+    ];
+    for (const [name, values] of cases) {
+      const argv = automatedMutatingApplyArgv(name, path, { ...values, "--intent": "session" });
+      const command = (tokens) => `node '${ONBOARDING_SCRIPT}' ${tokens.map((token) => `'${token}'`).join(" ")} '--runner' 'claude'`;
+      assert.equal(isSanctionedLifecycleCommand(command(argv), path), true, name);
+      assert.equal(isSanctionedLifecycleCommand(command([...argv, "--intent", "session"]), path), false,
+        `${name}: duplicate intent admitted`);
+      const altered = [...argv];
+      altered[altered.indexOf("--intent") + 1] = "other";
+      assert.equal(isSanctionedLifecycleCommand(command(altered), path), false,
+        `${name}: unknown intent admitted`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("greenfield scratch recovery: ordinary contained writes and mkdir survive every readiness status", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+      for (const input of [write("scratch/nested/trace.md"), edit("scratch/nested/trace.md"), bash("mkdir -p scratch/nested")]) {
+        assert.equal(evaluateLifecycleReadyGuard(input, deps).exitCode, 0, `${status}/${input.tool_name}`);
+      }
+      assert.equal(evaluateLifecycleReadyGuard(write("scratch/../src/escape.md"), deps).exitCode, 2, `${status}/escape`);
+    }
+    const unavailable = { projectDir: path, requireProjectOnboardingReadyFn() { throw new Error("unavailable"); } };
+    assert.equal(evaluateLifecycleReadyGuard(write("scratch/nested/trace.md"), unavailable).exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("greenfield read security: PowerShell and native read tools enforce physical read scope", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "read-scope-fixture-"));
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "in-root.md"), "safe\n");
+    writeFileSync(join(outside, "synthetic-key-name.txt"), "fixture\n");
+    symlinkSync(outside, join(path, "escape"));
+    const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+    const ps = (command) => evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, deps);
+    assert.equal(ps("Get-Content -LiteralPath in-root.md").exitCode, 0);
+    for (const command of [
+      `Get-ChildItem -LiteralPath '${outside}'`,
+      "Get-ChildItem -LiteralPath escape",
+      "Get-Content -LiteralPath C:\\Users\\Synthetic\\key",
+    ]) {
+      assert.match(ps(command).stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+    }
+    assert.match(ps("New-Item -Path src/escaped.md -ItemType File").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
+    assert.match(ps("Get-Content $env:SECRET").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const stateDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+      const action = (command) => evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, stateDeps);
+      assert.equal(action("New-Item -Path scratch/nested -ItemType Directory -Force").exitCode, 0, status);
+      assert.equal(action("Set-Content -LiteralPath scratch/nested/report.md -Value report").exitCode, 0, status);
+    }
+    for (const command of [
+      "New-Item -Path src/not-scratch -ItemType File",
+      "New-Item -Path scratch/../src/escape -ItemType File",
+      "New-Item -Path scratch/escape/* -ItemType File",
+      "Set-Content -LiteralPath escape/escaped.md -Value report",
+      "Set-Content -LiteralPath scratch/../outside.md -Value report",
+    ]) assert.match(ps(command).stderr, /GUARD-POWERSHELL-GRAMMAR/u, command);
+    const returnedInspect = `node '${ONBOARDING_SCRIPT}' inspect --root '${path}' --runner claude --intent session`;
+    assert.equal(ps(returnedInspect).exitCode, 0, "the documented PowerShell lane must admit returned lifecycle inspection");
+    const returnedAcknowledgePlan = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-plan --root '${path}' --activate --runner claude --intent session`;
+    assert.equal(ps(returnedAcknowledgePlan).exitCode, 0, "PowerShell must admit the exact returned acknowledgement plan");
+
+    const native = (tool_name, tool_input) => evaluateLifecycleReadyGuard({ tool_name, tool_input }, deps);
+    assert.equal(native("Read", { file_path: "in-root.md" }).exitCode, 0);
+    assert.equal(native("Grep", { pattern: "safe", path: "." }).exitCode, 0);
+    assert.equal(native("Glob", { pattern: "**/*.md", path: "." }).exitCode, 0);
+    for (const input of [
+      ["Read", { file_path: join(outside, "synthetic-key-name.txt") }],
+      ["Grep", { pattern: "fixture", path: outside }],
+      ["Glob", { pattern: "**/*", path: "escape" }],
+      ["Glob", { pattern: "../outside/*", path: "." }],
+    ]) assert.match(native(...input).stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, input[0]);
+
+    const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
+    assert.ok(manifest.hooks.PreToolUse.some((entry) =>
+      entry.matcher?.includes("PowerShell") && ["Read", "Grep", "Glob"].every((tool) => entry.matcher.includes(tool))
+      && entry.hooks?.some((hook) => hook.command?.includes("guard-lifecycle-ready.mjs"))));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 /**
  * NVA-INTAKESPECS-1. The design package is generated straight into `specs/<featureId>/`
  * (ADR-0045's own location) instead of a `project/.onboarding-staging/` holding area. The
@@ -8112,8 +8235,7 @@ test("NVA-B-GREENFIELD-SCRATCH-1: bootstrap-binding-required admits only contain
       projectDir: path,
       requireProjectOnboardingReadyFn() { deny("session-capability-unavailable"); },
     });
-    assert.equal(unavailable.exitCode, 2);
-    assert.match(unavailable.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.equal(unavailable.exitCode, 0);
   } finally {
     rmSync(path, { recursive: true, force: true });
     if (outside !== null) rmSync(outside, { recursive: true, force: true });
@@ -9828,6 +9950,67 @@ test("DISPATCH-RECORD-COLLISION: evaluateLifecycleReadyGuard blocks tool writes 
     assert.match(result.stderr, /already been used by a completed dispatch/u);
   } finally {
     rmSync(path, { recursive: true, force: true });
+  }
+});
+
+function markerQuotationFixture(t){
+  const root=mkdtempSync(join(tmpdir(),'scratch-marker-quotation-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  mkdirSync(join(root,'scratch'));
+  writeFileSync(join(root,'pipeline.user.yaml'),'marker\n');
+  return root;
+}
+function markerQuotationInput(path,translated=false,tool='Write'){
+  return {tool_name:tool,tool_input:{file_path:path,
+    ...(translated?{patchContainsAcknowledgementMarker:true}:
+      {[tool==='Edit'?'new_string':'content']:'Quoted fixture evidence: '+PO_PLAN_ACKNOWLEDGEMENT_MARKER})}};
+}
+test('proposed marker quotation permits native and translated inert scratch across readiness outcomes',t=>{
+  const root=markerQuotationFixture(t);
+  for(const state of ['bootstrap-binding-required','intake-required','restart-required','partial','malformed',null]){
+    const deps={projectDir:root,requireProjectOnboardingReadyFn(){
+      if(state===null)return {status:'ready'};
+      if(state==='malformed')throw new Error('fixture readiness unavailable');
+      throw new ProjectOnboardingReadyError('PORG-NOT-READY','fixture',{intent:'session',lifecycleStatus:state});
+    }};
+    for(const tool of ['Write','Edit'])for(const translated of [false,true]){
+      const result=evaluateLifecycleReadyGuard(markerQuotationInput('scratch/quotation.txt',translated,tool),deps);
+      assert.equal(result.exitCode,0,state+': '+result.stderr);
+    }
+  }
+});
+test('proposed marker quotation still refuses real authority, aliases and traversal',t=>{
+  const root=markerQuotationFixture(t);
+  mkdirSync(join(root,'specs','onboarding-abcd1234'),{recursive:true});
+  const authority=join(root,'specs','onboarding-abcd1234','prd_onboarding-abcd1234.md');
+  writeFileSync(authority,'authority\n');
+  symlinkSync(authority,join(root,'scratch','symlink.txt'));
+  linkSync(authority,join(root,'scratch','hardlink.txt'));
+  symlinkSync(join(root,'specs'),join(root,'scratch','directory'));
+  for(const path of ['specs/onboarding-abcd1234/prd_onboarding-abcd1234.md',
+    'project/pipeline-state.json','scratch/symlink.txt','scratch/hardlink.txt',
+    'scratch/directory/new.md','scratch/../project/pipeline-state.json']){
+    for(const translated of [false,true]){
+      const result=evaluateLifecycleReadyGuard(markerQuotationInput(path,translated),{projectDir:root});
+      assert.equal(result.exitCode,2,path);
+      assert.match(result.stderr,/GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u,path);
+    }
+  }
+});
+test('proposed marker quotation refuses an active plugin physically installed under scratch',t=>{
+  const root=markerQuotationFixture(t),live=join(root,'scratch','active-plugin');
+  mkdirSync(join(live,'hooks'),{recursive:true});
+  mkdirSync(join(live,'.claude-plugin'));
+  writeFileSync(join(live,'.claude-plugin','plugin.json'),'{}\n');
+  const prior=process.env.CLAUDE_PLUGIN_ROOT;
+  try {
+    process.env.CLAUDE_PLUGIN_ROOT=live;
+    const result=evaluateLifecycleReadyGuard(markerQuotationInput('scratch/active-plugin/hooks/quotation.mjs',true),{projectDir:root});
+    assert.equal(result.exitCode,2);
+    assert.match(result.stderr,/GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u);
+  } finally {
+    if(prior===undefined)delete process.env.CLAUDE_PLUGIN_ROOT;
+    else process.env.CLAUDE_PLUGIN_ROOT=prior;
   }
 });
 

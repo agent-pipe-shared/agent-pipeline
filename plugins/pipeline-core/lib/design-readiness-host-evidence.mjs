@@ -1,6 +1,8 @@
 import {designReadinessReportSha256,designReadinessRunnerSelectionSha256} from './design-readiness-hashes.mjs';
 import {createCodexDesignReadinessHostStore} from './codex-design-readiness-host-store.mjs';
 import {verifyCodexToolFreeBindingFromSources} from './codex-tool-free-design-readiness.mjs';
+import {buildRunnerDesignReadinessPrompt} from './runner-readiness-request.mjs';
+import {rereadReadinessAdvisorContextV2} from './readiness-advisor-context-v2.mjs';
 // SPDX-License-Identifier: SUL-1.0
 
 /** Host-observed execution binding for design-readiness reports. */
@@ -71,7 +73,7 @@ export function designReadinessModelOutputSchema({ runner, dispatchId, candidate
   return schema;
 }
 
-function expectedReferenceSetSha256(sources, sourceBytes) {
+function expectedReferenceBundle(sources, sourceBytes) {
   if (!sources || typeof sources !== "object" || Array.isArray(sources)
     || !sourceBytes || typeof sourceBytes !== "object" || Array.isArray(sourceBytes)) {
     throw new Error("readiness sources are invalid");
@@ -93,8 +95,9 @@ function expectedReferenceSetSha256(sources, sourceBytes) {
   }).sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   const checked = validateAdvisoryEvidenceBundle({ schema: ADVISORY_EVIDENCE_BUNDLE_SCHEMA, references });
   if (!checked.ok) throw new Error("readiness references exceed selected-duty bounds");
-  return checked.bundleSha256;
+  return {schema:ADVISORY_EVIDENCE_BUNDLE_SCHEMA,references};
 }
+function expectedReferenceSetSha256(sources,sourceBytes){return validateAdvisoryEvidenceBundle(expectedReferenceBundle(sources,sourceBytes)).bundleSha256;}
 
 /**
  * Verify a readiness binding against the runner's private, durable host store.
@@ -109,6 +112,7 @@ export function verifyDesignReadinessHostExecution({
   sources,
   sourceBytes,
   advisorObservationRefs = null,
+  advisorObservation = null,
   storeFactory = createRepositorySandboxSelectionStore,
   runnerStoreFactory = ({ gitCommonDir, repoFingerprint }) => createDesignReadinessRunnerHostStore({ gitCommonDir, repoFingerprint }),
   codexHostStoreFactory = createCodexDesignReadinessHostStore,
@@ -143,7 +147,7 @@ export function verifyDesignReadinessHostExecution({
       if (!lstatSync(trustedExecutablePath).isFile()) return fail('DWP-READINESS-HOST-EXECUTABLE-UNAVAILABLE');
       const store = codexHostStoreFactory({gitCommonDir:topology.gitCommonDir,repoFingerprint:hostExecution.repoFingerprint,trustedExecutablePath});
       const checked = verifyCodexToolFreeBindingFromSources({hostExecution,report:readinessReceipt,candidate,sources,sourceBytes,
-        route,store,repoFingerprint:hostExecution.repoFingerprint,repoRoot,advisorObservationRefs});
+        route,store,repoFingerprint:hostExecution.repoFingerprint,repoRoot,advisorObservationRefs,advisorObservation,trustedAdvisorExecutablePath:trustedExecutablePath});
       return checked.ok ? checked : fail('DWP-READINESS-HOST-RECEIPT-MISMATCH');
     } catch {return fail('DWP-READINESS-HOST-RECEIPT-UNAVAILABLE');}
   }
@@ -163,6 +167,12 @@ export function verifyDesignReadinessHostExecution({
       const route = resolveRoute({ rootDir: repoRoot, dutyId: "readiness", runner: hostExecution.runner, candidateCommit: candidate.commit });
       const reportSha256 = designReadinessReportSha256(readinessReceipt);
       expectedReferenceSetSha256(sources, sourceBytes);
+      if(advisorObservation!==null){
+        if(advisorObservationRefs!==null||canonicalJson(advisorObservation.candidate)!==canonicalJson(candidate))return fail('DWP2-READINESS-SUPPLEMENTAL-BINDING');
+        const context=rereadReadinessAdvisorContextV2(repoRoot,advisorObservation,sources);
+        const prompt=buildRunnerDesignReadinessPrompt({runner:hostExecution.runner,dispatchId:readinessReceipt.dispatchId,candidate,sources,route:hostExecution.route,evidenceBundle:expectedReferenceBundle(sources,sourceBytes),advisorObservation:context});
+        if(!receipt||receipt.requestSha256!==sha(Buffer.from(prompt,'utf8')))return fail('DWP2-READINESS-SUPPLEMENTAL-REQUEST-MISMATCH');
+      }
       if (!route || route.state !== "default"
         || route.model !== hostExecution.route.model || route.effort !== hostExecution.route.effort
         || route.sourceSha256 !== hostExecution.route.sourceSha256 || route.candidateCommit !== hostExecution.route.candidateCommit) {
@@ -189,6 +199,7 @@ export function verifyDesignReadinessHostExecution({
     } catch { return fail("DWP-READINESS-HOST-RECEIPT-INVALID"); }
   }
   let store;
+  if(advisorObservation!==null)return fail('DWP2-READINESS-SUPPLEMENTAL-CUSTODY-UNAVAILABLE');
   let selection;
   let execution;
   let journal;

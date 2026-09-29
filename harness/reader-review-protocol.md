@@ -1,153 +1,158 @@
 # Reader-review protocol
 
-This protocol is for reader-facing documentation review. It is separate from
-the technical Critic: it evaluates comprehensibility, order, granularity, and
-weighting as a reader would, and it does not assess implementation correctness.
+Reader review evaluates comprehensibility, order, granularity and weighting.
+It is separate from technical Critic review and implementation verification.
 
-## Fresh two-stage review
+## Bounded 2+2 course
 
-1. Freeze all documents named by `READER_REVIEW_PATHS` at a committed
-   state `Y`. Before this stage, disclose neither the capability inventory,
-   governance data, source, diff, nor history. A fresh reader reports only
-   cuts, reorderings, and file/line findings; it does not provide replacement
-   prose. Save its immutable report as `phase-one/<round>.md`.
-2. Give a second fresh reader the same frozen documents and immutable
-   phase-one report together with the committed capability inventory,
-   governance data, and this protocol. It records weighting, order,
-   granularity, and comprehensibility in immutable `phase-two/<round>.md`.
-   This is still reader review, never a technical Critic review.
-3. Record every finding's closure in `disposition/<round>.json`. If either
-   phase requires a public-document change, make the change and begin a new
-   fresh two-stage round. A previous round cannot review a changed public
-   state.
-4. The first round requiring no further public-document work is the closure
-   round. Commit its reports and disposition, then commit `record.json` last
-   as candidate `C`. The record names the final reviewed state `Y`; `Y` must
-   be an ancestor of `C`. Do not change covered documentation, the capability
-   inventory, governance data, or this protocol between `Y` and `C`.
+Freeze the checker's complete document set at each reviewed commit. Run two
+fresh read-only readers: phase one receives only the frozen public documents;
+phase two receives those documents, the immutable phase-one report, capability
+inventory, governance input and this protocol. Preserve reports unchanged.
 
-## Review-course limit
+One course follows: complete review, correction batch, correction-focused
+re-review, correction batch, complete review, correction batch,
+correction-focused re-review, final correction batch. Every re-review receives
+the full frozen document set and may flag surrounding regressions. Historical
+complete reviews in re-review positions remain valid and consume the same
+round; label their actual scope honestly. There are at most four two-stage
+rounds and four correction batches. Count a batch once across multiple commits.
+Preserve counts and findings across sessions. Renaming evidence, deleting a
+report, or making an evidence-only commit does not reset the course.
 
-One documentation course permits at most four complete two-stage rounds,
-including the initial round, and at most three public-document correction
-cycles between them. A correction cycle is one batch of edits to the covered
-documents followed by a fresh two-stage round; it counts once even when the
-batch needs multiple commits. Rewriting or re-numbering round IDs, restarting
-a session, or committing review evidence alone does not reset the course.
-Track rounds, correction cycles, reviewed commits, and remaining findings in
-the course handover. This is a procedural limit; the binding checker does not
-currently attest the course history or enforce these counts.
-Apply the count to an already-active course using its actual earlier rounds;
-do not invalidate a previously completed binding retroactively.
+An earlier round with no further public-document changes closes through the
+ordinary v1 binding. After the fourth review, resolve findings in one terminal
+batch and stop: no fifth Reader dispatch and no automatic new course for the
+same findings. Every finding needs an exact resolution commit or explicit
+documentation-owner acceptance. An unresolved finding leaves the course open.
+Record existing owner policy or the actual course decision; this does not
+create another PO approval gate. Distinct new documentation scope can require
+a new course, but cannot erase unresolved findings from the existing course.
 
-If the fourth round still requires covered-document edits, or a fourth
-correction cycle would be needed, stop automatic corrections and further
-reader dispatches. Present the unresolved findings, completed rounds and
-corrections, and concrete options for a course decision. Do not label the
-binding passed, silently start a new course for the same documents/findings,
-or waive a finding by editing its disposition. An explicit course decision by
-the documentation owner may authorize a newly bounded course or defer the
-documentation/release; involve the PO only when existing authority rules
-require it. The decision does not substitute for a fresh final review or a
-passing binding.
-Additional documents or a genuinely new scope may need a separate course,
-but cannot erase unresolved findings from the existing one.
+## Fixed committed inputs
 
-The checker only proves committed-state equality and the presence of bounded,
-well-formed evidence. It does not prove reader identity, actual freshness,
-sandbox isolation, truthful provenance, or judgment quality. A JSON boolean
-does not prove an independent reader review.
-
-## Bound document state
-
-The fixed review set is exactly the lexical, unique `READER_REVIEW_PATHS`
-constant in `harness/scripts/check-doc-reader-binding.mjs`. It contains sixteen
-approved public documents and excludes evidence, state, archives, ADRs, and
-backlog content. A reviewed state hashes raw Git-blob bytes for every covered
-file plus these raw committed inputs:
-
-- `docs/product-capability-inventory.json`
-- `governance/observation-doc-governance.json`
-- this protocol
-
-Every covered blob must be mode `100644`, at most 512 KiB; the set is at most
-4 MiB. Inputs are at most 1 MiB each. The identity uses SHA-256 raw-byte
-digests and `canonicalJson` with an actual NUL separator:
+The lexical, unique `READER_REVIEW_PATHS` in
+`harness/scripts/check-doc-reader-binding.mjs` owns the sixteen public document
+paths. Evidence, state, archives, ADRs and backlog content are excluded. Inputs
+are `docs/product-capability-inventory.json`,
+`governance/observation-doc-governance.json` and this protocol. Read raw Git
+blobs only: covered files must be mode 100644, at most 512 KiB each and 4 MiB
+combined; inputs are at most 1 MiB each. SHA-256 identity uses the actual NUL:
 
 ```
 SHA-256("pipeline.doc-reader-docset.v1\0" + canonicalJson({
   coverage: [{ path, sha256 }, ...],
-  capabilityInventorySha256,
-  governanceSha256,
-  readerProtocolSha256
+  capabilityInventorySha256, governanceSha256, readerProtocolSha256
 }))
 ```
 
-The checker reads Git objects only. Worktree edits and uncommitted reports
-cannot satisfy it.
+Snapshots discover committed inputs; they are not Reader evidence.
 
-## Frozen evidence schema
+## Ordinary unchanged-state binding
 
-For safe feature ID `<feature-id>` and safe round `<round>`, evidence paths
-are fixed:
+`pipeline.doc-reader-binding-record.v1` remains valid. It has exactly `schema`,
+`reviewedCommit`, `reviewedTree`, `docsetSha256`, `coverage`, `inputs`,
+`phaseOne`, `phaseTwo`, `disposition`. The full reviewed commit is an ancestor
+of the candidate, its tree is exact, and coverage/inputs/docset must equal both
+committed states. Report and disposition references have exactly `path` and
+`sha256`, under `specs/<feature-id>/evidence/reader-review/phase-one/`,
+`phase-two/` and `disposition/`, with one matching safe round ID.
 
-```
-specs/<feature-id>/evidence/reader-review/
-  phase-one/<round>.md
-  phase-two/<round>.md
-  disposition/<round>.json
-  record.json
-```
+Reports are distinct, nonempty UTF-8 regular blobs, at most 1 MiB each.
+Disposition is at most 256 KiB. Its closed schema is
+`pipeline.doc-reader-disposition.v1`, with `schema`, `round`, `status`,
+`findings`. `no-findings` requires an empty array; `resolved` a nonempty one.
+Each finding has `id`, `class`, `status`, `resolutionCommit`. Unique safe IDs,
+classes `cut`, `fileline`, `reordering`, and statuses `resolved`, `no-change`
+are required. A resolved commit must be real and an ancestor of the reviewed
+state; no-change requires null. Commit reports/disposition, then `record.json`
+last. Covered document or input drift invalidates this binding.
 
-`record.json` has exactly these fields:
+## Terminal correction binding
 
-```json
-{
-  "schema": "pipeline.doc-reader-binding-record.v1",
-  "reviewedCommit": "<full 40-hex Y>",
-  "reviewedTree": "<full 40-hex tree of Y>",
-  "docsetSha256": "<sha256>",
-  "coverage": [{ "path": "<fixed path>", "sha256": "<sha256>" }],
-  "inputs": {
-    "capabilityInventorySha256": "<sha256>",
-    "governanceSha256": "<sha256>",
-    "readerProtocolSha256": "<sha256>"
-  },
-  "phaseOne": { "path": "<phase-one path>", "sha256": "<sha256>" },
-  "phaseTwo": { "path": "<phase-two path>", "sha256": "<sha256>" },
-  "disposition": { "path": "<disposition path>", "sha256": "<sha256>" }
-}
-```
+The separate `pipeline.doc-reader-terminal-record.v1` record at the same
+`record.json` path distinguishes the fourth reviewed state from the final
+editorially corrected state. It does not claim that the final correction was
+freshly read. Its field set is closed:
 
-The record must equal the recomputed coverage, inputs, and docset at both `Y`
-and `C`. The reports are distinct, nonempty UTF-8 regular blobs at `C`, each
-at most 1 MiB. The disposition is a regular UTF-8 JSON blob at `C`, at most
-256 KiB, and has the same round identifier as both reports.
+| Field | Contract |
+| --- | --- |
+| `schema`, `courseId` | Exact schema and safe course identifier. |
+| `rounds` | Exactly four ordered entries, each `id`, `mode`, `reviewed`, `phaseOne`, `phaseTwo`, `disposition`. |
+| `correctionBatches` | Exactly four entries, each `afterRound` (1..4) and 1..32 ordered unique correction `commits`. |
+| `ownerDecision` | Exact `path`/`sha256` reference to committed `owner-decision.json`. |
+| `final` | Exact snapshot of the final correction commit. |
+| `policyTransition` | Null if protocol bytes match; otherwise exact `fromSha256`, `toSha256`, `commit`. |
 
-`disposition/<round>.json` is closed and has exactly `schema`, `round`,
-`status`, and `findings`. Its schema is
-`pipeline.doc-reader-disposition.v1`; `status` is either `no-findings` with an
-empty array or `resolved` with a nonempty array. Each finding has exactly
-`id`, `class`, `status`, and `resolutionCommit`. IDs are unique safe strings;
-classes are `cut`, `fileline`, or `reordering`; statuses are `resolved` or
-`no-change`. A resolved finding names a real full commit that is an ancestor
-of `Y`; a no-change finding has `resolutionCommit: null`. Unknown, malformed,
-or unresolved statuses fail. Empty findings are valid only through explicit
-`no-findings` status.
+Every `reviewed` and `final` snapshot has exactly `commit`, `tree`, `coverage`,
+`inputs`, `docsetSha256`; recompute all bytes and identities. Modes are
+`complete` for rounds one/three and `corrections-only` or honestly disclosed
+historical `complete` for rounds two/four. Each batch follows its reviewed
+commit and precedes the next reviewed state (or final state). Its commit list
+must equal the Git history of covered document/input changes in that interval.
+Evidence-only commits do not count as document correction commits.
+Historical reviewed coverage comes from the literal `READER_REVIEW_PATHS`
+array in that round's committed checker, parsed as data without executing old
+code. It must be unique, lexical and within the current public scope. Bind that
+actual coverage and its digest; do not invent earlier review of a document
+added in a later correction. Final/candidate coverage still uses the current
+fixed set. Missing or malformed historical scope declarations fail.
 
-## Checker interface
+Every report reference has `path`, `sha256`, `publication`. Publication has
+exactly `kind` (`raw` or `path-normalized`) and `rawSha256`. Raw publication
+requires equality with the public digest. A normalized copy discloses the
+private raw digest without publishing private bytes or pretending byte
+identity. The checker binds the public copy's first committed publication,
+and rejects subsequent rewrites or delete/re-add histories.
+
+Each matching disposition uses `pipeline.doc-reader-terminal-disposition.v1`
+and exactly `schema`, `round`, `status: resolved`, `findings` (1..256 entries).
+Findings have `id`, `class`, `status`, `resolutionCommit`, as above. A `resolved`
+finding names a commit in that round's correction batch. An `accepted` finding
+requires null and its exact `<round>/<finding-id>` in the owner's acceptance
+list. Open, unknown, duplicated or malformed findings fail. An empty earlier
+round belongs to early ordinary closure rather than a manufactured four-round
+terminal course.
+
+The closed owner record uses
+`pipeline.doc-reader-terminal-owner-decision.v1` with `schema`, `courseId`,
+`authority: documentation-owner`, `by`,
+`decision: authorize-terminal-correction`, `maxRounds: 4`,
+`maxCorrectionBatches: 4`, `prohibitFifthReview: true`,
+`fourthReviewedCommit`, `acceptedFindingIds`, `source`. Source is a digest-bound
+reference to the adopted Reader skill, this protocol, or a safe Markdown
+course-decision document directly under the feature's Reader evidence root.
+It records existing authority; the JSON is not a signature or proof of human
+identity. Acceptance keys must exactly match findings actually marked accepted.
+
+Reject extra committed round evidence, including a fifth report subsequently
+deleted from the candidate. Capability inventory and governance must match
+the fourth reviewed inputs. A protocol change must be an explicit transition
+in the final batch, bound to its actual committed bytes. Candidate coverage
+and all inputs must match `final`; later drift fails. Publish reports,
+dispositions and owner evidence, then commit the terminal record last.
+
+The checker validates Git bytes, ancestry, bounds and declared dispositions.
+It cannot prove reader identity/freshness, sandbox isolation, truthfulness,
+semantic finding completeness, whether an edit resolves prose, or ownership
+from a JSON claim. Retain honest host provenance and the immutable reports.
+Do not substitute coordinator self-review or fabricate a final Reader verdict.
+
+## Checker and release interface
 
 ```
 node harness/scripts/check-doc-reader-binding.mjs \
   --root <root> --candidate <full40hex> --feature-id <safe-id> [--snapshot]
 ```
 
-Duplicate, unknown, and incomplete arguments fail before Git-object work.
-The default emits one JSON object with schema
-`pipeline.doc-reader-binding-check.v1`, a `passed` or `failed` status, the
-candidate and reviewed identities (which may be null on unresolved failure),
-the current docset digest (which may be null), findings, and assurance text.
-It exits 0 only for pass, 1 for binding findings, and 2 for usage or
-environment failures. `--snapshot` emits schema
-`pipeline.doc-reader-docset-snapshot.v1`; it is read-only discovery and never
-review evidence or a check success.
+Unknown, duplicate and incomplete arguments fail. The check returns
+`pipeline.doc-reader-binding-check.v1`, `passed`/`failed`, candidate and actual
+reviewed identities, final docset digest, findings and
+`committed-state-and-evidence-presence-only` assurance. Exit codes remain 0 for
+pass, 1 for findings, 2 for usage/environment errors. `--snapshot` returns
+`pipeline.doc-reader-docset-snapshot.v1`, never review success.
+
+Source release preflight accepts only the exact committed checker result and
+candidate-matching local checker/dependency bytes. It does not launch Reader
+agents. Complete a valid ordinary or terminal binding before freezing the
+release candidate; release gates remain separate.

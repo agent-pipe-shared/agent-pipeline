@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -52,7 +52,7 @@ function invoke(root, argv, deps = {}) {
 }
 
 function freshRoot(name) {
-  const root = mkdtempTestScratch(`pipeline-state-inspect-${name}-`);
+  const root = mkdtempTestScratch(`pipeline-state-inspect-${name}-`, process.env.PIPELINE_INSPECT_TEST_BASE);
   roots.push(root);
   mkdirSync(join(root, ".claude"), { recursive: true });
   return root;
@@ -163,6 +163,9 @@ function awaitingApprovalFixture(name) {
   const statePathValue = resolveStatePath(root);
   const state = JSON.parse(readFileSync(statePathValue, "utf8"));
   state.planSubmission = awaitingApprovalSubmission(featureId, planPath);
+  mkdirSync(join(root, 'specs/widget'), { recursive: true });
+  writeFileSync(join(root, planPath), `plan:${planPath}`);
+  writeFileSync(join(root, state.planSubmission.specPath), `spec:${state.planSubmission.specPath}`);
   writeFileSync(statePathValue, JSON.stringify(state, null, 2) + "\n");
   return { root, statePathValue, state };
 }
@@ -686,4 +689,39 @@ test("--help lists inspect among the accepted commands", () => {
   const result = invoke(root, ["--help"]);
   assert.equal(result.status, 0, result.err);
   assert.ok(result.out.includes("inspect"), "help output must name the inspect subcommand");
+});
+
+test('inspect observes committed-submission source bytes and names sanctioned recovery for PRD or Spec drift without mutation', () => {
+  for (const name of ['planPath', 'specPath']) {
+    const { root, statePathValue, state } = awaitingApprovalFixture('source-drift-' + name);
+    const beforeState = readFileSync(statePathValue), path = join(root, state.planSubmission[name]);
+    writeFileSync(path, 'Changed source after submission\n');
+    const result = invoke(root, ['inspect']); assert.equal(result.status, 0, result.err);
+    const payload = JSON.parse(result.out);
+    assert.equal(payload.status, 'draft'); assert.equal(payload.lifecycle.code, 'PLAN-LIFECYCLE-DIGEST-DRIFT');
+    assert.equal(payload.planApproved, false);
+    const recovery = payload.nextAction.kind === 'command' ? payload.nextAction : payload.nextAction.applyAction;
+    assert.equal(recovery.argv[1], 'reopen-design'); assert.equal(recovery.requiresConfirmation, true);
+    assert.equal(recovery.mutation, true);
+    assert.doesNotMatch(payload.nextActionText, /approve-plan|design-workflow-package/);
+    assert.deepEqual(readFileSync(statePathValue), beforeState);
+    assert.equal(readFileSync(path, 'utf8'), 'Changed source after submission\n');
+  }
+});
+test('inspect cannot call a missing Plan or Spec current or offer presentation approval', () => {
+  for (const name of ['planPath', 'specPath']) {
+    const { root, statePathValue, state } = awaitingApprovalFixture('source-missing-' + name);
+    const before = readFileSync(statePathValue); unlinkSync(join(root, state.planSubmission[name]));
+    const result = invoke(root, ['inspect']); const payload = JSON.parse(result.out);
+    assert.equal(payload.lifecycle.code, 'PLAN-LIFECYCLE-DIGEST-DRIFT'); assert.equal(payload.status, 'draft');
+    const action = payload.nextAction.kind === 'command' ? payload.nextAction : payload.nextAction.applyAction;
+    assert.equal(action.argv[1], 'reopen-design'); assert.equal(action.requiresConfirmation, true);
+    assert.deepEqual(readFileSync(statePathValue), before);
+  }
+});
+test('inspect retains awaiting approval only for actual unchanged PRD and Spec bytes', () => {
+  const { root, statePathValue } = awaitingApprovalFixture('source-observed-current');
+  const before = readFileSync(statePathValue); const result = invoke(root, ['inspect']); const payload = JSON.parse(result.out);
+  assert.equal(payload.lifecycle.code, 'PLAN-LIFECYCLE-CURRENT'); assert.equal(payload.status, 'awaiting-approval');
+  assert.equal(payload.planApproved, false); assert.deepEqual(readFileSync(statePathValue), before);
 });

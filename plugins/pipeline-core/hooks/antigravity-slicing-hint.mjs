@@ -4,6 +4,11 @@
 import { readFileSync } from "node:fs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { deliverAntigravitySlicing, observeAntigravitySlicing } from "./native-slicing.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+
+
 
 export function antigravitySlicingOutput(input, phase = "observe") {
   const result = phase === "deliver"

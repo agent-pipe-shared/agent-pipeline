@@ -41,6 +41,13 @@ four reports and final correction without fabricating a fresh Reader verdict.
 
 ## Triage
 
+The latest manual quality review identified report overwrite followed by
+byte-identical restoration as an endpoint-only binding gap. The Source checker
+now rejects intermediate report changes through exact candidate Git history;
+the real-Git restoration regression and original corpus pass9/9. No fifth
+Reader was launched. Bounded correction review and the final Alfred binding
+remain distinct obligations; no release acceptance or item closure is claimed.
+
 - **Decision:** pending
 - **Assignment:** Alfred release preparation
 - **Date:** 2026-09-27

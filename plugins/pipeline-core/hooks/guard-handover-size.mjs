@@ -47,6 +47,11 @@ import { fileURLToPath } from "node:url";
 import { HANDOVER_MEASUREMENT_SCHEMA, resolveHandoverConfig } from "../lib/handover-rotation.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
 export const DENIAL_CODE = "HANDOVER-ROTATION-REQUIRED";
@@ -130,6 +135,7 @@ export function proposedHandoverBytes(input, currentContent) {
  * @param {string} [options.rotateScriptPath] override for the path named in the refusal message (tests only)
  */
 export function evaluateHandoverSizeGuard(input, { rootDir = process.cwd(), rotateScriptPath = DEFAULT_ROTATE_SCRIPT_PATH } = {}) {
+  if (!observeGovernanceScope({ rootDir }).requiresEnforcement) return verdict(0);
   const toolName = String(input?.tool_name ?? "");
   if (!WRITE_TOOLS.includes(toolName)) return verdict(0);
 

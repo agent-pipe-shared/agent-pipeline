@@ -160,6 +160,26 @@ other hook.
 
 ## Triage
 
+Additional manual quality review found three boundary gaps: unsupported Git
+topology was treated as enrollment without proof, ordinary hooksPath config
+reads were classified as destructive, and Agy's oversized-input error enforced
+before scope observation. Source corrections retain actually proven enrollment,
+allow ordinary inactive config reads, and keep inactive/declined input failures
+quiet. Hook9/9 passes; final scope21/23 plus targeted2/2 is not a full-suite
+PASS. Fresh-process proof and decline/idempotence controls pass, but an actual
+unsupported ancestor Git control varied in the shared temporary namespace.
+The permitted stable environment and final candidate gate remain open.
+Observation writes no migration; older unreadable decisions without retained
+independent proof require explicit recovery. The item stays open.
+
+The final bounded correction course reproduced and fixed historical-witness
+handling under proof-store failure, including a valid decline learned through
+a root alias. Four final relevant cases pass; the same-controller diagnostic
+witness grants no current write authority. Fresh double authority damage with
+no independent observable enrollment remains an explicit recovery limit.
+The full23 environment qualification above remains open, and this targeted
+correction does not close the item.
+
 Independent targeted verification reproduced F1/F3/F6/F7/F8/F9 and the F10 budget
 footprint on the current source. See the
 [tracked diagnostic evidence](../evidence/2026-09-28-activation-uninstall-targeted-verification.md).

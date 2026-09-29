@@ -1,3 +1,4 @@
+import { isPhysicalScratchTarget } from "./physical-scratch-boundary.mjs";
 // SPDX-License-Identifier: SUL-1.0
 /**
  * protected-test-paths — ONE definition of the configured protected-test-path rules, plus
@@ -111,7 +112,8 @@ export function loadProtectedTestPathRules({ rootDir, readFileSyncFn = readFileS
 }
 
 /** The write-lane match: backslashes folded, rules already case-insensitive. */
-export function protectedTestPathRuleFor(rules, filePath) {
+export function protectedTestPathRuleFor(rules, filePath, { rootDir, liveRoots } = {}) {
+  if (rootDir && isPhysicalScratchTarget(filePath, { rootDir, liveRoots })) return null;
   if (typeof filePath !== "string" || filePath === "") return null;
   const normalized = filePath.replace(/\\/gu, "/");
   return rules.find((rule) => rule.re.test(normalized)) ?? null;
@@ -385,7 +387,8 @@ function containsWholeToken(haystack, needle) {
   return new RegExp(`(?<![a-z0-9._-])${escaped}(?![a-z0-9._-])`, "u").test(haystack);
 }
 
-function ruleForCandidate(rules, candidate) {
+function ruleForCandidate(rules, candidate, rootDir) {
+  if (rootDir && isPhysicalScratchTarget(candidate, { rootDir })) return null;
   if (typeof candidate !== "string" || candidate === "") return null;
   const normalized = candidate.replace(/\\/gu, "/");
   return rules.find((rule) => rule.re.test(normalized)) ?? null;
@@ -890,7 +893,7 @@ export function protectedTestPathShellHit({ command, rules, root, toolName = "Ba
   if (!Array.isArray(rules) || rules.length === 0) return null;
 
   for (const target of extractShellWriteTargets({ command, root, toolName, platform })) {
-    const rule = ruleForCandidate(rules, target.candidate);
+    const rule = ruleForCandidate(rules, target.candidate, root);
     if (rule !== null) return hit(rule, target.candidate, target.lane, target.classification);
   }
 

@@ -200,6 +200,21 @@ new below.
 
 ## Triage
 
+Additional independent quality review confirmed omitted owned workspace hook
+registrations and stale completed-journal postconditions. Source now removes
+only manifest-proved executable registrations and rechecks owned workspace,
+Git hook, private-state and durable-decline postconditions on resume and before
+completion. Original corpus7/7 passes; restored registry and re-enrollment
+controls refuse with typed drift/readback errors. Evidence:
+`scratch/0.7-quality-uninstall-critic-corrections-20260929/results.md`.
+This remains open pending combined candidate and runner acceptance.
+
+The bounded follow-up also checks full owned hook and plugin-registry elements:
+modified timeout or nested metadata is preserved as an ownership conflict,
+not deleted by command/path similarity. Actual before/after controls and final
+original7/7 pass. Evidence:
+`scratch/0.7-quality-uninstall-modified-hooks-20260929/registry-successor/`.
+
 Independent targeted verification confirmed B1 through canonical reset and an
 actual failed Git commit. B2's install-time path dependency was reproduced with
 a controlled library copy; actual runner cache pruning remains unverified. See

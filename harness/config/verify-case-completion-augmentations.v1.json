@@ -1,0 +1,10 @@
+{
+  "schema": "pipeline.verify-case-completion-augmentations.v1",
+  "augmentations": [
+    {"name":"architecture-design-test-fixture-tests","file":"plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs","caseCompletion":{"schema":"pipeline.verify-case-completion-policy.v1","caseIds":["ADF001"],"maxBytes":65536}},
+    {"name":"feature-close-audit-receipt-tests","file":"plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs","caseCompletion":{"schema":"pipeline.verify-case-completion-policy.v1","caseIds":["FCR001"],"maxBytes":65536}},
+    {"name":"pipeline-state-close-audit-tests","file":"plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs","caseCompletion":{"schema":"pipeline.verify-case-completion-policy.v1","caseIds":["PSC001"],"maxBytes":65536}},
+    {"name":"publication-close-audit-binding-tests","file":"plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs","caseCompletion":{"schema":"pipeline.verify-case-completion-policy.v1","caseIds":["PCB001"],"maxBytes":65536}},
+    {"name":"architecture-decision-waiver-store-tests","file":"plugins/pipeline-core/lib/architecture-decision-waiver-store.test.mjs","caseCompletion":{"schema":"pipeline.verify-case-completion-policy.v1","caseIds":["ADW001"],"maxBytes":65536}}
+  ]
+}

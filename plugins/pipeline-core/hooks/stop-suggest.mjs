@@ -101,6 +101,11 @@ import {
   coordinatorNextPhases,
   readCloseCoordinator,
 } from "../scripts/publication-close-journal.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 // ---- phase -> gate mapping (ONE small table; later phases are one-line additions) -------
 export const PHASE_GATE_MAP = {
@@ -390,6 +395,7 @@ export function decideDedupedOutput({ phaseMessage, priorMarker }) {
 
 // ---- CLI entrypoint: real environment, always exit 0 ---------------------------------------
 export function run() {
+  if (!observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return;
   const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
   // Read this hook's own Stop-hook stdin ONCE, purely to resolve session_id (needed to key the

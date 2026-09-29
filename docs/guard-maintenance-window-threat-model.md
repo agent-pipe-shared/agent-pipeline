@@ -326,7 +326,8 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/claude-model-host-observation.mjs`,
   `lib/codex-model-host-observation.mjs`,
   `lib/design-readiness-host-evidence.mjs`,
-  `lib/codex-readiness-host-record.mjs`, `lib/codex-host-process-journal.mjs`, `lib/codex-host-process-launcher.mjs`, `lib/codex-host-process-exec-worker.mjs`, `lib/codex-host-process-supervisor.mjs`, `lib/codex-readiness-ownership-verifier.mjs`, `lib/codex-isolated-structured-host.mjs`, `lib/codex-tool-free-design-readiness.mjs`, `lib/design-readiness-hashes.mjs`, `scripts/codex-design-readiness-host.mjs`, `lib/codex-host-output-custody.mjs`, `lib/codex-design-readiness-host-store.mjs`, `lib/codex-readiness-finalization.mjs`, `scripts/codex-design-readiness-bootstrap.mjs`, `scripts/tool-identity.mjs`, `lib/advisory-lifecycle-v2.mjs`,
+  `lib/physical-scratch-boundary.mjs`, `lib/lifecycle-denial-loop.mjs`, `lib/advisory-route-selection.mjs`, `lib/codex-host-output-custody.mjs`,
+  `lib/codex-readiness-host-record.mjs`, `lib/codex-host-process-journal.mjs`, `lib/codex-host-process-launcher.mjs`, `lib/codex-host-process-exec-worker.mjs`, `lib/codex-host-process-supervisor.mjs`, `lib/codex-readiness-ownership-verifier.mjs`, `lib/codex-design-readiness-host-store.mjs`, `lib/codex-readiness-finalization.mjs`, `lib/codex-isolated-structured-host.mjs`, `lib/codex-tool-free-design-readiness.mjs`, `lib/design-readiness-hashes.mjs`, `scripts/codex-design-readiness-host.mjs`, `scripts/codex-design-readiness-bootstrap.mjs`, `scripts/tool-identity.mjs`, `lib/advisory-lifecycle-v2.mjs`,
   `lib/sandboxed-readonly-duty.mjs`, `lib/codex-sandbox-compatibility.mjs`,
   `lib/design-readiness-runner-host-store.mjs`,
   `scripts/codex-sandbox-select.mjs`, and `lib/sandbox-failure.mjs`.
@@ -335,6 +336,98 @@ below assumes it holds and is written to catch a change that would break it.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
+
+- The genuine initial Advisor/course and versioned final-package authority closure adds `lib/advisory-receipt-assurance.mjs`, `lib/codex-advisor-admission.mjs`, `lib/codex-advisor-execution.mjs`, `lib/codex-advisor-host-record.mjs`, `lib/codex-advisor-host-store.mjs`, `lib/codex-advisor-request.mjs`, `lib/design-advisor-course-store.mjs`, `lib/design-advisor-course.mjs`, `lib/design-advisor-provenance.mjs`, `lib/design-advisory-coordinator-v2.mjs`, `lib/design-advisory-coordinator.mjs`, `lib/design-workflow-package-v2.mjs`, `schemas/pipeline.design-workflow-package.v2.json`, `scripts/codex-design-advisor-bootstrap.mjs`, `scripts/codex-design-advisor-host.mjs`. The schema token names the imported plugin-local resource; the root schema remains a required equivalent product mirror.
+
+- Alfred extends the never-liftable kernel to public governance scope,
+  lifecycle denial recovery, activation, design advisory and retirement authority,
+  including `lib/native-initial-advisor-execution.mjs`,
+  `lib/readiness-advisor-context-v2.mjs`, `lib/runner-readiness-request.mjs`,
+  and `lib/project-uninstall-workspace.mjs`. These dependencies carry initial
+  Advisor custody, Readiness input validation and retirement ownership checks;
+  an open maintenance window must not permit their replacement.
+  The canonical closure includes their first-party dependencies and generated
+  Git hook snapshot admission observer. Its four emitted dynamic imports are
+  declared individually: three Node builtins count toward call-site parity;
+  `lib/governance-scope.mjs` is the first-party edge. Missing or stale declarations
+  remain blocking findings. The additive paths, in kernel-array order, are:
+  `hooks/git-dangerous-policy.mjs`,
+  `hooks/hook-governance-admission.mjs`,
+  `lib/advisory-coordinator.mjs`,
+  `lib/advisory-decision-event.mjs`,
+  `lib/antigravity-json-spans.mjs`,
+  `lib/antigravity-plugin-topology.mjs`,
+  `lib/antigravity-topology-refresh-host.mjs`,
+  `lib/git-hook-footprint.mjs`,
+  `lib/git-hook-runtime-snapshot.mjs`,
+  `lib/git-hook-snapshot-admission.mjs`,
+  `lib/governance-scope.mjs`,
+  `lib/project-pipeline-footprint.mjs`,
+  `lib/project-uninstall-contract.mjs`,
+  `lib/project-uninstall.fixture.mjs`,
+  `lib/project-uninstall.mjs`,
+  `lib/runtime-projection-removal.mjs`,
+  `schemas/pipeline.governance-scope.v1.json`,
+  `schemas/project-uninstall-journal.schema.json`,
+  `schemas/project-uninstall-plan.schema.json`,
+  `schemas/project-uninstall-request.schema.json`,
+  `scripts/advisory-host-bridge.mjs`,
+  `scripts/browser-evidence-preflight.mjs`,
+  `scripts/check-artifact-topology.mjs`,
+  `scripts/codex-advisory-app-server.mjs`,
+  `scripts/codex-host-advisor-route.mjs`,
+  `scripts/codex-sandbox-preflight.mjs`,
+  `scripts/codex-sandbox-runtime.mjs`,
+  `scripts/design-advisory-admission.mjs`,
+  `scripts/design-advisory-coordinator.mjs`,
+  `scripts/host-advisor-workspace.mjs`,
+  `scripts/project-activation.mjs`,
+  `scripts/project-uninstall.mjs`,
+  `scripts/sandboxed-readonly-host-bridge.mjs`.
+
+### Supplementary completion-policy closure
+
+The named supplementary completion contract protects
+`harness/scripts/verify-case-completion-augmentation.mjs`,
+`harness/scripts/verify-case-completion-augmentation.test.mjs`, and
+`harness/config/verify-case-completion-augmentations.v1.json` as never liftable
+project kernel roots. The shared validator only fills absent completion policy
+on an exact existing declarative suite name and file. Their first-party closure
+also protects `lib/verify-case-completion-receipt.mjs`,
+`harness/scripts/check-verify-suite-registration.mjs`, and
+`lib/test-case-completion.mjs`. Existing policies,
+unknown targets, unsafe paths and malformed physical or candidate JSON are
+refused. Static and runtime consumers use the same loader; real FD completion
+still verifies the full declared case set and every disposition.
+
+Source delivery of these roots does not establish protected Verify integration,
+full Verify, Critic review or native runtime qualification. Those require their
+own final bindings and execution evidence.
+
+### Enrollment retirement closure
+
+`lib/enrollment-retirement-coordinator.mjs` is never liftable. Its existing
+onboarding, consent, runtime and plan-state owner APIs retain their protection.
+The nine schema mirrors are protected separately at both anchors. A `./schemas/`
+token below names the project-root resource; a full plugin path names its mirror:
+
+- `./schemas/pipeline.enrollment-retirement-archive.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-retirement-archive.v1.json`
+- `./schemas/pipeline.enrollment-retirement-coordinator.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-retirement-coordinator.v1.json`
+- `./schemas/pipeline.enrollment-retirement-result.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-retirement-result.v1.json`
+- `./schemas/pipeline.enrollment-retirement-inspection.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-retirement-inspection.v1.json`
+- `./schemas/pipeline.plan-invalidation.v1.json` and `plugins/pipeline-core/schemas/pipeline.plan-invalidation.v1.json`
+- `./schemas/pipeline.enrollment-git-creation-plan.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-git-creation-plan.v1.json`
+- `./schemas/pipeline.enrollment-git-creation-barrier.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-git-creation-barrier.v1.json`
+- `./schemas/pipeline.enrollment-git-removal-barrier.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-git-removal-barrier.v1.json`
+- `./schemas/pipeline.enrollment-git-creation.v1.json` and `plugins/pipeline-core/schemas/pipeline.enrollment-git-creation.v1.json`
+
+The shared registration proposal supplies full inherited-FD completion policies
+for three new suites. The existing runtime suite now uses full inherited-FD
+completion coverage for all 24 callbacks, with stable IDs COR001–COR024 and a
+65536-byte budget. Its existing completion entry is required, and its policy is
+bound to the existing builtin Verify row in the inert consumer proposal.
+Protected Verify, writer and guard proposals remain inert until admitted and
+bound to final Source verification.
 
 ## Threats and controls
 

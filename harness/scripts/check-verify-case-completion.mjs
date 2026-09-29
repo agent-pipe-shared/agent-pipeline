@@ -1,17 +1,21 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../../plugins/pipeline-core/lib/schema-lite.mjs";
+import { validateDeclarativeVerifySuites } from "./check-verify-suite-registration.mjs";
+import { validateVerifyCaseCompletionPolicy } from "../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs";
+import { loadAndApplyVerifyCaseCompletionAugmentations } from "./verify-case-completion-augmentation.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
 export const DEFAULT_REGISTRY = "harness/config/verify-case-completion.v1.json";
 export const DEFAULT_SCHEMA = "harness/config/verify-case-completion.v1.schema.json";
 export const DEFAULT_VERIFY = "harness/scripts/verify.mjs";
+export const DEFAULT_DECLARATIVE = "harness/verify-suites.json";
 export const REGISTRY_SCHEMA = "pipeline.verify-case-completion-registry.v1";
 const DISPOSITIONS = new Set(["required", "legacy-process-only"]);
 const LEGACY_REASON_RE = /^backlog\/items\/[^/]+\.md$/u;
@@ -43,6 +47,10 @@ function makeReader(root, candidate) {
     }
     return {
       read(relPath) { return readFileSync(regularPath(relPath), "utf8"); },
+      hasEntry(relPath) {
+        try { lstatSync(join(root, relPath)); return true; }
+        catch (error) { if (error.code === "ENOENT") return false; throw error; }
+      },
       exists(relPath) {
         if (!existsSync(join(root, relPath))) return false;
         try { regularPath(relPath); return true; } catch { return false; }
@@ -50,8 +58,9 @@ function makeReader(root, candidate) {
     };
   }
   function isRegularBlob(relPath) {
-    const result = runGit(root, ["ls-tree", candidate, "--", relPath]);
-    return result.status === 0 && /^100(?:644|755) blob [a-f0-9]{40}\t/u.test(result.stdout);
+    const result = runGit(root, ["ls-tree", "-z", candidate, "--", relPath]);
+    const record = /^100(?:644|755) blob [a-f0-9]{40}\t([^\0]+)\0$/u.exec(result.stdout);
+    return result.status === 0 && record !== null && record[1] === relPath;
   }
   return {
     read(relPath) {
@@ -61,6 +70,11 @@ function makeReader(root, candidate) {
       return result.stdout;
     },
     exists(relPath) { return isRegularBlob(relPath); },
+    hasEntry(relPath) {
+      const result = runGit(root, ["ls-tree", "-z", candidate, "--", relPath]);
+      if (result.status !== 0) throw new Error(`git ls-tree ${candidate}:${relPath} failed`);
+      return result.stdout !== "";
+    },
   };
 }
 
@@ -79,16 +93,20 @@ const BASES = Object.freeze({
   pluginScriptsDir: "plugins/pipeline-core/scripts",
 });
 
-function maskNonCode(source) {
+function maskNonCode(source, maskRegex = false) {
   let output = "";
   let state = "code";
   let quote = "";
+  let regexClass = false;
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index];
     const next = source[index + 1];
     if (state === "code") {
       if (char === "/" && next === "/") { output += "  "; index += 1; state = "line"; continue; }
       if (char === "/" && next === "*") { output += "  "; index += 1; state = "block"; continue; }
+      if (maskRegex && char === "/" && /(?:[([{:;,=!?&|]|=>|\b(?:return|throw|case))\s*$/u.test(output.slice(-128))) {
+        output += " "; state = "regex"; regexClass = false; continue;
+      }
       if (char === '"' || char === "'" || char === "`") { quote = char; output += " "; state = "string"; continue; }
       output += char;
       continue;
@@ -104,6 +122,13 @@ function maskNonCode(source) {
       continue;
     }
     if (char === "\\") { output += " "; if (index + 1 < source.length) { output += source[index + 1] === "\n" ? "\n" : " "; index += 1; } continue; }
+    if (state === "regex") {
+      if (char === "[") regexClass = true;
+      else if (char === "]") regexClass = false;
+      else if (char === "/" && !regexClass) state = "code";
+      output += char === "\n" ? "\n" : " ";
+      continue;
+    }
     output += char === "\n" ? "\n" : " ";
     if (char === quote) state = "code";
   }
@@ -156,14 +181,71 @@ function topLevelElements(source) {
   return elements;
 }
 
-function matchingClose(source, openIndex, openChar, closeChar) {
-  const masked = maskNonCode(source);
+function matchingClose(source, openIndex, openChar, closeChar, maskRegex = false) {
+  const masked = maskNonCode(source, maskRegex);
   let depth = 0;
   for (let index = openIndex; index < masked.length; index += 1) {
     if (masked[index] === openChar) depth += 1;
     else if (masked[index] === closeChar && --depth === 0) return index;
   }
   return -1;
+}
+
+function hasOnboardingParentRecorder(source, suitePath, bindings) {
+  // This one suite owns an IPC fan-out. Its parent writes the same real FD
+  // stream as node:test registration; runtime stream validation remains the
+  // completion authority. Do not admit recorder-only shapes in other suites.
+  if (suitePath !== "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+    || bindings.length !== 1 || bindings[0] !== "createTestCaseCompletionRecorder") return false;
+  const masked = maskNonCode(source, true);
+  const declarations = [
+    /^\s*const DIRECT_INVOCATION = isDirectInvocation\(import\.meta\.url\);/gmu,
+    /^\s*const shard = DIRECT_INVOCATION \? parseShardArgument\(shardArgument\) : null;/gmu,
+    /^\s*const ORCHESTRATING_SHARDS = DIRECT_INVOCATION && shard === null;/gmu,
+    /^\s*export const ONBOARDING_CASE_IDS = Object\.freeze\(ONBOARDING_TEST_CASES\.map\(\(entry\) => entry\.id\)\.sort\(\)\);/gmu,
+  ];
+  if (declarations.some((pattern) => topLevelMatches(masked, pattern).length !== 1)) return false;
+  const entries = topLevelMatches(masked, /^\s*if\s*\(ORCHESTRATING_SHARDS\)\s*\{/gmu);
+  if (entries.length !== 1) return false;
+  const entry = entries[0];
+  const prefix = masked.slice(0, entry.index);
+  if (topLevelMatches(prefix, /^\s*(?:throw\b|process\.exit\s*\()/gmu).length) return false;
+  const previousLine = prefix.trimEnd().split("\n").at(-1)?.trim() ?? "";
+  if (/^(?:(?:if|for|while|with)\s*\([^)]*\)|else)\s*$/u.test(previousLine)) return false;
+  const open = masked.indexOf("{", entry.index);
+  const close = matchingClose(source, open, "{", "}", true);
+  if (close === -1) return false;
+  const body = source.slice(open + 1, close), bodyCode = maskNonCode(body);
+  const calls = topLevelMatches(bodyCode, /^\s*const recorder = createTestCaseCompletionRecorder\s*\(/gmu);
+  if (calls.length !== 1 || [...masked.matchAll(/(?<![\w$.])createTestCaseCompletionRecorder\s*\(/gu)].length !== 1) return false;
+  const beforeCall = bodyCode.slice(0, calls[0].index);
+  if (topLevelMatches(beforeCall, /^\s*(?:throw\b|process\.exit\s*\()/gmu).length) return false;
+  const callTail = body.slice(calls[0].index), callOpen = callTail.indexOf("(");
+  const callClose = matchingClose(callTail, callOpen, "(", ")");
+  if (callClose === -1) return false;
+  const argument = callTail.slice(callOpen + 1, callClose).trim();
+  if (!argument.startsWith("{") || !argument.endsWith("}") || maskNonCode(argument).includes("...")) return false;
+  let properties;
+  try { properties = topLevelElements(argument.slice(1, -1)); } catch { return false; }
+  if (properties.length !== 3) return false;
+  const expected = [
+    /^caseIds\s*:\s*ONBOARDING_CASE_IDS$/u,
+    /^fd\s*:\s*completionFd$/u,
+    /^maxBytes\s*:\s*Number\(process\.env\.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES\s*\?\?\s*"65536"\)$/u,
+  ];
+  if (expected.some((pattern) => properties.filter((property) => pattern.test(property.trim())).length !== 1)) return false;
+  const afterCall = bodyCode.slice(calls[0].index + callClose + 1);
+  const runs = topLevelMatches(afterCall, /^\s*const results = await runShards\(recorder\);/gmu);
+  if (runs.length !== 1) return false;
+  if (topLevelMatches(afterCall.slice(0, runs[0].index), /^\s*(?:throw\b|process\.exit\s*\()/gmu).length) return false;
+  // Bind the admitted parent call to its close-observed disposition producer.
+  const shards = topLevelMatches(masked, /^\s*async function runShards\(recorder\)\s*\{/gmu);
+  if (shards.length !== 1) return false;
+  const shardsOpen = masked.indexOf("{", shards[0].index);
+  const shardsClose = matchingClose(source, shardsOpen, "{", "}", true);
+  if (shardsClose === -1) return false;
+  const shardBody = masked.slice(shardsOpen + 1, shardsClose);
+  return /const receipt = receiver\.close\(code, signal\);\s*coverage = receipt\.classes;\s*for \(const result of receipt\.results\) recorder\.dispose\(result\.id, result\.disposition\);/u.test(shardBody);
 }
 
 function hasRequiredProtocol(source, suitePath) {
@@ -173,6 +255,7 @@ function hasRequiredProtocol(source, suitePath) {
   const resolvedHelper = posix.normalize(posix.join(posix.dirname(suitePath), helperImports[0][2]));
   if (resolvedHelper !== "plugins/pipeline-core/lib/test-case-completion.mjs") return false;
   const bindings = helperImports.flatMap((match) => match[1].split(",").map((part) => part.trim()).filter(Boolean));
+  if (bindings.includes("createTestCaseCompletionRecorder")) return hasOnboardingParentRecorder(source, suitePath, bindings);
   if (bindings.filter((binding) => binding === "registerTestCaseCompletion").length !== 1
     || bindings.some((binding) => /\bas\s+registerTestCaseCompletion$/u.test(binding))) return false;
   const masked = maskNonCode(source);
@@ -193,7 +276,9 @@ function hasRequiredProtocol(source, suitePath) {
   if (!argument.startsWith("{") || !argument.endsWith("}") || maskNonCode(argument).includes("...")) return false;
   let properties;
   try { properties = topLevelElements(argument.slice(1, -1)); } catch { return false; }
-  const keys = properties.map((property) => /^\s*([A-Za-z_$][\w$]*)\s*:/u.exec(maskNonCode(property))?.[1] ?? null);
+  // Object shorthand has the same closed own-key shape as explicit properties.
+  // Methods, spreads, duplicate keys and caller-held configuration objects stay out.
+  const keys = properties.map((property) => /^\s*([A-Za-z_$][\w$]*)\s*(?::|$)/u.exec(maskNonCode(property))?.[1] ?? null);
   return keys.length === 3 && [...keys].sort().join("\0") === ["cases", "fd", "maxBytes"].sort().join("\0");
 }
 
@@ -241,6 +326,34 @@ function parseVerifyRegistrations(source, findings) {
     }
     if (parsed.length !== elements.length) findings.push(`VERIFY-PARSE ${arrayName} declared ${elements.length} entries, parsed ${parsed.length}`);
     for (const entry of parsed) accept(entry);
+  }
+  return entries;
+}
+
+
+function parseDeclarativeRegistrations(reader, findings, root, candidate) {
+  let data;
+  try {
+    data = reader.hasEntry(DEFAULT_DECLARATIVE) ? JSON.parse(reader.read(DEFAULT_DECLARATIVE)) : { schema: "pipeline.verify-suites.v1", suites: [] };
+  } catch (error) {
+    findings.push(`DECLARATIVE-READ ${error.message}`); return [];
+  }
+  // The same closed validator used by loadDeclarativeVerifySuites, with bytes
+  // obtained through the selected physical/Git-candidate reader. Never run Verify.
+  const validation = validateDeclarativeVerifySuites(data);
+  if (!validation.ok) { findings.push(`DECLARATIVE-SCHEMA ${validation.error}`); return []; }
+  const augmented = loadAndApplyVerifyCaseCompletionAugmentations({ rootDir: root, candidate, suites: data.suites });
+  if (!augmented.ok) { findings.push(`DECLARATIVE-AUGMENTATION ${augmented.code} ${augmented.error}`); return []; }
+  const entries = [];
+  for (const suite of augmented.suites) {
+    if (!safeRepoPath(suite.file) || !suite.file.endsWith(".mjs")) {
+      findings.push(`DECLARATIVE-PATH ${suite.name} has unsafe or malformed ${JSON.stringify(suite.file)}`); continue;
+    }
+    if (suite.caseCompletion !== undefined && !validateVerifyCaseCompletionPolicy(suite.caseCompletion)) {
+      findings.push(`DECLARATIVE-POLICY ${suite.name} has invalid completion policy`);
+    }
+    entries.push({ name: suite.name, path: suite.file, arrayName: "DECLARATIVE_VERIFY_SUITES",
+      caseCompletion: validateVerifyCaseCompletionPolicy(suite.caseCompletion) });
   }
   return entries;
 }
@@ -398,7 +511,8 @@ export function checkVerifyCaseCompletion({
   try { verifySource = reader.read(toPosix(verifyPath)); } catch (error) { findings.push(`VERIFY-READ ${error.message}`); }
   if (registrySource === undefined || schemaSource === undefined || verifySource === undefined) return { ok: false, findings, registeredCount: 0, vulnerableCount: 0, registryCount: 0 };
 
-  const registrations = parseVerifyRegistrations(verifySource, findings).filter((entry) => entry.path.endsWith(".test.mjs"));
+  const registrations = [...parseVerifyRegistrations(verifySource, findings), ...parseDeclarativeRegistrations(reader, findings, root, candidateOid)]
+    .filter((entry) => entry.path.endsWith(".test.mjs"));
   const schema = parseValidationSchema(schemaSource, findings);
   const registry = parseRegistry(registrySource, schema, reader, findings);
   const registrationByName = new Map();
@@ -444,7 +558,7 @@ export function checkVerifyCaseCompletion({
     const baseReader = makeReader(root, baseOid);
     try {
       const baseFindings = [];
-      const baseEntries = parseVerifyRegistrations(baseReader.read(toPosix(verifyPath)), baseFindings)
+      const baseEntries = [...parseVerifyRegistrations(baseReader.read(toPosix(verifyPath)), baseFindings), ...parseDeclarativeRegistrations(baseReader, baseFindings, root, baseOid)]
         .filter((entry) => entry.path.endsWith(".test.mjs"));
       if (baseFindings.length > 0) findings.push(...baseFindings.map((finding) => `BASE-${finding}`));
       else baseRegistrationKeys = new Set(baseEntries.map((entry) => `${entry.name}\0${entry.path}`));

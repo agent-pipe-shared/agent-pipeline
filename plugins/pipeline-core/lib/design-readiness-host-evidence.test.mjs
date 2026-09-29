@@ -75,13 +75,14 @@ function fixture(t, runner) {
       route,
     },
   };
-  const verifier = (receipt = readinessReceipt) => verifyDesignReadinessHostExecution({
+  const verifier = (receipt = readinessReceipt, advisorObservation = null) => verifyDesignReadinessHostExecution({
     repoRoot: root,
     hostExecution: receipt.hostExecution,
     readinessReceipt: receipt,
     candidate,
     sources,
     sourceBytes,
+    advisorObservation,
     resolveTopology: () => ({ gitCommonDir, primaryRoot: root }),
     deriveRepositoryFingerprint: () => repoFingerprint,
     resolveRoute: ({ dutyId, runner: selectedRunner, candidateCommit }) => ({
@@ -96,11 +97,13 @@ test("DWH01 Claude host-observed receipt is verified against its write-once priv
   const fx = fixture(t, "claude");
   assert.equal(fx.verifier().ok, true);
   assert.equal(fx.verifier().assurance, "host-observed-local");
+  assert.equal(fx.verifier(fx.readinessReceipt,{schema:'pipeline.readiness-advisor-observation.v2'}).ok,false,'legacy local receipt cannot authorize an invalid current v2 supplemental request');
 });
 
 test("DWH02 Antigravity host-observed receipt is local evidence and binds exact report, candidate and route", (t) => {
   const fx = fixture(t, "antigravity");
   assert.equal(fx.verifier().ok, true);
+  assert.equal(fx.verifier(fx.readinessReceipt,{schema:'pipeline.readiness-advisor-observation.v2'}).ok,false);
   const changed = structuredClone(fx.readinessReceipt);
   changed.summary = "tampered";
   assert.equal(fx.verifier(changed).code, "DWP-READINESS-HOST-RECEIPT-MISMATCH");

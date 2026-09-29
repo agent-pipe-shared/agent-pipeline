@@ -14,6 +14,7 @@ import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
 import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
 import { deriveV3BaselinePolicies } from "../lib/model-role-v3-baseline.mjs";
 import { resolvePluginManifestVersion } from "./pipeline-start-preflight.mjs";
+import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 
 const OID = /^[a-f0-9]{40}$/u;
 const AGY_SESSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
@@ -27,6 +28,74 @@ export function modelRoleBootstrapCliResult(result) {
 
 export function modelRoleBootstrapExitCode(result) {
   return result?.ok || (result?.fallback === "legacy-v3" && result.lifecycleImpact === "none") ? 0 : 1;
+}
+
+/** Transfer an observed session to an attended terminal; this never confirms its mapping. */
+export function modelRoleBootstrapTerminalIdentity({ runner, env = process.env,
+  hostHookSessionId = null, interactive = false } = {}) {
+  if (runner === "antigravity" || hostHookSessionId === null) {
+    return resolveModelRoleHostSessionIdentity({ runner, env, hostHookSessionId });
+  }
+  if (!interactive) return fail("MODEL-ROLE-ATTENDED-SESSION-REQUIRES-TERMINAL");
+  const transferredEnv = runner === "codex"
+    ? { CODEX_SESSION_ID: hostHookSessionId, CODEX_THREAD_ID: hostHookSessionId }
+    : runner === "claude" ? { CLAUDE_CODE_SESSION_ID: hostHookSessionId } : {};
+  const transferred = resolveModelRoleHostSessionIdentity({ runner, env: transferredEnv });
+  if (!transferred.ok) return transferred;
+  const keys = runner === "codex" ? ["CODEX_SESSION_ID", "CODEX_THREAD_ID"] : ["CLAUDE_CODE_SESSION_ID"];
+  if (keys.some((key) => env[key] !== undefined && env[key] !== transferred.sessionId)) {
+    return fail("MODEL-ROLE-SESSION-IDENTITY-CONFLICT");
+  }
+  return transferred;
+}
+
+export function modelRoleBootstrapAttendedAction({ rootDir, runner, sessionId,
+  executable = process.execPath, scriptPath = fileURLToPath(import.meta.url) } = {}) {
+  const identity = modelRoleBootstrapTerminalIdentity({ runner, env: {},
+    hostHookSessionId: sessionId, interactive: true });
+  if (!identity.ok || !isAbsolute(rootDir ?? "") || !isAbsolute(scriptPath ?? "")
+    || !isAbsolute(executable ?? "")) return null;
+  const command = renderHumanCopySafeCommand({ label: "confirm model mapping in an attended terminal",
+    executable, argv: [scriptPath, "--repo-root", rootDir, "--runner", runner,
+      "--host-session-id", identity.sessionId] });
+  return { kind: "command", executionBoundary: "attended-terminal", mutation: true,
+    requiresHumanConfirmation: true, sessionId: identity.sessionId, runner, rootDir, ...command };
+}
+
+/** Host-owned terminal input is compared with the displayed proposal, once. */
+export async function confirmModelRoleMapping(readback, { question, write } = {}) {
+  write(`${JSON.stringify(readback, null, 2)}\n`);
+  const entered = await question(
+    `Paste this exact 64-character mapping digest to confirm: ${readback.readbackSha256}\nDigest: `,
+  );
+  if (typeof entered === "string" && entered.trim() === readback.readbackSha256) return true;
+  write(`Mapping not confirmed: the input must match the exact 64-character digest shown above.\nExpected digest: ${readback.readbackSha256}\nRun the attended action again and paste that digest; no confirmation was recorded.\n`);
+  return false;
+}
+
+/** The same terminal transport is exercised by the CLI and disposable tests. */
+export async function runModelRoleBootstrapTransport({ rootDir, runner, env = process.env,
+  hostHookSessionId = null, interactive = false, question, write = () => {},
+  bootstrapOptions = {} } = {}) {
+  const identity = modelRoleBootstrapTerminalIdentity({ runner, env, hostHookSessionId, interactive });
+  if (!identity.ok) return modelRoleBootstrapCliResult(fail(identity.code));
+  // Only the explicitly transferred, validated identity is carried into the normal
+  // bootstrap resolver. Ambient conflicts were rejected above, never overwritten.
+  const identityEnv = runner === "codex"
+    ? { ...env, CODEX_SESSION_ID: identity.sessionId, CODEX_THREAD_ID: identity.sessionId }
+    : runner === "claude" ? { ...env, CLAUDE_CODE_SESSION_ID: identity.sessionId } : env;
+  const result = await runModelRoleBootstrap({ ...bootstrapOptions, rootDir, runner,
+    env: identityEnv, hostHookSessionId: runner === "antigravity" ? identity.sessionId : null,
+    confirm: interactive ? (readback) => confirmModelRoleMapping(readback, { question, write }) : null });
+  const diagnostic = modelRoleBootstrapCliResult(result);
+  if (result.status === "confirmation-required") {
+    const action = modelRoleBootstrapAttendedAction({ rootDir, runner, sessionId: identity.sessionId });
+    if (action) {
+      diagnostic.attendedAction = action;
+      write(`Human mapping confirmation requires an attended terminal for session ${identity.sessionId}.\n${action.text}\n`);
+    }
+  }
+  return diagnostic;
 }
 
 /** A lock is a bounded local hook observation, not provider attestation. */
@@ -165,10 +234,11 @@ async function main() {
   const args = process.argv.slice(2);
   const basic = args.length === 4 && args[0] === "--repo-root" && args[2] === "--runner"
     && ["codex", "claude"].includes(args[3]);
-  const agy = args.length === 6 && args[0] === "--repo-root" && args[2] === "--runner"
-    && args[3] === "antigravity" && args[4] === "--host-session-id";
-  if (!basic && !agy) {
-    throw new Error("Usage: model-role-bootstrap.mjs --repo-root <absolute-repo> --runner codex|claude|antigravity [--host-session-id <native-hook-id>]");
+  const transferred = args.length === 6 && args[0] === "--repo-root" && args[2] === "--runner"
+    && ["codex", "claude", "antigravity"].includes(args[3]) && args[4] === "--host-session-id";
+  const agy = transferred && args[3] === "antigravity";
+  if (!basic && !transferred) {
+    throw new Error("Usage: model-role-bootstrap.mjs --repo-root <absolute-repo> --runner codex|claude|antigravity [--host-session-id <observed-session-id>; Codex/Claude transfer requires an attended terminal, Antigravity requires its native hook]");
   }
   if (agy) {
     let source;
@@ -191,16 +261,15 @@ async function main() {
   const interactive = stdin.isTTY && stdout.isTTY;
   let result;
   try {
-    result = await runModelRoleBootstrap({ rootDir: args[1], runner: args[3],
-      hostHookSessionId: agy ? args[5] : null,
-      confirm: interactive ? async (readback) => {
-        stdout.write(`${JSON.stringify(readback, null, 2)}\n`);
+    result = await runModelRoleBootstrapTransport({ rootDir: args[1], runner: args[3],
+      hostHookSessionId: transferred ? args[5] : null, interactive,
+      write: (text) => process.stderr.write(text),
+      question: async (text) => {
         const prompt = createInterface({ input: stdin, output: stdout });
         try {
-          const entered = await prompt.question("Confirm the displayed mapping digest: ");
-          return entered.trim() === readback.readbackSha256;
+          return await prompt.question(text);
         } finally { prompt.close(); }
-      } : null });
+      } });
   } catch {
     result = fail("MODEL-ROLE-BOOTSTRAP-UNAVAILABLE");
   }

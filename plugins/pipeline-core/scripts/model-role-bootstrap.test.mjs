@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, openSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
 import { modelRoleBootstrapCliResult, modelRoleBootstrapExitCode,
-  observeAgyModelRoleHookSession, runModelRoleBootstrap } from "./model-role-bootstrap.mjs";
+  observeAgyModelRoleHookSession, runModelRoleBootstrap,
+  modelRoleBootstrapAttendedAction, modelRoleBootstrapTerminalIdentity,
+  runModelRoleBootstrapTransport } from "./model-role-bootstrap.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 const cases = [];
@@ -212,9 +216,125 @@ test("Antigravity CLI accepts only the exact fresh hook-session lock of this plu
   } finally { rmSync(rootDir, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 10);
+test("wrong attended input explains the exact digest without publishing a confirmation", async () => {
+  const f = fixture(), output = [];
+  let questions = 0;
+  const result = await runModelRoleBootstrapTransport({ ...f.input, bootstrapOptions: f.input,
+    interactive: true, write: (text) => output.push(text), question: async (prompt) => {
+      questions += 1;
+      assert.match(prompt, /Paste this exact 64-character mapping digest to confirm: [a-f0-9]{64}\nDigest: /u);
+      return "Confirm";
+    } });
+  assert.equal(result.code, "MODEL-ROLE-BOOTSTRAP-NOT-CONFIRMED");
+  assert.equal(questions, 1);
+  assert.equal(f.rows.size, 0);
+  assert.ok(output.some((text) => text.includes("input must match the exact 64-character digest")));
+  assert.ok(output.some((text) => text.includes(`Expected digest: ${result.readback.readbackSha256}`)));
+  assert.equal(result.fallback, "legacy-v3");
+  assert.equal(modelRoleBootstrapExitCode(result), 0);
+});
+
+test("exact attended input admits once and unchanged transport reuse preserves all seven receipts", async () => {
+  const f = fixture();
+  let questions = 0;
+  const ready = await runModelRoleBootstrapTransport({ ...f.input, bootstrapOptions: f.input,
+    interactive: true, question: async (prompt) => {
+      questions += 1;
+      return ` ${prompt.match(/[a-f0-9]{64}/u)[0]} `;
+    } });
+  assert.equal(ready.code, "MODEL-ROLE-BOOTSTRAP-READY");
+  const held = structuredClone(f.rows.get("session-1"));
+  assert.equal(held.receipts.length, 7);
+  const reused = await runModelRoleBootstrapTransport({ ...f.input, bootstrapOptions: f.input,
+    interactive: false, question: async () => { throw Error("must not ask again"); } });
+  assert.equal(reused.code, "MODEL-ROLE-BOOTSTRAP-REUSED");
+  assert.deepEqual(reused.receipts, held.receipts);
+  assert.equal(reused.readbackSha256, held.admission.readbackSha256);
+  assert.equal(reused.attendedAction, undefined);
+  assert.equal(questions, 1);
+  assert.equal(f.modelCalls, 1);
+});
+
+test("noninteractive guidance binds the observed session, current loaded script and exact runner/root", async () => {
+  const f = fixture({ rootDir: "/repo with spaces", env: { CODEX_THREAD_ID: "observed-session-42" } });
+  const output = [];
+  const result = await runModelRoleBootstrapTransport({ ...f.input, bootstrapOptions: f.input,
+    interactive: false, write: (text) => output.push(text), question: async () => {
+      throw Error("noninteractive transport must not ask");
+    } });
+  assert.equal(result.code, "MODEL-ROLE-BOOTSTRAP-HUMAN-CONFIRMATION-REQUIRED");
+  assert.equal(result.attendedAction.sessionId, "observed-session-42");
+  assert.equal(result.attendedAction.executable, process.execPath);
+  assert.deepEqual(result.attendedAction.argv, [fileURLToPath(new URL("./model-role-bootstrap.mjs", import.meta.url)),
+    "--repo-root", f.input.rootDir, "--runner", "codex", "--host-session-id", "observed-session-42"]);
+  assert.ok(output.some((text) => text.includes(result.attendedAction.text)));
+  assert.ok(result.attendedAction.text.split("\n").every((line) => line.length <= 72));
+  assert.equal(f.rows.size, 0);
+  assert.equal(result.fallback, "legacy-v3");
+  assert.equal(result.lifecycleImpact, "none");
+  const missing = fixture({ env: {} });
+  const unavailable = await runModelRoleBootstrapTransport({ ...missing.input, bootstrapOptions: missing.input });
+  assert.equal(unavailable.code, "MODEL-ROLE-SESSION-IDENTITY-UNAVAILABLE");
+  assert.equal(unavailable.attendedAction, undefined);
+  assert.equal(missing.modelCalls, 0);
+});
+
+test("attended action survives literal shell metacharacters through the shared copy-safe renderer", () => {
+  const scratchRoot = resolve("scratch");
+  mkdirSync(scratchRoot, { recursive: true });
+  const temporary = mkdtempSync(join(scratchRoot, "model-bootstrap-transport-"));
+  try {
+    const scriptPath = join(temporary, "observed '$` script.mjs");
+    writeFileSync(scriptPath, "process.stdout.write(JSON.stringify(process.argv.slice(2)));\n");
+    const rootDir = join(temporary, "project '$` $(never-run)");
+    const action = modelRoleBootstrapAttendedAction({ rootDir, runner: "codex",
+      sessionId: "observed-session", scriptPath });
+    const captured = execFileSync("bash", ["-c", action.copyCommand.posix], { encoding: "utf8" });
+    assert.deepEqual(JSON.parse(captured), ["--repo-root", rootDir, "--runner", "codex",
+      "--host-session-id", "observed-session"]);
+  } finally { rmSync(temporary, { recursive: true, force: true }); }
+});
+
+test("transferred identity needs an attended terminal and cannot replace conflicting ambient identity", async () => {
+  assert.equal(modelRoleBootstrapTerminalIdentity({ runner: "codex", env: {},
+    hostHookSessionId: "observed", interactive: false }).code, "MODEL-ROLE-ATTENDED-SESSION-REQUIRES-TERMINAL");
+  assert.equal(modelRoleBootstrapTerminalIdentity({ runner: "codex", env: { CODEX_THREAD_ID: "other" },
+    hostHookSessionId: "observed", interactive: true }).code, "MODEL-ROLE-SESSION-IDENTITY-CONFLICT");
+  assert.equal(modelRoleBootstrapTerminalIdentity({ runner: "codex", env: {},
+    hostHookSessionId: "../invented", interactive: true }).ok, false);
+  const f = fixture({ env: {} });
+  const ready = await runModelRoleBootstrapTransport({ ...f.input, bootstrapOptions: f.input,
+    hostHookSessionId: "observed", interactive: true,
+    question: async (prompt) => prompt.match(/[a-f0-9]{64}/u)[0] });
+  assert.equal(ready.ok, true);
+  assert.equal(f.rows.has("observed"), true);
+  assert.equal(f.rows.has("session-1"), false);
+  const scriptPath = fileURLToPath(new URL("./model-role-bootstrap.mjs", import.meta.url));
+  const child = JSON.parse(execFileSync(process.execPath, [scriptPath, "--repo-root", "/unused",
+    "--runner", "codex", "--host-session-id", "observed"], { encoding: "utf8" }));
+  assert.equal(child.code, "MODEL-ROLE-ATTENDED-SESSION-REQUIRES-TERMINAL");
+  assert.equal(child.fallback, "legacy-v3");
+  assert.equal(child.lifecycleImpact, "none");
+});
+
+test("a previous proposal digest cannot confirm a changed mapping in the same session", async () => {
+  const f = fixture();
+  const prior = await runModelRoleBootstrap(f.input);
+  const changedPolicies = structuredClone(approvedPolicies);
+  for (const entry of changedPolicies) if (entry.runner === "codex") entry.policy.approved[0].modelId += "-changed";
+  const changed = { ...f.input, readApprovedPolicy: () => ({ ok: true, approvedPolicies: changedPolicies }),
+    collectObservations: async () => ({ ok: true, observations: observations.filter((entry) => entry.runner === "codex")
+      .map((entry) => ({ ...entry, availableModelIds: entry.availableModelIds.map((id) => id + "-changed") })) }) };
+  const rejected = await runModelRoleBootstrapTransport({ ...changed, bootstrapOptions: changed,
+    interactive: true, question: async () => prior.readback.readbackSha256 });
+  assert.equal(rejected.code, "MODEL-ROLE-BOOTSTRAP-NOT-CONFIRMED");
+  assert.notEqual(rejected.readback.readbackSha256, prior.readback.readbackSha256);
+  assert.equal(f.rows.size, 0);
+});
+
+assert.equal(cases.length, 16);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd,
-  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "131072") });

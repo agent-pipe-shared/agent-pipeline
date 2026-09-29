@@ -50,7 +50,8 @@ import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy
 import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
 import { observeOnboardingBootstrapPlanApproval } from "../lib/onboarding-continuity.mjs";
 import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
-import { coordinateDesignAdvisory } from "../lib/design-advisory-coordinator.mjs";
+// This fixture exercises historical v1 admission, not v2 initial provenance.
+import { coordinateLegacyDesignAdvisory as coordinateDesignAdvisory } from "../lib/design-advisory-coordinator.mjs";
 import { checkPlanningAdoptionDisposition, resolveAdoptionState } from "./architecture-adoption.mjs";
 import {
   CODEX_HOST_REPOSITORY_INIT_DIRECTORY,

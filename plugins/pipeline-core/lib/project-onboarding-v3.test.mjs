@@ -11,6 +11,10 @@ import {
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {observeOnboardingEnrollmentHistory} from "./onboarding-continuity.mjs";
+import {createGovernanceScopeController,readGovernanceEnrollmentRetirement} from "./governance-scope.mjs";
+import {derivePlanLifecycle} from "./plan-spec-state-v2.mjs";
+import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
 
 import {
   applyProjectOnboardingManifestRepairV4,
@@ -44,7 +48,7 @@ import {
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "./project-onboarding-v3.mjs";
 import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
-import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
+import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
@@ -57,7 +61,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { validCurrentPlanApproval, validPreviousCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
-import { driveOnboardingInit } from "../scripts/onboarding-init.mjs";
+import { applyInitialOnboardingAnswers, driveOnboardingInit } from "../scripts/onboarding-init.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
 import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
 import {
@@ -67,7 +71,8 @@ import {
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import {
-  applyOnboardingBootstrapBind, applyOnboardingIntakeGenerate, observeBootstrapBindAcknowledgement,
+  applyOnboardingBootstrapBind, applyOnboardingIntakeConsent, applyOnboardingIntakeGenerate, observeBootstrapBindAcknowledgement,
+  readOnboardingIntakeMaterialInput,
   observeOnboardingBootstrapPlanApproval,
   planOnboardingBootstrapBind, planOnboardingBootstrapAcknowledgement, planOnboardingBootstrapAcknowledgementChat, applyOnboardingBootstrapAcknowledgement,
   planOnboardingIntakeGenerate, readOnboardingIntakeCheckpoint,
@@ -92,6 +97,7 @@ import { materializeArchitectureDesignFixture } from "./architecture-design-test
 import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
 import { designWorkflowAdvisorQuestionSha256 } from "./design-workflow-package.mjs";
 import { designReadinessReportSha256 } from "./design-readiness-host-evidence.mjs";
+import { createTestCaseCompletionRecorder } from "./test-case-completion.mjs";
 
 // B8 producer-to-guard property: exercise the real guard against every direct
 // session command action reached by this onboarding fixture corpus. The guard
@@ -139,7 +145,7 @@ chmodSync(testUnameExecutable, 0o755);
 process.env.PATH = `${testRuntimeBin}${delimiter}${process.env.PATH ?? ""}`;
 process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true }));
 
-// This file is BOTH a 166-case suite and the fixture library other suites borrow
+// This file is BOTH a 216-case suite and the fixture library other suites borrow
 // (`root`, `dispose`, `fakeDeps`, ... are exported below). Until this guard, an
 // importer paid for the whole suite as an import side effect: the lifecycle
 // recovery contract test needed four helpers and ran every unrelated case to get
@@ -153,26 +159,78 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
 // the full result and distributes the independently rooted cases across fixed
 // child-process shards; an explicitly labelled child invocation is only ever a
 // partial result and says so in its summary.
-const SHARD_COUNT = 4;
+// Two sequential chunks keep each of six children to 18 callbacks while the
+// direct parent retains custody of all case completions.
+const SHARD_COUNT = 6;
+const CHUNK_COUNT = 2;
+const EXPECTED_CASE_COUNT = 216;
+const CASES_PER_CHILD = EXPECTED_CASE_COUNT / (SHARD_COUNT * CHUNK_COUNT);
+const CHILD_DEADLINE_MS = 850_000; // Bound each independent chunk without truncating slower Git fixtures.
 const DIRECT_INVOCATION = isDirectInvocation(import.meta.url);
 const shardArgument = DIRECT_INVOCATION ? process.argv.slice(2) : [];
 function parseShardArgument(args) {
   if (args.length === 0) return null;
-  const match = args.length === 1 ? /^--pipeline-internal-shard=([0-3])\/4$/u.exec(args[0]) : null;
-  if (match === null) throw new Error("unsupported project-onboarding-v3 test argument");
-  return Number(match[1]);
+  const shardMatch = args.length === 2 ? /^--pipeline-internal-shard=(\d+)\/(\d+)$/u.exec(args[0]) : null;
+  const chunkMatch = args.length === 2 ? /^--pipeline-internal-chunk=(\d+)\/(\d+)$/u.exec(args[1]) : null;
+  if (shardMatch === null || chunkMatch === null || Number(shardMatch[2]) !== SHARD_COUNT
+    || Number(shardMatch[1]) >= SHARD_COUNT || Number(chunkMatch[2]) !== CHUNK_COUNT
+    || Number(chunkMatch[1]) >= CHUNK_COUNT) {
+    throw new Error("unsupported project-onboarding-v3 test argument");
+  }
+  return Number(shardMatch[1]);
+}
+function parseChunkArgument(args) {
+  if (args.length === 0) return null;
+  parseShardArgument(args);
+  return Number(/^--pipeline-internal-chunk=(\d+)\/(\d+)$/u.exec(args[1])[1]);
+}
+function assignedToChunk(index, shard, chunk) {
+  return index % SHARD_COUNT === shard && Math.floor(index / SHARD_COUNT) % CHUNK_COUNT === chunk;
 }
 function failedShardResults(results) {
   return results.filter((result) => result.code !== 0 || result.signal !== null || result.error !== null);
 }
 function assertShardControllerContract() {
   assert.equal(parseShardArgument([]), null);
-  assert.equal(parseShardArgument(["--pipeline-internal-shard=3/4"]), 3);
+  assert.equal(parseShardArgument(["--pipeline-internal-shard=5/6", "--pipeline-internal-chunk=1/2"]), 5);
+  assert.equal(parseChunkArgument(["--pipeline-internal-shard=5/6", "--pipeline-internal-chunk=1/2"]), 1);
   for (const args of [
-    ["--pipeline-internal-shard=4/4"],
-    ["--pipeline-internal-shard=0/3"],
-    ["--pipeline-internal-shard=0/4", "extra"],
+    ["--pipeline-internal-shard=5/6"],
+    ["--pipeline-internal-shard=6/6", "--pipeline-internal-chunk=0/2"],
+    ["--pipeline-internal-shard=0/8", "--pipeline-internal-chunk=0/2"],
+    ["--pipeline-internal-shard=0/6", "--pipeline-internal-chunk=2/2"],
+    ["--pipeline-internal-chunk=0/2", "--pipeline-internal-shard=0/6"],
+    ["--pipeline-internal-shard=0/6", "extra"],
   ]) assert.throws(() => parseShardArgument(args), /unsupported project-onboarding-v3 test argument/u);
+  const coordinates = Array.from({ length: SHARD_COUNT * CHUNK_COUNT }, (_, ordinal) => ({
+    shard: ordinal % SHARD_COUNT, chunk: Math.floor(ordinal / SHARD_COUNT),
+  }));
+  const covered = coordinates.flatMap(({ shard: selectedShard, chunk: selectedChunk }) =>
+    Array.from({ length: EXPECTED_CASE_COUNT }, (_, index) => index)
+      .filter((index) => assignedToChunk(index, selectedShard, selectedChunk)));
+  assert.equal(covered.length, EXPECTED_CASE_COUNT);
+  assert.deepEqual([...covered].sort((a, b) => a - b), Array.from({ length: EXPECTED_CASE_COUNT }, (_, index) => index));
+  for (const { shard: selectedShard, chunk: selectedChunk } of coordinates) {
+    assert.equal(covered.filter((index) => assignedToChunk(index, selectedShard, selectedChunk)).length, CASES_PER_CHILD);
+  }
+  const expectedCases = Array.from({ length: EXPECTED_CASE_COUNT }, (_, index) => ({
+    index, id: `POV-fixture-${index}`,
+  })).filter((entry) => assignedToChunk(entry.index, 0, 0));
+  const receipt = {
+    schema: "pipeline.onboarding-test-case-results.v1", shard: 0, chunk: 0,
+    declaredCount: EXPECTED_CASE_COUNT, assignedIndices: expectedCases.map((entry) => entry.index),
+    results: expectedCases.map((entry) => ({ index: entry.index, id: entry.id, disposition: "pass" })),
+    classes: [],
+  };
+  const missing = createShardReceiptReceiver(0, 0, expectedCases);
+  assert.throws(() => missing.close(0, null), /child callback receipt missing/u);
+  const duplicate = createShardReceiptReceiver(0, 0, expectedCases);
+  duplicate.receive(receipt);
+  duplicate.receive(receipt);
+  assert.throws(() => duplicate.close(0, null), /one terminal callback receipt per child/u);
+  assert.throws(() => validateShardReceipt({ ...receipt, chunk: 1 }, 0, 0, expectedCases));
+  assert.throws(() => validateShardReceipt({ ...receipt, results: receipt.results.slice(1) }, 0, 0, expectedCases),
+    /every assigned callback must finish/u);
   const synthetic = [
     { index: 0, code: 0, signal: null, error: null },
     { index: 1, code: 2, signal: null, error: null },
@@ -182,28 +240,141 @@ function assertShardControllerContract() {
   assert.deepEqual(failedShardResults(synthetic).map(({ index }) => index), [1, 2, 3]);
 }
 const shard = DIRECT_INVOCATION ? parseShardArgument(shardArgument) : null;
+const chunk = shard === null ? null : parseChunkArgument(shardArgument);
 const ORCHESTRATING_SHARDS = DIRECT_INVOCATION && shard === null;
 const RUNNING_AS_SUITE = DIRECT_INVOCATION;
 let declared = 0; let passed = 0; const failures = [];
+export const ONBOARDING_TEST_CASES = [];
+const assignedCases = [];
 function test(name, run) {
-  if (!RUNNING_AS_SUITE) return;
+  assert.equal(typeof name, "string");
+  assert.ok(name.length > 0);
+  assert.equal(typeof run, "function");
+  const id = `POV-${createHash("sha256").update(name).digest("hex").slice(0, 16)}`;
+  assert.ok(!ONBOARDING_TEST_CASES.some((entry) => entry.id === id), "callback names and completion IDs must be unique");
   const index = declared; declared += 1;
-  if (ORCHESTRATING_SHARDS || index % SHARD_COUNT !== shard) return;
-  try { run(); passed += 1; console.log(`PASS  ${name}`); }
-  catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); }
+  const entry = Object.freeze({ index, id, name, run });
+  ONBOARDING_TEST_CASES.push(entry);
+  if (!RUNNING_AS_SUITE) return;
+  if (ORCHESTRATING_SHARDS || !assignedToChunk(index, shard, chunk)) return;
+  assignedCases.push(entry);
+}
+export async function runAssignedCases(cases = assignedCases) {
+  const results = [];
+  for (const { index, id, name, run } of cases) {
+  const startedAtNs = process.hrtime.bigint();
+  const startedAtMonoNs = startedAtNs.toString();
+  console.log(`ORIGINAL184 CALLBACK START shard=${shard} index=${index} pid=${process.pid} mono_ns=${startedAtMonoNs}`);
+  let outcome = "throw";
+  try { await run(); outcome = "pass"; passed += 1; console.log(`PASS  ${name}`); }
+  catch (error) { outcome = "throw"; failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); }
+  finally {
+    const endedAtNs = process.hrtime.bigint();
+    const elapsedMs = Number(endedAtNs - startedAtNs) / 1e6;
+    results.push({ index, id, disposition: outcome === "pass" ? "pass" : "fail" });
+    console.log(`ORIGINAL184 CALLBACK END shard=${shard} index=${index} pid=${process.pid} mono_ns=${endedAtNs.toString()} elapsed_ms=${elapsedMs.toFixed(3)} outcome=${outcome}`);
+  }
+  }
+  return results;
 }
 
-async function runShards() {
+function assertClosedKeys(value, keys) {
+  assert.ok(value !== null && typeof value === "object" && !Array.isArray(value));
+  assert.deepEqual(Object.keys(value).sort(), [...keys].sort(), "IPC receipt shape must be closed");
+}
+export function validateShardReceipt(value, index, selectedChunk, expectedCases) {
+  assertClosedKeys(value, ["schema", "shard", "chunk", "declaredCount", "assignedIndices", "results", "classes"]);
+  assert.equal(value.schema, "pipeline.onboarding-test-case-results.v1");
+  assert.equal(value.shard, index);
+  assert.equal(value.chunk, selectedChunk);
+  assert.equal(value.declaredCount, EXPECTED_CASE_COUNT);
+  assert.equal(expectedCases.length, CASES_PER_CHILD, "each child must own exactly 18 callbacks");
+  assert.deepEqual(value.assignedIndices, expectedCases.map((entry) => entry.index));
+  assert.ok(Array.isArray(value.results));
+  assert.equal(value.results.length, expectedCases.length, "every assigned callback must finish");
+  for (let ordinal = 0; ordinal < expectedCases.length; ordinal += 1) {
+    const result = value.results[ordinal], expected = expectedCases[ordinal];
+    assertClosedKeys(result, ["index", "id", "disposition"]);
+    assert.equal(result.index, expected.index);
+    assert.equal(result.id, expected.id);
+    assert.ok(result.disposition === "pass" || result.disposition === "fail");
+  }
+  assert.ok(Array.isArray(value.classes) && value.classes.length <= 256);
+  assert.ok(value.classes.every((name) => typeof name === "string" && name.length > 0 && name.length <= 128));
+  assert.deepEqual(value.classes, [...new Set(value.classes)].sort());
+  return structuredClone(value);
+}
+export function validateShardClose(receipt, code, signal) {
+  assert.ok(receipt !== null, "child callback receipt missing");
+  assert.equal(signal, null, "child terminated before a validated close");
+  const expectedCode = receipt.results.some((entry) => entry.disposition === "fail") ? 1 : 0;
+  assert.equal(code, expectedCode, "child exit must agree with observed callback outcomes");
+}
+export function createShardReceiptReceiver(index, selectedChunk, expectedCases) {
+  let receipt = null, error = null, messages = 0;
+  return {
+    receive(value) {
+      messages += 1;
+      try {
+        assert.equal(messages, 1, "one terminal callback receipt per child");
+        receipt = validateShardReceipt(value, index, selectedChunk, expectedCases);
+      } catch (failure) { error ??= failure; }
+    },
+    close(code, signal) {
+      if (error !== null) throw error;
+      validateShardClose(receipt, code, signal);
+      return receipt;
+    },
+  };
+}
+async function runShards(recorder) {
   const suitePath = fileURLToPath(import.meta.url);
-  const children = Array.from({ length: SHARD_COUNT }, (_, index) => new Promise((resolvePromise) => {
-    const child = spawn(process.execPath, [suitePath, `--pipeline-internal-shard=${index}/${SHARD_COUNT}`], {
-      cwd: process.cwd(), env: { ...process.env }, shell: false, stdio: "inherit",
+  const results = [];
+  for (let selectedChunk = 0; selectedChunk < CHUNK_COUNT; selectedChunk += 1) {
+    const children = Array.from({ length: SHARD_COUNT }, (_, index) => new Promise((resolvePromise) => {
+    const expectedCases = ONBOARDING_TEST_CASES.filter((entry) => assignedToChunk(entry.index, index, selectedChunk));
+    assert.equal(expectedCases.length, CASES_PER_CHILD);
+    const receiver = createShardReceiptReceiver(index, selectedChunk, expectedCases);
+    const childEnv = { ...process.env };
+    // fd 3 in this child is IPC, not the parent's inherited completion pipe.
+    delete childEnv.PIPELINE_VERIFY_CASE_COMPLETION_FD;
+    delete childEnv.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES;
+    const child = spawn(process.execPath, [suitePath, `--pipeline-internal-shard=${index}/${SHARD_COUNT}`,
+      `--pipeline-internal-chunk=${selectedChunk}/${CHUNK_COUNT}`], {
+      cwd: process.cwd(), env: childEnv, shell: false, stdio: ["inherit", "inherit", "inherit", "ipc"],
     });
+    const childStartedAtNs = process.hrtime.bigint();
+    const childPid = Number.isInteger(child.pid) ? child.pid : 0;
+    console.log(`ORIGINAL184 CHILD START chunk=${selectedChunk} shard=${index} index=${index} pid=${childPid} mono_ns=${childStartedAtNs.toString()}`);
     let error = null;
+    let coverage = null;
+    const deadline = setTimeout(() => {
+      error ??= new Error(`child exceeded ${CHILD_DEADLINE_MS}ms deadline`);
+      child.kill("SIGKILL");
+    }, CHILD_DEADLINE_MS);
+    child.on("message", (value) => receiver.receive(value));
     child.once("error", (value) => { error = value; });
-    child.once("close", (code, signal) => resolvePromise({ index, code, signal, error }));
-  }));
-  return Promise.all(children);
+    child.once("close", (code, signal) => {
+      clearTimeout(deadline);
+      if (error === null) {
+        try {
+          const receipt = receiver.close(code, signal);
+          coverage = receipt.classes;
+          for (const result of receipt.results) recorder.dispose(result.id, result.disposition);
+        } catch (failure) { error = failure; }
+      }
+      const childEndedAtNs = process.hrtime.bigint();
+      const elapsedMs = Number(childEndedAtNs - childStartedAtNs) / 1e6;
+      const outcome = error !== null ? "spawn-error" : signal !== null ? "signal" : code === 0 ? "pass" : "fail";
+      console.log(`ORIGINAL184 CHILD END chunk=${selectedChunk} shard=${index} index=${index} pid=${childPid} mono_ns=${childEndedAtNs.toString()} elapsed_ms=${elapsedMs.toFixed(3)} outcome=${outcome}`);
+      resolvePromise({ index, chunk: selectedChunk, code, signal, error, coverage });
+    });
+    }));
+    const chunkResults = await Promise.all(children);
+    results.push(...chunkResults);
+    if (failedShardResults(chunkResults).length > 0) break;
+  }
+  return results;
 }
 // `root`, `dispose`, `fakeDeps`, `fakeGit`, `initializeRestartRequiredRoot`,
 // `clearRuntimeBarrier`, `completeKickoff` and `PLUGIN_PIPELINE_STATE_SCRIPT`
@@ -222,7 +393,12 @@ export function fakeGit(command, args, options = {}) {
   if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
   if (args[0] === "rev-parse" && args[1] === "--path-format=absolute" && args[2] === "--git-common-dir") return { status: 0, stdout: `${join(options.cwd, ".git")}\n`, stderr: "" };
   if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
-  if (args[0] === "init" && args[1] === "--initial-branch=main") { mkdirSync(join(options.cwd, ".git")); return { status: 0, stdout: "", stderr: "" }; }
+  if (args[0] === "init" && args[1] === "--initial-branch=main") {
+    // Successful fixture initialization must satisfy the canonical physical
+    // Git owner; failure-specific test adapters still override this branch.
+    return spawnSync("git", args, { ...options, encoding: "utf8", shell: false,
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" } });
+  }
   return { status: 1, stderr: "unexpected git arguments" };
 }
 function hostGit(rootDir, args) {
@@ -455,9 +631,39 @@ function repositoryCapability(status, intent = "dispatch") {
 // existing caller of this shared test setup keeps its exact prior behaviour
 // -- this is a test-fixture default, not the library default this task
 // removes; project-onboarding-v3.mjs itself never assumes one.
-export function initializeRestartRequiredRoot(path, deps = fakeDeps, runner = "codex") {
+// This fixture has explicit synthetic intake consent; no unresolved profile,
+// language, Git identity or signing mode is inferred. Use the existing writers
+// and descriptor readback, exactly as first-restart production admission does.
+export function captureFirstRestartFixtureInput(path, deps = fakeDeps,
+  text = "Fixture project request: exercise the local onboarding lifecycle.\n",
+  repositoryCapability = "local") {
+  const spawn = deps.spawnSync ?? fakeGit;
+  const checkpoint = readOnboardingIntakeCheckpoint({rootDir: path, repositoryCapability, spawn});
+  if (checkpoint.status === "present" && checkpoint.value.materialInput.length > 0) {
+    const material = readOnboardingIntakeMaterialInput({rootDir: path, repositoryCapability, spawn});
+    assert.equal(material.status, "present");
+    return checkpoint;
+  }
+  const consented = applyOnboardingIntakeConsent({rootDir: path, repositoryCapability,
+    granted: true, text, activate: true, deps: {...deps, spawn}});
+  assert.equal(consented.checkpoint.consent.granted, true);
+  const material = readOnboardingIntakeMaterialInput({rootDir: path, repositoryCapability, spawn});
+  assert.equal(material.status, "present");
+  assert.equal(material.chunks.length, 1);
+  assert.equal(material.chunks[0].text, text);
+  const captured = readOnboardingIntakeCheckpoint({rootDir: path, repositoryCapability, spawn});
+  assert.equal(captured.value.materialInput[0].sha256, sha256(Buffer.from(text, "utf8")));
+  return captured;
+}
+
+export function initializeRestartRequiredRoot(path, deps = fakeDeps, runner = "codex", materialInput = undefined) {
   const portable = planProjectOnboardingV3({ rootDir: path, deps, runner });
   assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps }).status, "applied");
+  return initializeFirstRestartRuntimeFixture(path, deps, runner, materialInput);
+}
+
+function initializeFirstRestartRuntimeFixture(path, deps = fakeDeps, runner = "codex", materialInput = undefined) {
+  if (runner === "codex") captureFirstRestartFixtureInput(path, deps, materialInput);
   const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps, operation: "runtime", runner });
   const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
   const initialized = applyProjectOnboardingLifecycleV4({
@@ -2073,9 +2279,11 @@ test("repository, source, and runtime gates precede every required App-Server ob
       intent: "bootstrap",
       deps: neverObserve,
     });
-    assert.equal(missingRuntime.status, "runtime-initialization-required");
+    assert.equal(missingRuntime.status, "intake-required");
+    assert.ok(missingRuntime.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
     assert.equal(calls, 0);
 
+    captureFirstRestartFixtureInput(lifecycleRoot, fakeDeps);
     const runtime = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: lifecycleRoot,
       deps: fakeDeps,
@@ -2248,7 +2456,7 @@ test("a pending Codex restart barrier never gates a Claude session, and that ses
     assert.equal(barrier.status, "present");
     const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
     assert.equal(observed.runner, "claude");
-    assert.equal(observed.status, "intake-required");
+    assert.equal(observed.status, "intake-design-questions-required");
     assert.equal(observed.runtime.status, "readback-not-applicable");
     assert.equal(observed.runtime.barrierSha256, null);
     assert.equal(observed.nextAction.kind, "collect-input");
@@ -2290,6 +2498,7 @@ test("the codex runtime apply is unchanged: bound executable, frozen .codex dige
     };
     const seed = planProjectOnboardingV3({ rootDir: path, deps: observingDeps, runner: "codex" });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: observingDeps }).status, "applied");
+    captureFirstRestartFixtureInput(path, observingDeps);
     const plan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: observingDeps, operation: "runtime", runner: "codex" });
     assert.deepEqual(plan.nextAction.expected.statuses, ["restart-required"]);
     const digest = plan.nextAction.argv[plan.nextAction.argv.indexOf("--plan-sha256") + 1];
@@ -2490,13 +2699,24 @@ test("bootstrap inspection of a blank local root offers the portable seed instea
 test("a git-only Codex control mount carries host-managed state through the restart barrier", (t) => {
   if (process.platform === "win32") return;
   const path = root();
+  const fixtureHome = root();
   const runtimeDeps = { codexExecutable: process.execPath };
   try {
     mkdirSync(join(path, ".git"));
     chmodSync(join(path, ".git"), 0o500);
     const portable = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "portable", deps: runtimeDeps });
     const portableDigest = portable.nextAction.argv[portable.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "portable", planSha256: portableDigest, activate: true, deps: runtimeDeps }).status, "runtime-initialization-required");
+    const seeded = applyProjectOnboardingLifecycleV4({runner: "codex", rootDir: path, operation: "portable", planSha256: portableDigest, activate: true, deps: runtimeDeps});
+    assert.equal(seeded.status, "intake-required");
+    assert.equal(seeded.repository.mode, "host-managed");
+    assert.equal(seeded.nextAction.kind, "command");
+    const initial = applyInitialOnboardingAnswers({rootDir: path, runner: "codex",
+      gitAuthorName: "Fixture PO", gitAuthorEmail: "fixture@example.invalid",
+      pushApproval: "chat", language: "en",
+      env: {...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: fixtureHome}});
+    assert.equal(initial.ok, true, JSON.stringify(initial));
+    captureFirstRestartFixtureInput(path, runtimeDeps,
+      "Exercise the host-managed Codex control mount restart barrier.\n", "host-managed");
     const runtime = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "runtime", deps: runtimeDeps });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
     const initialized = applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true, deps: runtimeDeps });
@@ -2505,6 +2725,7 @@ test("a git-only Codex control mount carries host-managed state through the rest
   } finally {
     try { chmodSync(join(path, ".git"), 0o700); } catch {}
     dispose(path);
+    dispose(fixtureHome);
   }
 });
 
@@ -2532,7 +2753,8 @@ test("public CLI emits typed inspect, plan, and explicit-apply results", () => {
     assert.deepEqual(names(path), []);
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", path, "--plan-sha256", digest, "--activate", "--runner", "codex"]);
-    assert.equal(applied.code, 0); assert.equal(applied.result.status, "runtime-initialization-required");
+    assert.equal(applied.code, 0);
+    assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required")); assert.equal(applied.result.status, "intake-required");
   } finally { dispose(path); }
 });
 
@@ -2561,10 +2783,11 @@ test("apply-portable-seed --activate surfaces the missing-author-identity ask-st
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", missing, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
     assert.equal(applied.code, 0);
-    assert.equal(applied.result.status, "runtime-initialization-required",
-      "the ask-step must never replace or change the lifecycle's own resting status");
-    assert.equal(applied.result.nextAction.kind, "command",
-      "the ask-step must never replace the primary chained nextAction");
+    assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    assert.equal(applied.result.status, "intake-required",
+      "uncaptured original input precedes the first Codex restart");
+    assert.equal(applied.result.nextAction.kind, "collect-input",
+      "the primary action captures original input before runtime initialization");
     assert.equal(applied.result.authorIdentityAction.kind, "collect-input");
     assert.equal(applied.result.authorIdentityAction.mutation, false);
     const fieldNames = applied.result.authorIdentityAction.inputs.map((input) => input.name).sort();
@@ -2593,7 +2816,7 @@ test("apply-portable-seed --activate surfaces the missing-author-identity ask-st
     const quietDigest = quietPlanned.result.nextAction.argv[quietPlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const quietApplied = invoke(["apply-portable-seed", "--root", configured, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], knowsItsAuthor);
     assert.equal(quietApplied.code, 0);
-    assert.equal(quietApplied.result.status, "runtime-initialization-required");
+    assert.equal(quietApplied.result.status, "intake-required");
     assert.equal(Object.prototype.hasOwnProperty.call(quietApplied.result, "authorIdentityAction"), false,
       "a configured repository must not be asked");
   } finally { dispose(missing); dispose(configured); }
@@ -2683,10 +2906,11 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", unasked, "--plan-sha256", digest, "--activate", "--runner", "codex"], neverAsked);
     assert.equal(applied.code, 0);
-    assert.equal(applied.result.status, "runtime-initialization-required",
-      "the ask-step must never replace or change the lifecycle's own resting status");
-    assert.equal(applied.result.nextAction.kind, "command",
-      "the ask-step must never replace the primary chained nextAction");
+    assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    assert.equal(applied.result.status, "intake-required",
+      "uncaptured original input precedes the first Codex restart");
+    assert.equal(applied.result.nextAction.kind, "collect-input",
+      "the primary action captures original input before runtime initialization");
     assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input");
     assert.equal(applied.result.pushApprovalSetupAction.mutation, false);
     assert.equal(applied.result.pushApprovalSetupAction.input.name, "humanApprovalMode");
@@ -2720,7 +2944,7 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
     const quietDigest = quietPlanned.result.nextAction.argv[quietPlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const quietApplied = invoke(["apply-portable-seed", "--root", asked, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], fakeDeps);
     assert.equal(quietApplied.code, 0);
-    assert.equal(quietApplied.result.status, "runtime-initialization-required");
+    assert.equal(quietApplied.result.status, "intake-required");
     assert.equal(quietApplied.result.pushApprovalSetupAction.kind, "collect-input",
       "a repository onboarded on an already-answered machine is still asked, pre-filled");
     assert.match(quietApplied.result.pushApprovalSetupAction.guidance, /pre-filled/u);
@@ -2758,10 +2982,11 @@ test("apply-portable-seed records baseline-only verification without a PO questi
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", withCandidate, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
     assert.equal(applied.code, 0);
-    assert.equal(applied.result.status, "runtime-initialization-required",
-      "the ask-step must never replace or change the lifecycle's own resting status");
-    assert.equal(applied.result.nextAction.kind, "command",
-      "the ask-step must never replace the primary chained nextAction");
+    assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    assert.equal(applied.result.status, "intake-required",
+      "uncaptured original input precedes the first Codex restart");
+    assert.equal(applied.result.nextAction.kind, "collect-input",
+      "the primary action captures original input before runtime initialization");
     assert.equal(Object.hasOwn(applied.result, "verifyContractAction"), false);
     assert.equal(Object.hasOwn(applied.result, "verifyContractStatus"), false);
     assert.equal(Object.hasOwn(applied.result, "pushGateSatisfiable"), false);
@@ -2837,7 +3062,8 @@ test("an ordinary inspect surfaces every pending ask whose condition is still tr
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", path, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
     assert.equal(applied.code, 0);
-    assert.equal(applied.result.status, "runtime-initialization-required");
+    assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    assert.equal(applied.result.status, "intake-required");
     assert.ok(Array.isArray(applied.result.nextAction?.pendingAsks) && applied.result.nextAction.pendingAsks.length > 0,
       "fixture sanity: at least one ask must be pending after the apply");
 
@@ -2846,7 +3072,7 @@ test("an ordinary inspect surfaces every pending ask whose condition is still tr
     // empty array.
     const inspected = invoke(["inspect", "--root", path, "--runner", "codex"], fakeDeps);
     assert.equal(inspected.code, 0);
-    assert.equal(inspected.result.status, "runtime-initialization-required");
+    assert.equal(inspected.result.status, "intake-required");
     assert.ok(Array.isArray(inspected.result.nextAction?.pendingAsks),
       "an ordinary inspect must carry the same nextAction.pendingAsks channel a driver already reads");
     assert.ok(inspected.result.nextAction.pendingAsks.length > 0,
@@ -2902,7 +3128,8 @@ test("an ask whose condition has been resolved stops appearing on the next ordin
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", path, "--plan-sha256", digest, "--activate", "--runner", "codex"], knowsItsAuthor);
     assert.equal(applied.code, 0);
-    assert.equal(applied.result.status, "runtime-initialization-required");
+    assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    assert.equal(applied.result.status, "intake-required");
     assert.equal(Object.prototype.hasOwnProperty.call(applied.result, "authorIdentityAction"), false,
       "fixture sanity: a resolved author identity must not be asked by the apply path either");
 
@@ -2996,10 +3223,11 @@ test("apply-portable-seed --activate seeds the machine's trust anchor into a fre
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", seeded, "--plan-sha256", digest, "--activate", "--runner", "codex"], machineHasKey);
     assert.equal(applied.code, 0);
-    assert.equal(applied.result.status, "runtime-initialization-required",
-      "seeding the anchor must never change the lifecycle's own resting status");
-    assert.equal(applied.result.nextAction.kind, "command",
-      "seeding the anchor must never replace the primary chained nextAction");
+    assert.ok(applied.result.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    assert.equal(applied.result.status, "intake-required",
+      "a public trust anchor does not substitute for captured project material");
+    assert.equal(applied.result.nextAction.kind, "collect-input",
+      "the returned primary action preserves first-restart intake ordering");
     const policyBytes = readFileSync(join(seeded, "project", "critical-human-proof.json"), "utf8");
     const policy = JSON.parse(policyBytes);
     assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v3");
@@ -3554,8 +3782,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
       ["portable-seed-required"],
     ));
 
-    mkdirSync(join(existing, ".git", "objects"), { recursive: true });
-    writeFileSync(join(existing, ".git", "HEAD"), "ref: refs/heads/main\n");
+    hostGit(existing, ["init", "--initial-branch=main"]);
     writeFileSync(join(existing, "README.md"), "existing local Git project\n");
     const adoption = inspectProjectOnboardingV3({ runner: "codex", rootDir: existing, deps: fakeDeps });
     assert.equal(adoption.status, "adoption-required");
@@ -3582,6 +3809,11 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
+    const captureRequired = inspectProjectOnboardingV3({runner: "codex", rootDir: runtime, deps: fakeDeps});
+    assert.equal(captureRequired.status, "intake-required");
+    assert.equal(captureRequired.nextAction.kind, "collect-input");
+    assert.ok(captureRequired.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    captureFirstRestartFixtureInput(runtime, fakeDeps);
     const missing = inspectProjectOnboardingV3({ runner: "codex", rootDir: runtime, deps: fakeDeps });
     assert.equal(missing.status, "runtime-initialization-required");
     assert.equal(missing.runtime.status, "missing");
@@ -3698,6 +3930,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
+    captureFirstRestartFixtureInput(runtimeRoot, fakeDeps);
     const runtime = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
@@ -3831,39 +4064,118 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
   }
 });
 
-test("runtime target preflight maps every reversible probe permission failure without residue", () => {
-  for (const code of ["EACCES", "EPERM", "EROFS"]) {
-    for (const stage of ["create", "fstat", "write", "file-fsync", "close", "rename", "directory-fsync"]) {
-      const path = root();
-      try {
-        const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
-        assert.equal(applyProjectOnboardingV3(seed, {
-          rootDir: path,
-          activate: true,
-          deps: fakeDeps,
-        }).status, "applied");
-        const before = treeSnapshot(path);
-        const observed = inspectProjectOnboardingV3({ runner: "codex",
-          rootDir: path,
-          deps: runtimeProbeFailureDeps(stage, code),
-        });
-        assert.equal(observed.status, "runtime-target-read-only", `${code}/${stage}`);
-        assert.deepEqual(observed.runtime, {
-          status: "target-read-only",
-          sourceSha256: null,
-          targetsSha256: null,
-          barrierSha256: null,
-          readbackSha256: null,
-        }, `${code}/${stage}`);
-        assertDiagnostic(observed, "runtime_target_read_only");
-        assert.equal(observed.nextAction, null);
-        assert.equal(JSON.stringify(observed).includes("synthetic runtime target"), false);
-        assert.deepEqual(treeSnapshot(path), before, `${code}/${stage}`);
-        assert.equal(Object.keys(treeSnapshot(path)).some((entry) => entry.includes(".pipeline-runtime-capability-")), false);
-      } finally { dispose(path); }
+const runtimeProbePermissionCodes = ["EACCES", "EPERM", "EROFS"];
+const runtimeProbeFailureStages = ["create", "fstat", "write", "file-fsync", "close", "rename", "directory-fsync"];
+let runtimeProbeSharedFixture = null;
+let runtimeProbeExitCleanupInstalled = false;
+let runtimeProbePendingCleanupPaths = [];
+
+function installRuntimeProbeExitCleanup() {
+  if (runtimeProbeExitCleanupInstalled) return;
+  process.once("exit", () => {
+    const paths = [
+      ...runtimeProbePendingCleanupPaths,
+      ...(runtimeProbeSharedFixture === null ? [] : [runtimeProbeSharedFixture.path]),
+    ];
+    runtimeProbeSharedFixture = null;
+    runtimeProbePendingCleanupPaths = [];
+    for (const path of paths) { try { dispose(path); } catch {} }
+  });
+  runtimeProbeExitCleanupInstalled = true;
+}
+
+function prepareRuntimeProbeSharedFixture() {
+  installRuntimeProbeExitCleanup();
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, {
+      rootDir: path,
+      activate: true,
+      deps: fakeDeps,
+    }).status, "applied");
+    const before = Object.freeze(treeSnapshot(path));
+    runtimeProbeSharedFixture = Object.freeze({ path, before });
+    return runtimeProbeSharedFixture;
+  } catch (error) {
+    try { dispose(path); } catch { runtimeProbePendingCleanupPaths.push(path); }
+    throw error;
+  }
+}
+
+function runRuntimeProbeFailureScenario(code, stage, plannedIndex, assignedShard, scopeKey, remainingByScope) {
+  assert.equal(plannedIndex % SHARD_COUNT, assignedShard);
+  if (shard !== null) assert.equal(assignedShard, shard);
+  const remaining = remainingByScope.get(scopeKey);
+  assert.ok(Number.isSafeInteger(remaining) && remaining > 0);
+  let scenarioFailure = null;
+  try {
+    const fixture = runtimeProbeSharedFixture ?? prepareRuntimeProbeSharedFixture();
+    const observed = inspectProjectOnboardingV3({ runner: "codex",
+      rootDir: fixture.path,
+      deps: runtimeProbeFailureDeps(stage, code),
+    });
+    assert.equal(observed.status, "runtime-target-read-only", `${code}/${stage}`);
+    assert.deepEqual(observed.runtime, {
+      status: "target-read-only",
+      sourceSha256: null,
+      targetsSha256: null,
+      barrierSha256: null,
+      readbackSha256: null,
+    }, `${code}/${stage}`);
+    assertDiagnostic(observed, "runtime_target_read_only");
+    assert.equal(observed.nextAction, null);
+    assert.equal(JSON.stringify(observed).includes("synthetic runtime target"), false);
+    const after = treeSnapshot(fixture.path);
+    assert.deepEqual(after, fixture.before, `${code}/${stage}`);
+    assert.equal(Object.keys(after).some((entry) => entry.includes(".pipeline-runtime-capability-")), false);
+  } catch (error) {
+    scenarioFailure = error;
+    const failedFixture = runtimeProbeSharedFixture;
+    runtimeProbeSharedFixture = null;
+    if (failedFixture !== null) {
+      try { dispose(failedFixture.path); } catch { runtimeProbePendingCleanupPaths.push(failedFixture.path); }
+    }
+    throw error;
+  } finally {
+    const left = remaining - 1;
+    remainingByScope.set(scopeKey, left);
+    if (left === 0 && runtimeProbeSharedFixture !== null) {
+      const lastFixture = runtimeProbeSharedFixture;
+      runtimeProbeSharedFixture = null;
+      try { dispose(lastFixture.path); }
+      catch (error) {
+        runtimeProbePendingCleanupPaths.push(lastFixture.path);
+        if (scenarioFailure === null) throw error;
+      }
     }
   }
-});
+}
+
+const runtimeProbeScenarios = runtimeProbePermissionCodes.flatMap((code) =>
+  runtimeProbeFailureStages.map((stage) => ({ code, stage })));
+const firstScenarioIndex = declared;
+const plannedScenarios = runtimeProbeScenarios.map((scenario, ordinal) => ({
+  ...scenario,
+  index: firstScenarioIndex + ordinal,
+  shard: (firstScenarioIndex + ordinal) % SHARD_COUNT,
+}));
+const remainingByScope = new Map(shard === null
+  ? [[null, plannedScenarios.length]]
+  : [[shard, plannedScenarios.filter((scenario) => assignedToChunk(scenario.index, shard, chunk)).length]]);
+for (const scenario of plannedScenarios) {
+  const plannedIndex = declared;
+  const assignedShard = plannedIndex % SHARD_COUNT;
+  if (RUNNING_AS_SUITE) assert.equal(plannedIndex, scenario.index);
+  const scopeKey = shard === null ? null : assignedShard;
+  test(
+    `runtime target preflight maps every reversible probe permission failure without residue `
+      + `${scenario.code}/${scenario.stage}`,
+    () => runRuntimeProbeFailureScenario(
+      scenario.code, scenario.stage, plannedIndex, assignedShard, scopeKey, remainingByScope,
+    ),
+  );
+}
 
 test("a symlinked runtime target parent fails closed without touching its destination", () => {
   const path = root(); const outside = root();
@@ -3922,6 +4234,7 @@ test("portable and runtime apply replays are zero-write with identical canonical
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
+    captureFirstRestartFixtureInput(runtimeRoot, fakeDeps);
     const runtimePlan = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
@@ -4022,6 +4335,7 @@ test("runtime initialization preserves the exact executable and private-state fa
         activate: true,
         deps: fakeDeps,
       }).status, "applied");
+      captureFirstRestartFixtureInput(path, fakeDeps);
       const plan = planProjectOnboardingLifecycleV4({ runner: "codex",
         rootDir: path,
         deps: fakeDeps,
@@ -4061,6 +4375,7 @@ test("runtime plan preimage drift preserves external bytes and maps to exact pro
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
+    captureFirstRestartFixtureInput(path, fakeDeps);
     const plan = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
@@ -4127,6 +4442,7 @@ test("runtime apply permission races roll back every byte and remove the exact r
         activate: true,
         deps: fakeDeps,
       }).status, "applied");
+      captureFirstRestartFixtureInput(path, fakeDeps);
       const plan = planProjectOnboardingLifecycleV4({ runner: "codex",
         rootDir: path,
         deps: fakeDeps,
@@ -4190,7 +4506,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     const barrier = initializeRestartRequiredRoot(path);
     clearRuntimeBarrier(path, barrier);
     const pristine = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
-    assert.equal(pristine.status, "intake-required");
+    assert.equal(pristine.status, "intake-design-questions-required");
     assert.equal(pristine.continuity.status, "absent-pristine");
     assert.equal(pristine.nextAction.kind, "collect-input");
 
@@ -4217,7 +4533,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.match(renderProjectOnboardingAction(planned.result.applyAction), /'Ship safely; keep \$\(touch nope\) as text'/u);
     assert.equal(existsSync(join(path, "nope")), false);
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-design-questions-required");
 
     const changedGoal = invoke([
       "kickoff", "apply", "--root", path, "--goal", `${goal} changed`, "--language", "en",
@@ -4225,7 +4541,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.equal(changedGoal.code, 2);
     assert.match(stderr, /KICKOFF-PLAN-DIGEST/u);
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-design-questions-required");
 
     const wrongDigest = invoke([
       "kickoff", "apply", "--root", path, "--goal", goal, "--language", "en",
@@ -4233,7 +4549,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.equal(wrongDigest.code, 2);
     assert.match(stderr, /KICKOFF-PLAN-DIGEST/u);
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-design-questions-required");
 
     const applied = invoke(planned.result.applyAction.argv.slice(1));
     assert.equal(applied.code, 0, stderr);
@@ -4707,18 +5023,17 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
 // directly above) is the sole mechanism that actually refuses implementation
 // writes, and it is completely unaffected by whether this proposal exists or
 // is ever acted on -- both halves are asserted below.
-test("the public onboarding handover is executable for every runner with baseline-only and configured verify", () => {
-  const paths = [];
-  const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
-  try {
-    for (const runner of ["claude", "codex", "antigravity"]) {
-      const path = root();
-      paths.push(path);
+for (const runner of ["claude", "codex", "antigravity"]) {
+  test(`the public onboarding handover is executable for every runner with baseline-only and configured verify ${runner}`, () => {
+    const path = root();
+    const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
+    try {
       hostGit(path, ["init", "--initial-branch=main"]);
       const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
 
       const portable = planProjectOnboardingV3({ rootDir: path, deps: localDeps, runner });
       assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: localDeps }).status, "applied");
+      if (runner === "codex") captureFirstRestartFixtureInput(path, localDeps, `Ship one ${runner} handover feature`);
       const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: localDeps, operation: "runtime", runner });
       const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
       const initialized = applyProjectOnboardingLifecycleV4({
@@ -4876,11 +5191,11 @@ test("the public onboarding handover is executable for every runner with baselin
       const secondPhase = state(configured.nextAction.argv.slice(1));
       assert.equal(secondPhase.code, 0, `${runner}: configured apply: ${secondPhase.stderr}`);
       assert.equal(reenterDriver().outcome, "ready", `${runner}: configured re-entry`);
+    } finally {
+      dispose(path);
     }
-  } finally {
-    for (const path of paths) dispose(path);
-  }
-});
+  });
+}
 
 // NVA-R40-PROJDRIFT (backlog/items/2026-08-29-projection-drift-fault-after-
 // design-implementation-transition-forces-restart.md): a real design->
@@ -5329,6 +5644,8 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["../scripts/security-scan.mjs", ["plugins", "pipeline-core", "scripts", "security-scan.mjs"]],
       ["../scripts/tool-identity.mjs", ["plugins", "pipeline-core", "scripts", "tool-identity.mjs"]],
       ["./trusted-tool-resolution.mjs", ["plugins", "pipeline-core", "lib", "trusted-tool-resolution.mjs"]],
+      ["./security-scanner-diagnostics.mjs", ["plugins", "pipeline-core", "lib", "security-scanner-diagnostics.mjs"]],
+      ["./security-scanner-diagnostics-publication.mjs", ["plugins", "pipeline-core", "lib", "security-scanner-diagnostics-publication.mjs"]],
       ["../scripts/security-adapters/gitleaks.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "gitleaks.mjs"]],
       ["../scripts/security-adapters/osv-scanner.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "osv-scanner.mjs"]],
       ["../scripts/security-adapters/semgrep.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "semgrep.mjs"]],
@@ -5784,6 +6101,13 @@ test("the hook onboarding installs actually fires: blocks a push the gate would 
   const path = root();
   try {
     hostGit(path, ["init", "--initial-branch=main"]);
+    // This fixture deliberately replaces the portable manifest to isolate the
+    // hook gate. Establish explicit enrollment before that projection changes.
+    const enrollment = createGovernanceScopeController({ hostStateRoot: join(path, "unused-host") });
+    const enrollmentPlan = enrollment.planDecision({ rootDir: path, decision: "enroll", by: "disposable-hook-fixture" });
+    assert.equal(enrollment.applyDecision(enrollmentPlan, { activate: true, planSha256: enrollmentPlan.planSha256 }).state, "active");
+    assert.equal(existsSync(join(path, "project", "pipeline-state.json")), false);
+    assert.equal(existsSync(join(path, ".claude", "pipeline-state.json")), false);
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
@@ -6020,9 +6344,10 @@ test("a claude-onboarded root reaches a real kickoff plan instead of runtime-att
     assert.equal(planned.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
     assert.notEqual(planned.status, "runtime-attestation-required");
     assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
-    // The other half of the same contract: omission is never promoted to this
-    // runner. Without the identity the entry point still inspects as Codex,
-    // which on this root is the historical Codex-only dead end.
+    // Codex still owes its own runtime attestation on this Claude root.
+    // Retain the supplied original goal through explicit fixture consent
+    // before probing that later gate; consent does not substitute identity.
+    captureFirstRestartFixtureInput(path, fakeDeps, goal);
     const substituted = planProjectOnboardingKickoffV4({ runner: "codex", rootDir: path, goal, deps: fakeDeps });
     assert.equal(substituted.schema, "pipeline.project-onboarding.v4");
     assert.equal(substituted.runner, "codex");
@@ -6323,7 +6648,7 @@ test("a kickoff plan produced for one runner does not validate an apply for anot
     assert.throws(() => applyProjectOnboardingKickoffV4({
       rootDir: path, goal, runner: "codex", planSha256: claudePlanned.planSha256, activate: true, deps: fakeDeps,
     }), /kickoff plan digest/u);
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" }).status, "intake-required");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" }).status, "intake-design-questions-required");
     const applied = applyProjectOnboardingKickoffV4({
       rootDir: path, goal, runner: "claude", planSha256: claudePlanned.planSha256, activate: true, deps: fakeDeps,
     });
@@ -6377,6 +6702,7 @@ test("an apply-shaped runtime-attestation-required exits non-zero; the same stat
   try {
     initializeClaudeOnboardedRoot(path);
     const goal = "Exit-code split regression (RUNNERNEUT-1 mechanism C)";
+    captureFirstRestartFixtureInput(path, fakeDeps, goal);
     // AGY-CHATADAPTER-2: fixed attended-confirmation seam for the --language en
     // kickoff calls below.
     const invoke = (args) => {
@@ -6612,7 +6938,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
       intent: "onboarding",
       deps: fakeDeps,
     });
-    assert.equal(kickoff.status, "intake-required");
+    assert.equal(kickoff.status, "intake-design-questions-required");
     assert.equal(kickoff.continuity.status, "absent-pristine");
     assert.equal(kickoff.appServer.status, "not-requested");
     assert.equal(kickoff.nextAction.kind, "collect-input");
@@ -6960,7 +7286,11 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(existsSync(join(path, ".git")), true);
     assert.equal(existsSync(join(path, ".claude")), false, "portable seed must not create legacy Claude authority files");
     assert.equal(existsSync(join(path, ".codex")), false);
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "runtime-initialization-required");
+    const beforeCapture = inspectProjectOnboardingV3({runner: "codex", rootDir: path, deps: fakeDeps});
+    assert.equal(beforeCapture.status, "intake-required");
+    assert.ok(beforeCapture.diagnostics.some(entry => entry.code === "first_restart_material_capture_required"));
+    captureFirstRestartFixtureInput(path, fakeDeps, "Exercise portable seeding and the runtime initialization transaction.\n");
+    assert.equal(inspectProjectOnboardingV3({runner: "codex", rootDir: path, deps: fakeDeps}).status, "runtime-initialization-required");
     const runtimePlan = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: fakeDeps, operation: "runtime" });
     const digest = runtimePlan.nextAction.argv[runtimePlan.nextAction.argv.indexOf("--plan-sha256") + 1];
     const runtimeApplied = applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: fakeDeps, operation: "runtime", planSha256: digest, activate: true });
@@ -7023,7 +7353,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
       },
     });
     const freshProcess = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps, intent: "bootstrap" });
-    assert.equal(freshProcess.status, "intake-required");
+    assert.equal(freshProcess.status, "intake-design-questions-required");
     assert.equal(freshProcess.runtime.status, "readback-current");
     assert.notEqual(freshProcess.runtime.barrierSha256, freshProcess.runtime.readbackSha256);
     const afterHostAuthority = validateV3BootstrapAuthority({ rootDir: path, deps: fakeDeps });
@@ -7158,6 +7488,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.deepEqual(names(join(path, ".codex")), []);
     assert.deepEqual(names(join(path, ".git")), []);
     chmodSync(join(path, ".git"), 0o700);
+    hostGit(path, ["init", "--initial-branch=main"]);
     appServerCalls = 0;
     const afterHostGit = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
@@ -7241,11 +7572,13 @@ test("Git capability rejects nonzero, missing-status, and non-EPERM spawn result
 });
 
 test("adoption preserves directory and linked-worktree Git metadata and blocks user-owned reserved paths", () => {
-  const adopted = root(); const linked = root(); const reserved = root();
+  const adopted = root(); const linked = root(); const reserved = root(); const worktreeOwner = root();
+  const linkedDeps = { ...fakeDeps, spawnSync: (command, args, options = {}) => spawnSync(command, args, {
+    ...options, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" },
+  }) };
   try {
     writeFileSync(join(adopted, "README.md"), "existing project\n");
-    mkdirSync(join(adopted, ".git", "objects"), { recursive: true });
-    writeFileSync(join(adopted, ".git", "HEAD"), "ref: refs/heads/main\n");
+    hostGit(adopted, ["init", "--initial-branch=main"]);
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: adopted, deps: fakeDeps });
     assert.equal(plan.status, "ready");
     assert.equal(plan.git.initializesGit, false);
@@ -7253,20 +7586,23 @@ test("adoption preserves directory and linked-worktree Git metadata and blocks u
     assert.equal(applied.status, "applied");
     assert.equal(readFileSync(join(adopted, ".git", "HEAD"), "utf8"), "ref: refs/heads/main\n");
 
+    hostGit(worktreeOwner, ["init", "--initial-branch=main"]);
+    hostGit(worktreeOwner, ["-c", "user.name=Synthetic fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-m", "Synthetic worktree fixture"]);
+    hostGit(worktreeOwner, ["worktree", "add", "-b", "fixture-linked", linked]);
+    const linkedControl = readFileSync(join(linked, ".git"), "utf8");
     writeFileSync(join(linked, "README.md"), "linked worktree project\n");
-    writeFileSync(join(linked, ".git"), "gitdir: /outside/managed-worktree\n");
-    const linkedPlan = planProjectOnboardingV3({ runner: "codex", rootDir: linked, deps: fakeDeps });
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: linked, deps: fakeDeps }).status, "adoption-required");
+    const linkedPlan = planProjectOnboardingV3({ runner: "codex", rootDir: linked, deps: linkedDeps });
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: linked, deps: linkedDeps }).status, "adoption-required");
     assert.equal(linkedPlan.status, "ready");
     assert.equal(linkedPlan.git.initializesGit, false);
-    const linkedApplied = applyProjectOnboardingV3(linkedPlan, { rootDir: linked, activate: true, deps: fakeDeps });
+    const linkedApplied = applyProjectOnboardingV3(linkedPlan, { rootDir: linked, activate: true, deps: linkedDeps });
     assert.equal(linkedApplied.status, "applied");
-    assert.equal(readFileSync(join(linked, ".git"), "utf8"), "gitdir: /outside/managed-worktree\n");
+    assert.equal(readFileSync(join(linked, ".git"), "utf8"), linkedControl);
 
     writeFileSync(join(reserved, "README.md"), "existing project\n");
     mkdirSync(join(reserved, ".codex"));
     assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: reserved }).status, "partial");
-  } finally { dispose(adopted); dispose(linked); dispose(reserved); }
+  } finally { dispose(adopted); dispose(linked); dispose(reserved); dispose(worktreeOwner); }
 });
 
 test("legacy V0 is migration-required and never receives a fresh fallback", () => {
@@ -7348,6 +7684,7 @@ test("a fresh portable seed remains non-ready until its missing Codex runtime is
   try {
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    captureFirstRestartFixtureInput(path, fakeDeps);
     const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(inspected.schema, "pipeline.project-onboarding.v4");
     assert.equal(inspected.status, "runtime-initialization-required");
@@ -7368,6 +7705,7 @@ test("Codex bootstrap accepts a dual-runner source whose default runner is Claud
     const source = readFileSync(sourcePath, "utf8")
       .replace('  default: "codex"\n', '  default: "claude"\n');
     writeFileSync(sourcePath, source);
+    captureFirstRestartFixtureInput(path, fakeDeps);
     const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(inspected.status, "runtime-initialization-required");
     assert.equal(inspected.runtime.status, "missing");
@@ -7513,7 +7851,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
       activate: true,
       deps: fakeDeps,
     });
-    assert.equal(repaired.status, "intake-required");
+    assert.equal(repaired.status, "intake-design-questions-required");
     assert.equal(readFileSync(manifestPath, "utf8").includes("human_facing: en"), true);
   } finally { dispose(path); }
 });
@@ -7786,6 +8124,7 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: unsupported, activate: true, deps: fakeDeps }).status, "applied");
     const sourcePath = join(unsupported, "pipeline.user.yaml");
     writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(/default: "?codex"?/u, "default: \"claude\""));
+    captureFirstRestartFixtureInput(unsupported, fakeDeps);
     const observedUnsupported = inspectProjectOnboardingV3({ runner: "codex", rootDir: unsupported, deps: fakeDeps });
     assert.equal(observedUnsupported.status, "runtime-initialization-required");
     const unsupportedPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: unsupported, deps: fakeDeps });
@@ -7845,6 +8184,7 @@ test("owned runtime drift and invalid V3 sources stay in closed lifecycle classi
   try {
     const seed = planProjectOnboardingV3({ runner: "codex", rootDir: drifted, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: drifted, activate: true, deps: fakeDeps }).status, "applied");
+    captureFirstRestartFixtureInput(drifted, fakeDeps);
     const runtime = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: drifted, deps: fakeDeps, operation: "runtime" });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
     assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: drifted, deps: fakeDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
@@ -7933,7 +8273,7 @@ test("H3 manifest repair rejects wrong digest and missing activation without wri
   } finally { dispose(path); }
 });
 
-test("H3 manifest repair preserves absent target after source drift and target appearance races", () => {
+test("H3 manifest repair rejects source drift without publishing absent target", () => {
   const drift = readyManifestFixture();
   try {
     const plan = planProjectOnboardingManifestRepair({ rootDir: drift, deps: fakeDeps });
@@ -7942,7 +8282,9 @@ test("H3 manifest repair preserves absent target after source drift and target a
     assert.equal(result.status, "invalid-plan");
     assert.equal(existsSync(join(drift, ".claude", "pipeline.yaml")), false);
   } finally { dispose(drift); }
-  for (const kind of ["file", "symlink", "hardlink"]) {
+});
+for (const kind of ["file", "symlink", "hardlink"]) {
+  test("H3 manifest repair rejects target appearance race: " + kind, () => {
     const path = readyManifestFixture();
     try {
       const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
@@ -7954,10 +8296,10 @@ test("H3 manifest repair preserves absent target after source drift and target a
       assert.equal(result.status, "invalid-plan");
       assert.equal(lstatSync(target).isSymbolicLink(), kind === "symlink");
     } finally { dispose(path); }
-  }
-});
+  });
+}
 
-test("H3 manifest repair rolls back only owned output on fsync and publication races", () => {
+test("H3 manifest repair rolls back owned output on fsync failure", () => {
   const fsyncRoot = readyManifestFixture();
   try {
     const plan = planProjectOnboardingManifestRepair({ rootDir: fsyncRoot, deps: fakeDeps });
@@ -7971,6 +8313,8 @@ test("H3 manifest repair rolls back only owned output on fsync and publication r
     }));
     assert.equal(existsSync(join(fsyncRoot, ".claude", "pipeline.yaml")), false);
   } finally { dispose(fsyncRoot); }
+});
+test("H3 manifest repair rolls back owned output on publication race", () => {
   const raceRoot = readyManifestFixture();
   try {
     const plan = planProjectOnboardingManifestRepair({ rootDir: raceRoot, deps: fakeDeps });
@@ -8045,7 +8389,7 @@ test("H3 manifest repair preserves foreign content when the published inode numb
   } finally { dispose(reuseRoot); }
 });
 
-test("H3 manifest repair fails closed on V4 readback failure and physical-root symlink", () => {
+test("H3 manifest repair fails closed on V4 readback failure", () => {
   const path = readyManifestFixture();
   try {
     const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
@@ -8059,6 +8403,8 @@ test("H3 manifest repair fails closed on V4 readback failure and physical-root s
     }));
     assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), false);
   } finally { dispose(path); }
+});
+test("H3 manifest repair fails closed on physical-root symlink", () => {
   const real = readyManifestFixture(); const link = `${real}-link`;
   try {
     symlinkSync(real, link);
@@ -8067,14 +8413,18 @@ test("H3 manifest repair fails closed on V4 readback failure and physical-root s
   } finally { dispose(real); try { unlinkSync(link); } catch {} }
 });
 
-test("H3 source recovery exposes authentic invalid, unsupported, and current categories", () => {
+test("H3 source recovery exposes authentic invalid-authority category", () => {
   const invalid = root();
   try { assert.equal(planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: invalid, deps: fakeDeps }).category, "invalid-authority"); } finally { dispose(invalid); }
+});
+test("H3 source recovery exposes authentic unsupported-source-transition category", () => {
   const unsupported = root();
   try {
     writeFileSync(join(unsupported, "pipeline.user.yaml"), yaml(v0Source()));
     assert.equal(planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: unsupported, deps: fakeDeps }).category, "unsupported-source-transition");
   } finally { dispose(unsupported); }
+});
+test("H3 source recovery exposes authentic current-authority category", () => {
   const current = root();
   try {
     const barrier = initializeRestartRequiredRoot(current, fakeDeps); clearRuntimeBarrier(current, barrier); completeKickoff(current, "H3 current authority", fakeDeps);
@@ -8082,7 +8432,7 @@ test("H3 source recovery exposes authentic invalid, unsupported, and current cat
   } finally { dispose(current); }
 });
 
-test("H3 source recovery distinguishes stale generated projection from unavailable evidence", () => {
+test("H3 source recovery distinguishes stale generated projection", () => {
   const stale = root();
   try {
     const barrier = initializeRestartRequiredRoot(stale, fakeDeps);
@@ -8096,7 +8446,8 @@ test("H3 source recovery distinguishes stale generated projection from unavailab
     assert.equal(plan.status, "ready");
     assert.equal(plan.nextAction?.mutation, false);
   } finally { dispose(stale); }
-
+});
+test("H3 source recovery distinguishes unavailable evidence", () => {
   const unavailable = root();
   try {
     const barrier = initializeRestartRequiredRoot(unavailable, fakeDeps);
@@ -8345,6 +8696,7 @@ test("reinstall quarantines only current V3 authority and leaves legacy calibrat
     const realDeps = { ...fakeDeps, spawnSync };
     const portable = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: realDeps });
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: realDeps }).status, "applied");
+    captureFirstRestartFixtureInput(path, realDeps);
     const runtime = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: realDeps, operation: "runtime" });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
     assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: realDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
@@ -8629,10 +8981,10 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     return { code, result: output ? JSON.parse(output) : null };
   };
   try {
-    const barrier = initializeRestartRequiredRoot(path);
-    clearRuntimeBarrier(path, barrier);
+    const portable = planProjectOnboardingV3({rootDir: path, deps: fakeDeps, runner: "codex"});
+    assert.equal(applyProjectOnboardingV3(portable, {rootDir: path, activate: true, deps: fakeDeps}).status, "applied");
 
-    // No checkpoint at all: intake-required, nextAction asks for consent.
+    // Before the first runtime barrier there is no checkpoint: collect actual consent.
     const fresh = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(fresh.status, "intake-required");
     assert.equal(fresh.continuity.status, "absent-pristine");
@@ -8668,6 +9020,13 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     // nextAction asks for the one bundled design-question round.
     const captured = invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]);
     assert.equal(captured.code, 0, stderr);
+    const beforeRuntime = inspectProjectOnboardingV3({runner: "codex", rootDir: path, deps: fakeDeps});
+    assert.equal(beforeRuntime.status, "runtime-initialization-required");
+    assert.equal(readOnboardingIntakeCheckpoint({rootDir: path, spawn: fakeGit}).value.materialInput.length, 1);
+    const runtime = planProjectOnboardingLifecycleV4({rootDir: path, deps: fakeDeps, operation: "runtime", runner: "codex"});
+    const runtimeSha = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+    assert.equal(applyProjectOnboardingLifecycleV4({rootDir: path, deps: fakeDeps, operation: "runtime", runner: "codex", planSha256: runtimeSha, activate: true}).status, "restart-required");
+    clearRuntimeBarrier(path, readRestartBarrier({rootDir: path, spawn: fakeGit}));
     const afterCapture = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(afterCapture.status, "intake-design-questions-required");
     assert.equal(afterCapture.nextAction.kind, "collect-input");
@@ -8726,8 +9085,14 @@ test("a confirmed first-round language is visible as a default, not forced on la
     for (const runner of ["claude", "codex", "antigravity"]) {
       const path = root();
       paths.push(path);
-      const barrier = initializeRestartRequiredRoot(path);
-      clearRuntimeBarrier(path, barrier);
+      // Inspect the fresh consent action before a checkpoint captures material.
+      const portable = planProjectOnboardingV3({rootDir: path, deps: fakeDeps, runner});
+      assert.equal(applyProjectOnboardingV3(portable, {rootDir: path, activate: true, deps: fakeDeps}).status, "applied");
+      if (runner !== "codex") {
+        const runtime = planProjectOnboardingLifecycleV4({rootDir: path, deps: fakeDeps, operation: "runtime", runner});
+        const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+        assert.equal(applyProjectOnboardingLifecycleV4({rootDir: path, deps: fakeDeps, operation: "runtime", runner, planSha256: digest, activate: true}).status, "intake-required");
+      }
       mkdirSync(join(path, ".git", "agent-pipeline"), { recursive: true });
       writeFileSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json"), JSON.stringify({
         schema: "pipeline.onboarding-initial-answers.v1",
@@ -8753,14 +9118,19 @@ test("a confirmed first-round language is visible as a default, not forced on la
   }
 });
 
-test("all three runners execute the exact returned consent and design-question actions without repeating durable Git identity", () => {
-  const paths = [];
-  try {
-    for (const runner of ["claude", "codex", "antigravity"]) {
-      const path = root();
-      paths.push(path);
-      const barrier = initializeRestartRequiredRoot(path);
-      clearRuntimeBarrier(path, barrier);
+for (const runner of ["claude", "codex", "antigravity"]) {
+  test(`all three runners execute the exact returned consent and design-question actions without repeating durable Git identity ${runner}`, () => {
+    const path = root();
+    try {
+      const portable = planProjectOnboardingV3({rootDir: path, deps: fakeDeps, runner});
+      assert.equal(applyProjectOnboardingV3(portable, {rootDir: path, activate: true, deps: fakeDeps}).status, "applied");
+      // Non-Codex retains its established runtime-first fixture setup.
+      if (runner !== "codex") {
+        const runtime = planProjectOnboardingLifecycleV4({rootDir: path, deps: fakeDeps, operation: "runtime", runner});
+        const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+        const initialized = applyProjectOnboardingLifecycleV4({rootDir: path, deps: fakeDeps, operation: "runtime", runner, planSha256: digest, activate: true});
+        assert.ok(["intake-required", "kickoff-required"].includes(initialized.status));
+      }
       const configuredGit = (command, args, options) => {
         if (command === "git" && args[0] === "config" && args[1] === "--get") {
           return { status: 0, stdout: args[2] === "user.name" ? "Durable PO\n" : "durable@example.invalid\n", stderr: "" };
@@ -8799,6 +9169,12 @@ test("all three runners execute the exact returned consent and design-question a
         ["<PO_INTAKE_PROFILE>", "feature"],
       ]));
 
+      if (runner === "codex") {
+        const runtime = planProjectOnboardingLifecycleV4({rootDir: path, deps: intakeDeps, operation: "runtime", runner});
+        const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+        assert.equal(applyProjectOnboardingLifecycleV4({rootDir: path, deps: intakeDeps, operation: "runtime", runner, planSha256: digest, activate: true}).status, "restart-required");
+        clearRuntimeBarrier(path, readRestartBarrier({rootDir: path, spawn: configuredGit}));
+      }
       const design = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
       assert.equal(design.kind, "collect-input");
       assert.equal(design.input.name, "answersJson");
@@ -8811,11 +9187,11 @@ test("all three runners execute the exact returned consent and design-question a
       const after = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps });
       assert.equal(after.nextAction.kind, "command");
       assert.equal(after.nextAction.argv[1], "intake-generate-plan");
+    } finally {
+      dispose(path);
     }
-  } finally {
-    for (const path of paths) dispose(path);
-  }
-});
+  });
+}
 
 test("bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds", () => {
   const path = root();
@@ -8833,8 +9209,8 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     return { code, result: output ? JSON.parse(output) : null };
   };
   try {
-    const barrier = initializeRestartRequiredRoot(path);
-    clearRuntimeBarrier(path, barrier);
+    const portable = planProjectOnboardingV3({rootDir: path, deps: fakeDeps, runner: "codex"});
+    assert.equal(applyProjectOnboardingV3(portable, {rootDir: path, activate: true, deps: fakeDeps}).status, "applied");
     // Unlike the lifecycle-routing test above, this fixture supplies a
     // --profile so a real bootstrap-bind-plan/apply can actually be
     // exercised below -- reproducing the exact "generated" state the
@@ -8843,6 +9219,8 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     assert.equal(consented.code, 0, stderr);
     const captured = invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]);
     assert.equal(captured.code, 0, stderr);
+    const barrier = initializeFirstRestartRuntimeFixture(path, fakeDeps, "codex", "Ship a safe project.");
+    clearRuntimeBarrier(path, barrier);
     const answers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely." }]);
     const answered = invoke(["intake-design-questions-apply", "--root", path, "--answers-json", answers, "--activate", "--runner", "codex"]);
     assert.equal(answered.code, 0, stderr);
@@ -9168,8 +9546,8 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
 test("chat acknowledgement consumes the one in-chat PO decision without a second terminal confirmation", () => {
   const path = root();
   try {
-    const barrier = initializeRestartRequiredRoot(path);
-    clearRuntimeBarrier(path, barrier);
+    const portable = planProjectOnboardingV3({rootDir: path, deps: fakeDeps, runner: "codex"});
+    assert.equal(applyProjectOnboardingV3(portable, {rootDir: path, activate: true, deps: fakeDeps}).status, "applied");
     const intakeDeps = { ...fakeDeps, spawn: fakeGit };
     const consent = onboardingCli([
       "intake-consent-apply", "--root", path, "--granted", "--profile", "feature", "--language", "en", "--activate", "--runner", "codex",
@@ -9179,6 +9557,8 @@ test("chat acknowledgement consumes the one in-chat PO decision without a second
       "intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex",
     ], { deps: intakeDeps, write: () => {}, writeError: () => {} });
     assert.equal(capture, 0);
+    const barrier = initializeFirstRestartRuntimeFixture(path, fakeDeps, "codex", "Ship a safe project.");
+    clearRuntimeBarrier(path, barrier);
     const answers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely." }]);
     const answer = onboardingCli([
       "intake-design-questions-apply", "--root", path, "--answers-json", answers, "--activate", "--runner", "codex",
@@ -9364,6 +9744,7 @@ test("F4 runtime probe cleanup preserves foreign content when the probe inode nu
   try {
     const portable = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    captureFirstRestartFixtureInput(path, fakeDeps);
     const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime", runner: "codex" });
     const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
     const nativeLstat = lstatSync;
@@ -9692,20 +10073,113 @@ test("F4 portable rollback preserves foreign content when a created target's ino
   } finally { dispose(ownedRoot); }
 });
 
+export const FRESH_ENROLLMENT_REGRESSION_CASES = [
+  {id:"FRB001",name:"fresh public portable apply in empty and existing Git roots creates no retirement",run:()=>{
+    for(const initialized of [false,true]){const path=root();try{
+      if(initialized)assert.equal(spawnSync("git",["init","--initial-branch=main"],{cwd:path}).status,0);
+      assert.equal(observeOnboardingEnrollmentHistory({rootDir:path}).retained,false);
+      const plan=planProjectOnboardingV3({rootDir:path,runner:"codex"});assert.equal(plan.status,"ready");
+      const result=applyProjectOnboardingV3(plan,{rootDir:path,activate:true});assert.equal(result.status,"applied",JSON.stringify(result));
+      assert.equal(result.governanceEnrollment.state,"active");assert.equal(readGovernanceEnrollmentRetirement({rootDir:path}),null);
+      assert.equal(readOnboardingIntakeCheckpoint({rootDir:path}).status,"absent");
+      assert.equal(existsSync(join(path,".agent-pipeline/enrollment-git-creation-barrier.json")),false);
+    }finally{dispose(path);}}
+  }},
+  {id:"FRB002",name:"retained non-Git public bootstrap refuses before mutation and offers explicit recovery",run:()=>{
+    const path=root();try{mkdirSync(join(path,".agent-pipeline"));const retained=join(path,".agent-pipeline/onboarding-consent.json"),bytes=Buffer.from('{"retained":"fixture"}\n');writeFileSync(retained,bytes);
+      const plan=planProjectOnboardingV3({rootDir:path,runner:"codex"});assert.equal(plan.status,"ready");
+      const result=applyProjectOnboardingV3(plan,{rootDir:path,activate:true});assert.equal(result.status,"activation-required",JSON.stringify(result));
+      assert.equal(result.diagnostics[0].code,"retained_enrollment_history");assert.ok(result.nextAction.argv.includes("plan-enrollment-git-creation"));
+      assert.equal(existsSync(join(path,".git")),false);assert.deepEqual(readFileSync(retained),bytes);assert.deepEqual(readdirSync(path),[".agent-pipeline"]);
+    }finally{dispose(path);}
+  }},
+  {id:"FRB003",name:"real retired public route requires fresh consent and cannot restore old approval",run:()=>{
+    const path=root();try{
+      const plan=planProjectOnboardingV3({rootDir:path,runner:"codex"});assert.equal(applyProjectOnboardingV3(plan,{rootDir:path,activate:true}).status,"applied");
+      const statePath=join(path,"project/pipeline-state.json"),state={schema:"pipeline.state.v0",activeFeature:{id:"offline-fixture",planPath:"specs/offline-fixture/prd.md",phase:"implementation"},planApproved:true,planApproval:{approvedBy:"disposable-fixture",approvedAt:"2026-09-29T00:00:00.000Z"}};writeFileSync(statePath,JSON.stringify(state)+"\n");
+      const controller=createGovernanceScopeController({hostStateRoot:join(path,"unused-host")}),decision=controller.planDecision({rootDir:path,decision:"decline",by:"disposable-fixture"});const declined=controller.applyDecision(decision,{activate:true,planSha256:decision.planSha256});assert.equal(declined.state,"declined");
+      const config=readFileSync(join(path,".git/config")),digest=createHash("sha256").update(config).digest("hex"),writer=PLUGIN_PIPELINE_STATE_SCRIPT;
+      const args=["--root",path,"--scope-key",declined.scopeKey,"--barrier-sha256",digest,"--by","disposable-fixture"];
+      const retired=spawnSync(process.execPath,[writer,"retire-enrollment",...args],{cwd:path,encoding:"utf8"});assert.equal(retired.status,0,retired.stderr);
+      const stateBytes=readFileSync(statePath),checkpoint=readOnboardingIntakeCheckpoint({rootDir:path});assert.equal(derivePlanLifecycle(JSON.parse(stateBytes)).approvalCurrent,false);assert.equal(checkpoint.value.consent,null);
+      const observed=inspectProjectOnboardingV3Core({rootDir:path,runner:"codex",intent:"bootstrap"});assert.equal(observed.status,"intake-required",JSON.stringify(observed));
+      const declinedActivation=spawnSync(process.execPath,[writer,"activate-enrollment",...args],{cwd:path,encoding:"utf8"});assert.equal(declinedActivation.status,2);assert.match(declinedActivation.stderr,/ER-FRESH-CONSENT/);
+      const repeat=planProjectOnboardingV3({rootDir:path,runner:"codex"});applyProjectOnboardingV3(repeat,{rootDir:path,activate:true});
+      assert.equal(controller.observe({rootDir:path}).state,"declined");assert.deepEqual(readFileSync(statePath),stateBytes);assert.equal(readOnboardingIntakeCheckpoint({rootDir:path}).sha256,checkpoint.sha256);assert.equal(readGovernanceEnrollmentRetirement({rootDir:path}).phase,"pending");
+    }finally{dispose(path);}
+    const readyPath=root();try{
+      const portable=planProjectOnboardingV3({rootDir:readyPath,runner:"claude"});assert.equal(applyProjectOnboardingV3(portable,{rootDir:readyPath,activate:true}).status,"applied");
+      const runtime=planProjectOnboardingLifecycleV4({rootDir:readyPath,runner:"claude",operation:"runtime"}),runtimeDigest=runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256")+1];
+      assert.equal(applyProjectOnboardingLifecycleV4({rootDir:readyPath,runner:"claude",operation:"runtime",planSha256:runtimeDigest,activate:true}).status,"intake-required");
+      const idleStatePath=join(readyPath,"project/pipeline-state.json");writeFileSync(idleStatePath,JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"retirement-fixture",planPath:"specs/retirement-fixture/prd.md",phase:"design"},planApproved:false})+"\n");
+      const discarded=spawnSync(process.execPath,[PLUGIN_PIPELINE_STATE_SCRIPT,"discard-feature","--by","disposable-fixture","--reason","retirement regression idle transition"],{cwd:readyPath,encoding:"utf8"});assert.equal(discarded.status,0,discarded.stderr);
+      assert.equal(inspectProjectOnboardingV3Core({rootDir:readyPath,runner:"claude",intent:"bootstrap"}).status,"ready");
+      const controller=createGovernanceScopeController({hostStateRoot:join(readyPath,"unused-host")}),decision=controller.planDecision({rootDir:readyPath,decision:"decline",by:"disposable-fixture"}),declined=controller.applyDecision(decision,{activate:true,planSha256:decision.planSha256});
+      const digest=createHash("sha256").update(readFileSync(join(readyPath,".git/config"))).digest("hex"),args=["--root",readyPath,"--scope-key",declined.scopeKey,"--barrier-sha256",digest,"--by","disposable-fixture"];
+      const retired=spawnSync(process.execPath,[PLUGIN_PIPELINE_STATE_SCRIPT,"retire-enrollment",...args],{cwd:readyPath,encoding:"utf8"});assert.equal(retired.status,0,retired.stderr);
+      const pending=readGovernanceEnrollmentRetirement({rootDir:readyPath});assert.equal(pending.phase,"pending");assert.equal(readOnboardingIntakeCheckpoint({rootDir:readyPath}).value.consent,null);
+      const refused=spawnSync(process.execPath,[PLUGIN_PIPELINE_STATE_SCRIPT,"activate-enrollment",...args],{cwd:readyPath,encoding:"utf8"});assert.equal(refused.status,2);assert.match(refused.stderr,/ER-FRESH-CONSENT/);
+      recordConsentGiven({rootDir:readyPath});const consent=applyOnboardingIntakeConsent({rootDir:readyPath,granted:true,language:"en",profile:"feature",text:"Explicit disposable reenrollment request.",activate:true});assert.equal(consent.checkpoint.consent.granted,true);
+      const observed=inspectProjectOnboardingV3Core({rootDir:readyPath,runner:"claude",intent:"bootstrap"});assert.equal(observed.status,"enrollment-activation-required",JSON.stringify(observed));
+      const action=observed.nextAction;assert.equal(action.mutation,true);assert.equal(action.requiresConfirmation,true);assert.ok(action.argv.includes("activate-enrollment"));
+      assert.equal(isSanctionedLifecycleCommand(renderProjectOnboardingAction(action),readyPath,{runner:"claude"}),true);
+      const activated=spawnSync(action.executable,action.argv,{cwd:readyPath,encoding:"utf8"});assert.equal(activated.status,0,activated.stderr);assert.equal(JSON.parse(activated.stdout).status,"active");
+      assert.equal(controller.observe({rootDir:readyPath}).state,"active");assert.equal(readGovernanceEnrollmentRetirement({rootDir:readyPath}).phase,"active");const idleState=JSON.parse(readFileSync(idleStatePath));assert.equal(idleState.planApproved,false);assert.equal(idleState.planApproval,undefined);assert.notEqual(derivePlanLifecycle(idleState).approvalCurrent,true);
+      assert.equal(inspectProjectOnboardingV3Core({rootDir:readyPath,runner:"claude",intent:"bootstrap"}).status,"ready");assert.equal(readOnboardingIntakeCheckpoint({rootDir:readyPath}).value.consent.granted,true);
+    }finally{dispose(readyPath);}
+  }},
+  {id:"FRB004",name:"fresh rollback restores owned empty root and preserves foreign concurrent Git bytes",run:()=>{
+    for(const concurrent of [false,true]){const path=root();try{
+      const failing={writeFileSync:(target,bytes,options)=>{if(concurrent)writeFileSync(join(path,".git/concurrent-fixture"),"foreign exact bytes");throw new Error("directed scaffold write failure");}};
+      const plan=planProjectOnboardingV3({rootDir:path,runner:"codex",deps:failing});const result=applyProjectOnboardingV3(plan,{rootDir:path,activate:true,deps:failing});assert.equal(result.status,concurrent?"rollback-failed":"rolled-back",JSON.stringify(result));
+      if(concurrent){assert.equal(readFileSync(join(path,".git/concurrent-fixture"),"utf8"),"foreign exact bytes");assert.match(result.diagnostics[0].message,/created Git control tree changed/);}else assert.deepEqual(readdirSync(path),[]);
+    }finally{dispose(path);}}
+  }},
+];
+for(const entry of FRESH_ENROLLMENT_REGRESSION_CASES)test(entry.name,entry.run);
+Object.freeze(ONBOARDING_TEST_CASES);
+export const ONBOARDING_CASE_IDS = Object.freeze(ONBOARDING_TEST_CASES.map((entry) => entry.id).sort());
+if (DIRECT_INVOCATION) {
+  assert.equal(declared, EXPECTED_CASE_COUNT, "the suite must declare all 216 stable callbacks");
+  if (shard !== null) assert.equal(assignedCases.length, CASES_PER_CHILD, "each child must execute 18 callbacks");
+}
+
 if (ORCHESTRATING_SHARDS) {
+  const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+    ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+    : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+  const recorder = createTestCaseCompletionRecorder({
+    caseIds: ONBOARDING_CASE_IDS, fd: completionFd,
+    maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+  });
   assertShardControllerContract();
-  console.log("project-onboarding-v3 controller: malformed coordinates and child failure outcomes fail closed");
-  const results = await runShards();
+  console.log("project-onboarding-v3 controller: malformed coordinates, partition coverage, and child failure outcomes fail closed");
+  const results = await runShards(recorder);
   const failed = failedShardResults(results);
-  console.log(`\nproject-onboarding-v3: ${declared} cases across ${SHARD_COUNT} shards, ${failed.length} shards failed`);
+  if (failed.length === 0) {
+    assert.equal(results.length, SHARD_COUNT * CHUNK_COUNT, "all 12 child receipts are required");
+    const completion = recorder.snapshot();
+    assert.equal(completion.disposedCount, EXPECTED_CASE_COUNT, "all 216 callbacks must be reported");
+    assert.equal(completion.terminal, true, "the parent must emit the terminal completion record");
+    const classes = new Set(results.flatMap((result) => result.coverage));
+    assert.ok(classes.size > 0, "B8 corpus must reach at least one real session command");
+    console.log(`B8 producer/guard command classes across all shards: ${classes.size}`);
+  }
+  console.log(`\nproject-onboarding-v3: ${declared} cases across ${CHUNK_COUNT} sequential chunks of ${SHARD_COUNT} shards, ${failed.length} shards failed`);
   if (failed.length > 0) {
-    for (const result of failed) console.error(`shard ${result.index}: ${result.error?.stack ?? result.signal ?? `exit ${result.code}`}`);
+    for (const result of failed) console.error(`chunk ${result.chunk} shard ${result.index}: ${result.error?.stack ?? result.signal ?? `exit ${result.code}`}`);
     process.exitCode = 1;
   }
 } else if (shard !== null) {
-  assert.ok(b8ObservedCommandClasses.size > 0,
-    "B8 producer/guard test must reach at least one session command per shard");
+  assert.equal(typeof process.send, "function", "internal chunk invocation requires parent IPC");
+  const results = await runAssignedCases();
+  await new Promise((resolvePromise, rejectPromise) => process.send({
+    schema: "pipeline.onboarding-test-case-results.v1", shard, chunk, declaredCount: declared,
+    assignedIndices: assignedCases.map((entry) => entry.index), results,
+    classes: [...b8ObservedCommandClasses].sort(),
+  }, (error) => error ? rejectPromise(error) : resolvePromise()));
+  process.disconnect();
   console.log(`B8 producer/guard command classes in shard: ${b8ObservedCommandClasses.size}`);
-  console.log(`\nproject-onboarding-v3 shard ${shard + 1}/${SHARD_COUNT}: ${passed} passed, ${failures.length} failed`);
+  console.log(`\nproject-onboarding-v3 chunk ${chunk + 1}/${CHUNK_COUNT} shard ${shard + 1}/${SHARD_COUNT}: ${passed} passed, ${failures.length} failed`);
   if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
 }

@@ -207,7 +207,7 @@ export function summarizePlanningDecisionApplicability(value) {
 export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), taskScope = null, planningSurface = undefined, now = new Date(), deps = {} } = {}) {
   const root = resolve(rootDir);
   const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now);
-  const design = inspectArchitectureDesign(root, taskScope);
+  const design = (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(root, taskScope);
   const disposition = design.ok && design.status === "materialized"
     ? { ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority }
     : (deps.checkPlanningAdoptionDisposition ?? checkPlanningAdoptionDisposition)(root, taskScope, now);
@@ -286,18 +286,19 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   }
   artifacts.decisionApplicability = inspectPlanningDecisionApplicability(root, surface, now, deps);
 
-  // A greenfield package already carries its PO-bound fitness model and zero-debt
-  // baseline. Do not send it through retrospective adoption calibration, which
-  // a new repository cannot honestly possess and which would reopen that path.
-  if (design.ok && design.status === "materialized") return {
+  // Greenfield design may be materialized before the implementation owner writes
+  // its declared contracts and tests. The approved design authorizes entry, but
+  // a missing physical surface is a deferral, never a fitness PASS.
+  if (design.ok && design.status === "materialized" && design.pendingPhysicalSurfaces.length > 0) return {
     schema: ARCHITECTURE_ENTRY_SCHEMA,
     status: "ready",
     root,
     code: null,
-    message: "the PO-bound greenfield architecture design is materialized and ready",
+    message: "the PO-bound greenfield architecture design is materialized; physical contract and verification checks remain pending",
     artifacts,
     disposition,
-    fitness: { overallStatus: "pass", blockingOverallStatus: "pass", source: "approved-design-package", planningSurface: surface },
+    fitness: { overallStatus: "deferred", blockingOverallStatus: "deferred", source: "approved-design-package",
+      planningSurface: surface, pendingPhysicalSurfaces: design.pendingPhysicalSurfaces },
     nextAction: null,
   };
 

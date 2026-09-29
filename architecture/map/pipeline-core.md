@@ -9,6 +9,19 @@ nonResponsibilities:
 ownedPaths:
   - plugins/pipeline-core/**
 publicContracts:
+  - plugins/pipeline-core/lib/design-advisor-course-store.mjs
+  - plugins/pipeline-core/lib/design-advisory-coordinator-v2.mjs
+  - plugins/pipeline-core/lib/design-workflow-package-v2.mjs
+  - plugins/pipeline-core/lib/native-initial-advisor-execution.mjs
+  - plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs
+  - plugins/pipeline-core/lib/runner-readiness-request.mjs
+  - plugins/pipeline-core/lib/project-uninstall-workspace.mjs
+  - plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs
+  - plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs
+  - plugins/pipeline-core/lib/design-readiness-host-evidence.mjs
+  - plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json
+  - plugins/pipeline-core/lib/security-scanner-diagnostics-publication.mjs
+  - plugins/pipeline-core/lib/security-scanner-diagnostics.mjs
   - plugins/pipeline-core/install-agy.mjs
   - plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
   - plugins/pipeline-core/hooks/antigravity-start-hint.mjs
@@ -90,12 +103,20 @@ publicContracts:
   - plugins/pipeline-core/scripts/goldfish-antigravity-live-host.mjs
   - plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.mjs
   - plugins/pipeline-core/scripts/elephant-implementation-dispatch.mjs
+  - plugins/pipeline-core/lib/governance-scope.mjs
+  - plugins/pipeline-core/scripts/project-activation.mjs
+  - plugins/pipeline-core/lib/project-uninstall-contract.mjs
+  - plugins/pipeline-core/lib/project-uninstall.mjs
+  - plugins/pipeline-core/lib/runtime-projection-removal.mjs
+  - plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
 allowedDependencies:
   - schemas
 authorityEffects:
   - read-write-workspace
   - execute-node-scripts
 verificationEntryPoints:
+  - plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs
+  - plugins/pipeline-core/lib/advisory-route-selection.test.mjs
   - plugins/pipeline-core/install-agy.test.mjs
   - plugins/pipeline-core/scripts/module-inventory.test.mjs
   - plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs
@@ -161,6 +182,31 @@ verificationEntryPoints:
   - plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs
   - plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs
   - plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs
+  - plugins/pipeline-core/scripts/antigravity-topology-integration.test.mjs
+  - plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+  - plugins/pipeline-core/scripts/browser-evidence-preflight.test.mjs
+  - plugins/pipeline-core/lib/codex-advisor-execution.test.mjs
+  - plugins/pipeline-core/hooks/codex-compact-session-output.test.mjs
+  - plugins/pipeline-core/lib/critic-route-v3.test.mjs
+  - plugins/pipeline-core/lib/design-advisor-course-store.test.mjs
+  - plugins/pipeline-core/lib/design-advisor-course.test.mjs
+  - plugins/pipeline-core/lib/design-advisor-provenance.test.mjs
+  - plugins/pipeline-core/lib/design-advisory-coordinator-v2.test.mjs
+  - plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs
+  - plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs
+  - plugins/pipeline-core/lib/governance-onboarding.test.mjs
+  - plugins/pipeline-core/lib/governance-scope.test.mjs
+  - plugins/pipeline-core/hooks/hook-governance-scope.test.mjs
+  - plugins/pipeline-core/lib/human-guard-override-capability-scan.test.mjs
+  - plugins/pipeline-core/hooks/lifecycle-denial-loop-guard.test.mjs
+  - plugins/pipeline-core/lib/lifecycle-denial-loop.test.mjs
+  - plugins/pipeline-core/lib/onboarding-first-restart-intake.test.mjs
+  - plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs
+  - plugins/pipeline-core/scripts/project-activation.test.mjs
+  - plugins/pipeline-core/scripts/project-reset-git-hooks.test.mjs
+  - plugins/pipeline-core/lib/project-uninstall-contract.test.mjs
+  - plugins/pipeline-core/lib/project-uninstall.test.mjs
+  - plugins/pipeline-core/lib/runtime-projection-removal.test.mjs
 adrReferences:
   - ADR-0062
   - ADR-0063
@@ -212,7 +258,7 @@ Core agent pipeline engine, hooks, lifecycle management, guards, and CLI scripts
 - `plugins/pipeline-core/scripts/check-protected-delta.mjs`: Compares a candidate Git diff with the shipped protected baseline. An unreadable baseline yields `unavailable` and never a misleading `pass`, even when no protected path can be classified.
 - `plugins/pipeline-core/scripts/close-coordinator.mjs`: Its feature-close preparation and replay require that revalidated Critic/Verify lifecycle alongside the audit bundle; a forged or unavailable consumed packet refuses closure before a new bundle or State transition.
 - `plugins/pipeline-core/scripts/design-advisory-admission.mjs`: Its read-only inspect rechecks the current exact human decision for a stored Advisor-unavailable exception, then binds the same public bytes to the immutable private transaction and source receipt. An earlier write-time approval claim alone cannot make later inspection pass. For an answered Claude consult fallback, the admission retains `nativeAvailable: true` when the native route was tried and failed; it does not misclassify the successful adapter as native. A v2 private transaction also binds the host-observed native-then-consult attempt trail byte-for-byte. That local trail is not provider attestation or a final PO approval, and the unavailable pre-approval package path remains open.
-- `plugins/pipeline-core/scripts/design-advisory-coordinator.mjs`, `lib/design-advisory-transaction.mjs` and `lib/advisory-attempt-trail.mjs`: The initial-design host path derives the receipt target from physical package bytes, retains a native-capable Claude session's actual consult fallback, and publishes a private attempt sequence alongside the sanitized receipt. The transaction pins the sequence digest in its v2 private shape and rechecks it on inspection; a one-step direct consult cannot masquerade as native fallback. Exhausted routes yield a typed pending input after physical receipt/trail and package-drift checks, without publishing an admission or granting implementation authority. The final one-approval package binding remains separate work.
+- `plugins/pipeline-core/scripts/design-advisory-coordinator.mjs` and `lib/design-advisory-coordinator-v2.mjs`: The productive default is the durable five-source initial Advisor course. The historical transaction/attempt-trail route is explicitly selected with `--legacy-v1`; it is diagnostic context, not current final-package approval. Codex retains independently observed answered or failed host evidence. Claude/Agy currently retain a proved zero-child unavailable initial course through `native-initial-advisor-execution.mjs`; this does not assert a genuine answered native initial call. Substantive successors require a parent-bound owner decision, reject decision reuse, and remain bounded by the course cap.
 - `plugins/pipeline-core/lib/design-workflow-package.mjs`: Fail-closed validator and physical repository reader for the proposed single-final-approval package. It binds exact source/evidence bytes, regular non-symlink file identity, candidate identity before and after the read, fresh independent readiness, Advisor receipt/disposition and exhausted-route trail; duplicate JSON keys, aliases, symlinks and oversized inputs fail. It returns a bounded PO-review projection that exposes the complete source inventory, readiness findings/choices and Advisor disposition/exception while explicitly remaining pending approval and non-authorizing. Integration with the one `approve-plan` authority write and implementation boundary is still absent.
 - `plugins/pipeline-core/scripts/critic-packet-preflight.mjs`: The private consumed-receipt reader compares the receipt record to the consumed journal state before downstream Verify or portable export can treat it as review evidence; a changed receipt file alone cannot mint a new verdict. This local readback does not replace independent Critic execution.
 - `plugins/pipeline-core/lib/portable-agy-authorship-export.mjs`: Prepares a redacted Agy authorship subject only after the local Git-backed verifier reaches PASS with independently read private host and Critic evidence. Its clone reader checks physical committed export bytes, the authored Git commit/parent/tree/paths and a detached PO proof against the trust anchor already committed before that Agy commit. When a public v4 record is present, it additionally binds the exact physical and committed record bytes to the signed record digest and checks model, effort, route policy and report consistency; both authorship and repository-wide Critic coverage consume that portable readback. It does not claim provider model attestation, sign a proof, publish the export or replace a real provider-backed qualification run.
@@ -287,3 +333,44 @@ Core agent pipeline engine, hooks, lifecycle management, guards, and CLI scripts
 - `node --test plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs`
 - `node plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs`
 - `node plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs`
+
+## Alfred governance and lifecycle registration
+
+Enrollment retirement preserves byte-exact archived generations and advances
+monotone transaction phases through the real onboarding, consent, runtime and
+plan-state owner APIs. Explicit local Git creation requires attended digest
+confirmation and preserves foreign scopes. Nine project/plugin schema mirrors
+and the coordinator belong to the never-liftable kernel; protected writer/guard
+integration and native qualification require their own final Source evidence.
+
+The public governance scope gates hook entrypoints before project authority is consulted. Project activation follows the admitted lifecycle action. Uninstall validates retirement scope and removes only exact owned runtime projections; topology refresh binds physical project and current runtime readback. These contracts preserve signature and private-state boundaries.
+
+## Scanner diagnostic sidecar
+
+The Semgrep adapter observes only its existing child. The security producer
+reuses canonical evidence-root and executable/candidate bindings. The closed
+diagnostics helper exposes no verdict authority; safe Linux publication requires
+procfs-anchored owned directories and trusted same-UID cooperating publishers.
+Unsupported publication and unavailable local-rule provenance remain explicit.
+The exclusive staging inode stays held through rename/readback/fsync; leftover
+staging is busy, not automatically reclaimed. No rename-CAS or hostile-UID
+isolation is claimed. The global ADR draft records PO-approved implementation
+and defers formal numbering/accepted status under ADR-0069.
+
+## Initial Advisor, Readiness and retirement custody
+
+The v2 package reconstructs the initial Advisor course and current structured
+disposition before preparing Readiness. The distinct supplemental runtime
+context is untrusted input, not a sixth normative source. Codex and native
+Readiness readers bind the actual submitted request against the private host
+receipt; later material disposition changes invalidate that binding. Local
+receipts do not attest a provider or effective model. Final approval and the
+protected main writer require their own delivered, candidate-bound evidence.
+
+Governance common Git config remains the current decision authority. Only an
+explicit sanctioned decision publishes the separate private positive witness;
+it can preserve an unverifiable-active diagnosis after control damage, never
+grant active or declined state. Older unreadable decisions without independent
+provenance require explicit recovery. Observation never writes a migration.
+Uninstall removes exact manifest-proved workspace elements and rechecks resume
+postconditions; edited hook or plugin metadata is an ownership conflict.

@@ -815,8 +815,22 @@ process.exit(0);
 }
 {
   const rootDir = makeRootDir("semgrep-clean-root");
-  const result = await semgrepAdapter.run({ rootDir, config: { binaryPath: semgrepClean }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  let observedChild;
+  const result = await semgrepAdapter.run({
+    rootDir, config: { binaryPath: semgrepClean }, timeoutMs: 5000,
+    env: { SEMGREP_ENABLE_VERSION_CHECK: "1", SEMGREP_SEND_METRICS: "on" },
+    spawnFn(command, args, options) {
+      observedChild = { command, args, options };
+      return fixtureSpawnFn(command, args, options);
+    },
+  });
   assertEqual("semgrep run: clean fixture -> PASS", { status: result.status, count: result.findings.length }, { status: "PASS", count: 0 });
+  assertEqual("semgrep run: caller cannot enable version checks or metrics",
+    { versionCheck: observedChild.options.env.SEMGREP_ENABLE_VERSION_CHECK, metrics: observedChild.options.env.SEMGREP_SEND_METRICS },
+    { versionCheck: "0", metrics: "off" });
+  assertEqual("semgrep run: offline environment controls preserve executable, argv and deadline",
+    { command: observedChild.command, args: observedChild.args, cwd: observedChild.options.cwd, timeout: observedChild.options.timeout, shell: observedChild.options.shell },
+    { command: semgrepClean, args: ["scan", "--json", "--timeout", "45", "--timeout-threshold", "0", "--config", "auto", rootDir], cwd: rootDir, timeout: 5000, shell: false });
 }
 {
   const rootDir = makeRootDir("semgrep-findings-root");

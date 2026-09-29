@@ -55,10 +55,11 @@
  *    tested so a follow-up dispatch can wire the call in without inventing
  *    the mechanism itself.
  */
+import { createHash } from "node:crypto";
 import {
-  closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync,
+  closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, parse, resolve, sep } from "node:path";
 
 export const CONSENT_MARKER_SCHEMA = "pipeline.onboarding-consent-marker.v1";
 export const CONSENT_MARKER_STATUS = "consent-given-onboarding-incomplete";
@@ -80,11 +81,11 @@ function atomicWriteFileSync(targetPath, bytes) {
   const tempPath = `${targetPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const fd = openSync(tempPath, "w");
   try {
-    writeSync(fd, bytes);
+    let n=0;while(n<bytes.length){const wrote=writeSync(fd,bytes,n,bytes.length-n,n);if(wrote<=0)throw Error("ER-CONSENT-WRITE");n+=wrote;}fsyncSync(fd);
   } finally {
     closeSync(fd);
   }
-  renameSync(tempPath, targetPath);
+  renameSync(tempPath, targetPath);const parent=openSync(dirname(targetPath),"r");try{fsyncSync(parent);}finally{closeSync(parent);}
 }
 
 function appendAuditEntry(rootDir, entry) {
@@ -92,7 +93,7 @@ function appendAuditEntry(rootDir, entry) {
   mkdirSync(dirname(auditPath), { recursive: true });
   const fd = openSync(auditPath, "a");
   try {
-    writeSync(fd, `${JSON.stringify(entry)}\n`);
+    const bytes=Buffer.from(`${JSON.stringify(entry)}\n`);let n=0;while(n<bytes.length){const wrote=writeSync(fd,bytes,n,bytes.length-n,null);if(wrote<=0)throw Error("ER-CONSENT-AUDIT-WRITE");n+=wrote;}fsyncSync(fd);
   } finally {
     closeSync(fd);
   }
@@ -137,7 +138,10 @@ export function readConsentMarker({ rootDir, deps = {} } = {}) {
  * Write the marker at the exact moment PO consent to adopt Agent Pipeline is
  * given for this repository.
  */
-export function recordConsentGiven({ rootDir, now = new Date(), deps = {} } = {}) {
+export function recordConsentGiven(options = {}) {
+  return withEnrollmentConsentLock(options.rootDir, () => recordConsentGivenLocked(options));
+}
+function recordConsentGivenLocked({ rootDir, now = new Date(), deps = {} } = {}) {
   const existing = readConsentMarker({ rootDir, deps });
   const consentGivenAt = existing.status === CONSENT_MARKER_STATUS && !existing.corrupt && existing.consentGivenAt
     ? existing.consentGivenAt
@@ -153,7 +157,10 @@ export function recordConsentGiven({ rootDir, now = new Date(), deps = {} } = {}
  * on an absent marker (returns `{ status: "absent" }` without touching the
  * audit log -- nothing was cleared).
  */
-export function clearConsentMarker({ rootDir, reason, deps = {} } = {}) {
+export function clearConsentMarker(options = {}) {
+  return withEnrollmentConsentLock(options.rootDir, () => clearConsentMarkerLocked(options));
+}
+function clearConsentMarkerLocked({ rootDir, reason, deps = {} } = {}) {
   if (!CLEAR_REASONS.has(reason)) {
     throw new Error(
       `clearConsentMarker: unrecognized reason "${reason}" (must be "onboarding-complete" or "po-explicit-override")`,
@@ -178,4 +185,53 @@ export function clearConsentMarker({ rootDir, reason, deps = {} } = {}) {
 /** True exactly when the marker is currently in its blocking state. */
 export function isConsentLockBlocking({ rootDir, deps = {} } = {}) {
   return readConsentMarker({ rootDir, deps }).status === CONSENT_MARKER_STATUS;
+}
+
+/** Bounded physical snapshot used only by the canonical retirement coordinator. */
+export function observeEnrollmentRetirementConsent({rootDir}={}) {
+ const root=resolve(rootDir),target=consentMarkerPath(root);let cursor=parse(target).root;
+ for(const part of target.slice(cursor.length).split(sep).filter(Boolean)){
+  cursor=join(cursor,part);let st;
+  try{st=lstatSync(cursor);}catch(e){if(e.code==='ENOENT')return {path:target,bytes:null,identity:null,sha256:null};throw e;}
+  if(st.isSymbolicLink()||realpathSync(cursor)!==cursor)throw Error('ER-CONSENT-ALIAS');
+ }
+ const st=lstatSync(target);if(!st.isFile()||st.nlink!==1||st.size>65536)throw Error('ER-CONSENT-FILE');
+ const bytes=readFileSync(target),after=lstatSync(target);
+ if(st.dev!==after.dev||st.ino!==after.ino||st.mtimeMs!==after.mtimeMs||st.ctimeMs!==after.ctimeMs||bytes.length!==after.size)throw Error('ER-CONSENT-DRIFT');
+ const value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+ if(Object.keys(value).sort().join('|')!=='consentGivenAt|schema|status'||value.schema!==CONSENT_MARKER_SCHEMA||value.status!==CONSENT_MARKER_STATUS||new Date(value.consentGivenAt).toISOString()!==value.consentGivenAt)throw Error('ER-CONSENT-MALFORMED');
+ return {path:target,bytes,identity:{dev:String(st.dev),ino:String(st.ino)},sha256:createHash('sha256').update(bytes).digest('hex')};
+}
+function withEnrollmentConsentLock(rootDir,operation){
+ const target=consentMarkerPath(rootDir),directory=dirname(target);
+ if(realpathSync(resolve(rootDir))!==resolve(rootDir)||!lstatSync(resolve(rootDir)).isDirectory())throw Error("ER-CONSENT-ROOT");
+ if(!existsSync(directory))mkdirSync(directory,{mode:0o700});
+ if(lstatSync(directory).isSymbolicLink()||realpathSync(directory)!==directory)throw Error("ER-CONSENT-ALIAS");
+ const lock=target+'.lock',rootStat=lstatSync(resolve(rootDir)),descriptor={schema:'pipeline.enrollment-retirement-consent-lock.v1',root:resolve(rootDir),dev:String(rootStat.dev),ino:String(rootStat.ino),pid:process.pid};
+ let fd;
+ try{fd=openSync(lock,'wx',0o600);}catch(error){
+  if(error.code!=='EEXIST')throw error;const stat=lstatSync(lock);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||stat.size>4096)throw Error('ER-CONSENT-LOCK');
+  const raw=readFileSync(lock),prior=JSON.parse(raw.toString('utf8'));
+  if(Object.keys(prior).sort().join('|')!=='dev|ino|pid|root|schema'||prior.schema!==descriptor.schema||prior.root!==descriptor.root||prior.dev!==descriptor.dev||prior.ino!==descriptor.ino||!Number.isSafeInteger(prior.pid)||prior.pid<=0)throw Error('ER-CONSENT-LOCK');
+  try{process.kill(prior.pid,0);throw Error('ER-CONSENT-LIVE-LOCK');}catch(e){if(e.code!=='ESRCH')throw e;}
+  const recovery=lock+'.recover',guard=openSync(recovery,'wx',0o600);
+  try{const again=lstatSync(lock);if(again.dev!==stat.dev||again.ino!==stat.ino||!readFileSync(lock).equals(raw))throw Error('ER-CONSENT-LOCK-CAS');unlinkSync(lock);fd=openSync(lock,'wx',0o600);}
+  finally{closeSync(guard);unlinkSync(recovery);}
+ }
+ const lockStat=lstatSync(lock),bytes=Buffer.from(JSON.stringify(descriptor)+'\n');
+ try{let n=0;while(n<bytes.length){const wrote=writeSync(fd,bytes,n,bytes.length-n,n);if(wrote<=0)throw Error('ER-CONSENT-LOCK-WRITE');n+=wrote;}fsyncSync(fd);return operation();}
+ finally{closeSync(fd);const actual=lstatSync(lock);if(actual.dev!==lockStat.dev||actual.ino!==lockStat.ino)throw Error('ER-CONSENT-LOCK-CAS');unlinkSync(lock);const parent=openSync(directory,'r');try{fsyncSync(parent);}finally{closeSync(parent);}}
+
+}
+/** Removal-only CAS. A different fresh marker is never consumed by a replay. */
+export function retireEnrollmentConsent({rootDir,expectedSha256}={}) {
+ return withEnrollmentConsentLock(rootDir,()=>{
+  const current=observeEnrollmentRetirementConsent({rootDir});
+  if(current.sha256===null)return {sha256:null,replayed:true};
+  if(current.sha256!==expectedSha256)throw Error('ER-CONSENT-FRESH-DRIFT');
+  unlinkSync(current.path);
+  appendAuditEntry(rootDir,{schema:CONSENT_AUDIT_SCHEMA,clearedAt:new Date().toISOString(),reason:'enrollment-retirement'});
+  const fd=openSync(dirname(current.path),'r');try{fsyncSync(fd);}finally{closeSync(fd);}
+  return {sha256:null,replayed:false};
+ });
 }

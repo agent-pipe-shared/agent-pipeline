@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
 import { resolvePluginManifestVersion } from '../scripts/pipeline-start-preflight.mjs';
 import { nativeHookSessionId } from '../lib/native-hook-failure-memory.mjs';
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+
 
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
@@ -46,6 +49,12 @@ function main() {
   try {
     input = JSON.parse(readFileSync(0, 'utf8'));
   } catch (e) {
+    const scope = observeGovernanceScope({ rootDir: process.cwd() });
+    if (!scope.requiresEnforcement) {
+      const decision = sessionStartDecision(process.cwd());
+      process.stdout.write(JSON.stringify(decision.context ? { injectSteps: [{ ephemeralMessage: decision.context }] } : {}) + '\n');
+      return;
+    }
     reportFailure('input-parse-failed', e);
     return;
   }
@@ -60,7 +69,7 @@ function main() {
   try {
     const rootDir = antigravityRepositoryRoot(input);
     if (!rootDir) {
-      reportFailure('AGY-REPOSITORY-CONTEXT-UNAVAILABLE');
+      process.stdout.write('{}\n');
       return;
     }
     sessionId = nativeHookSessionId(input, {});
@@ -70,6 +79,7 @@ function main() {
     // arbitrary Git repository. An optional onboarding hint must not arm a
     // mandatory implementation block before the repository opts in.
     if (!decision.governed) {
+      if (!decision.context) { process.stdout.write('{}\n'); return; }
       process.stdout.write(JSON.stringify({
         injectSteps: [{ ephemeralMessage: decision.context }],
       }) + '\n');

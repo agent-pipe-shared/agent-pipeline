@@ -8,7 +8,7 @@ import { canonicalJson } from './codex-sandbox-compatibility.mjs';
 import { validateAgainstSchema } from './schema-lite.mjs';
 import { designReadinessReportSha256, designReadinessRunnerSelectionSha256 } from './design-readiness-hashes.mjs';
 import { hostDigest, hostFault, readHostJournal } from './codex-host-process-journal.mjs';
-import { readFinalizedReadinessObservation, readCurrentReadinessAdvisorObservation } from './codex-readiness-finalization.mjs';
+import { readFinalizedReadinessObservation, readCurrentReadinessAdvisorObservation, rereadCurrentReadinessAdvisorObservation } from './codex-readiness-finalization.mjs';
 import { runIsolatedStructuredHost } from './codex-isolated-structured-host.mjs';
 
 const names = ['input', 'prd', 'spec', 'design', 'traceability'];
@@ -70,7 +70,7 @@ function readSourceSnapshot(repoRoot, sources, candidate, readCommittedSource) {
 
 export async function runCodexToolFreeDesignReadiness({ repoRoot, repoFingerprint, dispatchId, candidate, sources, route,
   codexPath, inputDirectory, store, readCandidate, invokeHost = runIsolatedStructuredHost,
-  advisorObservationRefs = null, readCommittedSource = (root, commit, path) => execFileSync('git', ['show', `${commit}:${path}`], {
+  advisorObservationRefs = null, advisorObservation: suppliedAdvisorObservation = null, readCommittedSource = (root, commit, path) => execFileSync('git', ['show', `${commit}:${path}`], {
     cwd: root, maxBuffer: 524288, timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] }),
 } = {}) {
   let receiptId = null;
@@ -82,7 +82,9 @@ export async function runCodexToolFreeDesignReadiness({ repoRoot, repoFingerprin
       || typeof route.effort !== 'string' || !route.effort || typeof readCandidate !== 'function'
       || !same(readCandidate(), candidate)) throw hostFault('CTFR-BINDING');
     const before = readSourceSnapshot(repoRoot, sources, candidate, readCommittedSource);
-    const advisorObservation = advisorObservationRefs === null ? null : readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,...advisorObservationRefs});
+    if(suppliedAdvisorObservation!==null&&advisorObservationRefs!==null)throw hostFault('CTFR-ADVISOR-OBSERVATION-AMBIGUOUS');
+    const advisorObservation = suppliedAdvisorObservation!==null ? rereadCurrentReadinessAdvisorObservation(repoRoot,suppliedAdvisorObservation,sources,codexPath) : advisorObservationRefs === null ? null : readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,...advisorObservationRefs});
+    if(advisorObservation!==null&&!same(advisorObservation.candidate,candidate))throw hostFault('CTFR-ADVISOR-OBSERVATION-CANDIDATE');
     const executableSha256 = hostDigest(readFileSync(codexPath));
     const { outputSchema, prompt, requestSha256 } = buildCodexToolFreeReadinessRequest({ dispatchId, candidate, sources, route, sourceContent: before, advisorObservation });
     receiptId = `drh_${randomBytes(16).toString('hex')}`;
@@ -105,7 +107,7 @@ export async function runCodexToolFreeDesignReadiness({ repoRoot, repoFingerprin
       throw hostFault('CTFR-MODEL-REPORT');
     }
     const after = readSourceSnapshot(repoRoot, sources, candidate, readCommittedSource);
-    if (advisorObservation !== null && !same(advisorObservation,readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,...advisorObservationRefs}))) throw hostFault('CTFR-ADVISOR-OBSERVATION-DRIFT');
+    if (advisorObservation !== null && !same(advisorObservation,rereadCurrentReadinessAdvisorObservation(repoRoot,advisorObservation,sources,codexPath))) throw hostFault('CTFR-ADVISOR-OBSERVATION-DRIFT');
     if (!same(before, after) || !same(readCandidate(), candidate)) throw hostFault('CTFR-SOURCE-OR-CANDIDATE-DRIFT');
     const observed = execution.observed;
     const journal = join(store.processRoot, `codex-host-${receiptId}`);
@@ -164,7 +166,7 @@ export function verifyCodexToolFreeBinding({ hostExecution, report, candidate, s
 /** Public package verification reconstructs the request, never trusts a
  * coordinator's returned "expected" object as its authority. */
 export function verifyCodexToolFreeBindingFromSources({ hostExecution, report, candidate, sources,
-  route, sourceBytes, store, repoFingerprint, repoRoot = null, advisorObservationRefs = null } = {}) {
+  route, sourceBytes, store, repoFingerprint, repoRoot = null, advisorObservationRefs = null, advisorObservation = null, trustedAdvisorExecutablePath = null } = {}) {
   try {
     if (!exact(sourceBytes, names) || !exact(sources, names)) return { ok: false, code: 'CTFR-SOURCE-BINDING' };
     const content = Object.fromEntries(names.map(name => {
@@ -174,7 +176,8 @@ export function verifyCodexToolFreeBindingFromSources({ hostExecution, report, c
       return [name, { path: sources[name].path, sha256: sources[name].sha256,
         content: new TextDecoder('utf-8', { fatal: true }).decode(entry.bytes) }];
     }));
-    const request = buildCodexToolFreeReadinessRequest({ dispatchId: report.dispatchId, candidate, sources, route, sourceContent: content, advisorObservation: advisorObservationRefs === null ? null : readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,...advisorObservationRefs}) });
+    if(advisorObservation!==null&&(advisorObservationRefs!==null||!same(advisorObservation.candidate,candidate)))throw hostFault('CTFR-ADVISOR-OBSERVATION-BINDING');
+    const request = buildCodexToolFreeReadinessRequest({ dispatchId: report.dispatchId, candidate, sources, route, sourceContent: content, advisorObservation: advisorObservation!==null ? rereadCurrentReadinessAdvisorObservation(repoRoot,advisorObservation,sources,trustedAdvisorExecutablePath) : advisorObservationRefs === null ? null : readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,...advisorObservationRefs}) });
     const context = { repoFingerprint, dispatchId: report.dispatchId, candidate, sources, route,
       requestSha256: request.requestSha256, reportSha256: designReadinessReportSha256(report) };
     const first = store.readForBinding(hostExecution.selectionId, context);

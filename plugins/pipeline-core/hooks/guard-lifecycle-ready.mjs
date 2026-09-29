@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isPhysicalScratchTarget, isBoundedScratchOnlyWords } from "../lib/physical-scratch-boundary.mjs";
 // SPDX-License-Identifier: SUL-1.0
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
@@ -21,6 +22,7 @@ import {
   relative,
   resolve,
   sep,
+  win32,
 } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,7 +33,10 @@ import {
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
   inspectProjectOnboardingV3,
+  renderProjectOnboardingAction,
 } from "../lib/project-onboarding-v3.mjs";
+import { observeReturnedActionDenial, resetLifecycleDenial } from "../lib/lifecycle-denial-loop.mjs";
+import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
 import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
 import { checkPlanningAdoptionDisposition } from "../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
@@ -100,6 +105,11 @@ import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
 } from "./guard-command-grammar.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 // MACHPATH-1/AC-9: machinePlaneFilePath() is re-exported here so no existing test import
 // changes -- lib/machine-plane.mjs is now the sole owner of that derivation (no second
 // copy anywhere in this plugin). isMachinePlaneWritePath() below keeps its own guard-side
@@ -288,6 +298,7 @@ const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
 // Both shells this hook is wired for. PowerShell was named in the matcher but in no
 // decision, which made the whole gate a no-op on the runner that uses it.
 const SHELL_TOOLS = ["Bash", "PowerShell"];
+const READ_TOOLS = ["Read", "Grep", "Glob"];
 // backlog: 2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-
 // tool-shell.md. Claude's Bash tool always executes through Git-Bash/POSIX, on every host
 // including Windows -- process.platform reflects the HOST operating system, never the
@@ -1448,6 +1459,7 @@ export function isMeaningfulGateStrengthShellNeedle(needle) {
 }
 
 function gateStrengthShellRefusal(command, root, dependencies = {}) {
+  if (isBoundedScratchOnlyWords(simpleWords(command, root), { rootDir: root })) return null;
   if (typeof command !== "string" || command === "") return null;
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
   if (isGateStrengthSafeGitCommand(command, root)) return null;
@@ -4011,6 +4023,17 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
   // both still fall through to refusal below, same as every other malformed shape here). Not
   // routed through matchFlagSpec(): there is no subcommand prefix and no --root here, and a
   // single admissible token has no flag order to be insensitive to.
+  // Explicit retained-history Git creation: exact request and digest only.
+  // The canonical CLI independently requires attended confirmation of this digest.
+  if (args[0] === "apply-enrollment-git-creation") {
+    const runnerIndex = rawArgs.indexOf("--runner");
+    return runnerIndex >= 0
+      && ["claude", "codex", "antigravity"].includes(rawArgs[runnerIndex + 1])
+      && matchFlagSpec(args.slice(1), {
+        required: { "--request-create-git": true, "--activate": true },
+        requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
+      });
+  }
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) return true;
   if (args[0] === "inspect"
     && matchFlagSpec(args.slice(1), {
@@ -4041,6 +4064,7 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
   if (AUTOMATED_LIFECYCLE_ARGV_COMMANDS.includes(args[0])
     && matchFlagSpec(args.slice(1), {
       requiredValue: { "--root": isRootValue },
+      optional: args[0] === "intake-generate-plan" ? { "--summary": true } : {},
       optionalValue: { "--intent": isIntentValue },
     })) return true;
   // NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-shape.md).
@@ -4236,6 +4260,7 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
     "--git-author-email": nonEmptyTrimmedNotFlag,
     "--language": isLanguageValue,
     "--profile": isProfileValue,
+    "--intent": isIntentValue,
   };
   const mutatingShape = MUTATING_ONBOARDING_ARGV_SHAPES[args[0]];
   if (mutatingShape !== undefined) {
@@ -4295,6 +4320,7 @@ function sanctionedDriverArgs(args, root) {
       "--push-approval": (value) => value === "signature" || value === "chat",
     },
     optionalValue: {
+      "--language": (value) => value === "de" || value === "en",
       "--git-author-name": (value) => nonEmpty(value) && value.length <= 320,
       "--git-author-email": (value) => nonEmpty(value) && value.length <= 320,
       "--trust-anchor-mode": (value) => value === "existing" || value === "new",
@@ -4538,6 +4564,21 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
 }
 
 function sanctionedPipelineStateArgs(args, root) {
+  // Closed canonical enrollment routes; the writer owns all CAS, consent and lock checks.
+  if (args[0] === "inspect-enrollment-retirement") {
+    return exactRoot(args, root, 1) && args.length === 3;
+  }
+  if (args[0] === "retire-enrollment" || args[0] === "activate-enrollment") {
+    return matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--root": (value) => value === root,
+        "--scope-key": (value) => /^[a-f0-9]{64}$/u.test(value ?? ""),
+        "--barrier-sha256": (value) => /^[a-f0-9]{64}$/u.test(value ?? ""),
+        "--by": (value) => typeof value === "string" && value.trim() !== ""
+          && value.length <= 256 && !/[\x00-\x1f]/u.test(value),
+      },
+    });
+  }
   if (args[0] === "materialize-architecture") return args.length === 1;
   const validBy = (value) => typeof value === "string"
     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
@@ -4853,9 +4894,9 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
  * foreign-root observation, and any producer action outside that validator all
  * remain refused.
  */
-function isExactObservedOnboardingNextAction(command, root, dependencies = {}) {
+function observedOnboardingCommandMatch(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
-  if (!words) return false;
+  if (!words) return null;
   let observed;
   try {
     observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
@@ -4864,7 +4905,7 @@ function isExactObservedOnboardingNextAction(command, root, dependencies = {}) {
       runner: dependencies.runner,
     });
   } catch {
-    return false;
+    return null;
   }
   const action = observed?.nextAction;
   if (observed?.schema !== "pipeline.project-onboarding.v4"
@@ -4880,7 +4921,14 @@ function isExactObservedOnboardingNextAction(command, root, dependencies = {}) {
     || typeof action.requiresConfirmation !== "boolean"
     || words.length !== action.argv.length + 1
     || words[0] !== action.executable
-    || action.argv.some((value, index) => words[index + 1] !== value)) return false;
+    || action.argv.some((value, index) => words[index + 1] !== value)) return null;
+  return {observed, action};
+}
+
+function isExactObservedOnboardingNextAction(command, root, dependencies = {}) {
+  const match = observedOnboardingCommandMatch(command, root, dependencies);
+  if (!match) return false;
+  const action = match.action;
   const [script, ...args] = action.argv;
   // The rebind planner is intentionally not a generally sanctioned lifecycle
   // command: outside a currently observed action it would make unrelated
@@ -5117,49 +5165,9 @@ export function isSanctionedGhReadOnlyDiagnostic(command, root, options = {}) {
  * status; it does not make scratch a general project-write exemption.
  */
 function isPhysicalIntakeScratchPath(filePath, root, dependencies = {}, { allowScratchRoot = false } = {}) {
-  const scratchRoot = join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
-  const resolved = resolve(root, filePath);
-  if (resolved === scratchRoot) {
-    if (!allowScratchRoot) return false;
-  } else if (!pathInside(scratchRoot, resolved)) {
-    return false;
-  }
-  if (!isPathWithinRealpathedRoot(resolved, root, dependencies)) return false;
-  const lstat = dependencies.lstatSyncFn ?? lstatSync;
-  const realpath = dependencies.realpathSyncFn ?? realpathSync;
-  let scratchStat;
-  try {
-    scratchStat = lstat(scratchRoot);
-  } catch (error) {
-    // Only an absent entry permits the bounded first creation. Permission, I/O, and malformed
-    // filesystem failures are not evidence that scratch is absent and must fail closed.
-    return error?.code === "ENOENT";
-  }
-  if (scratchStat.isSymbolicLink() || !scratchStat.isDirectory()) return false;
-  try {
-    if (realpath(scratchRoot) !== scratchRoot) return false;
-  } catch {
-    return false;
-  }
-  // existsSync follows links and skips a dangling leaf while searching for an ancestor. Use
-  // lstat instead so the first lexical entry is inspected even when its target is absent.
-  let ancestor = resolved;
-  while (ancestor !== scratchRoot) {
-    try {
-      lstat(ancestor);
-      break;
-    } catch (error) {
-      if (error?.code !== "ENOENT") return false;
-      ancestor = dirname(ancestor);
-    }
-  }
-  try {
-    return pathInside(scratchRoot, realpath(ancestor));
-  } catch {
-    return false;
-  }
+  return isPhysicalScratchTarget(filePath, { rootDir: root, allowScratchRoot,
+    lstat: dependencies.lstatSyncFn ?? lstatSync, realpath: dependencies.realpathSyncFn ?? realpathSync });
 }
-
 /**
  * NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
  * tmp-fallback.md): the write-side twin of isReadOnlyDiagnosticCommand() above, scoped to
@@ -5579,6 +5587,68 @@ function isFirstDenialThisScope(input, root, classKey, dependencies) {
  * called unconditionally so a lifted command is admitted only if these checks also
  * admit it. Its own logic is otherwise unchanged.
  */
+// Telemetry never changes an admission/refusal. Only exact currently offered
+// commands reach the counter; answer placeholders and unrelated attempts do not.
+function lifecycleLoopScope(input, dependencies) {
+  const identity = lifecycleSubagentIdentity(input, dependencies);
+  if (!["orchestrator", "subagent"].includes(identity.kind)) return null;
+  return {sessionId: input.session_id, agentId: identity.kind === "subagent" ? identity.agentId : null};
+}
+
+function lifecycleLoopState(observed, root, dependencies) {
+  const checkpoint = (dependencies.readOnboardingIntakeCheckpointFn ?? readOnboardingIntakeCheckpoint)({
+    rootDir: root, repositoryCapability: observed.repository?.mode ?? "local"});
+  if (!["absent", "present"].includes(checkpoint.status)) throw new Error("intake observation unavailable");
+  const index = observed.nextAction.argv.indexOf("--plan-sha256");
+  return {
+    sourceSha256: observed.runtime?.sourceSha256 ?? null,
+    targetsSha256: observed.runtime?.targetsSha256 ?? null,
+    barrierSha256: observed.runtime?.barrierSha256 ?? null,
+    readbackSha256: observed.runtime?.readbackSha256 ?? null,
+    stateSha256: observed.continuity?.stateSha256 ?? null,
+    handoverSha256: observed.continuity?.handoverSha256 ?? null,
+    historySha256: observed.continuity?.historySha256 ?? null,
+    checkpointSha256: checkpoint.status === "present" ? checkpoint.sha256 : null,
+    planSha256: index >= 0 ? observed.nextAction.argv[index + 1] : null,
+  };
+}
+
+function withLifecycleReturnedActionTelemetry(result, input, root, toolName, dependencies) {
+  if (dependencies.runner !== "codex") return result;
+  try {
+    const scope = lifecycleLoopScope(input, dependencies);
+    if (!scope) return result;
+    const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
+    if (!commonDir) return result;
+    if (result.exitCode === 0) {
+      (dependencies.resetLifecycleDenialFn ?? resetLifecycleDenial)({commonDir, scope});
+      return result;
+    }
+    if (result.exitCode !== 2 || toolName !== "Bash" || !dependencies.lifecycleReturnedDenial
+      || !result.stderr.startsWith("BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY:")) return result;
+    const match = observedOnboardingCommandMatch((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
+    if (!match || match.observed.runner !== "codex" || match.observed.status !== dependencies.lifecycleReturnedDenial.status) {
+      (dependencies.resetLifecycleDenialFn ?? resetLifecycleDenial)({commonDir, scope});
+      return result;
+    }
+    const recorded = (dependencies.observeReturnedActionDenialFn ?? observeReturnedActionDenial)({
+      commonDir, scope, offeredActionMatches: true, state: lifecycleLoopState(match.observed, root, dependencies),
+      reason: dependencies.lifecycleReturnedDenial.reason, status: match.observed.status,
+      action: {kind: match.action.kind, executable: match.action.executable, argv: match.action.argv},
+    });
+    if (recorded?.code !== "GUARD-LIFECYCLE-RETURNED-ACTION-LOOP" || recorded.count !== 2) return result;
+    const diagnostic = {schema: "pipeline.lifecycle-returned-action-loop.v1", code: recorded.code, count: 2,
+      actionFingerprint: recorded.actionFingerprint, stateFingerprint: recorded.stateFingerprint,
+      mutation: false, nextAction: {kind: "command", executable: process.execPath, argv: [REPAIR_MAP_SCRIPT], mutation: false, requiresConfirmation: false}};
+    const recovery = renderProjectOnboardingAction(diagnostic.nextAction);
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: "
+      + `Pipeline session readiness remains ${match.observed.status}. The exact returned action was refused twice against the same observed bindings.\n`
+      + "Stop retrying this mutation until the observed bindings change; run the read-only diagnosis and report this bounded loop to the PO.\n"
+      + "Read-only diagnosis: " + recovery + "\n" + JSON.stringify(diagnostic) + "\n");
+  } catch {
+    return result; // missing identities, storage faults and invalid records never create a loop claim
+  }
+}
 function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
   // The exact resume-hint readback is passive and is itself needed to diagnose
   // which non-ready lifecycle status applies. Admit it by shape before asking
@@ -5592,6 +5662,17 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     return externalRestartOnly();
   }
 
+  // A physically contained scratch file is a recovery surface in every lifecycle state,
+  // including malformed or unavailable readiness observations. All earlier cross-root,
+  // protected-path and shell checks have already run. This is restricted to ordinary
+  // Write/Edit and a single, parsed mkdir shape; it grants no general shell mutation.
+  if (!restartResumeHintNearMissWrite(input, root)
+    && (isBootstrapBindingScratchWrite(input, root, dependencies)
+    || (toolName === "Bash"
+      && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)))) {
+    return verdict(0);
+  }
+
   let receipt;
   try {
     receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
@@ -5600,6 +5681,9 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       runner: dependencies.runner,
     });
   } catch (error) {
+    dependencies.lifecycleReturnedDenial = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY" && error.intent === "session"
+      ? {reason: error.code, status: error.lifecycleStatus} : null;
     // NVA-REBDEAD-1 (backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md, decision 2): readiness for the resolved
     // rebase authority's own narrow surface is RE-BASED on orig-head, never lifted outright.
     // The resolver already proved orig-head is validly approved and implementing (Requirement
@@ -5903,9 +5987,106 @@ function withRebaseAuthorityDisclosure(result, dependencies, memo) {
 }
 
 export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
+  if (!observeGovernanceScope({ rootDir: dependencies.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return verdict(0);
   const memo = { resolved: false, value: null };
   const scoped = { ...dependencies, rebaseAuthorityMemo: memo };
   return withRebaseAuthorityDisclosure(evaluateLifecycleReadyGuardCore(input, scoped), dependencies, memo);
+}
+
+function containedLiteralReadPath(value, root, dependencies = {}, extraRoots = []) {
+  if (typeof value !== "string" || value === "" || /[\0$`*?\[\]{}]/u.test(value)
+    || value.startsWith("~") || (process.platform !== "win32" && win32.isAbsolute(value))) return false;
+  const candidate = rawReadCandidatePath(value, root);
+  return candidate !== null && [root, ...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots]
+    .some((boundary) => isRealpathedWithinBoundary(candidate, boundary, dependencies));
+}
+
+function containedRelativeGlob(value) {
+  return typeof value === "string" && value !== "" && !value.includes("\0")
+    && !value.includes("\\") && !value.startsWith("~")
+    && !isAbsolute(value) && !win32.isAbsolute(value)
+    && !value.split("/").includes("..");
+}
+
+function readToolScopeVerdict(input, root, dependencies) {
+  const toolName = String(input.tool_name);
+  const params = input.tool_input ?? {};
+  const sessionRoots = sessionReadScopeRoots(input, dependencies);
+  const path = toolName === "Read" ? params.file_path : params.path ?? ".";
+  const selector = toolName === "Glob" ? params.pattern : params.glob;
+  const scoped = containedLiteralReadPath(path, root, dependencies, sessionRoots)
+    && (selector === undefined || containedRelativeGlob(selector));
+  if (scoped) return verdict(0);
+  return verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_SCOPE_DENIAL_CODE}: read target must remain inside the physical project or an approved session read root.\n`);
+}
+
+function powerShellNamedArgs(argv, valueFlags, bareFlags = []) {
+  const values = new Map();
+  const bare = new Set();
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index].toLowerCase();
+    if (values.has(flag) || bare.has(flag)) return null;
+    if (valueFlags.includes(flag)) {
+      const value = argv[++index];
+      if (typeof value !== "string" || value === "" || value.startsWith("-")) return null;
+      values.set(flag, value);
+    } else if (bareFlags.includes(flag)) bare.add(flag);
+    else return null;
+  }
+  return { values, bare };
+}
+
+function powerShellScratchPath(target, root, dependencies, allowScratchRoot = false) {
+  return typeof target === "string" && target !== "" && !/[\0$`*?\[\]{}]/u.test(target)
+    && !target.startsWith("~") && (process.platform === "win32" || !win32.isAbsolute(target))
+    && isPhysicalIntakeScratchPath(target, root, dependencies, { allowScratchRoot });
+}
+
+function powerShellScopeVerdict(input, root, dependencies) {
+  const command = input.tool_input.command ?? input.tool_input.CommandLine;
+  // PowerShell interpolation and composition must never be interpreted as a literal path.
+  if (/[\r\n;$`@|&<>]/u.test(command)) {
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use one literal command.\n");
+  }
+  const parsed = parseGuardCommand(command, root, { platform: "win32" });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) {
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use one literal command.\n");
+  }
+  const { executable, argv } = parsed.segments[0];
+  const name = basename(executable).toLowerCase();
+  if (name === "new-item") {
+    const named = powerShellNamedArgs(argv, ["-path", "-itemtype"], ["-force"]);
+    const target = named?.values.get("-path");
+    const itemType = named?.values.get("-itemtype")?.toLowerCase();
+    if (target && ["directory", "file"].includes(itemType)
+      && powerShellScratchPath(target, root, dependencies, itemType === "directory")) {
+      return verdict(0);
+    }
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: New-Item is limited to physically contained scratch files and directories.\n");
+  }
+  if (name === "set-content" || name === "add-content") {
+    const named = powerShellNamedArgs(argv, ["-path", "-literalpath", "-value", "-encoding"], ["-nonewline"]);
+    const target = named?.values.get("-literalpath") ?? named?.values.get("-path");
+    const value = named?.values.get("-value");
+    const encoding = named?.values.get("-encoding");
+    if (named && !(named.values.has("-literalpath") && named.values.has("-path"))
+      && target && value !== undefined && (encoding === undefined || encoding.toLowerCase() === "utf8")
+      && powerShellScratchPath(target, root, dependencies)) return verdict(0);
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: content writes are limited to physically contained scratch files.\n");
+  }
+  if (["get-content", "get-childitem", "get-item", "test-path"].includes(name)) {
+    let target;
+    if (argv.length === 0 && name === "get-childitem") target = ".";
+    else if (argv.length === 1) target = argv[0];
+    else if (argv.length === 2 && ["-literalpath", "-path"].includes(argv[0].toLowerCase())) target = argv[1];
+    else return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: unsupported read arguments.\n");
+    return containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
+      ? verdict(0)
+      : verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_SCOPE_DENIAL_CODE}: read target outside approved roots.\n`);
+  }
+  if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
+  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use a sanctioned Pipeline action or a contained literal read.\n");
 }
 
 function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
@@ -5915,11 +6096,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   // bootstrap admission, cross-repo mutation, the closed grammar and gate strength alike.
   // On the native-Windows platform ADR-0051 makes a hard requirement, `Set-Content
   // project/guard-config.json` was exactly the shell bypass efe452c set out to close.
-  if (![...SHELL_TOOLS, ...WRITE_TOOLS].includes(toolName)) return verdict(0);
+  if (![...SHELL_TOOLS, ...WRITE_TOOLS, ...READ_TOOLS].includes(toolName)) return verdict(0);
   if (WRITE_TOOLS.includes(toolName)) {
     const filePath = writeTargetPath(input?.tool_input, toolName);
     if (filePath.trim() === "" || filePath.includes("\0")) return blocked();
-  } else {
+  } else if (SHELL_TOOLS.includes(toolName)) {
     const command = (input?.tool_input?.command ?? input?.tool_input?.CommandLine);
     if (typeof command !== "string" || command.trim() === "" || command.includes("\0")) return blocked();
   }
@@ -5932,15 +6113,12 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     return blocked();
   }
 
-  let governed;
-  try {
-    const exists = dependencies.existsSyncFn ?? existsSync;
-    governed = governanceMarkers(dependencies).markers.some((marker) => exists(join(root, marker)));
-  } catch {
-    return blocked();
-  }
-  if (!governed) return onboardingConsentBlocked(input, root) ?? verdict(0);
-  if (WRITE_TOOLS.includes(toolName) && isBootstrapAcknowledgementMarkerMutation(input)) {
+  if (READ_TOOLS.includes(toolName)) return readToolScopeVerdict(input, root, dependencies);
+  // A quoted marker in inert physical scratch is evidence, not PO authority.
+  // Existing scratch identity rejects aliases and active plugin roots; every
+  // later bootstrap, path and lifecycle check still applies.
+  if (WRITE_TOOLS.includes(toolName) && isBootstrapAcknowledgementMarkerMutation(input)
+    && !isIntakeLifecycleScratchWrite(input, root, dependencies)) {
     return bootstrapAcknowledgementMarkerBlocked();
   }
   // NVA-BOOTRECEIPT-1: a pure side effect, never a verdict of its own -- the sanctioned
@@ -6035,7 +6213,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   // parser, so a PowerShell command naming one of the five paths is refused even when it
   // only reads. That over-refuses on exactly five filenames and fails closed; a
   // PowerShell-aware read-only classifier is the proper fix.
-  if (toolName === "PowerShell") return withLifts(shellLifts, verdict(0));
+  if (toolName === "PowerShell") return withLifts(shellLifts, powerShellScopeVerdict(input, root, dependencies));
   // ADR-0059 Decision 6: a consumed cross-repository capability clears ONLY the
   // cross-repository objection. Every later check still runs against the lifted action --
   // the writer-owned State refusal, the closed shell grammar, the LAUNCH_SCRIPT external
@@ -6248,10 +6426,19 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       lifts.push(route.admitted);
     }
   }
-  return withLifts(lifts, evaluateAfterGrammarAdmission(input, root, toolName, dependencies));
+  const inspect = dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3;
+  let inspected = false, observed, inspectionError;
+  const consistent = {...dependencies, inspectProjectOnboardingV3Fn(options) {
+    if (!inspected) { inspected = true; try { observed = inspect(options); } catch (error) { inspectionError = error; } }
+    if (inspectionError) throw inspectionError;
+    return observed;
+  }};
+  const result = evaluateAfterGrammarAdmission(input, root, toolName, consistent);
+  return withLifts(lifts, withLifecycleReturnedActionTelemetry(result, input, root, toolName, consistent));
 }
 
 export function main(rawInput = undefined, dependencies = {}) {
+  if (!observeGovernanceScope({ rootDir: dependencies.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return 0;
   const writeError = dependencies.writeErrorFn ?? ((value) => process.stderr.write(value));
   let input;
   try {

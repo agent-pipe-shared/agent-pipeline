@@ -207,6 +207,7 @@
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
+| pipeline.design-package-parent-metadata-false-drift | open | defect | pipeline | — | 2026-09-29 | — | — |
 | pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
 | pipeline.design-workflow-package-omits-contract | open | defect | pipeline | alfred | 2026-09-28 | — | — |
@@ -275,6 +276,7 @@
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.git-apply-bypasses-draft-source-guard | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.git-commit-multiple-message-trailers-are-misparsed | closed | defect | pipeline | nova-b | 2026-09-14 | 2026-09-30 | — |
+| pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog | open | defect | pipeline | alfred | 2026-09-29 | — | 0.7 local candidate remediation — shipped hook runtime dependency closure |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | — | 2026-08-10 | 2026-08-17 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | — | 2026-08-10 | — | — |
@@ -455,6 +457,7 @@
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.onboarding-spec-marker-has-no-preapproval-reconcile | open | defect | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.onboarding-test-runner-reports-async-pass-before-settlement | open | defect | pipeline | alfred | 2026-09-29 | — | 0.7 test integrity and bounded runtime; Source repair delivered, final candidate verification pending. |
 | pipeline.operating-model-not-shipped-with-the-plugin | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading. |
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
@@ -749,7 +752,7 @@
 
 ## Counts
 
-- open: 84
+- open: 87
 - in_progress: 0
 - closed: 643
 - rejected: 3

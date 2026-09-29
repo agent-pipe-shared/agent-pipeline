@@ -1,0 +1,670 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.design-workflow-package.v2",
+  "title": "Initial consultation and final revised design approval package",
+  "description": "Initial advice is independently verified against its initial committed context; committed revisions and fresh readiness bind final sources. Integrity is not approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "featureId",
+    "authoringDispatchId",
+    "candidate",
+    "sources",
+    "advisor",
+    "readiness",
+    "createdAt"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.design-workflow-package.v2"
+    },
+    "featureId": {
+      "$ref": "#/$defs/id"
+    },
+    "authoringDispatchId": {
+      "$ref": "#/$defs/id"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "sources": {
+      "$ref": "#/$defs/sources"
+    },
+    "advisor": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/answeredAdvisor"
+        },
+        {
+          "$ref": "#/$defs/unavailableAdvisor"
+        }
+      ]
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "dispatchId"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "dispatchId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitObject": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._/@:-]+$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree"
+      ],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "tree": {
+          "$ref": "#/$defs/gitObject"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input",
+        "prd",
+        "spec",
+        "design",
+        "traceability"
+      ],
+      "properties": {
+        "input": {
+          "$ref": "#/$defs/source"
+        },
+        "prd": {
+          "$ref": "#/$defs/source"
+        },
+        "spec": {
+          "$ref": "#/$defs/source"
+        },
+        "design": {
+          "$ref": "#/$defs/source"
+        },
+        "traceability": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "evidenceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dispatchId",
+        "queueRevision",
+        "candidateCommit",
+        "candidateTree"
+      ],
+      "properties": {
+        "dispatchId": {
+          "$ref": "#/$defs/id"
+        },
+        "queueRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidateCommit": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "candidateTree": {
+          "$ref": "#/$defs/gitObject"
+        }
+      }
+    },
+    "consultation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "courseId",
+        "initialContextSha256",
+        "dispatch",
+        "questionSha256",
+        "evidenceSha256",
+        "receiptSha256",
+        "answerSha256",
+        "reportCanonicalSha256",
+        "proposalSetSha256"
+      ],
+      "properties": {
+        "courseId": {
+          "$ref": "#/$defs/id"
+        },
+        "initialContextSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "dispatch": {
+          "$ref": "#/$defs/dispatch"
+        },
+        "questionSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidenceSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receiptSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "answerSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reportCanonicalSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "proposalSetSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "courseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "courseId",
+        "initialContextSha256",
+        "reservationId",
+        "slot",
+        "routeStepSha256"
+      ],
+      "properties": {
+        "courseId": {
+          "$ref": "#/$defs/id"
+        },
+        "initialContextSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reservationId": {
+          "$ref": "#/$defs/id"
+        },
+        "slot": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "routeStepSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "courseId",
+        "consultationSha256",
+        "proposalSetSha256",
+        "items",
+        "ownerDispatchId",
+        "createdAt"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pipeline.design-advisor-disposition.v1"
+        },
+        "courseId": {
+          "$ref": "#/$defs/id"
+        },
+        "consultationSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "proposalSetSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "proposalId",
+              "decision",
+              "rationale",
+              "revisionCommit"
+            ],
+            "properties": {
+              "proposalId": {
+                "$ref": "#/$defs/id"
+              },
+              "decision": {
+                "enum": [
+                  "adopt",
+                  "reject",
+                  "defer"
+                ]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "revisionCommit": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/gitObject"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "ownerDispatchId": {
+          "$ref": "#/$defs/id"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "courseId",
+        "seq",
+        "priorRevisionSha256",
+        "candidate",
+        "sources",
+        "parentCommit",
+        "proposalIds",
+        "reason"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pipeline.design-advisor-revision.v1"
+        },
+        "courseId": {
+          "$ref": "#/$defs/id"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "priorRevisionSha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "sources": {
+          "$ref": "#/$defs/sources"
+        },
+        "parentCommit": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "proposalIds": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "reason": {
+          "enum": [
+            "advisor-disposition",
+            "readiness-correction",
+            "packaging-only"
+          ]
+        }
+      }
+    },
+    "answeredAdvisor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "runner",
+        "profile",
+        "route",
+        "initialContext",
+        "courseBinding",
+        "consultation",
+        "hostReceipt",
+        "receipt",
+        "report",
+        "disposition",
+        "revisions"
+      ],
+      "properties": {
+        "status": {
+          "const": "answered"
+        },
+        "runner": {
+          "const": "codex"
+        },
+        "profile": {
+          "enum": [
+            "epic",
+            "feature"
+          ]
+        },
+        "route": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model",
+            "effort",
+            "sourceSha256",
+            "candidateCommit"
+          ],
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "effort": {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
+            "sourceSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidateCommit": {
+              "$ref": "#/$defs/gitObject"
+            }
+          }
+        },
+        "initialContext": {
+          "$ref": "#/$defs/evidenceFile"
+        },
+        "courseBinding": {
+          "$ref": "#/$defs/courseBinding"
+        },
+        "consultation": {
+          "$ref": "#/$defs/consultation"
+        },
+        "hostReceipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sha256"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "receipt": {
+          "$ref": "#/$defs/evidenceFile"
+        },
+        "report": {
+          "$ref": "#/$defs/evidenceFile"
+        },
+        "disposition": {
+          "$ref": "#/$defs/disposition"
+        },
+        "revisions": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/revision"
+          }
+        }
+      }
+    },
+    "unavailableAdvisor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "runner",
+        "profile",
+        "route",
+        "initialContext",
+        "courseBinding",
+        "consultation",
+        "hostReceipt",
+        "receipt",
+        "report",
+        "disposition",
+        "revisions",
+        "failureEvidence",
+        "proposedException"
+      ],
+      "properties": {
+        "status": {
+          "const": "unavailable"
+        },
+        "runner": {
+          "enum": [
+            "codex",
+            "claude",
+            "antigravity"
+          ]
+        },
+        "profile": {
+          "enum": [
+            "epic",
+            "feature"
+          ]
+        },
+        "route": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model",
+            "effort",
+            "sourceSha256",
+            "candidateCommit"
+          ],
+          "properties": {
+            "model": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "effort": {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max",
+                null
+              ]
+            },
+            "sourceSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidateCommit": {
+              "$ref": "#/$defs/gitObject"
+            }
+          }
+        },
+        "initialContext": {
+          "$ref": "#/$defs/evidenceFile"
+        },
+        "courseBinding": {
+          "$ref": "#/$defs/courseBinding"
+        },
+        "consultation": {
+          "type": "null"
+        },
+        "hostReceipt": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "sha256"
+              ],
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/id"
+                },
+                "sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            }
+          ]
+        },
+        "receipt": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/evidenceFile"
+            }
+          ]
+        },
+        "report": {
+          "type": "null"
+        },
+        "disposition": {
+          "type": "null"
+        },
+        "revisions": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/revision"
+          }
+        },
+        "failureEvidence": {
+          "$ref": "#/$defs/evidenceFile"
+        },
+        "proposedException": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "approval",
+            "oneTime",
+            "rationale"
+          ],
+          "properties": {
+            "kind": {
+              "const": "advisor-unavailable"
+            },
+            "approval": {
+              "const": "final"
+            },
+            "oneTime": {
+              "const": true
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    }
+  }
+}

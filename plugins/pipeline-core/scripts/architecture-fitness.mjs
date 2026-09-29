@@ -256,12 +256,12 @@ export function evaluateContractPresenceFreshness({ rootDir, inventory }) {
       } else if (!isGlob) {
         try {
           const stat = fs.statSync(fullPath);
-          if (stat.size === 0) {
+          if (!stat.isFile() || fs.readFileSync(fullPath, "utf8").trim().length === 0) {
             violations.push({
               ruleId: "stale-contract",
               module: mod.id,
               target: contract,
-              details: `Public contract "${contract}" is empty (0 bytes)`
+              details: `Public contract "${contract}" is not a nonempty file`
             });
           }
         } catch (err) {
@@ -559,6 +559,16 @@ export function evaluateVerificationLocality({ rootDir, inventory }) {
           target: entry,
           details: `Declared verification entry point "${entry}" for module "${mod.id}" not found on disk`
         });
+      } else {
+        try {
+          if (!fs.statSync(fullPath).isFile() || fs.readFileSync(fullPath, "utf8").trim().length === 0) {
+            violations.push({ ruleId: "empty-verification-entry-point", module: mod.id, target: entry,
+              details: `Declared verification entry point "${entry}" is not a nonempty file` });
+          }
+        } catch {
+          violations.push({ ruleId: "unreadable-verification-entry-point", module: mod.id, target: entry,
+            details: `Declared verification entry point "${entry}" is unreadable` });
+        }
       }
     }
   }
@@ -568,7 +578,7 @@ export function evaluateVerificationLocality({ rootDir, inventory }) {
       classId: 6,
       propertyId: "verification-locality",
       outcome: OUTCOME_FINDING,
-      details: `${violations.length} missing verification entry point(s) detected`,
+      details: `${violations.length} missing, empty, or unreadable verification entry point(s) detected`,
       violations,
       evidence: { violations }
     };
@@ -578,7 +588,7 @@ export function evaluateVerificationLocality({ rootDir, inventory }) {
     classId: 6,
     propertyId: "verification-locality",
     outcome: OUTCOME_PASS,
-    details: "All declared module verification entry points exist and run locally.",
+    details: "All declared module verification entry points are nonempty local files; execution is checked by Verify.",
     violations: [],
     evidence: { modulesVerified: modules.map((m) => m.id) }
   };

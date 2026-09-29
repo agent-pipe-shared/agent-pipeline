@@ -100,6 +100,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { loadManifestSafe } from "../lib/manifest.mjs";
+import { buildScannerDiagnostics, observeLocalRules } from "../lib/security-scanner-diagnostics.mjs";
+import { publishScannerDiagnostics } from "../lib/security-scanner-diagnostics-publication.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 // NVA-SECGATE-1: gate-mode resolution now lives in security-completeness-gate.mjs (the
 // SHARED absent-key default both consumers use) -- see that function's own doc comment for
@@ -894,6 +896,7 @@ export async function runSecurityScan({
   // "invalid") from one that never produced output (`raw == null` -> "execution-unavailable").
   // Never read by the v1 evidence or the exit-code logic.
   const rawByTool = {};
+  const diagnosticRecords = [];
   const childProcessPreflight = scanRoot
     ? runChildProcessPreflight({ rootDir: scanRoot, timeoutMs, spawnFn })
     : { status: "ERROR", classification: "candidate_snapshot", reason: snapshot.reason };
@@ -949,9 +952,19 @@ export async function runSecurityScan({
           const adapterConfig = { ...builtConfig, binaryPath: inst.path };
           const runArgs = { rootDir: scanRoot, config: adapterConfig, timeoutMs, env };
           if (spawnFn) runArgs.spawnFn = spawnFn;
+          const rulesBefore = key === "semgrep" ? observeLocalRules(scanRoot, builtConfig.rulesDir) : null;
           const result = await adapter.run(runArgs);
           rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
           entry = scannerEntry(adapter, result, fileSha256(inst.path));
+          if (key === "semgrep") {
+            // Explicit unknown: robust descriptor/candidate provenance is unavailable.
+            diagnosticRecords.push({
+              tool: "semgrep",
+              executableSha256: entry.executableSha256,
+              rules: rulesBefore,
+              child: result.diagnostics ?? { observation: "not-observed" },
+            });
+          }
           findings.push(...result.findings);
         }
       }
@@ -1024,7 +1037,8 @@ export async function runSecurityScan({
   };
   const evidence = { ...evidenceCore, payloadSha256: sha256(canonicalJson(evidenceCore)) };
 
-  const evidenceDir = join(resolveEvidenceRoot(rootDir), "evidence");
+  const evidenceRoot = resolveEvidenceRoot(rootDir);
+  const evidenceDir = join(evidenceRoot, "evidence");
   mkdirSync(evidenceDir, { recursive: true });
   writeFileSync(join(evidenceDir, "security-latest.json"), JSON.stringify(evidence, null, 2) + "\n");
 
@@ -1051,6 +1065,15 @@ export async function runSecurityScan({
     process.stderr.write(`security-scan: v2 evidence emission skipped (non-fatal, exit code unchanged): ${err?.message ?? err}\n`);
   }
 
+  // G13 proposal: separate diagnostic-only storage, never an admission input.
+  try {
+    const diagnostics = buildScannerDiagnostics(evidence, diagnosticRecords);
+    if (publishScannerDiagnostics(evidenceRoot, diagnostics).status !== "published") {
+      process.stderr.write("security-scan: diagnostic sidecar unavailable (exit code unchanged)\n");
+    }
+  } catch {
+    process.stderr.write("security-scan: diagnostic sidecar unavailable (exit code unchanged)\n");
+  }
   return { evidence, exitCode, evidenceV2, verdictV2 };
 }
 

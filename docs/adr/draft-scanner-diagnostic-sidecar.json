@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-scanner-diagnostic-sidecar",
+  "title": "Bounded scanner diagnostic sidecar",
+  "status": "proposed",
+  "digest": "3caccbf3e194df46d43d03aabe8a5d9de25e8e0dc6af5bbde54a48c1f14d936e",
+  "scope": "global",
+  "date": "2026-09-29"
+}

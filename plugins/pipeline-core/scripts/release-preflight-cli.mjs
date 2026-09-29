@@ -85,6 +85,8 @@ const SOURCE_READER_REQUIRED_PATHS = Object.freeze([
   "harness/scripts/check-doc-contracts.mjs",
   "harness/scripts/check-doc-reconciliation.mjs",
   SOURCE_READER_CHECKER_PATH,
+  "harness/scripts/doc-reader-terminal-binding.mjs",
+  "plugins/pipeline-core/lib/governance-event.mjs",
   "harness/reader-review-protocol.md",
   "governance/observation-doc-governance.json",
   "docs/product-capability-inventory.json",
@@ -160,12 +162,12 @@ function sourceCalibration(root, commit) {
   }
 }
 
-function localSourceReaderChecker(root, candidateBytes) {
+function localSourceReaderChecker(root, candidateBytes, relativePath = SOURCE_READER_CHECKER_PATH) {
   let checkerPath;
   let rootRealPath;
   let checkerRealPath;
   try {
-    checkerPath = repoFile(root, SOURCE_READER_CHECKER_PATH, "source reader checker");
+    checkerPath = repoFile(root, relativePath, "source reader checker or dependency");
     rootRealPath = realpathSync(root);
     checkerRealPath = realpathSync(checkerPath);
   } catch {
@@ -226,6 +228,9 @@ function requireSourceReaderBinding(root, { base, candidate, featureId }) {
     const blob = committedRegularBlob(root, candidate.commit, path, SOURCE_READER_MEMBER_MAX_BYTES);
     if (blob === null) fail("RPC-DOC-READER-BINDING", "a required committed source reader member is missing or invalid");
     members.set(path, blob);
+  }
+  for (const path of ["harness/scripts/doc-reader-terminal-binding.mjs", "plugins/pipeline-core/lib/governance-event.mjs"]) {
+    localSourceReaderChecker(root, members.get(path), path);
   }
   const checkerPath = localSourceReaderChecker(root, members.get(SOURCE_READER_CHECKER_PATH));
   const child = spawnSync(process.execPath, [checkerPath, "--root", root, "--candidate", candidate.commit, "--feature-id", featureId], {

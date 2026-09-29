@@ -192,6 +192,20 @@ test("closed lifecycle derives draft, awaiting-approval, approved, and implement
   assert.equal(derivePlanLifecycle(awaiting).status, "awaiting-approval");
   const accepted = approved(awaiting);
   assert.equal(derivePlanLifecycle(accepted).status, "approved");
+
+  const exceptionState = structuredClone(accepted);
+  exceptionState.planApproval.designWorkflowApproval.advisorException = {
+    kind: "advisor-unavailable", oneTime: true, packageSha256: DESIGN_WORKFLOW_PACKAGE_SHA256,
+    courseId: "dac-genuine-failure", initialContextSha256: "a".repeat(64), failureEvidenceSha256: "b".repeat(64),
+    rationale: "The exact final PO decision includes the recorded Advisor-only exception.",
+  };
+  assert.equal(derivePlanLifecycle(exceptionState).status, "approved");
+  const mismatchedException = structuredClone(exceptionState);
+  mismatchedException.planApproval.designWorkflowApproval.advisorException.packageSha256 = "0".repeat(64);
+  assert.equal(derivePlanLifecycle(mismatchedException).ok, false);
+  const repeatedException = structuredClone(exceptionState);
+  repeatedException.planApproval.designWorkflowApproval.advisorException.oneTime = false;
+  assert.equal(derivePlanLifecycle(repeatedException).ok, false);
   const implementation = enterPlanImplementation({
     state: accepted,
     expectedStateSha256: sha256CanonicalJson(accepted),

@@ -47,7 +47,7 @@
         ]
       },
       {
-        "matcher": "Bash|PowerShell",
+        "matcher": "Bash|PowerShell|Read|Grep|Glob",
         "hooks": [
           {
             "type": "command",

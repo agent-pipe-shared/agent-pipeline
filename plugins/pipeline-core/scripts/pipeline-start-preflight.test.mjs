@@ -145,6 +145,9 @@ function readyObservation() {
 }
 function preflight(options) {
   return observePipelineStartPreflight({
+    observeGovernanceScopeFn: ({ rootDir }) => ({ schema: "pipeline.governance-scope.v1", state: "active", root: rootDir, scopeKey: "a".repeat(64), repositoryKind: "git", provenance: { kind: "isolated-unit-capability", refs: [] }, diagnostics: [], requiresEnforcement: true, hintAllowed: false }),
+    observeAntigravityLoadedTopologyFn: ({ loadedPluginRoot }) => ({ schema: "pipeline.antigravity-loaded-topology.v1", status: "current", loadedKind: "direct", loadedPluginRoot, executingGuardAssurance: "not-established-by-topology" }),
+
     observe: readyObservation,
     inspectEffectiveArchitectureDecisionsFn: () => ({
       schema: "pipeline.architecture-effective-decisions.v1", area: "project",
@@ -529,6 +532,21 @@ test("NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided drive
   });
 });
 
+test("a soft plugin refresh still exposes the not-ready project's onboarding action", () => {
+  const result = preflight({
+    env: {}, pluginList: pluginList("0.4.5+new"), read: () => manifest,
+    cwd: "/projects/current",
+    requireProjectOnboardingReadyFn() {
+      throw new ProjectOnboardingReadyError("PORG-NOT-READY", "onboarding pending", {
+        intent: "bootstrap", lifecycleStatus: "intake-required",
+      });
+    },
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.nextAction.kind, "command");
+  assert.equal(result.nextAction.argv[0], `${result.pluginRoot}/scripts/onboarding-init.mjs`);
+  assert.equal(result.nextAction.expected.schema, "pipeline.onboarding-init.v1");
+});
 test("NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged", () => {
   const cwd = "/projects/current";
   const result = preflight({

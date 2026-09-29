@@ -15,6 +15,7 @@ import {
   lstatSync,
   openSync,
   readFileSync,
+  readSync,
   realpathSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -128,7 +129,7 @@ function samePhysicalPath(left, right) {
     : left === right;
 }
 
-function readPhysicalAdvisoryEvidence(repoRoot, path) {
+function readPhysicalAdvisoryEvidence(repoRoot, path, remainingBytes = MAX_EVIDENCE_TOTAL_BYTES) {
   const resolvedRoot = resolve(repoRoot);
   const root = realpathSync(resolvedRoot);
   if (!samePhysicalPath(root, resolvedRoot) || !lstatSync(root).isDirectory()) {
@@ -144,6 +145,12 @@ function readPhysicalAdvisoryEvidence(repoRoot, path) {
     || !samePhysicalPath(realpathSync(lexical), lexical)) {
     throw new Error("advisory evidence reference is not a physical repository file");
   }
+  if (before.size > BigInt(MAX_EVIDENCE_REFERENCE_BYTES)) {
+    throw new Error("advisory evidence reference exceeds its byte limit");
+  }
+  if (before.size > BigInt(remainingBytes)) {
+    throw new Error("advisory evidence bundle exceeds its byte limit");
+  }
   let descriptor;
   try {
     const noFollow = process.platform === "win32" ? 0 : (constants.O_NOFOLLOW ?? 0);
@@ -152,7 +159,26 @@ function readPhysicalAdvisoryEvidence(repoRoot, path) {
     if (!sameEvidenceIdentity(before, opened) || opened.nlink !== 1n) {
       throw new Error("advisory evidence reference identity drifted before read");
     }
-    const bytes = readFileSync(descriptor);
+    if (opened.size > BigInt(MAX_EVIDENCE_REFERENCE_BYTES)) {
+      throw new Error("advisory evidence reference exceeds its byte limit");
+    }
+    if (opened.size > BigInt(remainingBytes)) {
+      throw new Error("advisory evidence bundle exceeds its byte limit");
+    }
+    const bound = Math.min(MAX_EVIDENCE_REFERENCE_BYTES, remainingBytes);
+    const storage = Buffer.alloc(bound + 1);
+    let count = 0;
+    while (count < storage.length) {
+      const read = readSync(descriptor, storage, count, storage.length - count, null);
+      if (read === 0) break;
+      count += read;
+    }
+    if (count > bound) {
+      throw new Error(bound < MAX_EVIDENCE_REFERENCE_BYTES
+        ? "advisory evidence bundle exceeds its byte limit"
+        : "advisory evidence reference exceeds its byte limit");
+    }
+    const bytes = storage.subarray(0, count);
     const afterDescriptor = fstatSync(descriptor, { bigint: true });
     const afterPath = lstatSync(lexical, { bigint: true });
     if (!sameEvidenceIdentity(opened, afterDescriptor)
@@ -179,7 +205,13 @@ export function buildAdvisoryEvidenceBundle(repoRoot, references) {
       || (index > 0 && references[index - 1] >= entry))) {
     throw new Error("advisory evidence references are invalid");
   }
-  const entries = references.map((path) => readPhysicalAdvisoryEvidence(repoRoot, path));
+  const entries = [];
+  let totalBytes = 0;
+  for (const path of references) {
+    const entry = readPhysicalAdvisoryEvidence(repoRoot, path, MAX_EVIDENCE_TOTAL_BYTES - totalBytes);
+    entries.push(entry);
+    totalBytes += entry.bytes;
+  }
   const bundle = { schema: ADVISORY_EVIDENCE_BUNDLE_SCHEMA, references: entries };
   const checked = validateAdvisoryEvidenceBundle(bundle);
   if (!checked.ok) throw new Error(checked.code);

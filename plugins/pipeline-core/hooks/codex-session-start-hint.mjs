@@ -11,6 +11,9 @@ import { inspectResumeHint, recordResumeHintConsumption, recordResumeHintDeliver
 import { readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput } from "../lib/onboarding-continuity.mjs";
 import { decideOutput, loadStateSafe, shouldActivate } from "./post-compact-reground.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -141,11 +144,13 @@ function resumeHintContextLines(root, sessionId) {
 }
 
 export function sessionStartDecision(projectDir = process.cwd(), exists = existsSync, sessionId = null, runner = "codex") {
+  const scope = observeGovernanceScope({ rootDir: projectDir });
+  if (!scope.requiresEnforcement && !scope.hintAllowed) return { governed: false, message: "", context: "" };
   let governed = false;
   let root = null;
   try {
     root = resolve(projectDir);
-    governed = GOVERNANCE_MARKERS.some((marker) => exists(join(root, marker)));
+    governed = scope.requiresEnforcement;
   } catch {
     // A session-start hint must never prevent Codex from opening a workspace.
   }
@@ -226,6 +231,14 @@ function readStdinInput() {
 }
 
 export function main({ projectDir, exists, input } = {}) {
+  const scope = observeGovernanceScope({ rootDir: projectDir ?? process.cwd() });
+  if (!scope.requiresEnforcement) {
+    if (scope.hintAllowed) {
+      const decision = sessionStartDecision(projectDir);
+      process.stdout.write(JSON.stringify({ systemMessage: decision.message, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: decision.context } }) + "\n");
+    }
+    return;
+  }
   const compact = compactStdout(input, projectDir);
   if (compact) {
     process.stdout.write(compact);

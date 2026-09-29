@@ -25,13 +25,14 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveSystemExecutable } from "./tool-identity.mjs";
 import { runCodexDesignReadinessHost } from "./codex-design-readiness-host.mjs";
 import { readCurrentReadinessAdvisorObservation } from "../lib/codex-readiness-finalization.mjs";
+import { readDesignReadinessPreparationFromRepository } from "../lib/design-workflow-package-v2.mjs";
 
 const NAMES = Object.freeze(["input", "prd", "spec", "design", "traceability"]);
 const OID = /^[a-f0-9]{40}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const PATH = /^(?!\/)(?!.*\\)(?!.*:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._/@-]+$/u;
-const USAGE = "usage: codex-design-readiness-bootstrap.mjs --repo-root <absolute-path> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <repo-path> --source <input|prd|spec|design|traceability> <repo-path> (repeat --source five times) [--advisor-receipt <repo-path> --advisor-route <repo-path>]";
+const USAGE = "usage: codex-design-readiness-bootstrap.mjs --repo-root <absolute-path> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <repo-path> --source <input|prd|spec|design|traceability> <repo-path> (repeat --source five times) [--advisor-preparation <pipeline.design-readiness-preparation.v2 repo-path> | --advisor-receipt <repo-path> --advisor-route <repo-path>]";
 const READINESS_SCHEMA = JSON.parse(readFileSync(new URL("../schemas/pipeline.design-readiness-receipt.v1.json", import.meta.url), "utf8"));
 
 function fail(message) { throw new Error(message); }
@@ -56,6 +57,7 @@ function parseArgs(argv) {
     const field = {
       "--repo-root": "repoRoot", "--dispatch-id": "dispatchId", "--queue-revision": "queueRevision",
       "--advisor-receipt": "advisorReceiptPath", "--advisor-route": "advisorRoutePath",
+      "--advisor-preparation": "advisorPreparationPath",
       "--session-id": "sessionId", "--expected-descriptor-sha256": "descriptorSha256", "--receipt": "receiptPath",
     }[key];
     if (!field) fail(USAGE);
@@ -71,6 +73,7 @@ function parseArgs(argv) {
   if (new Set([...Object.values(values.sources), values.receiptPath]).size !== NAMES.length + 1) fail("readiness paths must be unique");
   if ((values.advisorReceiptPath === undefined) !== (values.advisorRoutePath === undefined)
     || (values.advisorReceiptPath !== undefined && (!PATH.test(values.advisorReceiptPath) || !PATH.test(values.advisorRoutePath) || new Set([...Object.values(values.sources),values.receiptPath,values.advisorReceiptPath,values.advisorRoutePath]).size !== 8))) fail(USAGE);
+  if(values.advisorPreparationPath!==undefined&&(!PATH.test(values.advisorPreparationPath)||values.advisorReceiptPath!==undefined||new Set([...Object.values(values.sources),values.receiptPath,values.advisorPreparationPath]).size!==7))fail(USAGE);
   return values;
 }
 function candidateAtHead(root, execFile = execFileSync) {
@@ -180,8 +183,9 @@ export async function runCodexDesignReadinessBootstrap(argv = process.argv.slice
   const repoFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: topology.gitCommonDir, primaryRoot: topology.primaryRoot });
   const candidate = (deps.readCandidateFn ?? ((root) => candidateAtHead(root, deps.execFileSyncFn)))(args.repoRoot);
   const sourceSnapshot = readSources(args.repoRoot, args.sources, candidate, deps);
-  const observation = args.advisorReceiptPath === undefined ? null : readCurrentReadinessAdvisorObservation({repoRoot:args.repoRoot,candidate,sources:sourceSnapshot.sources,receiptPath:args.advisorReceiptPath,routePath:args.advisorRoutePath});
-  const advisorObservationRefs = observation === null ? null : {receiptRef:observation.receiptRef,routeRef:observation.routeRef};
+  const prepare=()=>{const value=readDesignReadinessPreparationFromRepository({repoRoot:args.repoRoot,packagePath:args.advisorPreparationPath});if(!value.ok||canonicalJson(value.advisorObservation.candidate)!==canonicalJson(candidate)||canonicalJson(value.advisorObservation.sources)!==canonicalJson(sourceSnapshot.sources))fail('Advisor readiness preparation is not current and verified');return value.advisorObservation;};
+  const observation = args.advisorPreparationPath!==undefined?prepare():args.advisorReceiptPath === undefined ? null : readCurrentReadinessAdvisorObservation({repoRoot:args.repoRoot,candidate,sources:sourceSnapshot.sources,receiptPath:args.advisorReceiptPath,routePath:args.advisorRoutePath});
+  const advisorObservationRefs = observation === null||args.advisorPreparationPath!==undefined ? null : {receiptRef:observation.receiptRef,routeRef:observation.routeRef};
   const output = targetPath(args.repoRoot, args.receiptPath);
   const helperCandidate = join(dirname(dirname(codexPath)), "codex-resources", "bwrap");
   let observedHelperPath = null;
@@ -198,6 +202,7 @@ export async function runCodexDesignReadinessBootstrap(argv = process.argv.slice
     },
     sources: sourceSnapshot.sources,
     advisorObservationRefs,
+    advisorObservation:args.advisorPreparationPath===undefined?null:observation,
     sandboxRuntime: {
       schema: "pipeline.codex-sandbox-runtime.v1",
       repoRoot: args.repoRoot,
@@ -207,7 +212,7 @@ export async function runCodexDesignReadinessBootstrap(argv = process.argv.slice
     },
   }, deps.readinessHostDependencies);
   if (result?.status !== "reviewed" || !result.readinessReceipt) {
-    return { ok: false, code: "CODEX-READINESS-UNAVAILABLE", childStarted: result?.childStarted ?? null };
+    return { ok: false, code: "CODEX-READINESS-UNAVAILABLE", hostCode: /^[A-Z][A-Z0-9-]{1,80}$/.test(result?.code ?? "") ? result.code : "CODEX-READINESS-HOST-UNAVAILABLE", childStarted: result?.childStarted ?? null };
   }
   const receipt = result.readinessReceipt;
   const schemaCheck = validateAgainstSchema(receipt, READINESS_SCHEMA);
@@ -218,7 +223,7 @@ export async function runCodexDesignReadinessBootstrap(argv = process.argv.slice
   const currentSnapshot = readSources(args.repoRoot, args.sources, currentCandidate, deps);
   if (JSON.stringify(currentCandidate) !== JSON.stringify(candidate)
     || currentSnapshot.evidenceSha256 !== sourceSnapshot.evidenceSha256) fail("candidate or readiness source changed while the review was running; receipt was not published");
-  if (observation !== null && canonicalJson(readCurrentReadinessAdvisorObservation({repoRoot:args.repoRoot,candidate:currentCandidate,sources:currentSnapshot.sources,...advisorObservationRefs})) !== canonicalJson(observation)) fail("Advisor runtime observation changed while readiness was running; receipt was not published");
+  if (observation !== null && canonicalJson(args.advisorPreparationPath!==undefined?prepare():readCurrentReadinessAdvisorObservation({repoRoot:args.repoRoot,candidate:currentCandidate,sources:currentSnapshot.sources,...advisorObservationRefs})) !== canonicalJson(observation)) fail("Advisor runtime observation changed while readiness was running; receipt was not published");
   const published = publishExclusive(output, receipt);
   return {
     ok: true,

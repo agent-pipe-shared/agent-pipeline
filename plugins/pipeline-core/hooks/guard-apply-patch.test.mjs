@@ -7,6 +7,13 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import vm from "node:vm";
+import { loadProtectedTestPathRules, protectedTestPathRuleFor } from "../lib/protected-test-paths.mjs";
+import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { applyOnboardingIntakeConsent, classifyOnboardingContinuity } from "../lib/onboarding-continuity.mjs";
+import { requireProjectOnboardingReady } from "../lib/project-onboarding-ready-gate.mjs";
+import { applyProjectOnboardingKickoffV4, expectedPipelineScriptsRunnerAllowlistEntries, planProjectOnboardingKickoffV4 } from "../lib/project-onboarding-v3.mjs";
 
 import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
@@ -35,6 +42,8 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
 function fixture(protectedPattern = null) {
   const root = mkdtempSync(join(tmpdir(), "guard-apply-patch-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
+  recordConsentGiven({ rootDir: root });
+  assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true);
   if (protectedPattern) {
     writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
       protectedTestPaths: [{ id: "PATCH-LOCK", pattern: protectedPattern, reason: "locked by test" }],
@@ -141,6 +150,93 @@ function runNativeCodexPatchGuard(root, command) {
   }
 }
 
+function runLifecycleWithObservedCaller(root, command, originalInput) {
+  const parsed = parseEofPatch(command);
+  const job = parsed.jobs.find(job => job.path.endsWith("guard-lifecycle-ready.mjs"));
+  assert.ok(job);
+  const translated = JSON.parse(job.input);
+  translated.session_id = JSON.parse(originalInput).session_id;
+  job.input = JSON.stringify(translated);
+  const source = readFileSync(guard, "utf8");
+  const start = source.indexOf("function killGuardProcess(child)");
+  const end = source.indexOf("\nasync function runGuardsInParallel", start);
+  assert.ok(start >= 0 && end > start);
+  const lifecycle = readFileSync(join(hookDir, "guard-lifecycle-ready.mjs"), "utf8");
+  const runnerStart = lifecycle.indexOf("function runnerFromArgv(argv)");
+  const runnerEnd = lifecycle.indexOf("\nfunction pathInside", runnerStart);
+  assert.ok(runnerStart >= 0 && runnerEnd > runnerStart);
+  const script = `const childProcess = require("node:child_process");
+let observed = null;
+const spawn = (executable, argv, options) => {
+  observed = {executable, argv, ambientClaudeCode: options.env.CLAUDECODE};
+  return childProcess.spawn(executable, argv, options);
+};
+const CHILD_TIMEOUT_MS = 4000;
+${source.slice(start, end)}
+${lifecycle.slice(runnerStart, runnerEnd)}
+(async () => {
+  const result = await runGuard(${JSON.stringify(job)});
+  console.log(JSON.stringify({...result,observed,parsedRunner:runnerFromArgv(observed.argv.slice(1))}));
+})().catch(error => {console.error(error.stack);process.exitCode = 1;});`;
+  const result = spawnSync(process.execPath, ["--eval", script], {
+    cwd: root, env: { ...process.env, CLAUDE_PROJECT_DIR: root, CLAUDECODE: "1" },
+    encoding: "utf8", timeout: 10_000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+let idleGuardFixtureRoot = null;
+function readyIdleGuardFixture() {
+  if (idleGuardFixtureRoot !== null) return idleGuardFixtureRoot;
+  const root = mkdtempSync(join(tmpdir(), "guard-apply-patch-ready-idle-"));
+  try {
+    const portablePlan = runOnboarding(root, ["plan", "--root", root, "--runner", "codex"]);
+    followOnboardingAction(root, portablePlan, "apply-portable-seed");
+    // These are explicit synthetic fixture inputs, recorded through the
+    // canonical intake owner before the first runtime restart.
+    applyOnboardingIntakeConsent({
+      rootDir: root, granted: true, gitAuthor: { name: "Idle Guard Fixture", email: "idle@example.invalid" },
+      language: "en", profile: "mini", text: "Exercise native patch guards in an onboarded idle project.\n", activate: true,
+    });
+    const runtimePlan = runOnboarding(root, ["plan-runtime", "--root", root, "--runner", "codex"]);
+    const runtime = followOnboardingAction(root, runtimePlan, "initialize-runtime");
+    assert.equal(runtime.status, "restart-required", JSON.stringify(runtime));
+    simulateHostRuntimeReadback(root);
+    // Mirror the existing Source readiness fixture's ignored host artifact.
+    // Values come from the producer; no admission or project authority is
+    // manufactured, and the real inspection/gate below must accept them.
+    writeFileSync(join(root, ".claude", "settings.local.json"), `${JSON.stringify({
+      permissions: { allow: expectedPipelineScriptsRunnerAllowlistEntries() },
+    }, null, 2)}\n`);
+    // Synthetic preparation uses the public library seam already used by the
+    // Source readiness fixtures; it does not claim an attended PO CLI action.
+    const kickoffInput = { rootDir: root, goal: "Exercise native patch guards", language: "en", runner: "codex" };
+    const kickoff = planProjectOnboardingKickoffV4(kickoffInput);
+    const kicked = applyProjectOnboardingKickoffV4({ ...kickoffInput, planSha256: kickoff.planSha256, activate: true });
+    assert.equal(kicked.status, "ready", JSON.stringify(kicked));
+    const writer = join(hookDir, "..", "scripts", "pipeline-state.mjs");
+    const discarded = spawnSync(process.execPath, [writer, "discard-feature", "--by", "Idle Guard Fixture", "--reason", "Fixture kickoff completed; test an idle onboarded project"], {
+      cwd: root, env: { ...process.env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8",
+    });
+    assert.equal(discarded.status, 0, discarded.stderr);
+    const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+    assert.equal(state.activeFeature, undefined);
+    assert.equal(state.discardedFeatures.length, 1);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+    assert.equal(observeGovernanceScope({ rootDir: root }).state, "active");
+    const inspected = runOnboarding(root, ["inspect", "--root", root, "--intent", "session", "--runner", "codex"]);
+    assert.equal(inspected.status, "ready", JSON.stringify(inspected));
+    assert.equal(requireProjectOnboardingReady({ rootDir: root, intent: "session", runner: "codex" }).status, "ready");
+    idleGuardFixtureRoot = root;
+    process.once("exit", () => rmSync(root, { recursive: true, force: true }));
+    return root;
+  } catch (error) {
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 function freshGeneratedConsumerFixture() {
   // Fresh onboarding is intentionally stricter than a generic hook fixture:
   // even an empty `.claude/` directory is an unrelated entry, so it is not a
@@ -149,18 +245,19 @@ function freshGeneratedConsumerFixture() {
   try {
     const portablePlan = runOnboarding(root, ["plan", "--root", root, "--runner", "codex"]);
     const portable = followOnboardingAction(root, portablePlan, "apply-portable-seed");
-    const runtimePlan = followOnboardingAction(root, portable, "plan-runtime");
-    const runtime = followOnboardingAction(root, runtimePlan, "initialize-runtime");
-    assert.equal(runtime.status, "restart-required", JSON.stringify(runtime));
-    simulateHostRuntimeReadback(root);
-    const intake = runOnboarding(root, ["inspect", "--root", root, "--runner", "codex"]);
     const originalMaterial = "Document the original fixture material only.\n";
-    const consented = applyCollectedOnboardingAction(root, intake, {
+    // The public route captures original material before its first restart;
+    // follow the producer's returned action rather than assuming runtime first.
+    const consented = applyCollectedOnboardingAction(root, portable, {
       "<PO_INTAKE_GIT_AUTHOR_NAME>": "Greenfield Fixture",
       "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "greenfield@example.invalid",
       "<PO_INTAKE_LANGUAGE>": "en",
       "<PO_INTAKE_PROFILE>": "feature",
     }, originalMaterial);
+    const runtimePlan = runOnboarding(root, ["plan-runtime", "--root", root, "--runner", "codex"]);
+    const runtime = followOnboardingAction(root, runtimePlan, "initialize-runtime");
+    assert.equal(runtime.status, "restart-required", JSON.stringify(runtime));
+    simulateHostRuntimeReadback(root);
     const designState = runOnboarding(root, ["inspect", "--root", root, "--runner", "codex"]);
     const answered = applyCollectedOnboardingAction(root, designState, {
       "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "Guard fixture." }]),
@@ -209,7 +306,7 @@ check("valid Add/Update/Delete/Move paths are extracted and checked", () => {
     "*** Delete File: docs/obsolete.md",
     "*** End Patch",
   ].join("\n");
-  const result = run(patch);
+  const result = run(patch, { root: readyIdleGuardFixture() });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, "");
 });
@@ -245,7 +342,7 @@ check("multi-file patches use bounded parallel guard fan-out", () => {
     ]).flat(),
     "*** End Patch",
   ].join("\n");
-  const result = run(patch);
+  const result = run(patch, { root: readyIdleGuardFixture() });
   assert.equal(result.status, 0, result.stderr);
 });
 
@@ -329,22 +426,17 @@ check("the lifecycle guard is invoked per patched path with an explicit codex ru
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   const patch = "*** Begin Patch\n*** Update File: src/a.mjs\n*** End Patch";
   const input = JSON.stringify({ tool_name: "apply_patch", session_id: "apply-patch-session", tool_input: { command: patch } });
-  const result = spawnSync(process.execPath, [guard], {
-    cwd: root,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root, CLAUDECODE: "1" },
-    encoding: "utf8",
-    input,
-  });
-  // A malformed/absent --runner makes guard-lifecycle-ready.mjs's own main()
-  // fail closed before ever reaching the gate, which surfaces only the
-  // generic "exact V4 ready result" message with no typed lifecycle status.
-  // Reaching the specific "session readiness is <status>" message proves an
-  // explicit, valid runner was threaded through and the gate was actually
-  // consulted -- despite CLAUDECODE=1 being present in the environment.
+  const observed = runLifecycleWithObservedCaller(root, patch, input);
+  const result = { status: observed.status, stderr: observed.stderr };
+  // Identity is observed at the actual Source spawn boundary. Generic denial
+  // wording also describes a valid runner inspecting a non-ready fixture.
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /guard-lifecycle-ready/);
-  assert.match(result.stderr, /Pipeline session readiness is/u);
-  assert.doesNotMatch(result.stderr, /exact V4 ready result for session intent/u);
+  assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  assert.equal(observed.observed.executable, process.execPath);
+  assert.deepEqual(observed.observed.argv, [join(hookDir, "guard-lifecycle-ready.mjs"), "--runner", "codex"]);
+  assert.equal(observed.observed.ambientClaudeCode, "1");
+  assert.equal(observed.parsedRunner, "codex");
 });
 
 check("architectural invariant: evaluateLifecycleReadyGuard's own outer tool-name gate still does not recognize apply_patch -- a raw, untranslated call reaching it directly is admitted unconditionally even against a governed path that the identical path in translated Edit shape blocks (regression pin for backlog: raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate; if this ever stops holding, guard-apply-patch.mjs's translate-first comment needs re-reading before anyone relies on the outer gate alone)", () => {
@@ -417,6 +509,17 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     assert.equal(readFileSync(prdPath, "utf8"), prdBytes);
     assert.equal(readFileSync(specPath, "utf8"), specBytes);
     assert.equal(readFileSync(scratchPath, "utf8"), scratchBytes);
+    const markerPending = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
+    assert.equal(markerPending.status, "bootstrap-binding-required", JSON.stringify(markerPending));
+    assert.equal(markerPending.nextAction?.kind, "command", JSON.stringify(markerPending));
+    assert.equal(markerPending.nextAction.argv[1], "intake-spec-marker-apply", JSON.stringify(markerPending));
+    assert.equal(markerPending.nextAction.requiresConfirmation, false);
+    const markerDigestIndex = markerPending.nextAction.argv.indexOf("--plan-sha256");
+    assert.notEqual(markerDigestIndex, -1);
+    assert.match(markerPending.nextAction.argv[markerDigestIndex + 1], /^[a-f0-9]{64}$/u);
+    const markerRepaired = followOnboardingAction(created.root, markerPending, "intake-spec-marker-apply");
+    assert.equal(markerRepaired.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
+    assert.equal(markerRepaired.status, "applied", JSON.stringify(markerRepaired));
     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
     assert.equal(postAuthoring.nextAction?.kind, "architecture-design-required", JSON.stringify(postAuthoring));
@@ -541,6 +644,139 @@ check("a generated checkpoint native patch rejects both symlinked scratch root a
     if (created) rmSync(created.root, { recursive: true, force: true });
     if (external) rmSync(external, { recursive: true, force: true });
   }
+});
+
+// Exercise the canonical parser/translation without an inactive-governance exit.
+function parseEofPatch(command) {
+  const source = readFileSync(guard, "utf8");
+  const start = source.indexOf("const lines = command.replace");
+  const end = source.indexOf("let exitCode = 0;", start);
+  const guardsStart = source.indexOf("const GUARDS =");
+  const guardsEnd = source.indexOf("const MAX_PARALLEL_GUARDS", guardsStart);
+  assert.ok(start >= 0 && end > start && guardsStart >= 0 && guardsEnd > guardsStart);
+  const guards = source.slice(guardsStart, guardsEnd).replaceAll("import.meta.url", JSON.stringify(new URL("./guard-apply-patch.mjs", import.meta.url).href));
+  return vm.runInNewContext(`${guards}\n${source.slice(start, end)}\n({ paths, jobs })`, {
+    command, input: { session_id: "eof-parser-fixture" }, URL, fileURLToPath,
+    block(reason) { throw new Error(reason); },
+  });
+}
+
+check("EOF01 canonical Update and renamed Update terminate at exact End of File", () => {
+  for (const move of [[], ["*** Move to: src/new.mjs"]]) {
+    const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: src/old.mjs", ...move, "@@", "-old", "+new", "*** End of File", "*** End Patch"].join("\n"));
+    assert.deepEqual(Array.from(parsed.paths, p => p.filePath), move.length ? ["src/old.mjs", "src/new.mjs"] : ["src/old.mjs"]);
+    assert.equal(parsed.jobs.length, parsed.paths.length * 4);
+  }
+});
+
+check("EOF02 orphan Add Delete and empty Update EOF markers fail closed", () => {
+  for (const operation of [[], ["*** Add File: src/a.mjs", "+new"], ["*** Delete File: src/a.mjs"], ["*** Update File: src/a.mjs"], ["*** Update File: src/a.mjs", "@@"], ["*** Update File: src/a.mjs", "+new"]]) {
+    assert.throws(() => parseEofPatch(["*** Begin Patch", ...operation, "*** End of File", "*** End Patch"].join("\n")), /orphan, misplaced, or duplicate End of File/);
+  }
+});
+
+check("EOF03 duplicate and nonterminal EOF markers fail closed", () => {
+  const prefix = ["*** Begin Patch", "*** Update File: src/a.mjs", "@@", "-old", "+new", "*** End of File"];
+  for (const tail of [["*** End of File"], ["+later"], ["@@", "+later"], ["*** Move to: src/new.mjs"], [""], ["stray"]]) {
+    assert.throws(() => parseEofPatch([...prefix, ...tail, "*** End Patch"].join("\n")), /duplicate End of File|nonterminal End of File/);
+  }
+});
+
+check("EOF04 unknown headers and all original path checks remain closed", () => {
+  for (const marker of ["*** End of File extra", "*** End of File:", "***  End of File", "*** Rename File: src/b.mjs"]) {
+    assert.throws(() => parseEofPatch(["*** Begin Patch", "*** Update File: src/a.mjs", "@@", "+new", marker, "*** End Patch"].join("\n")), /unknown or ambiguous patch header/);
+  }
+  for (const path of ["../outside", "src/../outside", "src//a.mjs", "src/a.mjs ", "src/"]) {
+    assert.throws(() => parseEofPatch(["*** Begin Patch", `*** Update File: ${path}`, "@@", "+new", "*** End of File", "*** End Patch"].join("\n")), /traversal, or ambiguous Update File path/);
+  }
+});
+
+check("EOF05 terminal marker resets only at a new file operation", () => {
+  const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: src/a.mjs", "@@ first", "+first", "*** End of File", "*** Update File: src/b.mjs", "@@", "+second", "*** End of File", "*** Add File: docs/new.md", "+new", "*** End Patch"].join("\n"));
+  assert.deepEqual(Array.from(parsed.paths, p => p.filePath), ["src/a.mjs", "src/b.mjs", "docs/new.md"]);
+  assert.equal(parsed.jobs.length, 12);
+  assert.throws(() => parseEofPatch("*** Begin Patch\n*** Update File: src/a.mjs\n@@\n+first\n@@\n*** End of File\n*** End Patch"), /misplaced/);
+});
+
+check("EOF06 terminal EOF preserves plain Update acknowledgement facts and protected rename destinations", () => {
+  const root = fixture("locked\\.test\\.mjs$");
+  try {
+    const literal = readFileSync(guard, "utf8").match(/line\.includes\(("[^\n]+?")\)/u)?.[1];
+    assert.equal(typeof literal, "string");
+    const marker = JSON.parse(literal);
+    const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: docs/staging.md", "@@", `+${marker}`, "*** End of File", "*** Update File: src/old.mjs", "*** Move to: locked.test.mjs", "@@", "+new", "*** End of File", "*** End Patch"].join("\n"));
+    const { rules } = loadProtectedTestPathRules({ rootDir: root });
+    assert.equal(protectedTestPathRuleFor(rules, parsed.paths[2].filePath, { rootDir: root })?.id, "PATCH-LOCK");
+    assert.equal(parsed.paths[0].patchContainsAcknowledgementMarker, true);
+    for (const path of parsed.paths) {
+      const jobs = parsed.jobs.filter(job => job.filePath === path.filePath);
+      assert.equal(jobs.length, 4);
+      for (const job of jobs) {
+        const input = JSON.parse(job.input);
+        assert.equal(input.tool_name, "Edit");
+        assert.equal(input.session_id, "eof-parser-fixture");
+        assert.equal(input.tool_input.file_path, path.filePath);
+        assert.equal(input.tool_input.patchContainsAcknowledgementMarker, path.patchContainsAcknowledgementMarker);
+      }
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("EOF07 inactive governance remains an unconditional hook no-op", () => {
+  const root = mkdtempSync(join(tmpdir(), "guard-apply-patch-inactive-"));
+  try {
+    const observation = observeGovernanceScope({ rootDir: root });
+    assert.equal(observation.state, "inactive");
+    assert.equal(observation.requiresEnforcement, false);
+    const result = run("*** Begin Patch\n*** End of File\n*** End Patch", { root });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+check("RCM01 renamed acknowledgement content reaches the writer-only denial with and without EOF", () => {
+  const root = fixture();
+  try {
+    writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+    const marker = JSON.parse(readFileSync(guard, "utf8").match(/line\.includes\(("[^\n]+?")\)/u)[1]);
+    for (const eof of [false, true]) {
+      const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: specs/plan.md", "*** Move to: specs/renamed-plan.md", "@@", `+${marker}`, ...(eof ? ["*** End of File"] : []), "*** End Patch"].join("\n"));
+      assert.deepEqual(Array.from(parsed.paths, path => path.filePath), ["specs/plan.md", "specs/renamed-plan.md"]);
+      assert.equal(parsed.paths.every(path => path.patchContainsAcknowledgementMarker === true), true);
+      const jobs = parsed.jobs.filter(job => job.path.endsWith("guard-lifecycle-ready.mjs"));
+      assert.equal(jobs.length, 2);
+      for (const job of jobs) {
+        const input = JSON.parse(job.input);
+        assert.equal(input.tool_input.patchContainsAcknowledgementMarker, true);
+        const result = evaluateLifecycleReadyGuard(input, { projectDir: root, runner: "codex" });
+        assert.equal(result.exitCode, 2, JSON.stringify(result));
+        assert.match(result.stderr, /GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u);
+      }
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("RCM02 innocuous renamed content never claims an acknowledgement fact", () => {
+  for (const eof of [false, true]) {
+    const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: specs/plan.md", "*** Move to: specs/renamed-plan.md", "@@", "+ordinary staging prose", ...(eof ? ["*** End of File"] : []), "*** End Patch"].join("\n"));
+    assert.equal(parsed.paths.every(path => path.patchContainsAcknowledgementMarker === false), true);
+    assert.equal(parsed.jobs.every(job => JSON.parse(job.input).tool_input.patchContainsAcknowledgementMarker === false), true);
+  }
+});
+
+check("RCM03 a fact observed before Move to also protects its destination", () => {
+  const marker = JSON.parse(readFileSync(guard, "utf8").match(/line\.includes\(("[^\n]+?")\)/u)[1]);
+  const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: specs/plan.md", "@@", `+${marker}`, "*** Move to: specs/renamed-plan.md", "*** End Patch"].join("\n"));
+  assert.equal(parsed.paths.every(path => path.patchContainsAcknowledgementMarker === true), true);
+});
+
+check("RCM04 rename facts stay within their own file operation", () => {
+  const marker = JSON.parse(readFileSync(guard, "utf8").match(/line\.includes\(("[^\n]+?")\)/u)[1]);
+  const parsed = parseEofPatch(["*** Begin Patch", "*** Update File: specs/plan.md", "*** Move to: specs/renamed-plan.md", "@@", `+${marker}`, "*** End of File", "*** Update File: docs/ordinary.md", "*** Move to: docs/renamed.md", "@@", "+ordinary", "*** End of File", "*** End Patch"].join("\n"));
+  assert.deepEqual(Array.from(parsed.paths, path => path.patchContainsAcknowledgementMarker), [true, true, false, false]);
 });
 
 if (process.exitCode) process.exit(process.exitCode);

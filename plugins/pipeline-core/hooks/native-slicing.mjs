@@ -11,6 +11,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 export const NATIVE_SLICING_THRESHOLD = 3;
 const STATE_SCHEMA = "pipeline.native-slicing-state.v1";
@@ -127,7 +132,6 @@ function saveState(path, state, dependencies = {}) {
 
 function withState(input, runner, options, callback) {
   try {
-    const rawSessionId = sessionId(input, runner);
     // Antigravity hooks execute from the installed integration directory. Its
     // event envelope carries the consumer workspace explicitly, while Codex
     // supplies cwd. Prefer the former only for that runner.
@@ -135,6 +139,8 @@ function withState(input, runner, options, callback) {
       ? input.workspacePaths.find((path) => typeof path === "string" && path !== "")
       : null;
     const rootDir = options.rootDir ?? workspaceRoot ?? input?.cwd ?? process.cwd();
+    if (!observeGovernanceScope({ rootDir }).requiresEnforcement) return { due: false, output: null };
+    const rawSessionId = sessionId(input, runner);
     const commonDir = (options.resolveGitCommonDirFn ?? resolveGitCommonDir)(rootDir, options);
     if (!rawSessionId || !commonDir) return { due: false, output: null };
     const { path, state } = loadState(commonDir, runner, rawSessionId, options);

@@ -175,6 +175,14 @@ function stripCodeComments(source) {
 // below), so an edge added or removed in the source without updating this table fails
 // rather than silently stops being covered.
 const DYNAMIC_IMPORT_EDGES = {
+  // The generated Git hook admission contains four dynamic calls. Builtins count
+  // toward call-site parity but only the snapshot observer is a first-party edge.
+  "plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs": [
+    "node:fs",
+    "node:crypto",
+    "node:path",
+    "./governance-scope.mjs",
+  ],
   // The Critic's model-role selector loads the host bootstrap only for the
   // Antigravity hook-session observation path. Both sides are protected so a
   // maintenance window cannot change which runner/model is admitted.
@@ -453,12 +461,12 @@ check("GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets 
     throw new Error(`Could not locate the "## Protected assets" ... "## Threats and controls" span in ${docPath}.`);
   }
   const section = doc.slice(sectionStart, sectionEnd);
-  const DOC_PATH_TOKEN_RE = /`((?:lib|scripts|hooks)\/[A-Za-z0-9_.\-]+\.(?:mjs|js|json)|project\/critical-human-proof\.json)`/g;
+  const DOC_PATH_TOKEN_RE = /`((?:plugins\/pipeline-core\/)?(?:lib|scripts|hooks|schemas)\/[A-Za-z0-9_.\-]+\.(?:mjs|js|json)|\.\/schemas\/[A-Za-z0-9_.\-]+\.json|harness\/(?:scripts|config)\/[A-Za-z0-9_.\-]+\.(?:mjs|json)|project\/critical-human-proof\.json)`/g;
   const docPaths = new Set();
   let match;
   while ((match = DOC_PATH_TOKEN_RE.exec(section)) !== null) {
     const token = match[1];
-    docPaths.add(token.startsWith("project/") ? token : `plugins/pipeline-core/${token}`);
+    docPaths.add(token.startsWith("./schemas/") ? token.slice(2) : token.startsWith("plugins/pipeline-core/") || token.startsWith("project/") || token.startsWith("harness/") ? token : `plugins/pipeline-core/${token}`);
   }
   const missing = NEVER_LIFTABLE_KERNEL_PATHS.filter((p) => !docPaths.has(p));
   assert.equal(
@@ -531,6 +539,17 @@ check("GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupti
     "fake comment markers between them must not have desynchronized the scan of the second " +
     "real import that follows it",
   );
+});
+
+check("GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots", () => {
+  for (const path of [
+    "harness/scripts/verify-case-completion-augmentation.mjs",
+    "harness/scripts/verify-case-completion-augmentation.test.mjs",
+    "harness/config/verify-case-completion-augmentations.v1.json",
+  ]) {
+    assert.ok(NEVER_LIFTABLE_KERNEL_PATHS.includes(path), path);
+    assert.equal(isNeverLiftableKernelPath(join(REPO_ROOT, path), { rootDir: REPO_ROOT }), true);
+  }
 });
 
 console.log(`\nguard-maintenance-window-kernel-closure: ${passed} passed, ${failed} failed`);

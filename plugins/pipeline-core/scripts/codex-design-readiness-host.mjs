@@ -11,6 +11,7 @@ import {validatePipelineUserV3} from '../lib/runner-profiles-v3.mjs';
 import {parseYaml} from '../lib/yaml-lite.mjs';
 import {createCodexDesignReadinessHostStore} from '../lib/codex-design-readiness-host-store.mjs';
 import {runCodexToolFreeDesignReadiness,verifyCodexToolFreeBindingFromSources} from '../lib/codex-tool-free-design-readiness.mjs';
+import {rereadCurrentReadinessAdvisorObservation} from '../lib/codex-readiness-finalization.mjs';
 
 const NAMES=['input','prd','spec','design','traceability'];
 const OID=/^[a-f0-9]{40}$/,SHA=/^[a-f0-9]{64}$/;
@@ -21,7 +22,7 @@ function currentCandidate(root){
   const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',timeout:10000,maxBuffer:524288,stdio:['ignore','pipe','pipe']}).trim();
   return {commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])};
 }
-export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,dispatchId,dispatch,sources,sandboxRuntime,advisorObservationRefs=null},dependencies={}){
+export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,dispatchId,dispatch,sources,sandboxRuntime,advisorObservationRefs=null,advisorObservation=null},dependencies={}){
   let inputDirectory=null;
   try{
     if(typeof repoRoot!=='string'||!isAbsolute(repoRoot)||resolve(repoRoot)!==repoRoot||realpathSync(repoRoot)!==repoRoot
@@ -47,14 +48,15 @@ export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,disp
       ||typeof sandboxRuntime.codexPath!=='string'||!isAbsolute(sandboxRuntime.codexPath))return unavailable('CODEX-READINESS-EXECUTABLE-UNAVAILABLE');
     const readCandidate=()=> (dependencies.readCandidate??currentCandidate)(repoRoot);
     if(!same(readCandidate(),candidate))return unavailable('CODEX-READINESS-CANDIDATE-DRIFT');
+    if(advisorObservation!==null){if(advisorObservationRefs!==null||!same(advisorObservation.candidate,candidate))return unavailable('CODEX-READINESS-ADVISOR-BINDING');advisorObservation=rereadCurrentReadinessAdvisorObservation(repoRoot,advisorObservation,sources,sandboxRuntime.codexPath);}
     const store=(dependencies.createHostStore??createCodexDesignReadinessHostStore)({gitCommonDir:topology.gitCommonDir,repoFingerprint,trustedExecutablePath:sandboxRuntime.codexPath});
     inputDirectory=mkdtempSync(join(store.processRoot,'input-'));
     const result=await (dependencies.runToolFreeReadiness??runCodexToolFreeDesignReadiness)({repoRoot,repoFingerprint,dispatchId,candidate,sources,route,
-      codexPath:sandboxRuntime.codexPath,inputDirectory,store,readCandidate,advisorObservationRefs});
+      codexPath:sandboxRuntime.codexPath,inputDirectory,store,readCandidate,advisorObservationRefs,advisorObservation});
     if(result?.status!=='reviewed'||!result.report)return unavailable(result?.code??'CODEX-READINESS-HOST-UNAVAILABLE');
     const sourceBytes=Object.fromEntries(NAMES.map(name=>[name,{path:sources[name].path,bytes:readFileSync(join(repoRoot,sources[name].path))}]));
     const checked=(dependencies.verifyBinding??verifyCodexToolFreeBindingFromSources)({hostExecution:result.report.hostExecution,report:result.report,
-      candidate,sources,route,sourceBytes,store,repoFingerprint,repoRoot,advisorObservationRefs});
+      candidate,sources,route,sourceBytes,store,repoFingerprint,repoRoot,advisorObservationRefs,advisorObservation,trustedAdvisorExecutablePath:sandboxRuntime.codexPath});
     if(!checked.ok||!same(readCandidate(),candidate))return unavailable('CODEX-READINESS-READBACK-FAILED');
     // Only verified closed ownership authorizes removal of the empty input directory.
     rmSync(inputDirectory,{recursive:true,force:false});inputDirectory=null;

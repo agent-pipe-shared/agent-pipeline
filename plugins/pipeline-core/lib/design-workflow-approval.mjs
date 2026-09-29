@@ -2,7 +2,7 @@
 
 /** Exact PO-decision contract for a complete design workflow package. */
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
-import { readApprovedDesignWorkflowPackage, readDesignWorkflowPackageFromRepository } from "./design-workflow-package.mjs";
+import { designWorkflowAdvisorExceptionBinding, readApprovedDesignWorkflowPackage, readDesignWorkflowPackageFromRepository } from "./design-workflow-package.mjs";
 import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 
 export const DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA = "pipeline.design-workflow-package-approval-request.v1";
@@ -23,18 +23,18 @@ const validApprovalIntent = (value) => exact(value, ["value", "sha256"])
   && SHA256.test(value.value.planSha256 ?? "")
   && SHA256.test(value.value.specSha256 ?? "")
   && validCandidate(value.value.candidate)
-  && value.value.policyRevision === "design-workflow-package-v1"
+  && ["design-workflow-package-v1", "design-workflow-package-v2"].includes(value.value.policyRevision)
   && SHA256.test(value.value.subjectSha256 ?? "")
   && value.value.decision === "approve";
 
-function makeIntent({ featureId, planSha256, specSha256, candidate, packageSha256 }) {
+function makeIntent({ featureId, planSha256, specSha256, candidate, packageSha256, packageSchema = "pipeline.design-workflow-package.v1" }) {
   return createPoApprovalIntent({
     kind: "design-workflow-package",
     featureId,
     planSha256,
     specSha256,
     candidate,
-    policyRevision: "design-workflow-package-v1",
+    policyRevision: packageSchema === "pipeline.design-workflow-package.v2" ? "design-workflow-package-v2" : "design-workflow-package-v1",
     subjectSha256: packageSha256,
     decision: "approve",
   });
@@ -49,12 +49,12 @@ function candidateReader(readCandidate) {
  * is physically re-read against the current repository candidate.
  */
 export function createDesignWorkflowPackageApprovalRequest({
-  repoRoot, packagePath, featureId, planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution,
+  repoRoot, packagePath, featureId, planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath,
 } = {}) {
   if (!ID.test(featureId ?? "") || !SAFE_PATH.test(planPath ?? "") || !SHA256.test(planSha256 ?? "")
     || !SAFE_PATH.test(specPath ?? "") || !SHA256.test(specSha256 ?? "")) return { ok: false, code: "DWP-APPROVAL-BINDING" };
   const packageRead = readDesignWorkflowPackageFromRepository({ repoRoot, packagePath, readCandidate: candidateReader(readCandidate),
-    ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}) });
+    ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath });
   if (!packageRead.ok) return packageRead;
   const pkg = packageRead.workflowPackage;
   if (pkg.featureId !== featureId) return { ok: false, code: "DWP-APPROVAL-FEATURE-MISMATCH" };
@@ -62,7 +62,7 @@ export function createDesignWorkflowPackageApprovalRequest({
     || pkg.sources.spec.path !== specPath || pkg.sources.spec.sha256 !== specSha256) return { ok: false, code: "DWP-APPROVAL-PLAN-SPEC-MISMATCH" };
   let approvalIntent;
   try {
-    approvalIntent = makeIntent({ featureId, planSha256, specSha256, candidate: pkg.candidate, packageSha256: packageRead.packageSha256 });
+    approvalIntent = makeIntent({ featureId, planSha256, specSha256, candidate: pkg.candidate, packageSha256: packageRead.packageSha256, packageSchema: pkg.schema });
   } catch { return { ok: false, code: "DWP-APPROVAL-INTENT" }; }
   return {
     ok: true,
@@ -71,6 +71,7 @@ export function createDesignWorkflowPackageApprovalRequest({
       packagePath,
       packageSha256: packageRead.packageSha256,
       approvalIntent,
+      ...(designWorkflowAdvisorExceptionBinding(packageRead) ? { advisorException: designWorkflowAdvisorExceptionBinding(packageRead) } : {}),
     },
     packageRead,
   };
@@ -80,9 +81,10 @@ export function createDesignWorkflowPackageApprovalRequest({
 export function validateDesignWorkflowPackageApprovalRequest({
   repoRoot, request, packagePath, featureId, planPath, planSha256, specPath, specSha256, readCandidate,
   verifyReadinessExecution,
+  trustedAdvisorExecutablePath,
   allowUnrelatedCommits = false,
 } = {}) {
-  if (!exact(request, ["schema", "packagePath", "packageSha256", "approvalIntent"])
+  if (!exact(request, ["schema", "packagePath", "packageSha256", "approvalIntent", ...(Object.hasOwn(request ?? {}, "advisorException") ? ["advisorException"] : [])])
     || request.schema !== DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA
     || !SAFE_PATH.test(request.packagePath ?? "") || (packagePath !== undefined && request.packagePath !== packagePath)
     || !SHA256.test(request.packageSha256 ?? "") || !validApprovalIntent(request.approvalIntent)) return { ok: false, code: "DWP-APPROVAL-REQUEST-SHAPE" };
@@ -91,18 +93,20 @@ export function validateDesignWorkflowPackageApprovalRequest({
       repoRoot, packagePath: request.packagePath, packageSha256: request.packageSha256,
       featureId, planPath, planSha256, specPath, specSha256,
       readCandidate: candidateReader(readCandidate),
+      trustedAdvisorExecutablePath, advisorExceptionBinding: request.advisorException ?? null,
     })
     : readDesignWorkflowPackageFromRepository({ repoRoot, packagePath: request.packagePath,
-      readCandidate: candidateReader(readCandidate), ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}) });
+      readCandidate: candidateReader(readCandidate), ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath });
   if (!packageRead.ok) return packageRead;
   const pkg = packageRead.workflowPackage;
+  if (canonical(designWorkflowAdvisorExceptionBinding(packageRead)) !== canonical(request.advisorException ?? null)) return { ok: false, code: "DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING" };
   if (pkg.featureId !== featureId || pkg.sources.prd.path !== planPath || pkg.sources.prd.sha256 !== planSha256
     || pkg.sources.spec.path !== specPath || pkg.sources.spec.sha256 !== specSha256
     || packageRead.packageSha256 !== request.packageSha256) return { ok: false, code: "DWP-APPROVAL-BINDING" };
   let expected;
   try {
     expected = makeIntent({ featureId, planSha256, specSha256, candidate: pkg.candidate,
-      packageSha256: request.packageSha256 });
+      packageSha256: request.packageSha256, packageSchema: pkg.schema });
   } catch { return { ok: false, code: "DWP-APPROVAL-INTENT" }; }
   if (canonical(expected) !== canonical(request.approvalIntent)) return { ok: false, code: "DWP-APPROVAL-INTENT-DRIFT" };
   return { ok: true, request, packageRead, packageSha256: request.packageSha256,
@@ -111,16 +115,17 @@ export function validateDesignWorkflowPackageApprovalRequest({
 
 export function verifyDesignWorkflowPackageApproval({
   repoRoot, request, proof, anchors, packagePath, featureId, planPath, planSha256, specPath, specSha256,
-  readCandidate, verifyReadinessExecution, allowUnrelatedCommits = false,
+  readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits = false,
 } = {}) {
   const checked = validateDesignWorkflowPackageApprovalRequest({ repoRoot, request, packagePath, featureId,
-    planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, allowUnrelatedCommits });
+    planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits });
   if (!checked.ok) return checked;
   const verified = verifyAgainstTrustAnchors({ intent: request.approvalIntent, anchors, proof });
   if (!verified.verified) return { ok: false, code: verified.code ?? "DWP-APPROVAL-PROOF-INVALID" };
   return { ok: true, code: "DWP-APPROVAL-VERIFIED", packageSha256: checked.packageSha256,
     intentSha256: checked.intentSha256, proof: structuredClone(proof), proofSha256: verified.proofSha256,
-    signer: verified.signer, packageRead: checked.packageRead };
+    signer: verified.signer, packageRead: checked.packageRead,
+    ...(request.advisorException ? { advisorException: structuredClone(request.advisorException) } : {}) };
 }
 
 /**
@@ -131,15 +136,16 @@ export function verifyDesignWorkflowPackageApproval({
  */
 export function verifyStoredDesignWorkflowPackageSignature({
   repoRoot, packagePath, packageSha256, featureId, planPath, planSha256, specPath, specSha256,
-  approval, anchors, readCandidate,
+  approval, anchors, readCandidate, trustedAdvisorExecutablePath,
 } = {}) {
-  if (!exact(approval, ["schema", "mode", "approvedBy", "approvedAt", "packageSha256", "intentSha256", "proofSha256", "proof"])
+  if (!exact(approval, ["schema", "mode", "approvedBy", "approvedAt", "packageSha256", "intentSha256", "proofSha256", "proof", ...(Object.hasOwn(approval ?? {}, "advisorException") ? ["advisorException"] : [])])
     || approval.schema !== DESIGN_WORKFLOW_APPROVAL_SCHEMA || approval.mode !== "signature"
     || approval.packageSha256 !== packageSha256 || !SHA256.test(approval.intentSha256 ?? "")
     || !SHA256.test(approval.proofSha256 ?? "")) return { ok: false, code: "DWP-APPROVAL-RECORD-SHAPE" };
   const packageRead = readApprovedDesignWorkflowPackage({
     repoRoot, packagePath, packageSha256, featureId, planPath, planSha256, specPath, specSha256,
     readCandidate: candidateReader(readCandidate),
+    trustedAdvisorExecutablePath, advisorExceptionBinding: approval.advisorException ?? null,
   });
   if (!packageRead.ok) return packageRead;
   let approvalIntent;
@@ -148,6 +154,7 @@ export function verifyStoredDesignWorkflowPackageSignature({
       featureId, planSha256, specSha256,
       candidate: packageRead.workflowPackage.candidate,
       packageSha256,
+      packageSchema: packageRead.workflowPackage.schema,
     });
   } catch { return { ok: false, code: "DWP-APPROVAL-INTENT" }; }
   if (approvalIntent.sha256 !== approval.intentSha256) return { ok: false, code: "DWP-APPROVAL-INTENT-DRIFT" };
@@ -156,11 +163,12 @@ export function verifyStoredDesignWorkflowPackageSignature({
     packagePath,
     packageSha256,
     approvalIntent,
+    ...(approval.advisorException ? { advisorException: structuredClone(approval.advisorException) } : {}),
   };
   const verified = verifyDesignWorkflowPackageApproval({
     repoRoot, request, proof: approval.proof, anchors,
     packagePath, featureId, planPath, planSha256, specPath, specSha256,
-    readCandidate, allowUnrelatedCommits: true,
+    readCandidate, trustedAdvisorExecutablePath, allowUnrelatedCommits: true,
   });
   if (!verified.ok) return verified;
   if (verified.proofSha256 !== approval.proofSha256

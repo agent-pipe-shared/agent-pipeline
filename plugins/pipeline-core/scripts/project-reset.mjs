@@ -82,6 +82,7 @@
  * inside an otherwise ordinary `ready` plan, because resuming an
  * interrupted reset is the case this item was filed for.
  */
+import { planResetGitHooks, applyResetGitHooks } from "../lib/project-reset-git-hooks.mjs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -125,6 +126,8 @@ export const PROJECT_RESET_APPLY_RESULT_SCHEMA = "pipeline.project-reset-apply-r
 // durable record of intent); a fault strictly before "journal-rename" is
 // recovered by discarding the orphaned temporary file and leaves the root
 // byte-identical to before the call.
+export const RESET_GIT_HOOK_FAULT_STAGES = Object.freeze(["git-hook-shim", "git-hook-remove", "git-hooks-complete"]);
+
 export const RESET_APPLY_FAULT_STAGES = Object.freeze([
   "journal-temp-fsync",
   "journal-rename",
@@ -500,6 +503,9 @@ export function planProjectReset({ rootDir } = {}) {
     }
   }
 
+  let gitHooks;
+  try { gitHooks = commonDir ? planResetGitHooks(root) : undefined; }
+  catch (error) { return refusal("root-unsafe", error.code ?? "PROJECT-RESET-GIT-HOOKS-UNSAFE", root); }
   const canonical = {
     schema: PROJECT_RESET_PLAN_SCHEMA,
     status: "ready",
@@ -509,6 +515,7 @@ export function planProjectReset({ rootDir } = {}) {
     remove,
     keep,
     neverTouched: NEVER_TOUCHED,
+    ...(gitHooks ? { gitHooks } : {}),
   };
   return { ...canonical, planSha256: canonicalSha256(canonical) };
 }
@@ -717,6 +724,7 @@ export function applyProjectReset({ rootDir, expectedPlanSha256, deps = {} } = {
       remove,
       keep: plan.keep,
       neverTouched: plan.neverTouched,
+      ...(plan.gitHooks ? { gitHooks: plan.gitHooks } : {}),
     };
     const bytes = Buffer.from(`${JSON.stringify(journal, null, 2)}\n`, "utf8");
     const temporary = writeControlFileSynced(journalPath, bytes);
@@ -732,6 +740,16 @@ export function applyProjectReset({ rootDir, expectedPlanSha256, deps = {} } = {
     fault("journal-rename");
     fsyncDirectory(root);
     fault("journal-directory-fsync");
+  }
+
+  if (journal.gitHooks !== undefined) {
+    const boundPlan = { schema: PROJECT_RESET_PLAN_SCHEMA, status: "ready", code: null, root, authorityTier: journal.authorityTier, remove: journal.remove, keep: journal.keep, neverTouched: journal.neverTouched, gitHooks: journal.gitHooks };
+    if (canonicalSha256(boundPlan) !== expectedPlanSha256) return refuseApply("PROJECT-RESET-GIT-HOOKS-JOURNAL-BINDING", root, journal.authorityTier);
+  }
+  try { applyResetGitHooks({ root, journal, fault }); }
+  catch (error) {
+    if (error.code === "PROJECT-RESET-APPLY-SIMULATED-FAULT") throw error;
+    return refuseApply(error.code ?? "PROJECT-RESET-GIT-HOOKS-UNSAFE", root, journal.authorityTier);
   }
 
   const moveable = journal.remove
@@ -774,6 +792,7 @@ export function applyProjectReset({ rootDir, expectedPlanSha256, deps = {} } = {
     remove: journal.remove,
     keep: journal.keep,
     neverTouched: journal.neverTouched,
+    ...(journal.gitHooks ? { gitHooks: journal.gitHooks } : {}),
     planSha256: expectedPlanSha256,
   };
   const receiptBytes = Buffer.from(`${JSON.stringify(result, null, 2)}\n`, "utf8");

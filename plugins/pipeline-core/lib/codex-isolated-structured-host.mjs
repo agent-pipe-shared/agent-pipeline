@@ -6,11 +6,12 @@ import { join } from 'node:path';
 import { canonicalJson } from './codex-sandbox-compatibility.mjs';
 import { checkedHostDirectory, readHostJournal } from './codex-host-process-journal.mjs';
 import { FINALIZED_READINESS_SCHEMA, FINALIZED_READINESS_FILENAME, validateReadinessFinalization, readReadinessSourceObservation, readFinalizedReadinessObservation } from './codex-readiness-finalization.mjs';
-import { rereadCurrentReadinessAdvisorObservation } from './codex-readiness-finalization.mjs';
+import {rereadCurrentReadinessAdvisorObservation} from './codex-readiness-finalization.mjs';
 import { parseStrictJson } from './governance-event.mjs';
 import { validateAgainstSchema } from './schema-lite.mjs';
 import { spawnManagedCodexHost } from './codex-host-process-supervisor.mjs';
 import { createHostOutputCustody } from './codex-host-output-custody.mjs';
+import {ADVISOR_FINALIZATION_FILENAME,ADVISOR_FINALIZATION_SCHEMA,observeAdvisorInitialHostInput,createAdvisorHostFinalization,validateAdvisorHostFinalization,readFinalizedAdvisorObservation,createAdvisorFailedFinalization,validateAdvisorFailedFinalization,ADVISOR_FAILED_FINALIZATION_SCHEMA} from './codex-advisor-host-record.mjs';
 
 export const DISABLED_FEATURES = Object.freeze([
   'apps', 'plugins', 'remote_plugin', 'browser_use', 'browser_use_external',
@@ -58,26 +59,26 @@ function physical(path, directory) {
 
 
 // Private controller publication only. Not exported; no caller JSON writer.
-function publishFinalizedReadiness(directory,value){
+function publishFinalizedObservation(directory,value,filename,validator,schema){
   checkedHostDirectory(directory);
-  if(!validateReadinessFinalization(value))throw boundedError('host-readiness-finalization-invalid');
+  if(!validator(value))throw boundedError('host-readiness-finalization-invalid');
   const bytes=Buffer.from(canonicalJson(value));if(bytes.length>65536)throw boundedError('host-readiness-finalization-unbounded');
   const temporary=join(directory,'.finalization-pending-'+randomBytes(16).toString('hex'));let fd;
   try{
     fd=openSync(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
     writeFileSync(fd,bytes);fsyncSync(fd);closeSync(fd);fd=undefined;
-    linkSync(temporary,join(directory,FINALIZED_READINESS_FILENAME));
+    linkSync(temporary,join(directory,filename));
     const dirfd=openSync(directory,constants.O_RDONLY|constants.O_DIRECTORY);try{fsyncSync(dirfd);}finally{closeSync(dirfd);}
   }finally{
     if(fd!==undefined)closeSync(fd);try{unlinkSync(temporary);}catch(error){if(error.code!=='ENOENT')throw error;}
     const dirfd=openSync(directory,constants.O_RDONLY|constants.O_DIRECTORY);try{fsyncSync(dirfd);}finally{closeSync(dirfd);}
   }
-  return {schema:FINALIZED_READINESS_SCHEMA,sha256:hash(bytes)};
+  return {schema,sha256:hash(bytes)};
 }
 
 export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort, prompt, outputSchema,
   startupTimeoutMs = 45_000, turnTimeoutMs = 180_000, managedProcess = null,
-  inputContract = null, beforeTurnInput = null, advisorRecipeSha256 = null, inputRecheckTimeoutMs = 5_000, readinessSourceContext = null, readinessAdvisorObservation = null } = {}) {
+  inputContract = null, beforeTurnInput = null, advisorRecipeSha256 = null, inputRecheckTimeoutMs = 5_000, readinessSourceContext = null, readinessAdvisorObservation = null, advisorSourceContext = null } = {}) {
   const inputDisposition = { contract: ['readiness', 'advisor'].includes(inputContract) ? inputContract : null, status: 'not-submitted', recheck: 'not-required',
     submissionCount: 0, requestSha256: null, recipeSha256: null };
   const inputRejected = code => ({ ok: false, code, report: null, observed: { ownership: null, inputDisposition } });
@@ -115,11 +116,19 @@ export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort,
     managedProcess = freezeInput({ journalParent: managedProcess.journalParent, receiptId: managedProcess.receiptId,
       binding: { ...managedProcess.binding } });
   } catch { return inputRejected('host-request-snapshot-invalid'); }
+  let advisorSourceBefore = null;
+  if (inputContract === 'advisor') {
+    try { advisorSourceContext = freezeInput(parseStrictJson(Buffer.from(JSON.stringify(advisorSourceContext))));
+      advisorSourceBefore = observeAdvisorInitialHostInput(advisorSourceContext, managedProcess.binding);
+      const rebuilt = advisorSourceBefore.request;
+      if (rebuilt.recipeSha256 !== advisorRecipeSha256 || rebuilt.prompt !== prompt || canonicalJson(rebuilt.outputSchema) !== canonicalJson(outputSchema) || advisorSourceContext.route.model !== model || advisorSourceContext.route.effort !== effort) throw boundedError('host-advisor-request-mismatch');
+    } catch { return inputRejected('host-advisor-source-unavailable'); }
+  } else if (advisorSourceContext !== null) return inputRejected('host-advisor-context-invalid');
   let supplementaryBefore = null;
   if (readinessAdvisorObservation !== null) {
     if (inputContract !== 'readiness' || readinessSourceContext === null) return inputRejected('host-readiness-advisor-context-invalid');
     try { readinessAdvisorObservation = freezeInput(parseStrictJson(Buffer.from(JSON.stringify(readinessAdvisorObservation))));
-      supplementaryBefore = rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources);
+      supplementaryBefore = rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources,codexPath);
     } catch {return inputRejected('host-readiness-advisor-context-unavailable');}
   }
   let sourceBefore = null;
@@ -299,9 +308,12 @@ export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort,
       const inputMetadata = Object.freeze({ schema: 'pipeline.codex-advisor-before-turn-input.v1',
         repoFingerprint: managedProcess.binding.repoFingerprint, dispatchId: managedProcess.binding.dispatchId,
         candidateCommit: managedProcess.binding.candidateCommit, requestSha256, recipeSha256: advisorRecipeSha256 });
+      const inputReadback = observeAdvisorInitialHostInput(advisorSourceContext, managedProcess.binding);
+      if (canonicalJson(inputReadback) !== canonicalJson(advisorSourceBefore)) throw boundedError('host-advisor-source-drift');
       await recheckAdvisorInput(beforeTurnInput, inputMetadata, inputRecheckTimeoutMs, inputDisposition);
+      if (canonicalJson(observeAdvisorInitialHostInput(advisorSourceContext, managedProcess.binding)) !== canonicalJson(advisorSourceBefore)) throw boundedError('host-advisor-source-drift');
     }
-    if (supplementaryBefore !== null && canonicalJson(rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources)) !== canonicalJson(supplementaryBefore)) throw boundedError('host-readiness-advisor-context-drift');
+    if (supplementaryBefore !== null && canonicalJson(rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources,codexPath)) !== canonicalJson(supplementaryBefore)) throw boundedError('host-readiness-advisor-context-drift');
     const turn = await response('turn/start', { threadId, input: [{ type: 'text', text: prompt }],
       model, effort, permissions: profileId, approvalPolicy: 'never', outputSchema });
     turnId = turn.turn?.id;
@@ -363,7 +375,7 @@ export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort,
     && inputContract === 'readiness' && sourceBefore !== null) {
     try {
       const sourceAfter = readReadinessSourceObservation(readinessSourceContext, managedProcess.binding);
-      if (supplementaryBefore !== null && canonicalJson(rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources)) !== canonicalJson(supplementaryBefore)) throw boundedError('host-readiness-advisor-context-drift');
+      if (supplementaryBefore !== null && canonicalJson(rereadCurrentReadinessAdvisorObservation(readinessSourceContext.repoRoot,readinessAdvisorObservation,readinessSourceContext.sources,codexPath)) !== canonicalJson(supplementaryBefore)) throw boundedError('host-readiness-advisor-context-drift');
       if (canonicalJson(sourceBefore) !== canonicalJson(sourceAfter)) throw boundedError('host-readiness-source-drift');
       const intent = readHostJournal(managed.directory, 'intent');
       if (!intent) throw boundedError('host-readiness-intent-unavailable');
@@ -379,17 +391,46 @@ export async function runIsolatedStructuredHost({ codexPath, cwd, model, effort,
         terminal: { exitCode: terminal.code, signal: terminal.signal, spawnError: terminal.spawnError, turnStatus, stdioStatus: outputObservation.stdioStatus },
         inputDisposition, ownership, outputCustody: outputObservation };
       delete finalization.candidateCommit;
-      finalizedReadiness = publishFinalizedReadiness(managed.directory, finalization);
+      finalizedReadiness = publishFinalizedObservation(managed.directory, finalization, FINALIZED_READINESS_FILENAME, validateReadinessFinalization, FINALIZED_READINESS_SCHEMA);
       const checked = readFinalizedReadinessObservation(managed.directory, { ...finalization, route: { model } });
       if (!checked || checked.sha256 !== finalizedReadiness.sha256) throw boundedError('host-readiness-finalization-readback');
     } catch { failure = 'host-readiness-finalization-unavailable'; finalizedReadiness = null; }
+  }
+  let finalizedAdvisor = null;
+  if (failure === null && terminal.code === 0 && terminal.signal === null && !terminal.spawnError && !effectAttempt && !protocolError && inputContract === 'advisor' && advisorSourceBefore !== null) {
+    try {
+      const advisorSourceAfter = observeAdvisorInitialHostInput(advisorSourceContext, managedProcess.binding);
+      const intent = readHostJournal(managed.directory, 'intent');
+      if (!intent) throw boundedError('host-advisor-intent-unavailable');
+      const finalization = createAdvisorHostFinalization({context:advisorSourceContext,sourceBefore:advisorSourceBefore,sourceAfter:advisorSourceAfter,intent,report,
+        session:{threadId,turnId,freshThreadStarted,ephemeralRequested,modelObserved,providerObserved},
+        controls:{configurationVerified,profileVerified,mcpVerified,profileIntentSha256:hash(JSON.stringify({filesystem,network:false})),unexpectedToolItems:events.other,serverRequests:events.serverRequest},
+        terminal:{exitCode:terminal.code,signal:terminal.signal,spawnError:terminal.spawnError,turnStatus,stdioStatus:outputObservation.stdioStatus},inputDisposition,ownership,outputCustody:outputObservation});
+      finalizedAdvisor = publishFinalizedObservation(managed.directory,finalization,ADVISOR_FINALIZATION_FILENAME,validateAdvisorHostFinalization,ADVISOR_FINALIZATION_SCHEMA);
+      const checked = readFinalizedAdvisorObservation(managed.directory,finalization.initialBinding,{path:codexPath,sha256:finalization.executableSha256,repoRoot:advisorSourceContext.repoRoot});
+      if (!checked || checked.sha256 !== finalizedAdvisor.sha256) throw boundedError('host-advisor-finalization-readback');
+    } catch {failure='host-advisor-finalization-unavailable';finalizedAdvisor=null;}
+  }
+  let finalizedAdvisorFailure = null;
+  if (finalizedAdvisor === null && failure !== null && ownership !== null && !terminal.observationTimedOut && terminal.code === 0 && terminal.signal === null && !terminal.spawnError && !effectAttempt && !protocolError && inputContract === 'advisor' && advisorSourceBefore !== null && report !== null && inputDisposition.status === 'acknowledged' && inputDisposition.submissionCount === 1) {
+    try {
+      const advisorSourceAfter = observeAdvisorInitialHostInput(advisorSourceContext, managedProcess.binding), intent = readHostJournal(managed.directory,'intent');
+      if (!intent) throw boundedError('host-advisor-intent-unavailable');
+      const value = createAdvisorFailedFinalization({context:advisorSourceContext,sourceBefore:advisorSourceBefore,sourceAfter:advisorSourceAfter,intent,report,
+        session:{threadId,turnId,freshThreadStarted,ephemeralRequested,modelObserved,providerObserved},
+        controls:{configurationVerified,profileVerified,mcpVerified,profileIntentSha256:hash(JSON.stringify({filesystem,network:false})),unexpectedToolItems:events.other,serverRequests:events.serverRequest},
+        terminal:{exitCode:terminal.code,signal:terminal.signal,spawnError:terminal.spawnError,turnStatus,stdioStatus:outputObservation.stdioStatus},inputDisposition,ownership,outputCustody:outputObservation});
+      finalizedAdvisorFailure = publishFinalizedObservation(managed.directory,value,ADVISOR_FINALIZATION_FILENAME,validateAdvisorFailedFinalization,ADVISOR_FAILED_FINALIZATION_SCHEMA);
+      const checked = readFinalizedAdvisorObservation(managed.directory,value.initialBinding,{path:codexPath,sha256:value.executableSha256,repoRoot:advisorSourceContext.repoRoot});
+      if (!checked || checked.sha256 !== finalizedAdvisorFailure.sha256) throw boundedError('host-advisor-failure-readback');
+    } catch { finalizedAdvisorFailure = null; }
   }
   const ok = failure === null && terminal.code === 0 && terminal.signal === null && !terminal.spawnError && !effectAttempt && !protocolError;
   return { ok, code: ok ? 'structured-host-reviewed' : failure ?? 'host-terminal-failed', report: ok ? report : null,
     observed: { threadId, turnId, requestSha256, ownership, receiptId: managed?.receiptId ?? null,
       journalDirectory: managed?.directory ?? null, inputDisposition,
       configurationVerified, profileVerified, mcpVerified, provider: providerObserved, model: modelObserved,
-      requestedEffort: effort, freshThreadStarted, ephemeralRequested, finalizedReadiness, profileIntentSha256: hash(JSON.stringify({ filesystem, network: false })),
+      requestedEffort: effort, freshThreadStarted, ephemeralRequested, finalizedReadiness, finalizedAdvisor, finalizedAdvisorFailure, profileIntentSha256: hash(JSON.stringify({ filesystem, network: false })),
       turnStatus, terminal, events, stdoutBytes, stderrBytes, outputCustody: outputObservation },
     limitation: 'Host-observed tool-free execution; no provider or OS-sandbox attestation.' };
 }

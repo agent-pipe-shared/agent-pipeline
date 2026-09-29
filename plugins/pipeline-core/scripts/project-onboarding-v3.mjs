@@ -4,6 +4,7 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { spawnSync as hostSpawnSync } from "node:child_process";
 import { isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -21,6 +22,8 @@ import {
   applyOnboardingIntakeDesignQuestions,
   applyOnboardingIntakeGenerate,
   planOnboardingIntakeGenerate,
+  planOnboardingIntakeSpecMarker,
+  applyOnboardingIntakeSpecMarker,
   planOnboardingBootstrapBind,
   applyOnboardingBootstrapBind,
   planOnboardingBootstrapAcknowledgement,
@@ -33,6 +36,7 @@ import {
   KICKOFF_PROMOTION_APPLY_SCHEMA,
 } from "../lib/onboarding-continuity.mjs";
 import {
+  planEnrollmentGitCreation, applyEnrollmentGitCreation, ENROLLMENT_GIT_CREATION_SCHEMA,
   applyProjectOnboardingManifestRepairV4,
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingKickoffPromotionV4,
@@ -86,6 +90,7 @@ const PRIVATE_INTAKE_COMMANDS = new Set([
   "intake-consent-apply", "intake-capture-apply", "intake-design-questions-apply",
   "intake-design-questions-replace", "intake-generate-plan", "intake-generate-apply",
   "bootstrap-bind-plan", "bootstrap-bind-apply",
+  "intake-spec-marker-plan", "intake-spec-marker-apply",
 ]);
 
 function privateIntakeRepositoryCapability(options, deps) {
@@ -184,6 +189,8 @@ function resolveIntakeCaptureText(options) {
 //              twice-Critic-reviewed defense-in-depth the guard is built on and
 //              is preserved here on purpose, not widened.
 const ONBOARDING_SUBCOMMANDS = Object.freeze([
+  {name:"plan-enrollment-git-creation",flat:true,mutates:false,automatedArgvShape:"lifecycle"},
+  {name:"apply-enrollment-git-creation",flat:true,mutates:true,automatedArgvShape:null},
   { name: "inspect", flat: true, mutates: false, automatedArgvShape: null },
   { name: "plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "plan-reinstall", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
@@ -241,6 +248,8 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   // sanctionedOnboardingArgs() branch too -- added under this same NVA-W5-COORD-STEP5-2 dispatch,
   // not literally alongside intake-generate-apply's (that one landed earlier, 2026-08-19, under
   // NVA-W5-GUARDADMIT-1's closure). Both branches exist today.
+  { name: "intake-spec-marker-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "intake-spec-marker-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "bootstrap-bind-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "bootstrap-bind-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "bootstrap-acknowledge-chat-apply", flat: true, mutates: true, automatedArgvShape: null },
@@ -308,6 +317,7 @@ function resolveOnboardingCliRunner(env, root, deps) {
 
 function usage() {
   return [
+    "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]",
     "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
@@ -316,7 +326,7 @@ function usage() {
     "       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
-    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array> --activate",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate",
   ].join("\n");
 }
 function parse(args) {
@@ -365,15 +375,19 @@ function parse(args) {
     else if (arg === "--git-author-email") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-email requires an email" }; output.gitAuthorEmail = value; index += 1; }
     else if (arg === "--text") { const value = args[index + 1]; if (value === undefined) return { error: "--text requires one argv text element" }; output.text = value; index += 1; }
     else if (arg === "--text-file") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--text-file requires one file path" }; output.textFile = value; index += 1; }
-    else if (arg === "--answers-json") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-json requires a JSON array" }; output.answersJson = value; index += 1; }
+    else if (arg === "--answers-json") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-json requires a JSON array or no-open-questions disposition" }; output.answersJson = value; index += 1; }
+    else if (arg === "--summary") output.summary = true;
+    else if (arg === "--request-create-git") output.requestCreateGit = true;
     else if (arg === "--activate") output.activate = true;
     else if (arg === "--help" || arg === "-h") output.help = true;
     else return { error: `unknown argument: ${arg}` };
   }
   if (!output.help && !output.command) return { error: "one command is required" };
   if (!output.help && !output.root) return { error: "--root is required" };
+  if (output.summary && output.command !== "intake-generate-plan") return { error: "--summary is only valid for intake-generate-plan" };
   if (output.command?.startsWith("adopt-remote-") && (!output.remote || !output.ref)) return { error: "adopt-remote requires --remote and --ref" };
   if (output.command === "adopt-remote-apply" && !output.planSha256) return { error: "adopt-remote apply requires --plan-sha256" };
+  if (output.command === "intake-spec-marker-apply" && !output.planSha256) return { error: "intake-spec-marker-apply requires --plan-sha256" };
   if (output.command === "bootstrap-acknowledge-apply" && (!output.planSha256 || !output.proof)) return { error: "bootstrap-acknowledge-apply requires --plan-sha256 and --proof" };
   if (output.command === "bootstrap-acknowledge-chat-apply" && !output.planSha256) return { error: "bootstrap-acknowledge-chat-apply requires --plan-sha256" };
   // `plan-repair`/`apply-repair` are the only non-kickoff commands that accept
@@ -414,6 +428,12 @@ function parse(args) {
         language: output.language,
       };
     }
+  }
+  if(["plan-enrollment-git-creation","apply-enrollment-git-creation"].includes(output.command)){
+    const allowed=new Set(["command","activate","intent","root","runner",...(output.command==="apply-enrollment-git-creation"?["planSha256","requestCreateGit"]:[])]);
+    if(Object.keys(output).some(key=>!allowed.has(key)))return {error:"Git creation command has unexpected flags"};
+    const names=args.slice(1).filter(arg=>arg.startsWith("--"));if(new Set(names).size!==names.length)return {error:"Git creation command has duplicate flags"};
+    if(output.command==="apply-enrollment-git-creation"&&(!output.activate||!output.requestCreateGit||!output.planSha256))return {error:"Git creation requires --request-create-git --plan-sha256 --activate"};
   }
   if (output.activate && !APPLY_SHAPED_COMMANDS.has(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
@@ -672,6 +692,30 @@ function withUnbornHeadDispatchDeferral({ root, intent, deps }) {
     },
   };
 }
+export function summarizeOnboardingIntakeGeneratePlan(plan, { runner, intent } = {}) {
+  const fullArgv = [fileURLToPath(import.meta.url), "intake-generate-plan", "--root", plan.root];
+  if (intent) fullArgv.push("--intent", intent);
+  if (runner) fullArgv.push("--runner", runner);
+  return {
+    schema: "pipeline.onboarding-intake-generate-plan-summary.v1",
+    root: plan.root,
+    repositoryCapability: plan.repositoryCapability,
+    featureId: plan.featureId,
+    checkpointDataSha256: plan.checkpointDataSha256,
+    planSha256: plan.planSha256,
+    targets: Object.fromEntries(Object.entries(plan.targets).map(([name, target]) => [name, {
+      path: target.path,
+      afterSha256: target.afterSha256,
+      byteLength: Buffer.byteLength(target.content, "utf8"),
+    }])),
+    nextAction: plan.nextAction,
+    fullPlanAction: {
+      kind: "command", executable: "node", argv: fullArgv,
+      mutation: false, requiresConfirmation: false,
+      expected: { schema: INTAKE_GENERATE_PLAN_SCHEMA },
+    },
+  };
+}
 
 export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
@@ -737,7 +781,18 @@ export function main(args = process.argv.slice(2), {
           { code: "INTAKE-LANGUAGE-PROJECTION-REQUIRED" });
       }
     }
-    if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });
+    if(options.command==="plan-enrollment-git-creation")output=planEnrollmentGitCreation({rootDir:options.root,runner:options.runner,deps});
+    else if(options.command==="apply-enrollment-git-creation"){
+      const planned=planEnrollmentGitCreation({rootDir:options.root,runner:options.runner,deps});
+      if(planned.status!=="planned")output=planned;
+      else if(planned.plan.planSha256!==options.planSha256)output={schema:ENROLLMENT_GIT_CREATION_SCHEMA,status:"refused",root:planned.root,code:"ER-GIT-PLAN-CAS",plan:null,nextAction:null};
+      else{
+        const confirmation=requireAttendedChatGateConfirmation({summaryLines:["CREATE LOCAL GIT AND RETIRE RETAINED ENROLLMENT HISTORY",planned.root,planned.plan.planSha256],expected:planned.plan.planSha256,dependencies:deps??{}});
+        if(!confirmation.ok){writeError("Git creation requires the human to confirm this exact digest in their attended terminal.\n"+formatOnboardingRerunCommand(args,options.runner)+"\n");return 1;}
+        output=applyEnrollmentGitCreation({plan:planned.plan,planSha256:options.planSha256,requestCreateGit:options.requestCreateGit,activate:options.activate});
+      }
+    }
+    else if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });
     else if (options.command === "plan-reinstall") output = planProjectOnboardingReinstall({ rootDir: options.root, deps });
     else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "plan-partial-authority") output = planProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, runner: options.runner, deps });
@@ -827,10 +882,19 @@ export function main(args = process.argv.slice(2), {
         rootDir: options.root, repositoryCapability, answers, replace: options.command === "intake-design-questions-replace", activate: options.activate, deps,
       });
     }
-    else if (options.command === "intake-generate-plan") output = planOnboardingIntakeGenerate({
-      rootDir: options.root, repositoryCapability, deps,
-    });
+    else if (options.command === "intake-generate-plan") {
+      const fullPlan = planOnboardingIntakeGenerate({ rootDir: options.root, repositoryCapability, deps });
+      output = options.summary
+        ? summarizeOnboardingIntakeGeneratePlan(fullPlan, { runner: options.runner, intent: options.intent })
+        : fullPlan;
+    }
     else if (options.command === "intake-generate-apply") output = applyOnboardingIntakeGenerate({
+      rootDir: options.root, repositoryCapability, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
+    });
+    else if (options.command === "intake-spec-marker-plan") output = planOnboardingIntakeSpecMarker({
+      rootDir: options.root, repositoryCapability, runner: options.runner, intent: options.intent,
+    });
+    else if (options.command === "intake-spec-marker-apply") output = applyOnboardingIntakeSpecMarker({
       rootDir: options.root, repositoryCapability, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
     });
     else if (options.command === "bootstrap-bind-plan") output = planOnboardingBootstrapBind({
@@ -897,13 +961,14 @@ export function main(args = process.argv.slice(2), {
     };
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
+  if(output.schema===ENROLLMENT_GIT_CREATION_SCHEMA)return ["planned","created","retained","refused"].includes(output.status)?0:1;
   // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,
   // ..., planSha256, targets }` shaped, no `status` field -- same
   // reaching-this-line-means-success convention as the two kickoff plan
   // schemas it is grouped with below.
   if ([
     "pipeline.codex-onboarding-kickoff-plan.v1", "pipeline.codex-onboarding-kickoff-promotion-plan.v1",
-    INTAKE_GENERATE_PLAN_SCHEMA,
+    INTAKE_GENERATE_PLAN_SCHEMA, "pipeline.onboarding-intake-generate-plan-summary.v1",
   ].includes(output.schema)) return 0;
   // Wave 4 intake-checkpoint apply commands (NVA-W4-COORD-1/2) are apply-only,
   // `{ schema, root, mutated, checkpoint }` shaped -- no `status` field, so
@@ -925,6 +990,8 @@ export function main(args = process.argv.slice(2), {
   // vocabulary). fail() throws on every non-success path (see applyOnboardingKickoffPromotion),
   // so reaching this line with this schema always means the apply succeeded, exactly like the
   // intake-checkpoint apply commands immediately above.
+  if (output.schema === "pipeline.onboarding-intake-spec-marker-plan.v1") return ["repair-required", "already-current"].includes(output.status) ? 0 : 1;
+  if (output.schema === "pipeline.onboarding-intake-spec-marker-apply.v1") return ["applied", "already-current"].includes(output.status) ? 0 : 1;
   if (output.schema === KICKOFF_PROMOTION_APPLY_SCHEMA) return 0;
   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
   // `runtime-attestation-required` is a legitimate resting point for an
@@ -937,6 +1004,7 @@ export function main(args = process.argv.slice(2), {
   // split, not a shared list: every other resting status stays shared because
   // each of those genuinely can be the settled outcome of either shape.
   const restingStatuses = new Set([
+    "enrollment-retirement-required", "enrollment-history-recovery-required", "enrollment-activation-required",
     "portable-seed-required", "runtime-initialization-required", "runtime-attestation-required",
     "restart-required", "kickoff-required", "host-repository-init-required", "ready",
     "migration-required", "adoption-required", "projection-drift",

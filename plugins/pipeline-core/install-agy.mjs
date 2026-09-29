@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { isDirectInvocation } from "./lib/entrypoint.mjs";
 import { writeLocalDevelopmentInstalledPluginReceipt } from "./scripts/installed-plugin-attestation-host.mjs";
+import { homedir } from "node:os";
+import { createAntigravityRefreshHost, resolveAntigravityCliPath } from "./lib/antigravity-topology-refresh-host.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const LOCAL_MARKETPLACE = join(process.env.HOME || process.env.USERPROFILE, "agent-pipeline-local-marketplace");
@@ -18,7 +20,8 @@ export function installerUsageLines() {
     "",
     "Run this from an approved Agent-Pipeline plugin directory while your shell is in the project Antigravity will govern.",
     "The interactive installer defaults to that approved directory. A local marketplace copy is an explicit pre-release development choice.",
-    "The installer checks the physical plugin manifest and registry binding; it does not prove GitHub origin or release authenticity.",
+    "The installer checks physical managed/import/registry/wiring topology and readback; it does not prove GitHub origin or release authenticity.",
+    "Global refresh uses the installed Agy CLI; CLI-owned metadata is never hand-edited. A fresh executing session remains required.",
   ];
 }
 
@@ -194,6 +197,13 @@ export function updateAutonomousSettings({ targetFile }) {
   }
 }
 
+export function refreshAntigravityInstallation(options, dependencies = {}) {
+  const host = createAntigravityRefreshHost({ ...options, ...dependencies, writeInstalledReceipt: dependencies.writeInstalledReceipt ?? writeLocalDevelopmentInstalledPluginReceipt });
+  const plan = host.prepare();
+  if (plan.status !== "prepared") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: plan.reason, completed: [] };
+  return host.apply(plan);
+}
+
 export function runInteractiveInstaller() {
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 console.log("\n=== Antigravity Pipeline Installer ===\n");
@@ -213,10 +223,10 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
   const corePluginPath = selectedSource.pluginRoot;
   
   console.log(`\nPipeline plugin target: ${corePluginPath}\n`);
-  console.log("Antigravity uses GitOps/JSON configs instead of a global marketplace.");
+  console.log("Antigravity may retain a managed imported copy alongside path registries; both are observed before refresh.");
   console.log("Where would you like to install the pipeline?\n");
   console.log("  1) Workspace-Local (Recommended for teams - writes .agents/plugins.json)");
-  console.log("  2) Global (Applies to all your local projects - writes ~/.gemini/config/plugins.json)\n");
+  console.log("  2) Global topology refresh (updates managed copy, owned global wiring/registry and existing Pipeline registration in this workspace)\n");
 
   rl.question("Select option (1 or 2): ", (answer) => {
     let targetFile;
@@ -235,7 +245,11 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     }
 
     try {
-      updatePluginRegistry({ targetFile, corePluginPath });
+      const configRoot = join(homedir(), ".gemini");
+      if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
+      const result = refreshAntigravityInstallation({ configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() });
+      console.log(JSON.stringify(result));
+      if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");
     } catch (error) {
       console.error(`Installation refused: ${error.message}`);
       rl.close();

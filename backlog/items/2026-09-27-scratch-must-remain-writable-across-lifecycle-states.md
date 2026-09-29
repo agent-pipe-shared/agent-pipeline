@@ -179,3 +179,16 @@ two actual PO signatures. This new observation still describes the loaded
 recovery build, not an installed successor qualification. Keep the item open
 until the new candidate's physical Scratch and host-boundary sweeps establish
 the required supported preparation lanes.
+
+### Exact test fixture refused by installed guard (2026-09-29)
+
+During the evening two-file writer/test signature course, a native
+`apply_patch` attempt to create an exact test-preimage fixture under owned
+Scratch was refused with `GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY` because
+the fixture's test content included the acknowledgement marker. The exact
+attempted filename was not captured, so this observation establishes the
+installed content-classification failure, not a path-specific regression.
+The unchanged installed guard applies that marker rule without physical
+Scratch classification; the staged Source successor adds the contained-Scratch
+condition and targeted tests. The refusal did not edit the fixture or Source.
+The installed candidate still needs a live native readback before closure.

@@ -39,6 +39,24 @@ import { loadMapBundle } from "./module-inventory.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { fixtureAdoption, fixtureGit } from "./architecture-adoption-test-fixture.mjs";
 
+it("physical fitness rejects empty and whitespace-only contract and verification files", () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-empty-"));
+  try {
+    fs.mkdirSync(path.join(rootDir, "docs"));
+    fs.mkdirSync(path.join(rootDir, "tests"));
+    fs.writeFileSync(path.join(rootDir, "docs/contract.md"), " \n");
+    fs.writeFileSync(path.join(rootDir, "tests/app.test.mjs"), "");
+    const inventory = [{ id: "app", publicContracts: ["docs/contract.md"],
+      verificationEntryPoints: ["tests/app.test.mjs"] }];
+    assert.equal(evaluateContractPresenceFreshness({ rootDir, inventory }).violations[0].ruleId, "stale-contract");
+    assert.equal(evaluateVerificationLocality({ rootDir, inventory }).violations[0].ruleId, "empty-verification-entry-point");
+    fs.writeFileSync(path.join(rootDir, "docs/contract.md"), "# Contract\n");
+    fs.writeFileSync(path.join(rootDir, "tests/app.test.mjs"), "test('app', () => {});\n");
+    assert.equal(evaluateContractPresenceFreshness({ rootDir, inventory }).outcome, OUTCOME_PASS);
+    assert.equal(evaluateVerificationLocality({ rootDir, inventory }).outcome, OUTCOME_PASS);
+  } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+});
+
 it("actual fitness compares the durable accepted snapshot and refuses absent authority", () => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-accepted-"));
   try {

@@ -6,6 +6,11 @@ import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+
+
 
 const STOP_SUGGEST = fileURLToPath(new URL("./stop-suggest.mjs", import.meta.url));
 
@@ -36,8 +41,11 @@ try {
   projectRoot = process.cwd();
 }
 
+if (!observeGovernanceScope({ rootDir: projectRoot }).requiresEnforcement) { process.stdout.write("{}\n"); process.exit(0); }
+
 try {
   const result = spawnSync(process.execPath, [STOP_SUGGEST], {
+
     cwd: projectRoot,
     env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
     encoding: "utf8",

@@ -5,7 +5,7 @@
  * Read-only browser-evidence capability check.
  *
  * This deliberately probes a locally installed Playwright package and its
- * Chromium executable without running a product test, installing packages, or
+ * Chromium launch without running a product test, installing packages, or
  * downloading a browser.  A browser test failure belongs to the consumer's
  * Verify receipt; this preflight reports only whether that class of evidence
  * was available before the test began.  A declared fallback remains a
@@ -22,7 +22,7 @@ export const BROWSER_EVIDENCE_CLASSES = Object.freeze(["static", "offline-behavi
 
 const PLAYWRIGHT_PROBE = String.raw`
 const fs = require("node:fs");
-try {
+void (async () => { try {
   let playwright = null;
   for (const packageName of ["@playwright/test", "playwright"]) {
     try {
@@ -36,15 +36,26 @@ try {
     process.stdout.write(JSON.stringify({ state: "package-missing" }));
   } else {
     const executablePath = playwright.chromium?.executablePath?.();
-    if (typeof executablePath !== "string" || executablePath.length === 0) {
+    if (typeof executablePath !== "string" || executablePath.length === 0 || typeof playwright.chromium.launch !== "function") {
       process.stdout.write(JSON.stringify({ state: "probe-invalid" }));
+    } else if (!fs.existsSync(executablePath)) {
+      process.stdout.write(JSON.stringify({ state: "browser-missing" }));
     } else {
-      process.stdout.write(JSON.stringify({ state: fs.existsSync(executablePath) ? "ready" : "browser-missing", executablePath }));
+      try {
+        const browser = await playwright.chromium.launch({ headless: true, timeout: 10000 });
+        await browser.close();
+        process.stdout.write(JSON.stringify({ state: "ready" }));
+      } catch (error) {
+        const reason = String(error?.message ?? "");
+        const state = /error while loading shared libraries|Host system is missing dependencies/u.test(reason)
+          ? "host-dependency-missing" : "browser-launch-failed";
+        process.stdout.write(JSON.stringify({ state }));
+      }
     }
   }
 } catch {
   process.stdout.write(JSON.stringify({ state: "probe-error" }));
-}
+} })();
 `;
 
 function unavailable(code, detail, { requiredEvidence, fallbackEvidence } = {}) {
@@ -70,7 +81,7 @@ function probePlaywrightBrowser(rootDir, { spawnFn = spawnSync } = {}) {
       cwd: rootDir,
       encoding: "utf8",
       shell: false,
-      timeout: 10_000,
+      timeout: 20_000,
     });
   } catch {
     return { state: "probe-error" };
@@ -137,7 +148,7 @@ export function preflightBrowserEvidence({ rootDir = process.cwd(), requiredEvid
       selectedEvidence: "browser-e2e",
       testExecuted: false,
       installAttempted: false,
-      detail: "Playwright and its Chromium executable are locally available; no browser test was run by this preflight.",
+      detail: "Playwright launched and closed its local Chromium browser; no product test was run by this preflight.",
       exitCode: 0,
     });
   }
@@ -160,7 +171,11 @@ export function preflightBrowserEvidence({ rootDir = process.cwd(), requiredEvid
     ? "BEP-PLAYWRIGHT-PACKAGE-UNAVAILABLE"
     : observed.state === "browser-missing"
       ? "BEP-CHROMIUM-UNAVAILABLE"
-      : "BEP-BROWSER-PROBE-FAILED";
+      : observed.state === "host-dependency-missing"
+        ? "BEP-BROWSER-HOST-DEPENDENCY-UNAVAILABLE"
+        : observed.state === "browser-launch-failed"
+          ? "BEP-CHROMIUM-LAUNCH-UNAVAILABLE"
+          : "BEP-BROWSER-PROBE-FAILED";
   return Object.freeze({
     ...unavailable(code, `Browser E2E is unavailable before any test ran (${observed.state}).`, { requiredEvidence, fallbackEvidence }),
     exitCode: 1,

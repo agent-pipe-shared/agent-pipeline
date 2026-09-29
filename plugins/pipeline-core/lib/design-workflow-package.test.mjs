@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -67,6 +69,49 @@ function materializeFixture(root, fixture) {
     writeFileSync(target, data);
   }
   return packagePath;
+}
+
+function physicalReadbackMutationControl({ mutation, accepted }) {
+  const root = mkdtempSync(join(tmpdir(), "design-workflow-package-parent-control-"));
+  const nativeRead = fs.readFileSync;
+  try {
+    const fixture = baseFixture();
+    const packagePath = materializeFixture(root, fixture);
+    const artifactPaths = [packagePath, ...Object.values(fixture.workflowPackage.sources).map(entry => entry.path),
+      fixture.workflowPackage.advisor.receipt.path, fixture.workflowPackage.readiness.path];
+    const before = artifactPaths.map(path => nativeRead(join(root, path)));
+    let descriptorReads = 0;
+    let mutationCalls = 0;
+    fs.readFileSync = function (...args) {
+      const bytes = nativeRead(...args);
+      if (typeof args[0] === "number" && ++descriptorReads === artifactPaths.length + 1) {
+        mutationCalls++;
+        mutation({ root, packagePath, artifactPaths, before });
+      }
+      return bytes;
+    };
+    syncBuiltinESMExports();
+    const result = readApprovedDesignWorkflowPackage({
+      repoRoot: root, packagePath, packageSha256: sha(fixture.packageBytes),
+      featureId: fixture.workflowPackage.featureId,
+      planPath: fixture.workflowPackage.sources.prd.path, planSha256: fixture.workflowPackage.sources.prd.sha256,
+      specPath: fixture.workflowPackage.sources.spec.path, specSha256: fixture.workflowPackage.sources.spec.sha256,
+      readCandidate: () => candidate,
+    });
+    assert.equal(mutationCalls, 1, "mutation happens exactly within the first final physical reopen");
+    assert.equal(result.ok, accepted, JSON.stringify(result));
+    if (!accepted) assert.equal(result.code, "DWP-PHYSICAL-DRIFT");
+    if (accepted) {
+      assert.deepEqual(artifactPaths.map(path => nativeRead(join(root, path))), before,
+        "unrelated directory entries must not change any admitted artifact bytes");
+      assert.equal(result.approvedBinding, true);
+    }
+  } finally {
+    fs.readFileSync = nativeRead;
+    syncBuiltinESMExports();
+    fs.chmodSync(root, 0o700);
+    rmSync(root, { recursive: true, force: true });
+  }
 }
 
 function baseFixture({ unavailable = false, selectedCandidate = candidate } = {}) {
@@ -525,6 +570,30 @@ check("implementation readback requires the exact approved digest, feature, PRD 
       "DWP-APPROVAL-PLAN-SPEC-MISMATCH");
     assert.equal(readApprovedDesignWorkflowPackage({ ...args, specSha256: "e".repeat(64) }).code,
       "DWP-APPROVAL-PLAN-SPEC-MISMATCH");
+
+    physicalReadbackMutationControl({ accepted: true, mutation({ root }) {
+      mkdirSync(join(root, "unrelated-sibling-directory"));
+    } });
+    physicalReadbackMutationControl({ accepted: true, mutation({ root }) {
+      writeFileSync(join(root, "unrelated-sibling-file"), "unrelated content\n");
+    } });
+    physicalReadbackMutationControl({ accepted: false, mutation({ root }) {
+      fs.chmodSync(root, 0o500);
+    } });
+    physicalReadbackMutationControl({ accepted: false, mutation({ root, artifactPaths, before }) {
+      fs.renameSync(join(root, "specs"), join(root, "displaced-specs"));
+      for (const [index, path] of artifactPaths.entries()) {
+        mkdirSync(dirname(join(root, path)), { recursive: true });
+        writeFileSync(join(root, path), before[index]);
+      }
+    } });
+    physicalReadbackMutationControl({ accepted: false, mutation({ root }) {
+      fs.renameSync(join(root, "specs"), join(root, "displaced-specs"));
+      symlinkSync(join(root, "displaced-specs"), join(root, "specs"));
+    } });
+    physicalReadbackMutationControl({ accepted: false, mutation({ root, packagePath }) {
+      writeFileSync(join(root, packagePath), "changed admitted package bytes\n");
+    } });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

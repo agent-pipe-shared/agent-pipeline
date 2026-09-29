@@ -4,6 +4,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import * as existingIdentityFs from "node:fs";
+import { randomBytes as existingIdentityRandomBytes } from "node:crypto";
+import { join as existingIdentityJoin } from "node:path";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -15,6 +18,8 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest } from "./critical-action-approval-request.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import {
+  readExistingLocalRepositoryFingerprint as observeExistingIdentity,
+  readLocalRepositoryFingerprint as mintExistingIdentity,
   GOVERNANCE_FORK_DISPOSITION_APPROVAL,
   GovernanceEventStoreError,
   governanceForkDispositionApprovalSubject,
@@ -1271,4 +1276,65 @@ test("PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/oth
   await chmod(restrictedRoot, 0o750);
   const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: false }, secureWindowsIo());
   assert.equal(resolved, restrictedRoot);
+});
+
+function existingIdentityFileSnapshot(file) {
+  const stat = existingIdentityFs.lstatSync(file, { bigint: true });
+  return ['dev','ino','mode','uid','nlink','size','mtimeNs','ctimeNs'].map(key => stat[key]);
+}
+const EXISTING_IDENTITY_BINDING_SCHEMA = 'pipeline.governance-event-repository-binding.v2';
+function existingIdentityFixture(t) {
+  const root = existingIdentityFs.mkdtempSync(existingIdentityJoin(os.tmpdir(),'existing-identity-fixture-'));
+  t.after(()=>existingIdentityFs.rmSync(root,{recursive:true,force:true}));
+  execFileSync('git',['init','-q',root]);
+  const directory = existingIdentityJoin(root,'.git','agent-pipeline','governance-events');
+  const path = existingIdentityJoin(directory,'repository-binding.json');
+  const fingerprint = existingIdentityRandomBytes(32).toString('hex');
+  const value = { schema: EXISTING_IDENTITY_BINDING_SCHEMA, repositoryFingerprint:fingerprint, legacyAliases:[], boundAtEpochMs:1 };
+  const seed = input => { existingIdentityFs.mkdirSync(directory,{recursive:true}); existingIdentityFs.writeFileSync(path,JSON.stringify(input ?? value),{mode:0o600}); };
+  return {root,directory,path,fingerprint,value,seed};
+}
+const existingIdentityUnavailable = error => error.code === 'GES-EXISTING-REPOSITORY-BINDING';
+test('existing repository identity: missing identity refuses without creating namespace or binding',async t=>{
+  const f=existingIdentityFixture(t); await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+  assert.equal(existingIdentityFs.existsSync(existingIdentityJoin(f.root,'.git','agent-pipeline')),false);
+});
+test('existing repository identity: legacy identity refuses without migration or changed bytes',async t=>{
+  const f=existingIdentityFixture(t);f.seed({schema:'pipeline.governance-event-repository-binding.v1',repositoryFingerprint:f.fingerprint,boundAtEpochMs:1});
+  const before=existingIdentityFs.readFileSync(f.path), identityBefore=existingIdentityFileSnapshot(f.path);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+  assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);assert.deepEqual(existingIdentityFileSnapshot(f.path),identityBefore);
+});
+test('existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes',async t=>{
+  const f=existingIdentityFixture(t);const bound=await mintExistingIdentity({repositoryRoot:f.root});const before=existingIdentityFs.readFileSync(f.path);
+  assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound);
+  assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
+});
+test('existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding',async t=>{
+  for(const change of [v=>delete v.repositoryFingerprint,v=>v.extra=true,v=>v.repositoryFingerprint='invalid',v=>v.legacyAliases=[v.repositoryFingerprint],
+    v=>v.legacyAliases=['a'.repeat(64),'a'.repeat(64)],v=>v.repositoryFingerprint=[v.repositoryFingerprint],
+    v=>v.boundAtEpochMs=-1,v=>v.schema='unknown']){
+    const f=existingIdentityFixture(t),value=structuredClone(f.value);change(value);f.seed(value);const before=existingIdentityFs.readFileSync(f.path);
+    await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
+  }
+});
+test('existing repository identity: file/root aliases, multiple links and writable binding refuse',async t=>{
+  const f=existingIdentityFixture(t);f.seed();const alias=f.root+'-alias';existingIdentityFs.symlinkSync(f.root,alias);t.after(()=>existingIdentityFs.rmSync(alias,{force:true}));
+  await assert.rejects(observeExistingIdentity({repositoryRoot:alias}),existingIdentityUnavailable);
+  const duplicate=existingIdentityJoin(f.directory,'copy');existingIdentityFs.linkSync(f.path,duplicate);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+  existingIdentityFs.rmSync(duplicate);existingIdentityFs.chmodSync(f.path,0o666);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+  existingIdentityFs.chmodSync(f.path,0o600);const renamed=f.path+'.original';existingIdentityFs.writeFileSync(renamed,existingIdentityFs.readFileSync(f.path),{mode:0o600});existingIdentityFs.rmSync(f.path);existingIdentityFs.symlinkSync(renamed,f.path);
+  await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+});
+test('existing repository identity: oversized binding is rejected while preserving exact synthetic bytes',async t=>{
+  const f=existingIdentityFixture(t);f.seed();existingIdentityFs.writeFileSync(f.path,Buffer.alloc(65537,0x20));const before=existingIdentityFs.readFileSync(f.path);
+  await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
+});
+test('existing repository identity: linked worktree observes same common identity; bare repository remains unsupported',async t=>{
+  const f=existingIdentityFixture(t);f.seed();existingIdentityFs.writeFileSync(existingIdentityJoin(f.root,'README'),'synthetic');
+  execFileSync('git',['add','README'],{cwd:f.root});
+  execFileSync('git',['-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid','commit','-qm','fixture'],{cwd:f.root});
+  const linked=f.root+'-linked';execFileSync('git',['worktree','add','-q','--detach',linked],{cwd:f.root});t.after(()=>existingIdentityFs.rmSync(linked,{recursive:true,force:true}));
+  assert.equal(await observeExistingIdentity({repositoryRoot:linked}),f.fingerprint);
+  const bare=f.root+'-bare';execFileSync('git',['init','--bare','-q',bare]);t.after(()=>existingIdentityFs.rmSync(bare,{recursive:true,force:true}));
+  await assert.rejects(observeExistingIdentity({repositoryRoot:bare}),existingIdentityUnavailable);assert.equal(existingIdentityFs.existsSync(existingIdentityJoin(bare,'agent-pipeline')),false);
 });

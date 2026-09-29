@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.enrollment-retirement-result.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "generationSha256",
+    "archiveSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.enrollment-retirement-result.v1"
+    },
+    "status": {
+      "enum": [
+        "retired",
+        "replayed",
+        "active",
+        "retained"
+      ]
+    },
+    "generationSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "archiveSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

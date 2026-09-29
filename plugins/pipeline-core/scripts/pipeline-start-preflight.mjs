@@ -4,7 +4,7 @@
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +29,9 @@ import {
   snapshotPhysicalPluginRoot,
 } from "../lib/public-core-observation.mjs";
 import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedTopology } from "../lib/antigravity-topology-refresh-host.mjs";
+import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
   evaluateSelfApplicationAttestation,
@@ -491,15 +494,17 @@ export function observeAntigravityHardEnforcement({
   rootDir = process.cwd(),
   now = Date.now(),
   freshWindowMs = ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS,
-  readdir = readdirSync,
-  stat = statSync,
+  readdir = boundedAntigravityRunEntries,
+  stat = lstatSync,
   read = readFileSync,
   currentVersion = null,
 } = {}) {
   let freshestAgeMs = null;
+  const mismatchedVersions = new Set();
   try {
     const runDir = resolve(rootDir, ".git", "agent-pipeline", "run");
     const entries = readdir(runDir, { withFileTypes: true });
+    if (entries.length > 256) throw new Error("AGY-LOCK-SCAN-BOUND");
     for (const entry of entries) {
       if (!entry?.isDirectory?.() || !entry.name.startsWith("session-")) continue;
       try {
@@ -513,7 +518,11 @@ export function observeAntigravityHardEnforcement({
         // Version binding: an entry whose lock does not name the CURRENT
         // build is skipped exactly like an absent lock (see doc comment
         // above) -- never counted towards `freshestAgeMs`.
-        if (!lockVersionMatches(read, lockPath, currentVersion)) continue;
+        const recordedVersion = readAntigravityLockVersion(read, lockPath);
+        if (recordedVersion !== currentVersion || typeof currentVersion !== "string" || currentVersion.trim() === "") {
+          if (ageMs <= freshWindowMs && recordedVersion !== null && recordedVersion !== currentVersion && mismatchedVersions.size < 8) mismatchedVersions.add(recordedVersion);
+          continue;
+        }
         if (freshestAgeMs === null || ageMs < freshestAgeMs) freshestAgeMs = ageMs;
       } catch {
         continue; // this one entry raced away or is unreadable; keep scanning the rest
@@ -528,7 +537,20 @@ export function observeAntigravityHardEnforcement({
     observed,
     freshWindowMs,
     warning: observed ? null : ANTIGRAVITY_HARD_ENFORCEMENT_WARNING,
+    ...(!observed && mismatchedVersions.size > 0 ? { reason: "antigravity-lock-version-mismatch", currentVersion, recordedVersions: [...mismatchedVersions].sort(), evidenceClass: "mutable-lock-metadata" } : {}),
   };
+}
+
+function boundedAntigravityRunEntries(path) {
+  const dir = opendirSync(path), entries = [];
+  try { let entry; while ((entry = dir.readSync()) !== null) { if (entries.length >= 256) throw new Error("AGY-LOCK-SCAN-BOUND"); entries.push(entry); } return entries; }
+  finally { dir.closeSync(); }
+}
+function readAntigravityLockVersion(read, path) {
+  try {
+    const parsed = read === readFileSync ? readAntigravityPhysicalJson(path).value : JSON.parse(read(path, "utf8"));
+    return typeof parsed?.version === "string" && /^[A-Za-z0-9.+_-]{1,128}$/.test(parsed.version) ? parsed.version : null;
+  } catch { return null; }
 }
 
 /**
@@ -1009,8 +1031,11 @@ export function observePipelineStartPreflight({
   read = readFileSync,
   scriptUrl = import.meta.url,
   cwd = process.cwd(),
+  observeGovernanceScopeFn = observeGovernanceScope,
   knownMarketplaces = readClaudeKnownMarketplaces,
   observeAntigravityHardEnforcementFn = observeAntigravityHardEnforcement,
+  observeAntigravityLoadedTopologyFn = observeAntigravityLoadedTopology,
+  antigravityConfigRoot = resolve(homedir(), ".gemini"),
   observePrePushHookInstallationFn = observePrePushHookInstallation,
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
@@ -1031,6 +1056,29 @@ export function observePipelineStartPreflight({
   // this file); callers that DO register one may pass its sessionId here.
   currentSessionId = null,
 } = {}) {
+  // Repository enrollment precedes distribution/onboarding/housekeeping work.
+  // An installed runner plugin or unrelated AGENTS.md does not opt this root in.
+  let governanceScope;
+  try { governanceScope = observeGovernanceScopeFn({ rootDir: cwd }); }
+  catch { governanceScope = null; }
+  const validScope = governanceScope?.schema === "pipeline.governance-scope.v1"
+    && Object.keys(governanceScope).sort().join("\0") === ["schema", "state", "root", "scopeKey", "repositoryKind", "provenance", "diagnostics", "requiresEnforcement", "hintAllowed"].sort().join("\0")
+    && (governanceScope.root === null || typeof governanceScope.root === "string" && isAbsolute(governanceScope.root) && resolve(governanceScope.root) === governanceScope.root)
+    && ["active", "inactive", "declined", "unverifiable-active"].includes(governanceScope.state)
+    && governanceScope.requiresEnforcement === ["active", "unverifiable-active"].includes(governanceScope.state)
+    && governanceScope.hintAllowed === (governanceScope.state === "inactive" && governanceScope.root !== null);
+  if (!validScope || governanceScope.state !== "active") {
+    const state = validScope ? governanceScope.state : "unverifiable-active";
+    return {
+      schema: SCHEMA, statusScope: "pipeline-governance-activation",
+      status: state === "inactive" ? "pipeline-governance-inactive" : state === "declined" ? "pipeline-governance-declined" : "pipeline-governance-unverifiable",
+      governanceScope: validScope ? governanceScope : null,
+      pipelineWorkPerformed: false,
+      nextAction: state === "inactive" && governanceScope.hintAllowed
+        ? { kind: "opt-in-hint", mutation: false, requiresConfirmation: false, message: "Agent-Pipeline is inactive in this repository. Start onboarding explicitly if you want this project governed." }
+        : null,
+    };
+  }
   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
   // CLAUDECODE is set by every Claude Code session (main and subagent); its
   // absence keeps the historical Codex-CLI default. This is the one place a
@@ -1077,8 +1125,11 @@ export function observePipelineStartPreflight({
         plugin: { name: "pipeline-core", version },
       })
     : null;
+  const antigravityTopology = version && runner === "antigravity"
+    ? observeAntigravityLoadedTopologyFn({ loadedPluginRoot: pluginRoot, configRoot: antigravityConfigRoot, workspaceRoot: cwd })
+    : null;
   const registryInstalledPluginRoot = version && runner === "antigravity" && !pluginRootHasSelfApplicationGit(pluginRoot)
-    ? resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: pluginRoot, registryPayloads: antigravityPluginRegistries() })
+    ? antigravityTopology?.status === "current" && antigravityTopology.loadedPluginRoot === pluginRoot ? pluginRoot : null
     : null;
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
@@ -1127,7 +1178,7 @@ export function observePipelineStartPreflight({
   const localInstalledCopy = version && !selfApplicationGit && (
     runner === "codex" && installedIdentity?.source === "local-development" && codexRegistryContentBinding?.status !== "ready"
     || runner === "claude" && installedIdentity?.source === "local-development" && !claudeDirectDirectory
-    || runner === "antigravity" && registryInstalledPluginRoot === null
+    || runner === "antigravity" && (registryInstalledPluginRoot === null || antigravityTopology?.loadedKind === "managed-copy")
   );
   const rawInstalledPluginAttestation = localInstalledCopy
     ? runner === "codex" && registrySourcePluginRoot === null
@@ -1144,7 +1195,7 @@ export function observePipelineStartPreflight({
           ? { registryInstalledPluginRoot: runner === "claude" ? claudeRegistryBinding.installedPluginRoot : registryInstalledPluginRoot }
           : { registrySourcePluginRoot }),
         protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[runner] ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
-      })
+      }, runner === "antigravity" ? { antigravityConfigRoot, antigravityWorkspaceRoot: cwd } : {})
     : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
   const codexAttestationSource = rawInstalledPluginAttestation.status === "unavailable"
     && runner === "codex" && registrySourcePluginRoot !== null
@@ -1215,6 +1266,8 @@ export function observePipelineStartPreflight({
   const unseenRemotePush = observeUnseenPushToRemoteFn({ rootDir: cwd });
   const status = !version
     ? "plugin-identity-unavailable"
+    : runner === "antigravity" && antigravityTopology?.status !== "current"
+      ? "antigravity-topology-refresh-required"
     : installedPluginAttestationFailed
       ? "plugin-attestation-required"
       : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
@@ -1323,8 +1376,9 @@ export function observePipelineStartPreflight({
   const installedPluginRoot = candidateInstalledRoot ? resolve(candidateInstalledRoot) : null;
   const dutyNotRuntimeLive = observeDutyNotRuntimeLive({ checkoutPluginRoot, installedPluginRoot, read });
   const concurrentSessionWarning = observeConcurrentSessionWarning({ startPath: cwd, currentSessionId });
-  // NVA-K-DRIVERREACH: only asked when `status` (the PLUGIN/bootstrap-distribution
-  // question above) is already "ready" -- this is exactly the branch that used to
+  // Check project readiness for both executable bootstrap states. A plugin
+  // refresh is advisory, so it must not hide the project's onboarding action.
+  // This is exactly the branch that used to
   // unconditionally name the bare `inspect`, for a project that had not yet been
   // asked whether IT is ready. A project that already IS onboarding-ready keeps this
   // unchanged (falls through to the pre-existing `inspect` action below); only a
@@ -1334,7 +1388,7 @@ export function observePipelineStartPreflight({
   // back to the pre-existing behaviour rather than guessing -- the same
   // fail-toward-the-status-quo posture every sibling observation in this file takes.
   let projectOnboardingNotReady = false;
-  if (status === "ready") {
+  if (status === "ready" || status === "plugin-refresh-required") {
     try {
       requireProjectOnboardingReadyFn({ rootDir: cwd, intent: "bootstrap", runner });
     } catch (error) {
@@ -1458,9 +1512,11 @@ export function observePipelineStartPreflight({
     },
     effectiveDecisions,
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
-    nextAction: status === "plugin-attestation-required"
+    nextAction: status === "antigravity-topology-refresh-required"
+      ? { kind: "command", executable: "node", argv: [resolve(antigravityTopology?.sourcePluginRoot ?? pluginRoot, "install-agy.mjs")], mutation: true, requiresConfirmation: true, executionBoundary: "host", expected: { schema: "pipeline.antigravity-refresh-result.v1", status: "refreshed" } }
+      : status === "plugin-attestation-required"
       ? installedPluginAttestation.setupAction ?? null
-      : status === "ready"
+      : status === "ready" || status === "plugin-refresh-required" && projectOnboardingNotReady
       ? projectOnboardingNotReady
         // NVA-K-DRIVERREACH: point discovery at the guided driver -- the one place this
         // skill already instructs an agent to execute the returned action verbatim, so
@@ -1524,7 +1580,7 @@ export function observePipelineStartPreflight({
     // this key is absent from the envelope entirely, keeping their output
     // byte-identical to before this addition. Reuses the SAME observation the
     // `status` computation above already made -- see the comment there.
-    ...(runner === "antigravity" ? { antigravityHardEnforcement } : {}),
+    ...(runner === "antigravity" ? { antigravityHardEnforcement, antigravityTopology } : {}),
     // Present for every runner alike (unlike the Antigravity field above) whenever the
     // observation actually determined something -- omitted only for "repository-unresolved"
     // so the envelope's key set stays exactly what it was before this addition for every
@@ -1583,7 +1639,7 @@ export function pipelineStartPreflightExitCode(result) {
   // removed entirely, not merely omitted from this allowlist -- the hook is an offer, not a
   // requirement, and none of its states can produce a non-"ready" status any more
   // (NVA-PREPUSHVISIBLE-1; see PRE_PUSH_HOOK_OBSERVATION_SCHEMA's own doc comment above).
-  return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;
+  return ["ready", "plugin-refresh-required", "pipeline-governance-inactive", "pipeline-governance-declined"].includes(result?.status) ? 0 : 2;
 }
 
 export const SCRATCH_LIFECYCLE_SCHEMA = "pipeline.bootstrap-scratch-lifecycle.v1";
@@ -1726,6 +1782,7 @@ export function runBootstrapWorktreeSweep({ rootDir = process.cwd(), deps = {} }
 export function main() {
   const result = observePipelineStartPreflight();
   process.stdout.write(`${JSON.stringify(result)}\n`);
+  if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
   // Antigravity-only: the structured field above already carries this, but a
   // human watching the terminal reads stderr, not a JSON blob -- so the same
   // non-blocking warning is also printed here in plain text. Absent entirely

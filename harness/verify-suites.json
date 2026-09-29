@@ -447,6 +447,390 @@
       },
       "invariantPinned": "Claude/Codex native Host-Commit stages only the admitted return diff, runs ordinary Git hooks, and reads back runner-specific exact commit metadata",
       "nonOverlapNote": "Temporary real-Git mutation coverage is separate from callback validation and the Agy-specific host commit contract"
+    },
+    {
+      "name": "antigravity-topology-integration-tests",
+      "file": "plugins/pipeline-core/scripts/antigravity-topology-integration.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC19C001",
+          "RC19C002",
+          "RC19C003",
+          "RC19C004",
+          "RC19C005",
+          "RC19C006",
+          "RC19C007",
+          "RC19C008",
+          "RC19C009"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Antigravity restart and topology refresh preserve exact runtime projection bindings",
+      "nonOverlapNote": "Focused antigravity topology integration contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "antigravity-topology-refresh-host-tests",
+      "file": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC05C001",
+          "RC05C002",
+          "RC05C003",
+          "RC05C004",
+          "RC05C005",
+          "RC05C006",
+          "RC05C007",
+          "RC05C008",
+          "RC05C009",
+          "RC05C010",
+          "RC05C011"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Host topology refresh refuses stale or physically mismatched readback",
+      "nonOverlapNote": "Focused antigravity topology refresh host contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "codex-compact-session-output-tests",
+      "file": "plugins/pipeline-core/hooks/codex-compact-session-output.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC02C001",
+          "RC02C002",
+          "RC02C003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Codex compact output exposes bounded session continuity without granting authority",
+      "nonOverlapNote": "Focused codex compact session output contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "critic-route-v3-tests",
+      "file": "plugins/pipeline-core/lib/critic-route-v3.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC07C001",
+          "RC07C002",
+          "RC07C003",
+          "RC07C004",
+          "RC07C005",
+          "RC07C006"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Critic routing preserves validated V3 model and effort authority",
+      "nonOverlapNote": "Focused critic route v3 contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "design-workflow-signing-default-tests",
+      "file": "plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC21C001",
+          "RC21C002",
+          "RC21C003",
+          "RC21C004",
+          "RC21C005"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Default design signing preserves policy-selected signature requirements",
+      "nonOverlapNote": "Focused design workflow signing default contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "governance-onboarding-tests",
+      "file": "plugins/pipeline-core/lib/governance-onboarding.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC13C001"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Governance onboarding preserves explicit authority selection",
+      "nonOverlapNote": "Focused governance onboarding contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "governance-scope-tests",
+      "file": "plugins/pipeline-core/lib/governance-scope.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC14C001",
+          "RC14C002",
+          "RC14C003",
+          "RC14C004",
+          "RC14C005",
+          "RC14C006",
+          "RC14C007",
+          "RC14C008",
+          "RC14C009",
+          "RC14C010",
+          "RC14C011",
+          "RC14C012",
+          "RC14C013",
+          "RC14C014",
+          "RC14C015",
+          "RC14C016",
+          "RC14C017",
+          "RC14C018",
+          "RC14C019",
+          "RC14C020",
+          "RC14C021",
+          "RC14C022",
+          "RC14C023"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Public governance scope distinguishes governed and ungoverned repositories",
+      "nonOverlapNote": "Focused governance scope contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "hook-governance-scope-tests",
+      "file": "plugins/pipeline-core/hooks/hook-governance-scope.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC03C001",
+          "RC03C002",
+          "RC03C003",
+          "RC03C004",
+          "RC03C005",
+          "RC03C006",
+          "RC03C007",
+          "RC03C008",
+          "RC03C009"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Hook entrypoints apply governance scope before project guards",
+      "nonOverlapNote": "Focused hook governance scope contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "project-activation-tests",
+      "file": "plugins/pipeline-core/scripts/project-activation.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC22C001"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Project activation emits only the currently admitted lifecycle action",
+      "nonOverlapNote": "Focused project activation contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "project-reset-git-hooks-tests",
+      "file": "plugins/pipeline-core/scripts/project-reset-git-hooks.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC23C001",
+          "RC23C002",
+          "RC23C003",
+          "RC23C004",
+          "RC23C005",
+          "RC23C006",
+          "RC23C007",
+          "RC23C008",
+          "RC23C009",
+          "RC23C010",
+          "RC23C011",
+          "RC23C012",
+          "RC23C013",
+          "RC23C014",
+          "RC23C015",
+          "RC23C016",
+          "RC23C017"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Project reset preserves owned and unrelated Git hooks across refusal cases",
+      "nonOverlapNote": "Focused project reset git hooks contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "project-uninstall-contract-tests",
+      "file": "plugins/pipeline-core/lib/project-uninstall-contract.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "UC01C001",
+          "UC01C002",
+          "UC01C003",
+          "UC01C004",
+          "UC01C005",
+          "UC01C006",
+          "UC01C007",
+          "UC01C008"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Uninstall contract validates exact retirement scope and approved inputs",
+      "nonOverlapNote": "Focused project uninstall contract contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "project-uninstall-tests",
+      "file": "plugins/pipeline-core/lib/project-uninstall.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "UC02C001",
+          "UC02C002",
+          "UC02C003",
+          "UC02C004",
+          "UC02C005",
+          "UC02C006",
+          "UC02C007"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Project uninstall retires only owned artifacts with CAS and refusal safeguards",
+      "nonOverlapNote": "Focused project uninstall contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "runtime-projection-removal-tests",
+      "file": "plugins/pipeline-core/lib/runtime-projection-removal.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "UC03C001",
+          "UC03C002",
+          "UC03C003",
+          "UC03C004"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Runtime projection retirement removes only exact owned projection entries",
+      "nonOverlapNote": "Focused runtime projection removal contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "advisory-route-selection-tests",
+      "file": "plugins/pipeline-core/lib/advisory-route-selection.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ARS001",
+          "ARS002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "No-child Advisor route selection binds exact receipt bytes, rejects answer or child claims and preserves typed unavailable or permission-denied outcomes",
+      "nonOverlapNote": "Route-selection disposition validation is separate from Advisor execution, admission and durable course provenance"
+    },
+    {
+      "name": "verify-case-completion-augmentation-tests",
+      "file": "harness/scripts/verify-case-completion-augmentation.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "VAC001",
+          "VAC002",
+          "VAC003",
+          "VAC004",
+          "VAC005",
+          "VAC006",
+          "VAC007",
+          "VAC008",
+          "VAC009",
+          "VAC010",
+          "VAC011",
+          "VAC012"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Exact supplementary policy matching preserves original registration rows and completion coverage.",
+      "nonOverlapNote": "Exercises augmentation composition, real FD receipts and candidate JSON identity."
+    },
+    {
+      "name": "enrollment-retirement-coordinator-tests",
+      "file": "plugins/pipeline-core/lib/enrollment-retirement-coordinator.test.mjs",
+      "invariantPinned": "Closed byte-exact generation archive and monotone retirement phases",
+      "nonOverlapNote": "Pure retirement values and fresh consent generation binding",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ERT01",
+          "ERT02"
+        ],
+        "maxBytes": 131072
+      }
+    },
+    {
+      "name": "plan-spec-state-retirement-tests",
+      "file": "plugins/pipeline-core/lib/plan-spec-state-v2.retirement.test.mjs",
+      "invariantPinned": "Removal-only legacy approval retirement and orphan refusal",
+      "nonOverlapNote": "Retained legacy audit cannot become current through planApproved replay",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ERT03",
+          "ERT04"
+        ],
+        "maxBytes": 131072
+      }
+    },
+    {
+      "name": "enrollment-retirement-git-creation-tests",
+      "file": "plugins/pipeline-core/lib/enrollment-retirement-git-creation.test.mjs",
+      "invariantPinned": "Explicit attended local Git creation preserves retained state and foreign scopes; real disposable consent CAS and worktree isolation",
+      "nonOverlapNote": "Ordinary owner filesystem transactions; privileged state-writer handoff is explicitly a fixture callback",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "EGR01",
+          "EGR02",
+          "EGR03",
+          "EGR04",
+          "EGR05",
+          "EGR06",
+          "EGR07",
+          "EGR08",
+          "EGR09",
+          "EGR10"
+        ],
+        "maxBytes": 131072
+      }
+    },
+    {
+      "name": "security-scanner-diagnostics-tests",
+      "file": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs",
+      "invariantPinned": "Bounded scanner observation, verdict independence and owned Linux diagnostic publication reject drift and confidential payloads",
+      "nonOverlapNote": "Existing security-scan tests establish scan policy; this suite proves new diagnostic schema/storage/race boundaries",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G13D001",
+          "G13D002",
+          "G13D003",
+          "G13D004",
+          "G13D005",
+          "G13D006",
+          "G13D007",
+          "G13D008",
+          "G13D009",
+          "G13D010",
+          "G13D011",
+          "G13D012",
+          "G13D013",
+          "G13D014",
+          "G13D015",
+          "G13D016",
+          "G13D017",
+          "G13D018",
+          "G13D019",
+          "G13D020",
+          "G13D021",
+          "G13D022",
+          "G13D023",
+          "G13D024"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }

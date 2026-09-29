@@ -27,6 +27,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
+import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+function decorateInstalledImpl(content, pluginLibDir) {
+  const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/commit-msg-hook\/runtime-([a-f0-9]{64}))\/lib$/);
+  if (!matched) return content;
+  const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
+  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256});
+  if (content.split("async function main() {").length !== 2) throw Error("GHA-RENDER-ANCHOR");
+  return content.replace("async function main() {", "async function main() {\n  const governanceRoot = await projectRoot();\n  if (!governanceRoot) throw Error(\"GHA-ROOT\");\n  if (!await admitPipelineScope(governanceRoot)) return;") + renderGitHookSnapshotAdmission(runtimeSnapshot);
+}
+
 
 export const INSTALLER_VERSION = "2";
 export const MARKER_SCHEMA = "pipeline.commit-msg-hook-install.v1";
@@ -322,8 +333,12 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } 
     return { ...plan, status: plan.status === "foreign-hook-present" ? "refused-foreign-hook" : `refused-${plan.status}` };
   }
   const impl = implPath(plan.commonDir);
+  const snapshotState = join(plan.commonDir, "agent-pipeline", "commit-msg-hook");
+  mkdirSync(snapshotState, { recursive: true, mode: 0o700 });
+  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState });
+  pluginLibDir = join(runtimeSnapshot.root, "lib");
   const shimContent = renderShim(impl);
-  const implContent = renderImpl(pluginLibDir);
+  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir);
   atomicWrite(impl, implContent, 0o600);
   atomicWrite(plan.hookPath, shimContent, 0o755);
   const marker = {

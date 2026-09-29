@@ -18,6 +18,7 @@ import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fork, spawnSync } from "node:child_process";
 import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
+import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
@@ -1151,8 +1152,25 @@ check("Codex adapter refuses a passive inventory pipeline against an arbitrary h
   }
 });
 
+// These two lifecycle/HGO controls require active enrollment, unlike the passive
+// inventory control. Enroll the empty real temporary Git root before any scaffold.
+function activeNonReadyLifecycleFixture() {
+  const root = mkdtempSync(join(tmpdir(), "codex-active-nonready-"));
+  const initialized = spawnSync("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8", shell: false, timeout: 5_000 });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const plan = planGovernanceScopeDecision({ rootDir: root, decision: "enroll", by: "Fixture explicit enrollment" });
+  const enrolled = applyGovernanceScopeDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(enrolled.state, "active");
+  const observed = observeGovernanceScope({ rootDir: root });
+  assert.equal(observed.state, "active");
+  assert.equal(observed.requiresEnforcement, true);
+  mkdirSync(join(root, ".claude"));
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  return root;
+}
+
 check("GF-060/GF-064: an invalid lifecycle denial has no HGO route and never discloses a secret", () => {
-  const root = nonReadyLifecycleFixture();
+  const root = activeNonReadyLifecycleFixture();
   const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
   const output = decision(run({
     tool_name: "Bash",
@@ -1161,13 +1179,14 @@ check("GF-060/GF-064: an invalid lifecycle denial has no HGO route and never dis
   assert.equal(output.permissionDecision, "deny");
   assert.match(output.permissionDecisionReason, /GUARD-LIFECYCLE-NOT-READY/u);
   assert.match(output.permissionDecisionReason, /Technical repair is required before retrying/u);
+  assert.match(output.permissionDecisionReason, /Re-run the typed project-onboarding-v3 (?:session )?inspection(?: with intent session)? and use only its returned nextAction\./u);
   assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
     "the secret-bearing content leaked verbatim into the denial reason");
   assert.doesNotMatch(output.permissionDecisionReason, /Guard recovery route:|Human override available|copyCommand|authorize-by-signature/u);
 });
 
 check("GF-060/GF-094: an invalid lifecycle denial suppresses raw command and copy guidance", () => {
-  const root = nonReadyLifecycleFixture();
+  const root = activeNonReadyLifecycleFixture();
   const command = "node lib/project-onboarding-v3.mjs kickoff plan --root /some/project --goal HTML Minispiel gemäß Übergabe --language de";
   const output = decision(run({
     tool_name: "Bash",
@@ -1176,6 +1195,7 @@ check("GF-060/GF-094: an invalid lifecycle denial suppresses raw command and cop
   assert.equal(output.permissionDecision, "deny");
   assert.match(output.permissionDecisionReason, /GUARD-LIFECYCLE-NOT-READY/u);
   assert.doesNotMatch(output.permissionDecisionReason, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  assert.match(output.permissionDecisionReason, /Re-run the typed project-onboarding-v3 (?:session )?inspection(?: with intent session)? and use only its returned nextAction\./u);
   assert.doesNotMatch(output.permissionDecisionReason, /copyCommand|Guard recovery route:/u);
 });
 

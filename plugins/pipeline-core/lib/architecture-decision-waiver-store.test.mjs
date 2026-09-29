@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
-import test from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
+const completionCases = [];
+function test(name, run) {
+  if (arguments.length !== 2 || typeof run !== "function") throw new TypeError("Required completion expects the preserved sibling callback registration");
+  completionCases.push({ id: "ADW" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+}
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -49,3 +55,11 @@ test("AC-19 waiver source requires exact PO proof, names the original and expire
     decisionDigest: sha("different ADR") }], proof: proof(item.subject) });
   assert.equal(item.inspect().code, "ARCH-WAIVER-AUTHORITY-UNVERIFIED");
 });
+
+// Register each original sibling callback directly with the canonical recorder.
+if (completionCases.length !== 1) throw new Error("Required completion case count drift");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import {spawnSync} from "node:child_process";
+import {classifyOnboardingContinuity} from "./onboarding-continuity.mjs";
+import {planProjectOnboardingV3,applyProjectOnboardingV3} from "./project-onboarding-v3.mjs";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
@@ -38,6 +41,14 @@ test("A3 treats an absent lifecycle state as an empty dynamic protected class", 
   assert.ok(baseline.identity.baselineDigest);
   assert.equal(baseline.dynamic.status, "absent");
   assert.equal(baseline.diagnostics.some((item) => item.code === PB_DYNAMIC_UNAVAILABLE), false);
+  const idleRoot = fixture();const portable=planProjectOnboardingV3({rootDir:idleRoot,runner:"claude"});assert.equal(applyProjectOnboardingV3(portable,{rootDir:idleRoot,activate:true}).status,"applied");
+  writeFileSync(join(idleRoot,"project/pipeline-state.json"),JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"idle-fixture",planPath:"specs/idle/prd.md",phase:"design"},planApproved:false}));
+  const writer=resolve(dirname(fileURLToPath(import.meta.url)),"../scripts/pipeline-state.mjs");
+  const discarded=spawnSync(process.execPath,[writer,"discard-feature","--by","disposable-fixture","--reason","canonical idle protected baseline regression"],{cwd:idleRoot,encoding:"utf8"});assert.equal(discarded.status,0,discarded.stderr);
+  const state=JSON.parse(readFileSync(join(idleRoot,"project/pipeline-state.json")));assert.equal(state.closedFeatures,undefined);assert.equal(classifyOnboardingContinuity({rootDir:idleRoot}).status,"valid");
+  const idleBaseline=resolveProtectedBaseline({rootDir:idleRoot});assert.equal(idleBaseline.dynamic.status,"available");assert.deepEqual(idleBaseline.dynamic.entries,[]);assert.equal(idleBaseline.diagnostics.some(item=>item.code===PB_DYNAMIC_UNAVAILABLE),false);
+  for(const closedFeatures of [null,{},"invalid",0]){const malformed=resolveProtectedBaseline({rootDir:fixture({}, {...state,closedFeatures})});assert.equal(malformed.dynamic.status,"unavailable");assert.ok(malformed.diagnostics.some(item=>item.code===PB_DYNAMIC_UNAVAILABLE));}
+  for(const malformedState of [null,[],"invalid",{}])assert.equal(resolveProtectedBaseline({rootDir:fixture({},malformedState)}).dynamic.status,"unavailable");
 });
 
 test("A3 accepts valid project additions without changing the immutable baseline identity", () => {

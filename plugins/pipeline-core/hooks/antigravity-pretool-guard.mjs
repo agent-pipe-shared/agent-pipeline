@@ -36,6 +36,12 @@ import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
 import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+
+
 
 const { commandDisclosureFields } = humanGuardOverrideInternals;
 
@@ -320,6 +326,11 @@ export function isBootstrapReadCommand(value, {
 }
 
 export async function runAntigravityPreToolGuard(rawInput) {
+  const scopeAdmission = nativeHookGovernanceAdmission({ runner: "antigravity", rawInput });
+  if (!scopeAdmission.requiresEnforcement) {
+    if (scopeAdmission.destructiveDenial) deny(scopeAdmission.destructiveDenial);
+    allow(); return;
+  }
   let input;
   try { input = JSON.parse(rawInput); }
   catch { deny("Antigravity PreToolUse input is not valid JSON; pipeline guards fail closed."); }
@@ -381,15 +392,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
     });
   }
 
-  const lifecycleGoverned = [
-    ".agent-pipeline/core.lock.json",
-    "pipeline.user.yaml",
-    "project/pipeline.json",
-    "project/pipeline.yaml",
-    ".claude/pipeline.json",
-    ".claude/pipeline.yaml",
-    ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
-  ].some((marker) => existsSync(join(projectRoot, marker)));
+  const lifecycleGoverned = observeGovernanceScope({ rootDir: projectRoot }).requiresEnforcement;
 
   // --- Antigravity Hardening Layer: critic dispatch contamination + inline exec containment ---
   if (toolName === "Task") {
@@ -925,6 +928,9 @@ if (isDirectInvocation(import.meta.url)) {
   let rawInput;
   try { rawInput = await readStdinBounded(); }
   catch (error) {
+    // A transport failure has no parsed workspace or tool action. It cannot
+    // grant Pipeline authority to an inactive/declined fallback workspace.
+    if(!observeGovernanceScope({rootDir:process.cwd()}).requiresEnforcement)allow();
     deny("Antigravity PreToolUse input was unavailable within the hook budget; pipeline guards fail closed.", {
       code: "stdin-read-failed",
       fields: { name: error?.name, code: error?.code },

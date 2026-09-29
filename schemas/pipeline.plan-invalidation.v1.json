@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.plan-invalidation.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "featureId",
+    "invalidatedSubmissionSha256",
+    "invalidatedApprovalSha256",
+    "reason",
+    "invalidatedBy",
+    "invalidatedAt"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.plan-invalidation.v1"
+    },
+    "featureId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "invalidatedSubmissionSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "invalidatedApprovalSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reason": {
+      "enum": [
+        "reopen-design",
+        "document-drift",
+        "enrollment-retirement",
+        "pipeline.reopen-bound-unsubmitted-prd"
+      ]
+    },
+    "invalidatedBy": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "invalidatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

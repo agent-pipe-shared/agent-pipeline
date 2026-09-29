@@ -34,6 +34,12 @@ import {
 } from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+
+
 
 // Same pure, no-I/O reuse pattern as scripts/repair-map.mjs: the secret-eligibility
 // screen lives once in eligibility() and is never reimplemented here (GF-060, F2).
@@ -198,12 +204,18 @@ process.on("unhandledRejection", (reason) => {
 let rawInput;
 try { rawInput = await readStdinBounded(); }
 catch (error) {
+  if (!observeGovernanceScope({ rootDir: process.cwd() }).requiresEnforcement) process.exit(0);
   deny("Codex PreToolUse input was unavailable within the hook budget; pipeline guards fail closed.", {
     code: "stdin-read-failed",
     fields: { name: error?.name, code: error?.code },
   });
 }
 
+const scopeAdmission = nativeHookGovernanceAdmission({ runner: "codex", rawInput });
+if (!scopeAdmission.requiresEnforcement) {
+  if (scopeAdmission.destructiveDenial) deny(scopeAdmission.destructiveDenial);
+  process.exit(0);
+}
 let input;
 try { input = JSON.parse(rawInput); }
 catch { deny("Codex PreToolUse input is not valid JSON; pipeline guards fail closed."); }
@@ -257,15 +269,7 @@ try {
 // (GF-094) so a relaying agent can copy it verbatim instead of re-quoting it;
 // it is never an additional disclosure path -- gated by the exact same
 // `commandIsSafe` conjunct as `command`, never independently.
-const lifecycleGoverned = [
-  ".agent-pipeline/core.lock.json",
-  "pipeline.user.yaml",
-  "project/pipeline.json",
-  "project/pipeline.yaml",
-  ".claude/pipeline.json",
-  ".claude/pipeline.yaml",
-  ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
-].some((marker) => existsSync(join(projectRoot, marker)));
+const lifecycleGoverned = observeGovernanceScope({ rootDir: projectRoot }).requiresEnforcement;
 const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 // The prescribed bootstrap preflight is a sanctioned lifecycle command, but it
 // is also the lifecycle guard's only receipt-writing entry point. Route this
@@ -535,7 +539,7 @@ if (denials.length > 0) {
     process.exit(0);
   }
   if (consumed.status === "non-liftable-recovery-required") {
-    deny([consumed.cause, consumed.coDenialSummary, consumed.nextAction.reason].filter(Boolean).join("\n"));
+    deny([consumed.cause, ...(consumed.recoveryGuidance ?? []), consumed.coDenialSummary, consumed.nextAction.reason].filter(Boolean).join("\n"));
   }
   let overrideGuidance = "";
   if (consumed.status === "absent" || consumed.status === "replan") {

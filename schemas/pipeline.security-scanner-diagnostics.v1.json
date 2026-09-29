@@ -1,0 +1,389 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "authority",
+    "evidencePayloadSha256",
+    "candidate",
+    "scanners"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.security-scanner-diagnostics.v1"
+    },
+    "authority": {
+      "const": "diagnostic-only"
+    },
+    "evidencePayloadSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree",
+        "inputSha256"
+      ],
+      "properties": {
+        "commit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})(?![\\s\\S])"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tree": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})(?![\\s\\S])"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inputSha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "scanners": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tool",
+          "executableSha256",
+          "rules",
+          "child"
+        ],
+        "properties": {
+          "tool": {
+            "const": "semgrep"
+          },
+          "executableSha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rules": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "sha256",
+              "reason",
+              "unchanged"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "local",
+                  "auto"
+                ]
+              },
+              "sha256": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason": {
+                "enum": [
+                  null,
+                  "remote-config-not-observed",
+                  "observation-unavailable"
+                ]
+              },
+              "unchanged": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "mode": {
+                      "const": "auto"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "sha256": {
+                      "type": "null"
+                    },
+                    "reason": {
+                      "const": "remote-config-not-observed"
+                    },
+                    "unchanged": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "sha256": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "unchanged": {
+                      "type": "null"
+                    },
+                    "reason": {
+                      "enum": [
+                        "remote-config-not-observed",
+                        "observation-unavailable"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "mode": {
+                      "const": "local"
+                    },
+                    "reason": {
+                      "type": "null"
+                    },
+                    "unchanged": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "child": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observation",
+                  "exitCode",
+                  "errorCode",
+                  "signal",
+                  "elapsedMs",
+                  "timeoutMs",
+                  "version",
+                  "output"
+                ],
+                "properties": {
+                  "observation": {
+                    "const": "child-result"
+                  },
+                  "exitCode": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "errorCode": {
+                    "enum": [
+                      null,
+                      "ETIMEDOUT",
+                      "EPERM",
+                      "EACCES",
+                      "ENOENT",
+                      "ENOBUFS",
+                      "E2BIG",
+                      "ENOMEM",
+                      "OTHER"
+                    ]
+                  },
+                  "signal": {
+                    "enum": [
+                      null,
+                      "SIGTERM",
+                      "SIGKILL",
+                      "SIGINT",
+                      "SIGABRT",
+                      "SIGSEGV",
+                      "OTHER"
+                    ]
+                  },
+                  "elapsedMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "version": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "value",
+                      "source"
+                    ],
+                    "properties": {
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[0-9]{1,6}\\.[0-9]{1,6}\\.[0-9]{1,6}(?![\\s\\S])"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "source": {
+                        "enum": [
+                          "existing-json-output",
+                          "unknown-or-withheld"
+                        ]
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "source": {
+                              "const": "existing-json-output"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "value": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "else": {
+                          "properties": {
+                            "value": {
+                              "type": "null"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "output": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "stdoutBytes",
+                      "stderrBytes",
+                      "interpretation",
+                      "resultsCount",
+                      "errorsCount"
+                    ],
+                    "properties": {
+                      "stdoutBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "stderrBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "interpretation": {
+                        "enum": [
+                          "complete-json",
+                          "not-complete-json",
+                          "over-diagnostic-budget"
+                        ]
+                      },
+                      "resultsCount": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "errorsCount": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observation"
+                ],
+                "properties": {
+                  "observation": {
+                    "const": "not-observed"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.security-scanner-diagnostics.v1",
+  "title": "PROPOSED bounded scanner diagnostics, non-authorizing",
+  "$comment": "UTF-8 byte cap, duplicate-key rejection, binding, filesystem and confidentiality checks are mandatory external constraints in storage-and-privacy-contract.md; JSON Schema alone cannot prove them."
+}

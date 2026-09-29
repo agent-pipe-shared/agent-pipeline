@@ -204,6 +204,8 @@ test("Codex readiness bootstrap rejects duplicate source roles and flags before 
   const deps = dependencies(fx);
   const duplicate = [...args(fx), "--dispatch-id", "second-id"];
   await assert.rejects(() => runCodexDesignReadinessBootstrap(duplicate, deps), /usage: codex-design-readiness-bootstrap/u);
+  await assert.rejects(() => runCodexDesignReadinessBootstrap([...args(fx),'--advisor-preparation','evidence/design/preparation.json','--advisor-receipt','evidence/design/advisor.json','--advisor-route','evidence/design/route.json'],deps),/usage: codex-design-readiness-bootstrap/u);
+  await assert.rejects(() => runCodexDesignReadinessBootstrap([...args(fx),'--advisor-preparation',fx.receiptPath],deps),/usage: codex-design-readiness-bootstrap/u);
   assert.equal(deps.calls, 0);
 });
 

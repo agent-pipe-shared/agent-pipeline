@@ -3,25 +3,107 @@
   "$id": "pipeline.project-reset-plan.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "status", "code", "root", "authorityTier", "remove", "keep", "neverTouched", "planSha256"],
+  "required": [
+    "schema",
+    "status",
+    "code",
+    "root",
+    "authorityTier",
+    "remove",
+    "keep",
+    "neverTouched",
+    "planSha256"
+  ],
   "properties": {
-    "schema": { "type": "string", "enum": ["pipeline.project-reset-plan.v1", "pipeline.project-reset-apply-result.v1"] },
-    "status": { "type": "string", "enum": ["ready", "not-a-project", "authority-unreadable", "root-unsafe", "applied", "replayed", "refused"] },
-    "code": { "type": ["string", "null"] },
-    "root": { "type": ["string", "null"] },
-    "authorityTier": { "type": ["string", "null"], "enum": ["neutral", "legacy", null] },
+    "schema": {
+      "type": "string",
+      "enum": [
+        "pipeline.project-reset-plan.v1",
+        "pipeline.project-reset-apply-result.v1"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "not-a-project",
+        "authority-unreadable",
+        "root-unsafe",
+        "applied",
+        "replayed",
+        "refused"
+      ]
+    },
+    "code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "root": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorityTier": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "neutral",
+        "legacy",
+        null
+      ]
+    },
     "remove": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["path", "kind", "type", "existed"],
+        "required": [
+          "path",
+          "kind",
+          "type",
+          "existed"
+        ],
         "properties": {
-          "path": { "type": "string" },
-          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState", "runtimeOwnedKeys", "runtimeSeededFile", "kickoffAnchor"] },
-          "type": { "type": "string", "enum": ["file", "directory", "keys"] },
-          "existed": { "type": "boolean" },
-          "ownedKeys": { "type": "array", "items": { "type": "string" } }
+          "path": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "manifest",
+              "state",
+              "calibration",
+              "guardConfig",
+              "guardAudit",
+              "handover",
+              "privateState",
+              "runtimeOwnedKeys",
+              "runtimeSeededFile",
+              "kickoffAnchor"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "directory",
+              "keys"
+            ]
+          },
+          "existed": {
+            "type": "boolean"
+          },
+          "ownedKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -30,13 +112,43 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["path", "kind", "type", "existed", "reason"],
+        "required": [
+          "path",
+          "kind",
+          "type",
+          "existed",
+          "reason"
+        ],
         "properties": {
-          "path": { "type": "string" },
-          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "privateState", "runtimePreserveOnly", "kickoffAnchorPromoted"] },
-          "type": { "type": "string", "enum": ["file", "directory"] },
-          "existed": { "type": "boolean" },
-          "reason": { "type": "string" }
+          "path": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "manifest",
+              "state",
+              "calibration",
+              "guardConfig",
+              "guardAudit",
+              "privateState",
+              "runtimePreserveOnly",
+              "kickoffAnchorPromoted"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "directory"
+            ]
+          },
+          "existed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
         }
       }
     },
@@ -45,13 +157,239 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["category", "description"],
+        "required": [
+          "category",
+          "description"
+        ],
         "properties": {
-          "category": { "type": "string" },
-          "description": { "type": "string" }
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
         }
       }
     },
-    "planSha256": { "type": ["string", "null"] }
+    "planSha256": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gitHooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "root",
+        "rootIdentity",
+        "commonDir",
+        "commonIdentity",
+        "worktrees",
+        "hooks"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "enum": [
+            "pipeline.git-hook-footprint.v1"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "rootIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dev",
+            "ino"
+          ],
+          "properties": {
+            "dev": {
+              "type": "string"
+            },
+            "ino": {
+              "type": "string"
+            }
+          }
+        },
+        "commonDir": {
+          "type": "string"
+        },
+        "commonIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dev",
+            "ino"
+          ],
+          "properties": {
+            "dev": {
+              "type": "string"
+            },
+            "ino": {
+              "type": "string"
+            }
+          }
+        },
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hooks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "hookPath",
+              "state",
+              "markerPath",
+              "implPath",
+              "status",
+              "hook",
+              "marker",
+              "impl"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "pre-commit",
+                  "commit-msg",
+                  "pre-push"
+                ]
+              },
+              "hookPath": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "markerPath": {
+                "type": "string"
+              },
+              "implPath": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "owned",
+                  "owned-partial",
+                  "absent",
+                  "conflict"
+                ]
+              },
+              "hook": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "required": [
+                  "sha256",
+                  "identity",
+                  "mode"
+                ],
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "identity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dev",
+                      "ino"
+                    ],
+                    "properties": {
+                      "dev": {
+                        "type": "string"
+                      },
+                      "ino": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "mode": {
+                    "type": "number"
+                  }
+                }
+              },
+              "marker": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "required": [
+                  "sha256",
+                  "identity"
+                ],
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "identity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dev",
+                      "ino"
+                    ],
+                    "properties": {
+                      "dev": {
+                        "type": "string"
+                      },
+                      "ino": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "impl": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "required": [
+                  "sha256",
+                  "identity"
+                ],
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "identity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dev",
+                      "ino"
+                    ],
+                    "properties": {
+                      "dev": {
+                        "type": "string"
+                      },
+                      "ino": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

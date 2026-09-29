@@ -69,6 +69,41 @@ test("closed package refuses missing, duplicate, brownfield, broad, escaping and
     assert.throws(() => parseArchitectureDesign(prd(input)), /ARCHITECTURE-DESIGN-/u);
   }
 });
+test("compact greenfield package derives redundant fitness rows and zero baseline", (t) => {
+  const input = design();
+  const fullBytes = Buffer.byteLength(JSON.stringify(input));
+  delete input.fitnessModel.modules;
+  delete input.baseline;
+  const compactBytes = Buffer.byteLength(JSON.stringify(input));
+  assert.ok(compactBytes < fullBytes);
+  t.diagnostic(`architecture design authoring bytes: ${fullBytes} -> ${compactBytes}`);
+  const parsed = parseArchitectureDesign(prd(input));
+  assert.deepEqual(parsed.fitnessModel.modules, [{ id: "application",
+    ownedPaths: ["src/**", "tests/**", "docs/contract.md"], allowedDependencies: [], authorityEffects: [],
+    verificationEntryPoints: ["tests/application.test.mjs"] }]);
+  assert.deepEqual(parsed.baseline.ratchetMetrics,
+    { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 });
+  const targets = architectureDesignTargets(parsed);
+  assert.deepEqual(JSON.parse(targets.find(row => row.path === "architecture/fitness-model.json").bytes).modules,
+    parsed.fitnessModel.modules);
+});
+test("field-local diagnostics identify the single invalid architecture input", () => {
+  for (const [mutate, field, code] of [
+    [input => { input.disposition.scope[1] = "tests/**"; }, "disposition.scope[1]", "ARCHITECTURE-DESIGN-DISPOSITION-INVALID"],
+    [input => { input.modules[0].ownedPaths[0] = "../escape/**"; }, "modules[0].ownedPaths[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
+    [input => { input.modules[0].publicContracts[0] = "docs/*"; }, "modules[0].publicContracts[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
+    [input => { input.modules[0].verificationEntryPoints[0] = "tests/*"; }, "modules[0].verificationEntryPoints[0]", "ARCHITECTURE-DESIGN-PATH-INVALID"],
+  ]) {
+    const input = design(); mutate(input);
+    assert.throws(() => parseArchitectureDesign(prd(input)), error =>
+      error.message === code && error.field === field && typeof error.expected === "string");
+  }
+  const input = design();
+  input.fitnessModel.modules[0].ownedPaths = ["wrong/**"];
+  assert.throws(() => parseArchitectureDesign(prd(input)), error =>
+    error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH"
+      && error.field === "fitnessModel.modules[0].ownedPaths");
+});
 function snapshot(root) {
   const result = {};
   function visit(directory, prefix = "") {

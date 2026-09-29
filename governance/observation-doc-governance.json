@@ -316,6 +316,8 @@
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.json",
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
+          "docs/adr/draft-scanner-diagnostic-sidecar.json",
+          "docs/adr/draft-scanner-diagnostic-sidecar.md",
           "docs/adr/draft-session-cut-recommended-by-readiness.md",
           "docs/codex-isolated-critic-foundation.md",
           "docs/handover-0.5.2-findings.md",

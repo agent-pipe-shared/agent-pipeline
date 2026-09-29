@@ -79,6 +79,28 @@ test("a PO-deferred adoption reports complete fitness observations without enfor
   assert.equal(result.artifacts.baseline.status, "current");
   assert.equal(result.disposition.disposition, "deferred");
 });
+test("approved greenfield design defers missing physical surfaces without fabricating fitness pass", () => {
+  const design = { ok: true, status: "materialized", disposition: "approved-scoped",
+    scope: ["plugins/", "architecture/"], authority: "approved-design-package",
+    pendingPhysicalSurfaces: ["tests/application.test.mjs"],
+    planningSurface: { planPath: "specs/feature/prd.md", paths: ["plugins/pipeline-core/lib/architecture-design.mjs"] } };
+  let evaluations = 0;
+  const options = { rootDir: repoRoot, deps: {
+    inspectArchitectureDesign: () => design,
+    evaluateArchitectureFitness: () => { evaluations += 1; throw new Error("not yet executable"); },
+  } };
+  const deferred = inspectArchitectureEntryReadiness(options);
+  assert.equal(deferred.status, "ready", JSON.stringify(deferred));
+  assert.equal(deferred.fitness.overallStatus, "deferred");
+  assert.equal(deferred.fitness.blockingOverallStatus, "deferred");
+  assert.deepEqual(deferred.fitness.pendingPhysicalSurfaces, ["tests/application.test.mjs"]);
+  assert.equal(evaluations, 0);
+  design.pendingPhysicalSurfaces = [];
+  const evaluated = inspectArchitectureEntryReadiness(options);
+  assert.equal(evaluated.status, "blocked");
+  assert.equal(evaluated.code, "ARCHITECTURE-FITNESS-UNAVAILABLE");
+  assert.equal(evaluations, 1);
+});
 
 test("calibration-unavailable class 10 is preserved as report-only while other classes decide entry", () => {
   const result = inspectArchitectureEntryReadiness({

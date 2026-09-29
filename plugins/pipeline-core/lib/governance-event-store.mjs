@@ -11,6 +11,7 @@
  * portable-profile data through the restricted-machine-local functions.
  */
 import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat, stat } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -836,6 +837,55 @@ export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath
 export async function readLocalRepositoryFingerprint({ repositoryRoot } = {}) {
   const { fingerprint } = await assertPhysicalRoot(repositoryRoot);
   return fingerprint;
+}
+
+/** Observe only an existing v2 checkout identity. Never mints or migrates.
+ * Missing/v1 state is unavailable to read-only admission callers; provision it
+ * through the existing sanctioned writer separately. The physical observation
+ * is bounded and rechecked, not a repository-wide atomic snapshot.
+ */
+export async function readExistingLocalRepositoryFingerprint({ repositoryRoot } = {}) {
+  const unavailable = () => fail("GES-EXISTING-REPOSITORY-BINDING", "A physical existing v2 repository binding is required.");
+  let descriptor;
+  try {
+    if (typeof repositoryRoot !== "string" || !path.isAbsolute(repositoryRoot)
+      || path.resolve(repositoryRoot) !== repositoryRoot || await realpath(repositoryRoot) !== repositoryRoot) unavailable();
+    const repository = discoverRepository(repositoryRoot);
+    const target = path.join(repository.commonDir, ...LOCAL_REPOSITORY_BINDING_SEGMENTS);
+    await assertNoSymlinkAncestry(target);
+    const before = await lstat(target, { bigint: true });
+    const validFile = value => value.isFile() && !value.isSymbolicLink() && value.nlink === 1n
+      && value.size <= 65536n && (value.mode & 0o022n) === 0n
+      && (typeof process.getuid !== "function" || value.uid === BigInt(process.getuid()));
+    const same = (left, right) => ["dev", "ino", "mode", "uid", "nlink", "size", "mtimeNs", "ctimeNs"]
+      .every(key => left[key] === right[key]);
+    if (!validFile(before) || await realpath(target) !== target) unavailable();
+    descriptor = await open(target, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+    const opened = await descriptor.stat({ bigint: true });
+    if (!validFile(opened) || !same(before, opened)) unavailable();
+    const storage = Buffer.alloc(65537);
+    let count = 0;
+    while (count < storage.length) {
+      const { bytesRead } = await descriptor.read(storage, count, storage.length - count, null);
+      if (bytesRead === 0) break;
+      count += bytesRead;
+    }
+    const afterDescriptor = await descriptor.stat({ bigint: true });
+    const after = await lstat(target, { bigint: true });
+    if (count > 65536 || BigInt(count) !== opened.size || !same(opened, afterDescriptor)
+      || !same(opened, after) || !validFile(after) || await realpath(target) !== target) unavailable();
+    await assertNoSymlinkAncestry(target);
+    const currentRepository = discoverRepository(repositoryRoot);
+    if (currentRepository.commonDir !== repository.commonDir || currentRepository.primaryRoot !== repository.primaryRoot) unavailable();
+    const binding = parseStrictJson(storage.subarray(0, count));
+    if (!exactKeys(binding, ["schema", "repositoryFingerprint", "legacyAliases", "boundAtEpochMs"])
+      || binding.schema !== LOCAL_REPOSITORY_BINDING_SCHEMA || typeof binding.repositoryFingerprint !== "string" || !SHA256.test(binding.repositoryFingerprint)
+      || !Array.isArray(binding.legacyAliases) || binding.legacyAliases.length !== new Set(binding.legacyAliases).size
+      || binding.legacyAliases.some(value => typeof value !== "string" || !SHA256.test(value) || value === binding.repositoryFingerprint)
+      || !Number.isInteger(binding.boundAtEpochMs) || binding.boundAtEpochMs < 0) unavailable();
+    return binding.repositoryFingerprint;
+  } catch { unavailable(); }
+  finally { if (descriptor) { try { await descriptor.close(); } catch { unavailable(); } } }
 }
 
 /**

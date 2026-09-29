@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
+import { parseVerifyCaseCompletion } from "../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs";
 
 import {
   DEFAULT_REGISTRY,
@@ -105,8 +106,8 @@ function git(root, args) {
 check("VCR01", "the repository registry covers all arrays and pins the observed required-descriptor counts", () => {
   const result = checkVerifyCaseCompletion({ root: REPO_ROOT });
   assert.equal(result.ok, true, result.findings.join("\n"));
-  assert.equal(result.vulnerableCount, 201);
-  assert.equal(result.registryCount, 206);
+  assert.equal(result.vulnerableCount, 241);
+  assert.equal(result.registryCount, 246);
 });
 
 check("VCR02", "the closed classifier distinguishes vulnerable and separately registered cases", () => {
@@ -277,6 +278,53 @@ registerTestCaseCompletion(configuration);
     assert.equal(result.ok, false);
     assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"));
   }
+  const onboardingPath = "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs";
+  const actualSource = readFileSync(join(REPO_ROOT, onboardingPath), "utf8");
+  function onboardingFixture(source, path = onboardingPath) {
+    const context = fixture();
+    const verifyPath = "harness/scripts/verify.mjs";
+    write(context.root, verifyPath, readFileSync(join(context.root, verifyPath), "utf8").replace(
+      'join(libDir, "required.test.mjs")', `join(libDir, "${path.split("/").at(-1)}")`,
+    ));
+    context.registry.entries.find((entry) => entry.name === "required").path = path;
+    write(context.root, DEFAULT_REGISTRY, JSON.stringify(context.registry));
+    write(context.root, path, source);
+    return context;
+  }
+  const actual = onboardingFixture(actualSource);
+  const positive = checkVerifyCaseCompletion({ root: actual.root });
+  assert.equal(positive.ok, true, positive.findings.join("\n"));
+  const mutations = [
+    ["wrong suite path", (source) => source, "plugins/pipeline-core/lib/required.test.mjs"],
+    ["helper alias", (source) => source.replace("{ createTestCaseCompletionRecorder }", "{ registerTestCaseCompletion as createTestCaseCompletionRecorder }")],
+    ["foreign helper path", (source) => source.replace('from "./test-case-completion.mjs"', 'from "./fixtures/test-case-completion.mjs"')],
+    ["disabled orchestration", (source) => source.replace("const ORCHESTRATING_SHARDS = DIRECT_INVOCATION && shard === null;", "const ORCHESTRATING_SHARDS = false;")],
+    ["disabled direct invocation", (source) => source.replace("const DIRECT_INVOCATION = isDirectInvocation(import.meta.url);", "const DIRECT_INVOCATION = false;")],
+    ["false branch", (source) => source.replace("if (ORCHESTRATING_SHARDS) {", "if (false) {")],
+    ["unconditional exit before orchestration", (source) => source.replace("if (ORCHESTRATING_SHARDS) {", "process.exit(0);\nif (ORCHESTRATING_SHARDS) {")],
+    ["unbraced false before orchestration", (source) => source.replace("if (ORCHESTRATING_SHARDS) {", "if (false)\nif (ORCHESTRATING_SHARDS) {")],
+    ["dormant recorder", (source) => source.replace("const recorder = createTestCaseCompletionRecorder({", "function dormant() { const recorder = createTestCaseCompletionRecorder({").replace("  assertShardControllerContract();", "  }\n  assertShardControllerContract();")],
+    ["exit before recorder", (source) => source.replace("  const recorder = createTestCaseCompletionRecorder({", "  process.exit(0);\n  const recorder = createTestCaseCompletionRecorder({")],
+    ["open recorder object", (source) => source.replace("caseIds: ONBOARDING_CASE_IDS, fd: completionFd,", "caseIds: ONBOARDING_CASE_IDS, fd: completionFd, extra: true,")],
+    ["spread recorder object", (source) => source.replace("caseIds: ONBOARDING_CASE_IDS, fd: completionFd,", "...configuration, caseIds: ONBOARDING_CASE_IDS, fd: completionFd,")],
+    ["duplicate recorder key", (source) => source.replace("caseIds: ONBOARDING_CASE_IDS, fd: completionFd,", "caseIds: ONBOARDING_CASE_IDS, fd: completionFd, fd: completionFd,")],
+    ["foreign case set", (source) => source.replace("caseIds: ONBOARDING_CASE_IDS, fd: completionFd,", "caseIds: unrelatedIds, fd: completionFd,")],
+    ["discarded completion fd", (source) => source.replace("caseIds: ONBOARDING_CASE_IDS, fd: completionFd,", "caseIds: ONBOARDING_CASE_IDS, fd: 3,")],
+    ["unawaited shards", (source) => source.replace("const results = await runShards(recorder);", "const results = runShards(recorder);")],
+    ["exit before shards", (source) => source.replace("const results = await runShards(recorder);", "process.exit(0);\n  const results = await runShards(recorder);")],
+    ["foreign recorder argument", (source) => source.replace("const results = await runShards(recorder);", "const results = await runShards(other);")],
+    ["absent close validation", (source) => source.replace("const receipt = receiver.close(code, signal);", "const receipt = receiver.receipt;")],
+    ["fabricated pass disposition", (source) => source.replace("recorder.dispose(result.id, result.disposition)", 'recorder.dispose(result.id, "pass")')],
+    ["noncanonical declaration", (source) => source.replace("ONBOARDING_TEST_CASES.map((entry) => entry.id).sort()", "unrelatedIds")],
+  ];
+  for (const [name, mutate, path] of mutations) {
+    const impostor = mutate(actualSource);
+    if (path === undefined) assert.notEqual(impostor, actualSource, name);
+    const context = onboardingFixture(impostor, path);
+    const result = checkVerifyCaseCompletion({ root: context.root });
+    assert.equal(result.ok, false, name);
+    assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"), name);
+  }
 });
 
 check("VCR10", "required must resolve the import to the shipped completion helper", () => {
@@ -378,7 +426,196 @@ check("VCR14", "the CLI rejects unpaired refs and unknown arguments", () => {
   }
 });
 
-assert.equal(cases.length, 14, "the complete Verify case-completion registry corpus must be registered before execution begins");
+
+const DECLARATIVE = "harness/verify-suites.json";
+const declarativePolicy = () => ({ schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["case-one"], maxBytes: 4096 });
+function declarativeFixture() {
+  const context = fixture();
+  const suite = { name: "declarative-required", file: "plugins/pipeline-core/lib/declarative.test.mjs",
+    caseCompletion: declarativePolicy(), invariantPinned: "actual completion contract", nonOverlapNote: "declarative reader admission" };
+  write(context.root, suite.file, REQUIRED);
+  context.registry.entries.push({ name: suite.name, path: suite.file, disposition: "required" });
+  context.registry.entries.sort((a,b) => a.name.localeCompare(b.name));
+  write(context.root, DEFAULT_REGISTRY, JSON.stringify(context.registry));
+  const document = { schema: "pipeline.verify-suites.v1", suites: [suite] };
+  write(context.root, DECLARATIVE, JSON.stringify(document));
+  return { ...context, suite, document };
+}
+function saveDeclarative(f) { write(f.root, DECLARATIVE, JSON.stringify(f.document)); }
+function initializeCandidate(f) {
+  git(f.root, ["init", "-q"]); git(f.root, ["config", "user.email", "fixture@example.invalid"]);
+  git(f.root, ["config", "user.name", "Fixture"]); git(f.root, ["add", "."]);
+  git(f.root, ["commit", "-qm", "candidate fixture"]); return git(f.root, ["rev-parse", "HEAD"]);
+}
+function hasFinding(f, prefix, options = {}) {
+  const result = checkVerifyCaseCompletion({ root: f.root, ...options });
+  assert.equal(result.ok, false, JSON.stringify(result));
+  assert.ok(result.findings.some(x => x.startsWith(prefix)), result.findings.join("\n"));
+  return result;
+}
+
+check("VCR15", "required declarative suite is admitted from canonical closed JSON with real protocol", () => {
+  const f = declarativeFixture(), result = checkVerifyCaseCompletion({ root: f.root });
+  assert.equal(result.ok, true, result.findings.join("\n"));
+  assert.equal(result.registeredCount, 5); assert.equal(result.registryCount, 5);
+});
+
+check("VCR16", "required declarative registration still needs an explicit completion policy", () => {
+  const f = declarativeFixture(); delete f.suite.caseCompletion; saveDeclarative(f);
+  hasFinding(f, "REQUIRED-VERIFY-POLICY declarative-required");
+});
+
+check("VCR17", "required declarative registration still needs actual reachable shipped protocol", () => {
+  const f = declarativeFixture(); write(f.root, f.suite.file, FALSE_REQUIRED);
+  hasFinding(f, "REQUIRED-PROTOCOL declarative-required");
+});
+
+check("VCR18", "canonical declarative schema and unknown fields fail closed", () => {
+  for (const mutate of [d => { d.schema = "other"; }, d => { d.extra = true; },
+    d => { d.suites[0].extra = true; }, d => { d.suites = {}; }]) {
+    const f = declarativeFixture(); mutate(f.document); saveDeclarative(f); hasFinding(f, "DECLARATIVE-SCHEMA");
+  }
+  const f = declarativeFixture(); write(f.root, DECLARATIVE, "{broken"); hasFinding(f, "DECLARATIVE-READ");
+});
+
+check("VCR19", "declarative path and full runtime completion policy constraints are enforced", () => {
+  for (const file of ["../escape.test.mjs", "/tmp/escape.test.mjs", "plugins//bad.test.mjs", "plugins/../bad.test.mjs", "plugins\\bad.test.mjs"]) {
+    const f = declarativeFixture(); f.suite.file = file; saveDeclarative(f); hasFinding(f, "DECLARATIVE-PATH");
+  }
+  for (const ids of [[], ["duplicate", "duplicate"], ["z", "a"], ["1invalid"], ["a".repeat(65)]]) {
+    const f = declarativeFixture(); f.suite.caseCompletion.caseIds = ids; saveDeclarative(f); hasFinding(f, "DECLARATIVE-POLICY");
+  }
+  const f = declarativeFixture(); f.suite.caseCompletion.maxBytes = 1048577; saveDeclarative(f); hasFinding(f, "DECLARATIVE-POLICY");
+});
+
+check("VCR20", "duplicate suite IDs and missing files fail while distinct IDs may share a canonical file", () => {
+  const f = declarativeFixture(); f.document.suites.push({ ...f.suite }); saveDeclarative(f);
+  hasFinding(f, "VERIFY-DUPLICATE declarative-required");
+  const g = declarativeFixture(); g.document.suites.push({ ...g.suite, name: "other-name" }); saveDeclarative(g);
+  g.registry.entries.push({ name: "other-name", path: g.suite.file, disposition: "required" });
+  g.registry.entries.sort((a,b) => a.name.localeCompare(b.name)); write(g.root, DEFAULT_REGISTRY, JSON.stringify(g.registry));
+  const sharedPath = checkVerifyCaseCompletion({ root: g.root });
+  assert.equal(sharedPath.ok, true, sharedPath.findings.join("\n"));
+  assert.equal(sharedPath.registeredCount, 6, "canonical Verify journals distinct suite IDs even when files match");
+  const h = declarativeFixture(); rmSync(join(h.root, h.suite.file)); hasFinding(h, "VERIFY-MISSING declarative-required");
+  const i = declarativeFixture(); i.document.suites.push({ ...i.suite, name: "required", file: "plugins/pipeline-core/lib/other.test.mjs" });
+  saveDeclarative(i); hasFinding(i, "VERIFY-DUPLICATE required");
+});
+
+check("VCR21", "physical declarative directory and outside-repository alias cannot become absence", () => {
+  const f = declarativeFixture(); rmSync(join(f.root, DECLARATIVE)); mkdirSync(join(f.root, DECLARATIVE)); hasFinding(f, "DECLARATIVE-READ");
+  const g = declarativeFixture(), outside = mkdtempSync(join(tmpdir(), "declarative-outside-")), file = join(outside, "manifest.json");
+  writeFileSync(file, JSON.stringify(g.document)); rmSync(join(g.root, DECLARATIVE)); symlinkSync(file, join(g.root, DECLARATIVE));
+  hasFinding(g, "DECLARATIVE-READ");
+});
+
+check("VCR22", "candidate JSON, policy and suite bytes cannot borrow matching working-tree bytes", () => {
+  const f = declarativeFixture(), base = initializeCandidate(f);
+  assert.equal(checkVerifyCaseCompletion({ root: f.root, base, candidate: base }).ok, true);
+  delete f.suite.caseCompletion; saveDeclarative(f); git(f.root, ["add", "."]); git(f.root, ["commit", "-qm", "missing candidate policy"]);
+  const candidate = git(f.root, ["rev-parse", "HEAD"]); f.suite.caseCompletion = declarativePolicy(); saveDeclarative(f);
+  assert.equal(checkVerifyCaseCompletion({ root: f.root }).ok, true);
+  hasFinding(f, "REQUIRED-VERIFY-POLICY declarative-required", { base, candidate });
+  saveDeclarative(f); write(f.root, f.suite.file, FALSE_REQUIRED); git(f.root, ["add", "."]); git(f.root, ["commit", "-qm", "invalid candidate protocol"]);
+  const invalid = git(f.root, ["rev-parse", "HEAD"]); write(f.root, f.suite.file, REQUIRED);
+  hasFinding(f, "REQUIRED-PROTOCOL declarative-required", { base, candidate: invalid });
+});
+
+check("VCR23", "candidate declarative symlink and wildcard suite paths cannot borrow regular blobs", () => {
+  const f = declarativeFixture(), base = initializeCandidate(f);
+  write(f.root, "valid-manifest.json", JSON.stringify(f.document)); rmSync(join(f.root, DECLARATIVE));
+  symlinkSync("../../valid-manifest.json", join(f.root, DECLARATIVE));
+  git(f.root, ["add", "."]); git(f.root, ["commit", "-qm", "candidate symlink"]);
+  const candidate = git(f.root, ["rev-parse", "HEAD"]); rmSync(join(f.root, DECLARATIVE)); saveDeclarative(f);
+  hasFinding(f, "DECLARATIVE-READ", { base, candidate });
+  const g = declarativeFixture(); g.suite.file = "plugins/pipeline-core/lib/*.test.mjs";
+  g.registry.entries.find(x => x.name === g.suite.name).path = g.suite.file;
+  saveDeclarative(g); write(g.root, DEFAULT_REGISTRY, JSON.stringify(g.registry));
+  const globCandidate = initializeCandidate(g);
+  hasFinding(g, "VERIFY-MISSING declarative-required", { base: globCandidate, candidate: globCandidate });
+});
+
+check("VCR24", "new declarative registration cannot give an existing suite a legacy exemption", () => {
+  const f = fixture(); write(f.root, "plugins/pipeline-core/lib/dormant.test.mjs", LEGACY);
+  const base = initializeCandidate(f);
+  write(f.root, DECLARATIVE, JSON.stringify({ schema: "pipeline.verify-suites.v1", suites: [
+    { name: "dormant", file: "plugins/pipeline-core/lib/dormant.test.mjs" }] }));
+  f.registry.entries.push({ name: "dormant", path: "plugins/pipeline-core/lib/dormant.test.mjs", disposition: "legacy-process-only", reason: REASON });
+  f.registry.entries.sort((a,b) => a.name.localeCompare(b.name)); write(f.root, DEFAULT_REGISTRY, JSON.stringify(f.registry));
+  git(f.root, ["add", "."]); git(f.root, ["commit", "-qm", "new declarative legacy"]); const candidate = git(f.root, ["rev-parse", "HEAD"]);
+  hasFinding(f, "LEGACY-NEW dormant", { base, candidate });
+});
+
+check("VCR25", "base declarative registrations remain present in same-candidate migration inventory", () => {
+  const f = declarativeFixture(); delete f.suite.caseCompletion; saveDeclarative(f); write(f.root, f.suite.file, LEGACY);
+  const entry = f.registry.entries.find(x => x.name === f.suite.name); entry.disposition = "legacy-process-only"; entry.reason = REASON;
+  write(f.root, DEFAULT_REGISTRY, JSON.stringify(f.registry)); const base = initializeCandidate(f);
+  write(f.root, "README", "unrelated candidate"); git(f.root, ["add", "."]); git(f.root, ["commit", "-qm", "unrelated"]);
+  const candidate = git(f.root, ["rev-parse", "HEAD"]), result = checkVerifyCaseCompletion({ root: f.root, base, candidate });
+  assert.equal(result.ok, true, result.findings.join("\n"));
+});
+
+check("VCR26", "closed shorthand registration is admitted and produces an actual inherited-FD terminal receipt", () => {
+  const f = declarativeFixture();
+  const shorthand = `${IMPORT_KEYWORD} assert from "node:assert/strict";
+${IMPORT_KEYWORD} { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const cases = [{ id: "case-one", name: "actual shorthand case", run: () => assert.equal(1, 1) }];
+const fd = Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+const maxBytes = 4096;
+registerTestCaseCompletion({ cases, fd, maxBytes });
+`;
+  write(f.root, f.suite.file, shorthand);
+  const admitted = checkVerifyCaseCompletion({ root: f.root });
+  assert.equal(admitted.ok, true, admitted.findings.join("\n"));
+  write(f.root, "plugins/pipeline-core/lib/test-case-completion.mjs", readFileSync(join(REPO_ROOT, "plugins/pipeline-core/lib/test-case-completion.mjs"), "utf8"));
+  const actual = spawnSync(process.execPath, [join(f.root, f.suite.file)], {
+    cwd: f.root, stdio: ["ignore", "pipe", "pipe", "pipe"], timeout: 10000,
+    env: { ...process.env, PIPELINE_VERIFY_CASE_COMPLETION_FD: "3", PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: "4096" },
+  });
+  assert.equal(actual.status, 0, actual.stderr?.toString());
+  const receipt = parseVerifyCaseCompletion(actual.output[3], declarativePolicy());
+  assert.equal(receipt.declaredCount, 1); assert.equal(receipt.disposedCount, 1);
+  assert.deepEqual(receipt.counts, { pass: 1, fail: 0, skip: 0, todo: 0 });
+  for (const properties of ["cases, fd, maxBytes, extra: true", "cases, cases, fd, maxBytes", "...configuration", "cases() {}, fd, maxBytes"]) {
+    write(f.root, f.suite.file, shorthand.replace("{ cases, fd, maxBytes }", `{ ${properties} }`));
+    hasFinding(f, "REQUIRED-PROTOCOL declarative-required");
+  }
+});
+
+const AUGMENTATION_FILE = "harness/config/verify-case-completion-augmentations.v1.json";
+function supplementary(f) { return { schema: "pipeline.verify-case-completion-augmentations.v1", augmentations: [
+  { name: f.suite.name, file: f.suite.file, caseCompletion: declarativePolicy() }] }; }
+check("VCR27", "supplementary policy admits required completion without mutating an existing declarative row", () => {
+  const f = declarativeFixture(); delete f.suite.caseCompletion; saveDeclarative(f);
+  const before = readFileSync(join(f.root, DECLARATIVE));
+  write(f.root, AUGMENTATION_FILE, JSON.stringify(supplementary(f)));
+  const actual = checkVerifyCaseCompletion({ root: f.root }); assert.equal(actual.ok, true, actual.findings.join("\n"));
+  assert.equal(actual.registeredCount, 5); assert.equal(actual.registryCount, 5);
+  assert.deepEqual(readFileSync(join(f.root, DECLARATIVE)), before, "augmentation consumes policy without rewriting the append-only row");
+});
+check("VCR28", "unknown, duplicate, malformed and conflicting supplementary policies fail the canonical gate", () => {
+  for (const mutate of [d=>d.augmentations[0].name="unknown",d=>d.augmentations[0].file="../outside.test.mjs",d=>d.augmentations.push(structuredClone(d.augmentations[0])),d=>d.extra=true]) {
+    const f = declarativeFixture(); delete f.suite.caseCompletion; saveDeclarative(f); const data = supplementary(f); mutate(data);
+    write(f.root, AUGMENTATION_FILE, JSON.stringify(data)); hasFinding(f, "DECLARATIVE-AUGMENTATION");
+  }
+  const f = declarativeFixture(); write(f.root, AUGMENTATION_FILE, JSON.stringify(supplementary(f))); hasFinding(f, "DECLARATIVE-AUGMENTATION AUG-CONFLICT");
+});
+check("VCR29", "candidate-bound supplementary JSON cannot borrow worktree policy or hide required historical absence", () => {
+  const f = declarativeFixture(); delete f.suite.caseCompletion; saveDeclarative(f); const base = initializeCandidate(f);
+  write(f.root, AUGMENTATION_FILE, JSON.stringify(supplementary(f)));
+  assert.equal(checkVerifyCaseCompletion({ root: f.root }).ok, true);
+  hasFinding(f, "REQUIRED-VERIFY-POLICY declarative-required", { base, candidate: base });
+  git(f.root, ["add", "."]); git(f.root, ["commit", "-qm", "supplementary required policy"]); const candidate = git(f.root, ["rev-parse", "HEAD"]);
+  write(f.root, AUGMENTATION_FILE, "{broken"); const bound = checkVerifyCaseCompletion({ root: f.root, base, candidate });
+  assert.equal(bound.ok, true, bound.findings.join("\n")); hasFinding(f, "DECLARATIVE-AUGMENTATION AUG-READ");
+});
+check("VCR30", "published supplementary policy cannot be ignored when no matching declarative rows exist", () => {
+  const f = fixture(); write(f.root, AUGMENTATION_FILE, JSON.stringify({ schema: "pipeline.verify-case-completion-augmentations.v1", augmentations: [
+    { name: "unconsumed", file: "plugins/pipeline-core/lib/required.test.mjs", caseCompletion: declarativePolicy() }] }));
+  hasFinding(f, "DECLARATIVE-AUGMENTATION AUG-TARGET");
+});
+
+assert.equal(cases.length, 30, "the complete Verify case-completion registry corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

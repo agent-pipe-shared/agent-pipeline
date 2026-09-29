@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.project-uninstall-request.v1",
+  "description": "Closed structural contract. Digest/preimage/ownership and stage-prefix binding remain enforced by the controller; schema admission alone authorizes no mutation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "verb",
+    "rootDir",
+    "activate",
+    "planSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.project-uninstall-request.v1"
+    },
+    "verb": {
+      "enum": [
+        "plan",
+        "apply",
+        "resume"
+      ]
+    },
+    "rootDir": {
+      "type": "string"
+    },
+    "activate": {
+      "type": "boolean"
+    },
+    "planSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

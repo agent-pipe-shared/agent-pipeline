@@ -625,6 +625,7 @@ export const ALLOWLIST = Object.freeze([
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/check-doc-contracts.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/check-doc-reconciliation.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/reader-review-protocol.md\"", reason: sourceReaderReleaseGateAllowlistReason() },
+  { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/doc-reader-terminal-binding.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "value.verify === \"node harness/scripts/verify.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
 ]);
 

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import test from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
+const completionCases = [];
+function test(name, run) {
+  if (arguments.length !== 2 || typeof run !== "function") throw new TypeError("Required completion expects preserved two-argument registration");
+  completionCases.push({ id: "ARS" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+}
 import { createAdvisoryRouteSelection, validateAdvisoryRouteSelection } from "./advisory-route-selection.mjs";
 
 function fixture(status) {
@@ -35,3 +41,10 @@ test("an answer or child claim cannot be reclassified as route selection", () =>
   assert.equal(validateAdvisoryRouteSelection({ ...input, selection: { ...selection, childStarted: true } }).ok, false);
   assert.equal(validateAdvisoryRouteSelection({ ...input, receipt: { ...input.receipt, answerSha256: "d".repeat(64) }, selection }).ok, false);
 });
+
+if (completionCases.length !== 2) throw new Error("Required completion declared case count drift");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

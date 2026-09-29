@@ -155,6 +155,11 @@ import {
   decideDispatchBudgetCall,
   dispatchWorkingCap,
 } from "../lib/dispatch-budget-core.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
 export { CLOSING_ALLOWANCE, DENIAL_CODE, INVALID_INPUT_CODE, SAFETY_MARGIN };
@@ -826,6 +831,7 @@ export function resolveParentDispatchToolUseId(input, identity, dependencies = {
 }
 
 export function evaluateDispatchBudgetGuard(input, options = {}) {
+  if (!observeGovernanceScope({ rootDir: options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return verdict(0);
   const rootDir = options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
   const nowFn = options.nowFn ?? (() => new Date().toISOString());
   const rawTranscriptPath = input?.transcript_path;

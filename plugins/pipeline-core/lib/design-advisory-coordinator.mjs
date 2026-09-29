@@ -26,6 +26,7 @@ import { persistAdvisoryReceipt } from "./advisory-receipt-assurance.mjs";
 import { DESIGN_ADVISORY_RECEIPT_DIRECTORY, readDesignAdvisoryTransaction, writeDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
+import {coordinateInitialDesignAdvisory} from './design-advisory-coordinator-v2.mjs';
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const PATH = /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._/@:-]+$/u;
@@ -254,7 +255,9 @@ export function exportNoChildDesignAdvisoryEvidence({ repoRoot, featureId, planP
  * intentionally limited to runner/profile; route, role, evidence paths and
  * receipt target are all derived here.
  */
-export async function coordinateDesignAdvisory({
+/** Historical v1 transport only. Productive initial consultations use
+ * coordinateInitialDesignAdvisory and their actual versioned course contract. */
+export async function coordinateLegacyDesignAdvisory({
   repoRoot,
   runtime,
   featureId,
@@ -428,3 +431,12 @@ export async function coordinateDesignAdvisory({
     rmSync(scratch, { recursive: true, force: true });
   }
 }
+
+/** Productive API requires the explicit initial contract and a branded host
+ * capability. A two-source historical package cannot launch a new cycle. */
+export async function coordinateDesignAdvisory(options={}){
+ if(!options.sources||!options.authoringDispatchId)return {ok:false,status:'refused',code:'DAC-INITIAL-SOURCES-REQUIRED',implementationAuthority:false};
+ const runner=options.runtime?.runner??options.runner??'codex';
+ return coordinateInitialDesignAdvisory({...options,runner,profile:options.runtime?.profile??options.profile??'epic'});
+}
+export {coordinateInitialDesignAdvisory};

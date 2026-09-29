@@ -54,6 +54,19 @@ must retain the retirement, fresh-consent, root identity, CAS and lock checks.
 Preserve the original active assertions; accepting an unintended decline is
 not a repair.
 
+The direct-route correction is now delivered and qualifies all original 23
+governance-scope callbacks, including the seven previously failing controls.
+Frozen receipt:
+`scratch/0.7-governance-scope-enrollment-contract-fix-20260929/manifest.json`,
+SHA `9cf734a0255b82ecb2539d03732d5dadbabc6bd452d41f9ce9d324e4775771d2`.
+The initial corrected 22/23 run is retained; an explicit retained non-Git
+refusal-code correction completed the negative control. Genuine retained Git
+history stays declined pending retirement and fresh consent. Current full
+continuity receipt also passes 298/298 with this Source graph:
+`scratch/0.7-current-source-continuity-after-governance-20260929/manifest.json`,
+SHA `fe6671c73b8d7651c5d02b4043194fc5c35b6d53b6fd738ac10c5b58c0e711db`.
+These receipts do not close full onboarding, Verify or installed acceptance.
+
 ## Acceptance
 
 - First portable apply succeeds in empty and already initialized Git roots

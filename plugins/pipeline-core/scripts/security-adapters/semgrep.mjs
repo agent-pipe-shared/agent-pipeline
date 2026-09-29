@@ -34,6 +34,8 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter as PATH_DELIM, join as pathJoin } from "node:path";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
+import { performance } from "node:perf_hooks";
+import { observeSemgrepChild } from "../../lib/security-scanner-diagnostics.mjs";
 
 export const name = "semgrep";
 
@@ -94,7 +96,7 @@ function cleanupScratch(path) {
   try { rmSync(path, { recursive: true, force: true }); } catch { /* best-effort bounded scratch cleanup */ }
 }
 
-export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 60000, env = process.env }) {
+async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 60000, env = process.env }) {
   const resolved = config.binaryPath ? { installed: true, path: config.binaryPath } : resolveBinary(env);
   if (!resolved.installed) {
     return { status: "SKIPPED", classification: "binary_missing", findings: [], raw: null, reason: resolved.reason };
@@ -124,6 +126,8 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     SEMGREP_LOG_FILE: pathJoin(scratch, "semgrep.log"),
     SEMGREP_SETTINGS_FILE: pathJoin(scratch, "settings.yml"),
     SEMGREP_SEND_METRICS: "off",
+    // Local rules and disabled metrics also require suppressing the default version check.
+    SEMGREP_ENABLE_VERSION_CHECK: "0",
     SEMGREP_VERSION_CACHE_PATH: pathJoin(scratch, "version-cache"),
   };
 
@@ -206,6 +210,24 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
  * capability contract across all four adapters without re-deriving it from prose. Adding this
  * export changes none of `run()`/`isInstalled()`/`mapSemgrepSeverity()`'s existing behavior.
  */
+export async function run(options) {
+  const delegate = options.spawnFn ?? nodeSpawnSync;
+  let diagnostics = null;
+  const spawnFn = (...args) => {
+    const started = performance.now();
+    try {
+      const result = delegate(...args);
+      try { diagnostics = observeSemgrepChild(result, performance.now() - started, args[2].timeout); } catch { /* exit-neutral */ }
+      return result;
+    } catch (error) {
+      try { diagnostics = observeSemgrepChild({ error }, performance.now() - started, args[2].timeout); } catch { /* exit-neutral */ }
+      throw error;
+    }
+  };
+  const result = await runScan({ ...options, spawnFn });
+  return { ...result, diagnostics };
+}
+
 export const CAPABILITY_CONTRACT_V2 = Object.freeze({
   contractVersion: "v2",
   tool: name,

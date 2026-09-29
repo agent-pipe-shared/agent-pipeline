@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.enrollment-retirement-inspection.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "journal"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.enrollment-retirement-inspection.v1"
+    },
+    "journal": {
+      "anyOf": [
+        {
+          "$ref": "pipeline.enrollment-retirement-coordinator.v1.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

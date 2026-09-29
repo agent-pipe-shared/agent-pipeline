@@ -152,6 +152,11 @@ import {
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 const EXEMPT_PREFIXES = ["docs/", "specs/", "backlog/items/", ".claude/"];
 const DISPATCH_RECORD_BASENAME = /^dispatch-record(-[^/]*)?\.json$/i;

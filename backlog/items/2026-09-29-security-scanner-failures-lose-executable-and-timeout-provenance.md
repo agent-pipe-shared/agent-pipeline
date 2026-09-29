@@ -52,3 +52,43 @@ version-check-disabled minimal fixture completes, manifest
 These diagnostic helpers are not a delivered production retention feature or
 qualification of the original PUSHSEED callback. Assessment and limits:
 `scratch/0.7-native-semgrep-bounded-diagnosis-20260929/assessment.md`.
+
+## PO scope and architecture decision — 2026-09-29
+
+The PO explicitly selected **“G13 aufnehmen gemäß Vorschlag”**. This accepts G13
+implementation scope and the architecture package at
+`scratch/0.7-scanner-diagnostics-scope-proposal-20260929/architecture-decision-proposal/manifest.json`,
+SHA `4e31e11bcd6e683b82dd86165440d122062e90d0686fd63739e9612667edd06e`.
+The genuine chat decision is recorded in `scratch/0.7-g13-po-decision-20260929.md`.
+The Source contract is `docs/adr/draft-scanner-diagnostic-sidecar.md` with its
+digest-bound `pipeline.architecture-decision.v1` companion.
+
+Implementation must preserve the package's closed diagnostic-only schema,
+bounded privacy projection, verdict independence, candidate/evidence binding,
+safe descriptor-relative publication and honest unavailable behavior. The older
+inert patch remains a sketch, not approved conformant implementation. Ordinary
+implementation may proceed under this contract.
+
+## Progress — implementation evidence
+
+Seven product files are delivered in Source. Actual qualification passes the
+original147 security cases, 11 descriptor cases and 24 new diagnostic cases
+with real FD3 for the new suite; receipt SHA
+`1d962bcc0fa26b8544cd33b43c413070d93075f99806c778fa6eba931b817ea8`.
+The protected documentation/registration successor is held for its exact
+signature. Whole-candidate Verify, independent Critic, installation and native
+scanner acceptance remain pending; these Source checks do not replace them.
+
+This item remains open with manual completion. The decision is not a signature,
+protected-write capability, implementation/native PASS, new lifecycle approval
+or installed acceptance. Formal ADR ordinal/status acceptance follows ADR-0069
+at actual trunk acceptance; proposed machine status does not negate the genuine
+PO implementation authorization. Existing historical failure paragraphs and
+receipts above retain their original observation context.
+
+Additional quality review found a diagnostic candidate-binding gap. The decoder
+now requires the evidence payload digest and all three actual candidate identity
+fields; valid but different candidate metadata is refused. Existing diagnostic
+corpus24/24 passes, including candidate mismatch controls and the public CLI
+missing-tool fixture isolated from host HOME fallback. The bounded manual
+correction review and final whole-candidate qualification remain separate gates.

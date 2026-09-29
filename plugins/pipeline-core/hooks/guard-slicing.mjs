@@ -179,6 +179,11 @@ import { basename, dirname, join } from "node:path";
 import { resolveGitCommonDir, subagentIdentity } from "./guard-dispatch-budget.mjs";
 import { extractAntigravityDispatches, extractWorkflowDispatches } from "./guard-dispatch.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 // PSP-0's N, and the single threshold this file uses everywhere a count is
 // compared. Both triggers read this SAME constant -- never a second, locally
@@ -614,6 +619,7 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
  * silent allow, matching every sibling guard's fail-open posture.
  */
 export function evaluateSlicingGuard(input, options = {}) {
+  if (!observeGovernanceScope({ rootDir: options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return { exitCode: 0, stdout: "" };
   try {
     const rootDir = options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
     const nowFn = options.nowFn ?? (() => new Date().toISOString());

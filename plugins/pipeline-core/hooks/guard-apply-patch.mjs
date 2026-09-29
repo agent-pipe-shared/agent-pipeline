@@ -5,6 +5,11 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 const GUARDS = [
   { path: fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url)), args: [], lane: "parallel" },
@@ -104,15 +109,25 @@ if (first < 0 || lines[first] !== "*** Begin Patch" || lines[last] !== "*** End 
 
 const paths = [];
 let operation = null;
+let updateOperation = false;
+let updateHunkStarted = false;
+let updateHunkContent = false;
+let updateEndOfFile = false;
 let beginCount = 0;
 let endCount = 0;
 for (let index = 0; index < lines.length; index++) {
   const line = lines[index];
   if (line === "*** Begin Patch") { beginCount++; if (index !== first || beginCount > 1) block(`ambiguous Begin Patch header at line ${index + 1}.`); continue; }
   if (line === "*** End Patch") { endCount++; if (index !== last || endCount > 1) block(`ambiguous End Patch header at line ${index + 1}.`); continue; }
+  if (line === "*** End of File") {
+    if (!updateOperation || !updateHunkStarted || !updateHunkContent || updateEndOfFile) block(`orphan, misplaced, or duplicate End of File marker at line ${index + 1}.`);
+    updateEndOfFile = true;
+    continue;
+  }
   const header = line.match(/^\*\*\* (Add File|Update File|Delete File|Move to):(.*)$/);
   if (header) {
     const kind = header[1];
+    if (updateEndOfFile && kind === "Move to") block(`nonterminal End of File marker before Move to at line ${index + 1}.`);
     const suffix = header[2];
     if (!suffix.startsWith(" ") || suffix.startsWith("  ")) block(`ambiguous ${kind} path at line ${index + 1}.`);
     const filePath = suffix.slice(1);
@@ -121,10 +136,23 @@ for (let index = 0; index < lines.length; index++) {
     if (filePath === "" || filePath !== filePath.trim() || filePath.includes("\0") || normalized.endsWith("/") || normalized.includes("//") || segments.some((segment) => [".", ".."].includes(segment))) block(`empty, traversal, or ambiguous ${kind} path at line ${index + 1}.`);
     if (kind === "Move to" && operation !== "Update File") block(`Move to header without a preceding Update File at line ${index + 1}.`);
     operation = kind;
+    if (kind !== "Move to") {
+      updateOperation = kind === "Update File";
+      updateHunkStarted = false;
+      updateHunkContent = false;
+      updateEndOfFile = false;
+    }
     paths.push({ filePath, patchContainsAcknowledgementMarker: false });
     continue;
   }
   if (line.startsWith("*** ")) block(`unknown or ambiguous patch header at line ${index + 1}: ${line}`);
+  if (index > first && index < last && updateEndOfFile) block(`nonterminal End of File marker at line ${index + 1}.`);
+  if (updateOperation && (line === "@@" || line.startsWith("@@ "))) {
+    updateHunkStarted = true;
+    updateHunkContent = false;
+  } else if (updateOperation && updateHunkStarted && /^[ +\-]/u.test(line)) {
+    updateHunkContent = true;
+  }
   if (index > first && index < last && operation === null) {
     block(`patch content appears before the first file operation at line ${index + 1}.`);
   }
@@ -135,19 +163,32 @@ if (beginCount !== 1 || endCount !== 1 || paths.length === 0) block("non-empty a
 // needs while keeping the existing path-only translation boundary intact.
 // An apply_patch can author ordinary staging prose, but it must not smuggle
 // the PO acknowledgement marker past the attended chat/signature writer.
-let activePath = null;
+let activePaths = [];
 for (const line of lines) {
   const header = line.match(/^\*\*\* (?:Add File|Update File):(.*)$/);
   if (header) {
     const raw = header[1];
-    activePath = raw.startsWith(" ") ? raw.slice(1) : null;
+    activePaths = raw.startsWith(" ") ? [raw.slice(1)] : [];
     continue;
   }
-  if (line.startsWith("*** ")) { activePath = null; continue; }
-  if (activePath !== null && line.startsWith("+")
+  const move = line.match(/^\*\*\* Move to:(.*)$/);
+  if (move) {
+    const destination = move[1].startsWith(" ") ? move[1].slice(1) : null;
+    if (destination !== null && activePaths.length > 0) {
+      const containsMarker = activePaths.some((filePath) => paths.find((candidate) => candidate.filePath === filePath)?.patchContainsAcknowledgementMarker);
+      activePaths.push(destination);
+      const entry = paths.find((candidate) => candidate.filePath === destination);
+      if (entry && containsMarker) entry.patchContainsAcknowledgementMarker = true;
+    }
+    continue;
+  }
+  if (line.startsWith("*** ")) { activePaths = []; continue; }
+  if (activePaths.length > 0 && line.startsWith("+")
     && line.includes("<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->")) {
-    const entry = paths.find((candidate) => candidate.filePath === activePath);
-    if (entry) entry.patchContainsAcknowledgementMarker = true;
+    for (const filePath of activePaths) {
+      const entry = paths.find((candidate) => candidate.filePath === filePath);
+      if (entry) entry.patchContainsAcknowledgementMarker = true;
+    }
   }
 }
 

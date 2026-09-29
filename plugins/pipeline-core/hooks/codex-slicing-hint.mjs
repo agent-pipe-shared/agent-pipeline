@@ -4,6 +4,11 @@
 import { readFileSync } from "node:fs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { observeCodexSlicing } from "./native-slicing.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+
+
 
 export function codexSlicingOutput(input, eventName = "PreToolUse") {
   const result = observeCodexSlicing(input, eventName);

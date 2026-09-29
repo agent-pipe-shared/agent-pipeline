@@ -42,6 +42,17 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
+import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+function decorateInstalledImpl(content, pluginLibDir) {
+  const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/pre-push-hook\/runtime-([a-f0-9]{64}))\/lib$/);
+  if (!matched) return content;
+  const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
+  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256});
+  if (content.split("  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);").length !== 2) throw Error("GHA-RENDER-ANCHOR");
+  return content.replace("  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);", "  if (!await admitPipelineScope(projectRoot)) return;\n  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);") + renderGitHookSnapshotAdmission(runtimeSnapshot);
+}
+
 
 export const INSTALLER_VERSION = "1";
 export const MARKER_SCHEMA = "pipeline.pre-push-hook-install.v1";
@@ -130,7 +141,7 @@ function renderMarker(marker) {
 
 function expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt }) {
   const impl = implPath(commonDir);
-  const implContent = renderImpl(pluginLibDir);
+  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir);
   const shimContent = renderShim(impl);
   const marker = {
     schema: MARKER_SCHEMA,
@@ -616,6 +627,10 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } 
   if (plan.status === "foreign-hook-present") return { status: "refused-foreign-hook", hookPath: plan.hookPath, detail: plan.detail };
 
   const { hookPath, commonDir } = plan;
+  const snapshotState = join(commonDir, "agent-pipeline", "pre-push-hook");
+  mkdirSync(snapshotState, { recursive: true, mode: 0o700 });
+  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState });
+  pluginLibDir = join(runtimeSnapshot.root, "lib");
   const artifacts = expectedArtifacts({
     hookPath,
     commonDir,

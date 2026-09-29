@@ -138,6 +138,17 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
+import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+function decorateInstalledImpl(content, pluginLibDir) {
+  const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/pre-commit-hook\/runtime-([a-f0-9]{64}))\/lib$/);
+  if (!matched) return content;
+  const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
+  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256});
+  if (content.split("  const paths = stagedPaths(projectRoot);").length !== 2) throw Error("GHA-RENDER-ANCHOR");
+  return content.replace("  const paths = stagedPaths(projectRoot);", "  if (!await admitPipelineScope(projectRoot)) return;\n  const paths = stagedPaths(projectRoot);") + renderGitHookSnapshotAdmission(runtimeSnapshot);
+}
+
 
 export const INSTALLER_VERSION = "2";
 export const MARKER_SCHEMA = "pipeline.pre-commit-hook-install.v1";
@@ -896,8 +907,14 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, p
   if (plan.status === "foreign-hook-present") return { status: "refused-foreign-hook", hookPath: plan.hookPath, detail: plan.detail };
 
   const { hookPath, commonDir } = plan;
+  const snapshotState = join(commonDir, "agent-pipeline", "pre-commit-hook");
+  mkdirSync(snapshotState, { recursive: true, mode: 0o700 });
+  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState });
+  pluginLibDir = join(runtimeSnapshot.root, "lib");
+  pluginHooksDir = join(runtimeSnapshot.root, "hooks");
+  pluginScriptsDir = join(runtimeSnapshot.root, "scripts");
   const impl = implPath(commonDir);
-  const implContent = renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir });
+  const implContent = decorateInstalledImpl(renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir }), pluginLibDir);
   const shimContent = renderShim(impl);
 
   mkdirSync(join(commonDir, "agent-pipeline", "pre-commit-hook"), { recursive: true, mode: 0o700 });

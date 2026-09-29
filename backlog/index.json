@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2b59530c17f2154e0a03787de6e11c89957273e4ccb3db77cc778c5bfff7bca5"
+    "transitionHead": "c9146b62c3c0e83126aff2f48df94192e051ac86b0aa06df11c9fe02381b587f"
   },
   "counts": {
-    "open": 84,
+    "open": 87,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -2706,6 +2706,15 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.design-package-parent-metadata-false-drift",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Actual native DAA-DWP-PHYSICAL-DRIFT refusal and deterministic physical-reader diagnosis, 2026-09-29.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
       "status": "closed",
       "type": "defect",
@@ -3613,6 +3622,17 @@
       "closureRepository": "self",
       "closureCommit": "0605b19f7e9db2fa84ca19a6f4078c8cedd50df7",
       "closureEvidence": "plugins/pipeline-core/lib/commit-message-policy.test.mjs"
+    },
+    {
+      "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Original four-shard onboarding qualification and bounded runtime snapshot import-path diagnosis.",
+      "deferred": false,
+      "tracking": "0.7 local candidate remediation — shipped hook runtime dependency closure",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.git-identity-ask-step-unreachable-through-live-cli-path",
@@ -6023,6 +6043,17 @@
       "created": "2026-09-27",
       "source": "Claude/Windows greenfield review F-04, 2026-09-27; consumer reports blocked ad-hoc hashing, source confirms marker requirement and a separate post-approval rebind helper.",
       "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Confirmed during the PO-requested long-test optimization: source-bound216/eight-worker run run-A39Ey5 finished before900s but exited1; SECGATE2 was marked PASS before its promise rejected.",
+      "deferred": false,
+      "tracking": "0.7 test integrity and bounded runtime; Source repair delivered, final candidate verification pending.",
       "sprint": "alfred"
     },
     {

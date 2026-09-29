@@ -74,6 +74,11 @@ import { join } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 export const DEFAULT_SETUP_INTENT = "unconfigured";
 
@@ -278,6 +283,7 @@ export function decideFromProjectDir(rootDir) {
 
 // ---- CLI entrypoint: real environment, always exit 0 ------------------------------------------
 export function run() {
+  if (!observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return;
   const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const { stdout } = decideFromProjectDir(rootDir);
   if (stdout) process.stdout.write(stdout);

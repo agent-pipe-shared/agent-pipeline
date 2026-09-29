@@ -62,3 +62,27 @@ Evidence is the unchanged public receipts:
 No repeated Advisor model call was observed: the canonical results contain
 zero invocation attempts and no child. This item concerns the Readiness
 input boundary and remains open until source integration and verification.
+
+## Progress — implementation evidence
+
+Source now prepares a distinct supplemental v2 observation after verifying the
+actual Advisor course and current disposition. Codex and Claude/Agy Readiness
+include that observation in their submitted request; the final reader freshly
+reconstructs the private request digest. Changed material disposition invalidates
+the old receipt. The existing Codex package case passes1/1, native request
+custody5/5 and host reader3/3 pass. These are managed synthetic host fixtures,
+not real provider acceptance. Final candidate integration and independent
+qualification remain pending; historical not-ready reports are preserved.
+
+The bounded correction review additionally found that direct submissions could
+accept hash-consistent fabricated supplemental context before a child launch.
+Source now reuses the full private-course, host, committed-source and current
+candidate verifier before transmission and after the turn. The actual forged
+pre-fix context reached a managed child; the final affected case passes with
+real private answered/no-child controls and rejects the forgery before launch.
+Its actual approved max route exposed a package enum mismatch, also corrected
+in both schema mirrors and the unavailable reader. Exact route comparisons and
+physical author-dispatch binding remain mandatory. Earlier33 unaffected
+controls plus the final affected1/1 pass; no single final34 or long package
+PASS is claimed. These remain synthetic host controls. Owner evidence:
+`scratch/0.7-quality-readiness-pretransmission-provenance-20260929/pre-post.md`.

@@ -128,9 +128,12 @@ function dynamicContinuityEntries(rootDir, adapters) {
     // failed authority read. Keep every present-but-bad state fail-closed below.
     if (!adapters.existsSyncFn(state.path)) return { status: "absent", entries: [], diagnostics: [] };
     const parsed = JSON.parse(adapters.readFileSyncFn(state.path, "utf8"));
-    if (!Array.isArray(parsed?.closedFeatures)) throw new Error("closedFeatures is not an array");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("lifecycle state is not an object");
+    // Canonical kickoff/discard state can have no closed history yet.
+    if (parsed.closedFeatures === undefined && parsed.schema !== "pipeline.state.v0") throw new Error("absent closedFeatures requires canonical lifecycle state");
+    if (parsed.closedFeatures !== undefined && !Array.isArray(parsed.closedFeatures)) throw new Error("closedFeatures is not an array");
     const entries = [];
-    for (const feature of parsed.closedFeatures) {
+    for (const feature of parsed.closedFeatures ?? []) {
       for (const [key, binding] of Object.entries(feature?.continuityClose ?? {})) {
         if (!binding || typeof binding !== "object" || typeof binding.path !== "string" || !binding.path) continue;
         const path = canonicalProjectPath(rootDir, binding.path, adapters);

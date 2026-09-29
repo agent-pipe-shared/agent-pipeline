@@ -1,5 +1,12 @@
 // Synthetic non-Codex authority fixture; NOT managed Codex/provider evidence.
-import test from 'node:test';
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
+
+const completionCases = [];
+function test(name, run) {
+  if (arguments.length !== 2 || typeof run !== "function") throw new TypeError("Required completion expects the preserved two-argument test registration");
+  completionCases.push({ id: "RC21C" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+}
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,existsSync} from 'node:fs';
 
@@ -90,3 +97,11 @@ test('canonical equality cannot accept changed physical package or current repos
  const changed=JSON.parse(packageBytes);changed.createdAt='2026-09-28T11:00:00.000Z';f.put(f.refs.package,bytes(changed));assert.equal(validateDesignWorkflowPackageApprovalRequest({...binding,request}).ok,false);
  f.put(f.refs.package,packageBytes);f.put('candidate-change.md','Candidate changed\n');f.git(['add','candidate-change.md']);f.git(['commit','--quiet','-m','Change synthetic current candidate']);assert.equal(validateDesignWorkflowPackageApprovalRequest({...binding,request}).ok,false);
 });
+
+// Each original sibling callback is registered individually; no envelope case.
+if (completionCases.length !== 5) throw new Error("Required completion declared case count drift");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

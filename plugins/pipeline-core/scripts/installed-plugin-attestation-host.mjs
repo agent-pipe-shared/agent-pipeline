@@ -16,6 +16,7 @@ import { verifyInstalledPluginAttestation } from "../lib/installed-plugin-attest
 import { observeRunnerPublicCoreIdentity } from "../lib/public-core-observation.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedTopology } from "../lib/antigravity-topology-refresh-host.mjs";
 
 export const HOST_RESULT_SCHEMA = "pipeline.installed-plugin-attestation-host-result.v1";
 export const INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY = Object.freeze({
@@ -172,6 +173,8 @@ export function readExternalInstalledPluginReceipt(request, { receiptDirectory =
 
 /** Bootstrap/readback consumer. The private source path is loaded only from a 0600 host locator. */
 export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
+  antigravityConfigRoot = join(homedir(), ".gemini"),
+  antigravityWorkspaceRoot = process.cwd(),
   receiptDirectory = defaultReceiptDirectory(input?.provider),
   verify = verifyInstalledPluginAttestation,
   observe = (value, deps) => observeRunnerPublicCoreIdentity(input?.provider, value, deps),
@@ -191,6 +194,10 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
       || BigInt(locatorAuthority.receiptIdentity.gid) !== installedOwner.gid) throw new Error("IPA-HOST-LOCATOR-OWNER");
     const locator = JSON.parse(Buffer.from(locatorAuthority.receiptBytes).toString("utf8"));
     if (!locatorValid(locator, binding)) throw new Error("IPA-HOST-LOCATOR");
+    if (normalized.provider === "antigravity") {
+      const topology = observeAntigravityLoadedTopology({ loadedPluginRoot: normalized.installedPluginRoot, configRoot: antigravityConfigRoot, workspaceRoot: antigravityWorkspaceRoot });
+      if (topology.status !== "current" || topology.sourcePluginRoot !== locator.sourcePluginRoot) throw new Error("IPA-HOST-LOCATOR-SOURCE");
+    }
     if (["antigravity", "claude"].includes(normalized.provider)) {
       if (realpathSync(normalized.registryInstalledPluginRoot) !== realpathSync(normalized.installedPluginRoot)) throw new Error("IPA-HOST-LOCATOR-INSTALLED");
     } else if (realpathSync(normalized.registrySourcePluginRoot) !== locator.sourcePluginRoot) {
@@ -295,22 +302,9 @@ export function resolveClaudeRegistryBinding({
 }
 
 /** Resolve the exact Antigravity path registration selecting this loaded plugin. */
-export function resolveAntigravityRegistryInstalledRoot({ installedPluginRoot, registryPayloads = [] } = {}) {
-  try {
-    const loadedRoot = realpathSync(installedPluginRoot);
-    const loadedInfo = lstatSync(loadedRoot, { bigint: true });
-    if (!loadedInfo.isDirectory() || loadedInfo.isSymbolicLink()) return null;
-    const roots = registryPayloads.flatMap((payload) => JSON.parse(payload)?.entries ?? [])
-      .filter((entry) => exact(entry, ["path"]) && typeof entry.path === "string" && isAbsolute(entry.path))
-      .map((entry) => {
-        const configuredPath = resolve(entry.path);
-        const configuredInfo = lstatSync(configuredPath, { bigint: true });
-        if (!configuredInfo.isDirectory() || configuredInfo.isSymbolicLink()) return null;
-        return realpathSync(configuredPath);
-      })
-      .filter((path) => path === loadedRoot);
-    return roots.length === 1 ? roots[0] : null;
-  } catch { return null; }
+export function resolveAntigravityRegistryInstalledRoot({ installedPluginRoot, configRoot = join(homedir(), ".gemini"), workspaceRoot = process.cwd() } = {}) {
+  const observation = observeAntigravityLoadedTopology({ loadedPluginRoot: installedPluginRoot, configRoot, workspaceRoot });
+  return observation.status === "current" ? observation.loadedPluginRoot : null;
 }
 
 export function writeCodexRegistryInstalledPluginReceipt(input, dependencies = {}) {

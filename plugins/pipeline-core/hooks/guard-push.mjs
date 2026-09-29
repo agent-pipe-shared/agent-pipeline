@@ -181,6 +181,11 @@ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validat
 // calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
 // buildScratchOrphanAdvisory below for the full rationale.
 import { planOrphanScratchRetirement } from "../lib/session-cleanup-recovery.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 // The plugin root this guard is itself running from -- same self-location resolution
 // guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(

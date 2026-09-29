@@ -26,6 +26,11 @@ import {
 import { classifyDispatchBudgetCaller } from "../lib/dispatch-budget-core.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveGitCommonDir, resolveParentDispatchToolUseId } from "./guard-dispatch-budget.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+// Repository admission precedes hook input hardening and all governed effects.
+if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
@@ -44,6 +49,7 @@ function claudeChildIdentity(input) {
 }
 
 export function evaluateAdvisorProhibitionGuard(input, options = {}) {
+  if (!observeGovernanceScope({ rootDir: options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return { exitCode: 0, stderr: "" };
   if (String(input?.tool_name ?? "").toLowerCase() !== "advisor") return verdict(0);
   const identity = claudeChildIdentity(input);
   if (identity.kind !== "subagent") return verdict(0);

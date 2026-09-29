@@ -168,7 +168,7 @@ const PHASES = new Set(["design", "implementation"]);
 // which describes backing out of a submission or approval that never
 // existed. See reopenPlanDesign()'s fifth path below.
 const REOPEN_UNSUBMITTED_BINDING_REASON = "pipeline.reopen-bound-unsubmitted-prd";
-const INVALIDATION_REASONS = new Set(["reopen-design", "document-drift", REOPEN_UNSUBMITTED_BINDING_REASON]);
+const INVALIDATION_REASONS = new Set(["reopen-design", "document-drift", "enrollment-retirement", REOPEN_UNSUBMITTED_BINDING_REASON]);
 
 export const PLAN_LIFECYCLE_STATUSES = Object.freeze([
   "draft",
@@ -217,11 +217,18 @@ function isRepositoryPath(value) {
 
 const DESIGN_WORKFLOW_APPROVAL_SCHEMA = "pipeline.design-workflow-package-approval.v1";
 function validDesignWorkflowApproval(value, packageSha256) {
-  if (!hasExactKeys(value, ["schema", "mode", "approvedBy", "approvedAt", "packageSha256", "intentSha256", "proofSha256", "proof"])
+  if (!hasExactKeys(value, ["schema", "mode", "approvedBy", "approvedAt", "packageSha256", "intentSha256", "proofSha256", "proof", ...(Object.hasOwn(value ?? {}, "advisorException") ? ["advisorException"] : [])])
     || value.schema !== DESIGN_WORKFLOW_APPROVAL_SCHEMA
     || !new Set(["signature", "chat"]).has(value.mode)
     || !isNonBlankString(value.approvedBy) || !isCanonicalIso(value.approvedAt)
     || !SHA256.test(value.packageSha256 ?? "") || value.packageSha256 !== packageSha256) return false;
+  if (Object.hasOwn(value, "advisorException")) {
+    const e = value.advisorException;
+    if (!hasExactKeys(e, ["kind", "oneTime", "packageSha256", "courseId", "initialContextSha256", "failureEvidenceSha256", "rationale"])
+      || e.kind !== "advisor-unavailable" || e.oneTime !== true || e.packageSha256 !== packageSha256
+      || !isNonBlankString(e.courseId) || !SHA256.test(e.initialContextSha256 ?? "") || !SHA256.test(e.failureEvidenceSha256 ?? "")
+      || !isNonBlankString(e.rationale) || e.rationale.length > 4096) return false;
+  }
   if (value.mode === "chat") return value.intentSha256 === null && value.proofSha256 === null && value.proof === null;
   const proof = value.proof;
   return SHA256.test(value.intentSha256 ?? "") && SHA256.test(value.proofSha256 ?? "")
@@ -414,7 +421,8 @@ export function validPlanInvalidation(value) {
     // exists and a null would be a forged/incomplete record, not a
     // legitimate one.
     && (value.invalidatedSubmissionSha256 === null
-      ? value.reason === REOPEN_UNSUBMITTED_BINDING_REASON
+      ? (value.reason === REOPEN_UNSUBMITTED_BINDING_REASON
+        || (value.reason === "enrollment-retirement" && SHA256.test(value.invalidatedApprovalSha256 ?? "")))
       : SHA256.test(value.invalidatedSubmissionSha256))
     && (value.invalidatedApprovalSha256 === null || SHA256.test(value.invalidatedApprovalSha256))
     && isNonBlankString(value.invalidatedBy)
@@ -489,6 +497,11 @@ function currentSubmission(state, observation) {
 
 function currentApproval(state, submission, observation) {
   const approval = state.planApproval;
+  // Retirement only removes authority. A retained historical object cannot
+  // become current again merely because planApproved is copied or toggled.
+  if (approval !== undefined && validPlanInvalidation(state.planInvalidation)
+    && state.planInvalidation.reason === "enrollment-retirement"
+    && state.planInvalidation.invalidatedApprovalSha256 === sha256CanonicalJson(approval)) return null;
   if (submission !== null && (validCurrentPlanApproval(approval) || validPreviousCurrentPlanApproval(approval))) {
     const authority = approval.poGateAuthority;
     const invalidation = state.planInvalidation;
@@ -580,6 +593,10 @@ export function derivePlanLifecycle(state, observation = {}) {
   if (state.planSubmission === undefined
     && state.planApproved === false
     && validV2Approval(state.planApproval)
+    && !(validPlanInvalidation(state.planInvalidation)
+      && state.planInvalidation.reason === "enrollment-retirement"
+      && state.planInvalidation.featureId === state.activeFeature.id
+      && state.planInvalidation.invalidatedApprovalSha256 === sha256CanonicalJson(state.planApproval))
     && (!validV2Revocation(state.planRevocation)
       || !matchingRevocation(state.planRevocation, state.planApproval))) {
     return {
@@ -1091,6 +1108,42 @@ export function reopenPlanDesign({
     || !INVALIDATION_REASONS.has(reason)) return fail("PLAN-REOPEN-REQUEST-INVALID");
   const submission = state.planSubmission;
   if (!validPlanSubmission(submission)) {
+    if (reason === "enrollment-retirement" && state.planSubmission === undefined) {
+      const prior = state.planInvalidation;
+      const approvalSha256 = state.planApproval === undefined ? null : sha256CanonicalJson(state.planApproval);
+      if (validPlanInvalidation(prior) && prior.reason === reason
+        && prior.featureId === state.activeFeature.id
+        && prior.invalidatedApprovalSha256 === approvalSha256
+        && state.activeFeature.phase === "design" && state.planApproved === false) {
+        return { ok: true, replay: true, state, invalidation: prior };
+      }
+      // Match exactly the canonical reader's compatibility surface. This
+      // branch cannot approve, seal, migrate, or manufacture a submission.
+      const lifecycle = derivePlanLifecycle(state);
+      if (!lifecycle.ok || !lifecycle.approvalCurrent
+        || state.planInvalidation !== undefined || state.planRevocation !== undefined) {
+        return fail("PLAN-RETIRE-LEGACY-INVALID");
+      }
+      const invalidation = {
+        schema: PLAN_INVALIDATION_SCHEMA,
+        featureId: state.activeFeature.id,
+        invalidatedSubmissionSha256: null,
+        invalidatedApprovalSha256: approvalSha256,
+        invalidatedBy: by,
+        invalidatedAt: at,
+        reason,
+      };
+      return {
+        ok: true, replay: false, invalidation,
+        state: {
+          ...state,
+          activeFeature: { ...state.activeFeature, phase: "design",
+            phaseHistory: appendPhaseHistory(state.activeFeature, "design", at) },
+          planApproved: false,
+          planInvalidation: invalidation,
+        },
+      };
+    }
     // Pre-submission V2 approvals are a bounded compatibility state. They have
     // an authority-bound approval but no submission digest to invalidate, so a
     // V3 invalidation record cannot be truthfully manufactured. The sanctioned
@@ -1209,6 +1262,31 @@ export function reopenPlanDesign({
     },
     invalidation,
   };
+}
+
+/** Closed retirement request; granting remains exclusively in approval writers. */
+export function retireEnrollmentPlan({ state, expectedStateSha256, by, at }) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PLAN-RETIRE-STATE-STALE");
+  if (!isNonBlankString(by) || !isCanonicalIso(at)) return fail("PLAN-RETIRE-REQUEST-INVALID");
+  const lifecycle = derivePlanLifecycle(state);
+  if (!lifecycle.ok) return fail("PLAN-RETIRE-LIFECYCLE-INVALID");
+  if (state.activeFeature === undefined || state.activeFeature === null) {
+    // An orphan authority object is not an inactive draft.
+    if (state.planApproved === true || state.planApproval !== undefined || state.planSubmission !== undefined) {
+      return fail("PLAN-RETIRE-ORPHAN-AUTHORITY");
+    }
+    return { ok: true, replay: true, state, invalidation: null };
+  }
+  if (!lifecycle.approvalCurrent && !lifecycle.submissionCurrent) {
+    if (state.planApproval !== undefined
+      && !(validPlanInvalidation(state.planInvalidation)
+        && state.planInvalidation.reason === "enrollment-retirement"
+        && state.planInvalidation.invalidatedApprovalSha256 === sha256CanonicalJson(state.planApproval))) {
+      return fail("PLAN-RETIRE-MALFORMED-AUTHORITY");
+    }
+    return { ok: true, replay: true, state, invalidation: state.planInvalidation ?? null };
+  }
+  return reopenPlanDesign({ state, expectedStateSha256, by, at, reason: "enrollment-retirement" });
 }
 
 export function enterPlanImplementation({ state, expectedStateSha256, at }) {

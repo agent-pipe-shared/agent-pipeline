@@ -72,3 +72,18 @@ edit or success.
 - **Decision:** pending
 - **Assignment:** Alfred release preparation
 - **Date:** 2026-09-27
+
+## Additional 0.7 integration evidence (2026-09-29)
+
+The exact signed two-file writer/test patch passed an in-memory content replay
+but native `apply_patch` failed at an out-of-order writer hunk after the guard
+admitted it. No protected Source byte changed; the replacement action required
+a fresh signature. The corrected patch and per-file hashes are bound in
+`scratch/0.7-evening-signature-batch-20260929/writer-and-test.source-order.binding.json`.
+The writer half passed an actual native rehearsal on an exact Scratch preimage.
+The test half could not be rehearsed because the installed guard refused its
+Scratch fixture on protected marker *content*; that separate physical-boundary
+issue belongs to `2026-09-27-scratch-must-remain-writable-across-lifecycle-states.md`.
+The pre-signature checker must validate physical hunk order with the real native
+engine, compare every postimage digest and report an unverified rehearsal
+before requesting a human signature. In-memory replay alone is insufficient.

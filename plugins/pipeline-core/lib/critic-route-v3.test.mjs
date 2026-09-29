@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
-import test from 'node:test';
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
+
+const completionCases = [];
+function test(name, run) {
+  if (arguments.length !== 2 || typeof run !== "function") throw new TypeError("Required completion expects the preserved two-argument test registration");
+  completionCases.push({ id: "RC07C" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+}
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 
@@ -54,3 +61,11 @@ test('uncommitted edits cannot replace exact selected committed route authority'
   const f=fixture(t);writeFileSync(join(f.root,'pipeline.user.yaml'),'schema: broken\n');
   const route=resolveV3DutyRoute({rootDir:f.root,dutyId:'readiness',runner:'claude',candidateCommit:f.candidateCommit});assert.equal(route.model,f.registry.duties.readiness.claude.selector.value);
 });
+
+// Each original sibling callback is registered individually; no envelope case.
+if (completionCases.length !== 6) throw new Error("Required completion declared case count drift");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

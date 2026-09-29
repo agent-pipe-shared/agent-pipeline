@@ -47,3 +47,14 @@ This session's canonical Advisor observations have no child and no answer.
 
 The proposal requires integration and source-bound verification before manual
 closure. It is not a currently enforced guarantee or a new PO approval.
+
+## Progress — implementation evidence
+
+The productive default now uses the durable initial course. Restarts retain
+its immutable initial question, actual outcome and bounded attempts; a changed
+dispatch alone cannot create a new substantive course. Successors bind a new
+owner decision to the prior course, reject decision reuse and enforce a finite
+course cap. Directed execution7/7, private store10/10 and coordinator3/3 pass.
+Claude/Agy currently provide truthful zero-child unavailability, not a genuine
+answered initial invocation. Final integrated and installed-host qualification
+remain open; no Advisor PASS or backlog closure is claimed.
