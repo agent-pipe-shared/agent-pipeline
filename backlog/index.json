@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "def956e748ebdebee1f78e261ba6c5bdeb010bc0153ab8771ab5c418d2fab4fa"
+    "transitionHead": "2b59530c17f2154e0a03787de6e11c89957273e4ccb3db77cc778c5bfff7bca5"
   },
   "counts": {
-    "open": 81,
+    "open": 84,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -3837,6 +3837,16 @@
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Pre-integration verification of the S1 Governance Scope proposal in a network-off disposable Git fixture. An enrolled repository becomes inactive solely after deleting an unrelated registered worktree directory. Terminal 58232a, exit 0.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Complete original onboarding run and physical host-layout contract analysis, 2026-09-29.",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -8090,6 +8100,15 @@
       "closureEvidence": "evidence/dispatch-record-NVA-BL-32.json"
     },
     {
+      "id": "pipeline.security-scanner-failure-provenance",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Read-only scanner policy/provenance audit, 2026-09-29; frozen manifest df50d7e8f373d694f07579119add740081c0ca636a71c46f77f72b6b2c9edaba.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.sed-regex-address-is-misread-as-an-absolute-path",
       "status": "closed",
       "type": "defect",
@@ -8169,6 +8188,15 @@
       "closureRepository": "self",
       "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
       "closureEvidence": "backlog/items/2026-08-18-self-healing-local-cleanup-recovery.md"
+    },
+    {
+      "id": "pipeline.semgrep-offline-default-version-check",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Bounded native Semgrep controls, 2026-09-29: same executable and shipped local rules time out with default version check; disabling only that check completes valid JSON in 3615ms.",
+      "deferred": false
     },
     {
       "id": "pipeline.semgrep-timeout-oversized-pipeline-state-test",
