@@ -22,8 +22,15 @@ export function inspectArchitecturePushCurrency({ projectDir, commit, checkpoint
   if (!OID.test(tree ?? "")) return { ok: false, reason: "candidate tree is unavailable" };
   const paths = git(projectDir, ["ls-tree", "-r", "--name-only", commit, "--", "architecture/map"], run);
   if (paths === null) return { ok: false, reason: "candidate architecture map cannot be enumerated" };
-  // An unadopted project has no AC-18 map; a partial adopted map is a fault.
-  if (paths === "") return { ok: true, applicable: false, commit, tree, stalenessDebt: [] };
+  // A candidate cannot opt out by deleting a previously committed map. A
+  // never-adopted repository remains outside this gate during deferred rollout.
+  if (paths === "") {
+    const adopted = git(projectDir, ["ls-tree", "-r", "--name-only", commit, "--", "architecture/adoption-state.json"], run);
+    const priorIndex = git(projectDir, ["log", "-1", "--format=%H", commit, "--", MAP_INDEX], run);
+    if (adopted === null || priorIndex === null) return { ok: false, reason: "candidate architecture adoption history cannot be checked" };
+    if (adopted !== "" || priorIndex !== "") return { ok: false, reason: "candidate architecture map was removed after adoption" };
+    return { ok: true, applicable: false, commit, tree, stalenessDebt: [] };
+  }
   const index = git(projectDir, ["show", `${commit}:${MAP_INDEX}`], run);
   if (index === null) return { ok: false, reason: "candidate architecture map index is missing" };
   const stale = [];

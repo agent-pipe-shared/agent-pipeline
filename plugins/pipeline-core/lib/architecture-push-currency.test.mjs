@@ -29,6 +29,33 @@ test("unadopted repository stays outside AC-18 push map gate", () => {
   finally { rmSync(f.dir, { recursive: true, force: true }); }
 });
 
+test("a candidate cannot become unadopted by deleting its committed map", () => {
+  const f = fixture();
+  try {
+    mkdirSync(join(f.dir, "architecture", "map"), { recursive: true });
+    writeFileSync(join(f.dir, "architecture", "map", "index.md"), "# Map\n");
+    writeFileSync(join(f.dir, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core\n");
+    f.git("add", "."); f.git("commit", "-q", "-m", "adopt map");
+    f.git("rm", "-q", "-r", "architecture/map");
+    f.git("commit", "-q", "-m", "remove map");
+    const removed = inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() });
+    assert.equal(removed.ok, false);
+    assert.match(removed.reason, /removed after adoption/u);
+  } finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test("a committed adoption decision requires a map even before first map commit", () => {
+  const f = fixture();
+  try {
+    mkdirSync(join(f.dir, "architecture"), { recursive: true });
+    writeFileSync(join(f.dir, "architecture", "adoption-state.json"), "{}\n");
+    f.git("add", "."); f.git("commit", "-q", "-m", "record adoption decision");
+    const missing = inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() });
+    assert.equal(missing.ok, false);
+    assert.match(missing.reason, /removed after adoption/u);
+  } finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
+
 test("candidate sees contract changes after map update and checkpoint binds debt", () => {
   const f = fixture();
   try {
