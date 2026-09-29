@@ -7,38 +7,38 @@
 
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
-**Arbeitsauftrag des PO:** Bis heute Abend autonom am gesamten genehmigten
-Backlog-Umfang weiterarbeiten. Disjunkte Dateien in parallelen Slices bearbeiten,
-inhaltliche Patches fertigstellen und alles ohne Signatur Zulässige integrieren
-und prüfen. Geschützte Änderungen als konkrete Patches mit Zweck und Belegen
-in [der Abend-Liste](../scratch/0.7-evening-signature-queue-20260929.md) sammeln.
-Der PO ist lange AFK, ohne Signaturen. Signierbefehle erst bei Rückkehr
-vorbereiten; unabhängige Arbeit fortsetzen.
+**Arbeitsauftrag des PO:** Bis heute Abend autonom den gesamten genehmigten
+Backlog-Umfang umsetzen; disjunkte Dateien parallel bearbeiten. Patches bauen,
+ohne Signatur zulässige Änderungen integrieren und prüfen. Geschützte Patches
+mit Zweck und Belegen in [der Abend-Liste](../scratch/0.7-evening-signature-queue-20260929.md)
+sammeln. Der PO ist AFK, ohne Signaturen. Signierbefehle erst bei Rückkehr;
+unabhängige Arbeit fortsetzen.
 
 Reguläre **Implementation**, Revision 13, gilt seit 2026-09-28; Autorität:
 `project/pipeline-state.json` und das unveränderte
 [Designpaket](../specs/sprint-alfred-epic/evidence/design-workflow-package-c22c1cd281b1.json).
 Planfreigabe gilt; Advisor-Ausnahme akzeptiert, kein Advisor-PASS.
-Installed Recovery: `f9ebdd5b`, Build
-`20260928194946.0cace08c`; nicht der finale qualifizierte Kandidat.
+Installed Recovery: `f9ebdd5b` / `20260928194946.0cace08c`; kein finaler Kandidat.
 
 Aktivierung/Hook-Scope, Agy und Deinstallation sind im Scope; frühere Fixes
 bleiben enthalten. 135 Quell-, 26 Testdateien und neun geschützte Dateien
 sind geliefert, letztere nach zwei PO-Signaturen.
-Backlog `97d03bf2`; Produktintegration uncommittet. 26 isolierte Suiten: 193 Fälle,
+Backlog `7bbbd69a`; Produktintegration uncommittet. 26 isolierte Suiten: 193 Fälle,
 kein Source-Verify-PASS. Modellbestätigung: 16 Source-Fälle, vom PO bestätigt.
-Source-Prüfregistrierung: 658/241/246, keine Befunde; VCR 30/30.
+Prüfregistrierung: 658/241/246, keine Befunde; VCR 30/30.
 Kernel: 325 Pfade, frischer Source-Beleg 7/7. Reaktivierung: 38 frühere Fälle
 und fünf frische Writer-Kontrollen bestanden. Rename-Marker-Fix: fünf Kontrollen.
 
-Onboarding-Korrektur geliefert; komplette Continuity-Suite 298/298.
-Scope-Abgleich: 53 Befunde, zusätzlicher Non-Git-Defekt registriert.
+Continuity-Checkpoint 298/298, vor weiteren Host-Korrekturen.
+Scope: 53 Befunde plus zwei registrierte Defekte.
 Guard: Source 26/28; OBC298 und Baseline-Patch warten auf Signatur.
-Non-Git-Reader repariert; Scope 16/23, Onboarding-Nachlauf 61/184.
-Offen: übrige Scope-Korrekturen und Host-Belege. Danach Commit, Verify,
-bounded Critic und kohärente Stamps. Keine weitere Reader-Runde.
+Reader/Aktivierung repariert; Scope 23/23. Onboarding: 143 PASS, 8 FAIL,
+33 unbeobachtet nach 900s-Timeout; frühere Läufe bleiben erhalten.
+Git-/Hook-Fixtures und Recovery-Hinweise geprüft; Host-Korrektur läuft.
+Semgrep-Minimal-Scan: Versionsabfrage verursacht Timeout; Fix läuft.
+Danach Verify, bounded Critic und Stamps. Keine weitere Reader-Runde.
 Der PO installiert; Push, Tag und Veröffentlichung brauchen spätere Freigaben.
-Ältere Checkpoints sind historische Referenzen.
+Ältere Checkpoints: historisch.
 
 ## Historischer Übergang — lokaler 0.7-Kandidat, 2026-09-27
 
