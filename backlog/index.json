@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c9146b62c3c0e83126aff2f48df94192e051ac86b0aa06df11c9fe02381b587f"
+    "transitionHead": "6982e66bf83ce28ea7765c0f625a35bd5bf80f3b759a920e4b15c440c571e733"
   },
   "counts": {
-    "open": 87,
+    "open": 88,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -2791,6 +2791,16 @@
       "closureRepository": "self",
       "closureCommit": "d13bbc2d2d8151e3c3f90c8abcd6e7f11645aaa1",
       "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
+    },
+    {
+      "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "0.7 evening integration: three disjoint exact native actions were signed and armed; delivering the nine-file action changed whole-repository status and invalidated the two remaining capabilities despite unchanged tool-input digests and target preimages. See scratch/0.7-evening-signature-batch-20260929/serial-override-invalidates-disjoint-plans.md.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome",

@@ -7,10 +7,8 @@
 
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
-**PO-Auftrag:** Genehmigten Backlog autonom und in disjunkten Dateien parallel
-umsetzen. Zulässige Patches integrieren und prüfen; Signaturpatches mit Belegen
-in [der Abend-Liste](../scratch/0.7-evening-signature-queue-20260929.md) sammeln.
-Während PO-AFK unabhängig weiterarbeiten.
+**PO-Auftrag:** Den genehmigten 0.7-Umfang als lokalen Kandidaten fertigstellen.
+Der PO installiert den gestempelten Build selbst; keine Veröffentlichung.
 
 Reguläre **Implementation**, Revision 13, gilt seit 2026-09-28; Autorität:
 `project/pipeline-state.json` und das unveränderte
@@ -18,24 +16,22 @@ Reguläre **Implementation**, Revision 13, gilt seit 2026-09-28; Autorität:
 Planfreigabe gilt; Advisor-Ausnahme akzeptiert, kein Advisor-PASS.
 Installed Recovery: `f9ebdd5b` / `20260928194946.0cace08c`; kein finaler Kandidat.
 
-61 Items: 60 aktive Befunde und ein geschlossener Agy-Vorgänger.
-PO: manuelle frische Critics erlaubt; Befunde parallel korrigieren.
-[Qualitätscheckpoint](../scratch/0.7-quality-critic-checkpoint-20260929.md).
-HEAD `e71892e1`; Qualität in Source geliefert, Index-Vorbereitung erhalten.
-Reader-Historie/Scannerbindung korrigiert:9/9+24/24. Kein Release-PASS.
-Governance: Volllauf21/23+2/2, Temp offen; Hooks9/9. Uninstall7/7.
-Advisor-Fehlerkurs/Null-Child/Owner-Successor:7/7+10/10+3/3+1/1.
-PO-Helfer21/21+27/27+V2-Paket1/1; geschützter Hauptwriter als Patch gehalten.
-Claude/Agy-Kursroute mit ehrlicher Unavailable-Ausnahme geliefert;
-echte Answered-Abnahme offen. Governance-Kurs beendet, letzte Alias-Korrektur4/4.
-Readiness-Provenienz/Max:33+1 Fälle; Critic3 ohne Befund; Kernel-Closure7/7.
-Onboarding216: Parent-FD/Callback-IPC,16 Kontrollen und drei echte Fälle bestanden;
-Checker30/30. Vollständiger216-Lauf erst am integrierten Kandidaten.
-Neun-Dateien-Hold v3 mit neuen Maps; v2-Registry659/247 gültig.
-Baseline separat; alte Signaturen abgelaufen, keine AFK-Anfrage oder Lieferung.
-245/265-Freeze historisch; neue Source-Bindung, Gesamtqualifikation, Commit und Stamps offen.
-Keine weitere Reader-Runde oder Backlog-Schließung.
-Der PO installiert; Push, Tag und Veröffentlichung brauchen spätere Freigaben.
+Quellintegration `26fef9e7`: 244 Dateien im signierten Qualitätspaket committet.
+Die 1,66-MB-Datei `backlog/transitions.ndjson` blieb nur wegen des 1-MB-Puffers
+im Autorisierer aus diesem Paket; sie und die anschließende Registrierung eines
+neuen HGO-Befunds werden im nächsten lokalen Commit nachgeführt. Kein
+geschützter Quellpatch steht mehr aus. Pipeline-State-Test grün;
+Onboarding-Vollsuite 216/216 in zwei Blöcken mit je sechs Shards grün.
+Verify-Registrierung 692/692 und Case-Completion 247 Einträge gültig.
+Build-Stempel, kandidatengebundene Gesamtqualifikation und Installation sind
+noch offen. Keine weitere Reader-Korrekturrunde. Release-Push, Tag und
+Veröffentlichung haben keine Freigabe.
+
+Nach dem nächsten lokalen Kandidaten: die PO-Übergabe
+`/mnt/d/Dev/scratchpad/claude_issues/uebergabe-alfred-code-befunde-2026-09-29.md`
+vollständig ab Abschnitt 0 lesen, jeden Befund am dann aktuellen Stand prüfen
+und André erst einen Bericht mit A/B/C-Einordnung vorlegen. Umsetzung erst nach
+seiner Freigabe.
 
 ## Historischer Übergang — lokaler 0.7-Kandidat, 2026-09-27
 

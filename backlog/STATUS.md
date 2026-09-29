@@ -214,6 +214,7 @@
 | pipeline.design-workflow-signing-request-schema-drift | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
+| pipeline.disjoint-signed-hgo-actions-invalidate-one-another | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-07-27 | — |
 | pipeline.dispatch-record-contaminates-every-critic-review | deferred | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
@@ -752,7 +753,7 @@
 
 ## Counts
 
-- open: 87
+- open: 88
 - in_progress: 0
 - closed: 643
 - rejected: 3
