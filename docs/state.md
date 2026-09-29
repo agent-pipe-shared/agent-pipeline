@@ -5,33 +5,40 @@
 
 **Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
 
-## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-28
+## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
-Seit 2026-09-28 gilt reguläre **Implementation**, gebunden an
+**Arbeitsauftrag des PO:** Bis heute Abend autonom am gesamten genehmigten
+Backlog-Umfang weiterarbeiten. Disjunkte Dateien in parallelen Slices bearbeiten,
+inhaltliche Patches fertigstellen und alles ohne Signatur Zulässige integrieren
+und prüfen. Geschützte Änderungen als konkrete Patches mit Zweck und Belegen
+in [der Abend-Liste](../scratch/0.7-evening-signature-queue-20260929.md) sammeln.
+Der PO ist lange AFK, ohne Signaturen. Signierbefehle erst bei Rückkehr
+vorbereiten; unabhängige Arbeit fortsetzen.
+
+Reguläre **Implementation**, Revision 13, gilt seit 2026-09-28; Autorität:
 `project/pipeline-state.json` und das unveränderte
-[freigegebene Designpaket](../specs/sprint-alfred-epic/evidence/design-workflow-package-c22c1cd281b1.json).
-Advisor-Unverfügbarkeit ist akzeptiert, kein Advisor-PASS. Native Readiness:
-keine offenen Befunde. Der genehmigte Umfang braucht keine weitere Planfreigabe.
+[Designpaket](../specs/sprint-alfred-epic/evidence/design-workflow-package-c22c1cd281b1.json).
+Planfreigabe gilt; Advisor-Ausnahme akzeptiert, kein Advisor-PASS.
+Installed Recovery: `f9ebdd5b`, Build
+`20260928194946.0cace08c`; nicht der finale qualifizierte Kandidat.
 
-Der PO hat den Recovery-Stand `f9ebdd5b` lokal installiert. Seine drei Runner-
-Stamps teilen die Build-Identität `20260928194946.0cace08c`. Er enthält die
-Paketvalidierung und Codex-Compact-SessionStart-JSON-Korrektur. Der geladene
-Guard akzeptiert die Implementation-Autorität. Die finale Qualifizierung fehlt.
+Aktivierung/Hook-Scope, Agy und Deinstallation sind im Scope; frühere Fixes
+bleiben enthalten. 135 Quell-, 26 Testdateien und neun geschützte Dateien
+sind geliefert, letztere nach zwei PO-Signaturen.
+Backlog `97d03bf2`; Produktintegration uncommittet. 26 isolierte Suiten: 193 Fälle,
+kein Source-Verify-PASS. Modellbestätigung: 16 Source-Fälle, vom PO bestätigt.
+Source-Prüfregistrierung: 658/241/246, keine Befunde; VCR 30/30.
+Kernel: 325 Pfade, frischer Source-Beleg 7/7. Reaktivierung: 38 frühere Fälle
+und fünf frische Writer-Kontrollen bestanden. Rename-Marker-Fix: fünf Kontrollen.
 
-Die genehmigten Pakete zu Aktivierung und Hook-Scope, Agy-Topologie und
-Aktualisierung sowie inhaltserhaltender Deinstallation mit Git-Hook-Recovery
-werden parallel umgesetzt. Frühere 0.7-Korrekturen bleiben im gemeinsamen
-Integrationsumfang. Die Claude-Alias- und kanonische Signierkorrektur ist in
-`3d9ffe77` geliefert; 11/11 gezielte Source-Tests bestehen. Der Guard ließ den
-regulären Implementation-Schreibzugriff ohne weitere Signatur zu. Die neuen
-Befunde sind im Backlog registriert; die Compact-Regression und die korrigierte
-Aktivierungsprüfung sind als geprüfte Patches für die Integration vorbereitet.
-Die Codex-Modellzuordnung wurde bestätigt und erneut gelesen. Danach folgen
-gebundene Prüfbelege, der unabhängige Critic und die finale Qualifizierung.
-Es gibt keine weitere Reader-Korrekturrunde. Installation des abschließenden
-Kandidaten übernimmt der PO; Push, Tag und Veröffentlichung bleiben eigene
-spätere Freigaben. Die folgenden älteren Checkpoints bleiben historische
-Referenzen und ersetzen diese aktuelle Arbeitsanweisung nicht.
+Onboarding-Korrektur geliefert; komplette Continuity-Suite 298/298.
+Scope-Abgleich: 53 Befunde, zusätzlicher Non-Git-Defekt registriert.
+Guard: Source 26/28; OBC298 und Baseline-Patch warten auf Signatur.
+Non-Git-Reader repariert; Scope 16/23, Onboarding-Nachlauf 61/184.
+Offen: übrige Scope-Korrekturen und Host-Belege. Danach Commit, Verify,
+bounded Critic und kohärente Stamps. Keine weitere Reader-Runde.
+Der PO installiert; Push, Tag und Veröffentlichung brauchen spätere Freigaben.
+Ältere Checkpoints sind historische Referenzen.
 
 ## Historischer Übergang — lokaler 0.7-Kandidat, 2026-09-27
 
