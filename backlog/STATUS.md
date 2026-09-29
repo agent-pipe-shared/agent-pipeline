@@ -589,6 +589,7 @@
 | pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | — | 2026-08-18 | — | — |
+| pipeline.retirement-reader-masks-typed-unsafe-layout-inspection | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.rg-pipe-lexical-containment-gap | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — NVA-B-READCONTAIN-1 restored realpath-aware containment for the single-command read lane, the cat-pipeline lane, and the git-pipeline lane in guard-lifecycle-ready.mjs. It deliberately did not touch guard-command-grammar.mjs's approvedReadPath(), which backs the rg-to-rg/rg-to-head bounded pipeline (isBoundedReadOnlyPipeline) — that function stays purely lexical (resolve()+pathInside(), no existsSync/realpathSync at all), a strictly weaker check than even NVA-B-READCONTAIN-1's own round-1 (direct-symlink-only) fix. Traced and confirmed by the Elephant, 2026-09-06, while filing related gaps found during the same package's closure. |
 | pipeline.role-dispatch-payload-errors-fail-before-model-launch | closed | defect | pipeline | nova-b | 2026-09-10 | — | — |
 | pipeline.ruleset-freshness-wsl-subsystem-absent | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -745,7 +746,7 @@
 
 ## Counts
 
-- open: 80
+- open: 81
 - in_progress: 0
 - closed: 643
 - rejected: 3
