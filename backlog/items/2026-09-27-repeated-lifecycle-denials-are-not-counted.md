@@ -72,3 +72,27 @@ no complete event-history guarantee across storage failures, global scope
 retention guarantee or new admission authority. Productive integration,
 canonical Verify, installed Codex replay and formal release stamps remain
 pending. This item stays open; no new signature was requested.
+
+## Actual Codex recovery guidance loss (2026-09-29)
+
+A fresh Source advisory qualification was refused before execution with
+`GUARD-LIFECYCLE-NOT-READY`. Subsequent Source and installed canonical
+inspections reported ready; that later observation does not establish the
+readiness state at refusal time or authorize a retry. The exact refusal is
+preserved in
+`scratch/0.7-fresh-actual-source-onboarding-advisory-qualification-20260929/advisory-launch-denial.json`.
+No alternate execution shape or fabricated receipt followed.
+
+Independent Source inspection confirms a narrower recovery defect:
+`lifecycleNotReadyRecovery` in `human-guard-override.mjs` retains only the
+first line of the lifecycle guard reason. The Codex adapter then emits that
+header and a fixed request for technical repair. Existing detailed recovery
+guidance from later lines is discarded. The denied action supplies no native
+payload digest or readiness provenance, so the underlying partial-state cause
+remains unconfirmed; the historical September 20 temporary-file cause must
+not be assumed.
+
+Preserve bounded actionable lifecycle guidance through the non-liftable HGO
+and Codex response without changing admission, counting a legitimate state
+change as a loop, storing command payloads, or authorizing an automatic retry.
+Qualify the actual adapter response; a library-only shape is insufficient.

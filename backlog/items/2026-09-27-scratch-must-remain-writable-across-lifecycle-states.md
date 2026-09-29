@@ -160,3 +160,22 @@ for an active plugin installed beneath Scratch. Preparation is bound in
 syntax and inverse preservation pass, but protected Source delivery and a
 live native guard regression remain pending. Installing a recovery build
 does not establish the all-state guarantee.
+
+### Further opaque Scratch preparation refusal (2026-09-29)
+
+A worker's shell generator for its contained proposed test postimage was
+refused before execution with `GUARD-DEVPLAN-SHELL`,
+`DWP-SOURCE-PHYSICAL` and `opaque-interpreter-code`. Request digest:
+`e6920583a55fe3fc01f1f000a681545270787e868a521d41546dbbed86a7b395a`;
+action digest:
+`1150fa47ce30be262e6fd2fb787a3ed0a42e7da6114ba63d64ff613332c2bd2e`.
+The denied generator was abandoned; no alternate Scratch writer or override
+was used. The worker's own canonical inspection subsequently returned ready.
+A separately authorized native Source test amendment was admitted, with a
+different target and effect; it is not evidence that the Scratch action works.
+
+The nine protected guard/writer/Verify deliveries now exist in Source after
+two actual PO signatures. This new observation still describes the loaded
+recovery build, not an installed successor qualification. Keep the item open
+until the new candidate's physical Scratch and host-boundary sweeps establish
+the required supported preparation lanes.
