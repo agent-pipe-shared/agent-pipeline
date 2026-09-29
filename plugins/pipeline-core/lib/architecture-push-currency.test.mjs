@@ -44,15 +44,33 @@ test("a candidate cannot become unadopted by deleting its committed map", () => 
   } finally { rmSync(f.dir, { recursive: true, force: true }); }
 });
 
-test("a committed adoption decision requires a map even before first map commit", () => {
+test("a valid deferred adoption decision may precede the first map commit", () => {
   const f = fixture();
   try {
     mkdirSync(join(f.dir, "architecture"), { recursive: true });
-    writeFileSync(join(f.dir, "architecture", "adoption-state.json"), "{}\n");
-    f.git("add", "."); f.git("commit", "-q", "-m", "record adoption decision");
-    const missing = inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() });
-    assert.equal(missing.ok, false);
-    assert.match(missing.reason, /removed after adoption/u);
+    writeFileSync(join(f.dir, "architecture", "adoption-state.json"), JSON.stringify({ schema: "pipeline.adoption-state.v1", state: "deferred", scope: ["specs/example/"] }));
+    f.git("add", "."); f.git("commit", "-q", "-m", "defer adoption");
+    const deferred = inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() });
+    assert.equal(deferred.ok, true);
+    assert.equal(deferred.applicable, false);
+  } finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test("approved or malformed adoption state without a map fails closed", () => {
+  const f = fixture();
+  try {
+    mkdirSync(join(f.dir, "architecture"), { recursive: true });
+    const path = join(f.dir, "architecture", "adoption-state.json");
+    writeFileSync(path, JSON.stringify({ schema: "pipeline.adoption-state.v1", state: "approved-scoped", scope: ["specs/example/"] }));
+    f.git("add", "."); f.git("commit", "-q", "-m", "approve scoped adoption");
+    const approved = inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() });
+    assert.equal(approved.ok, false);
+    assert.match(approved.reason, /requires a map/u);
+    writeFileSync(path, "{broken\n");
+    f.git("add", "."); f.git("commit", "-q", "-m", "malform adoption");
+    const malformed = inspectArchitecturePushCurrency({ projectDir: f.dir, commit: f.commit() });
+    assert.equal(malformed.ok, false);
+    assert.match(malformed.reason, /malformed/u);
   } finally { rmSync(f.dir, { recursive: true, force: true }); }
 });
 

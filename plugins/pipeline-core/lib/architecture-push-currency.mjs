@@ -28,7 +28,17 @@ export function inspectArchitecturePushCurrency({ projectDir, commit, checkpoint
     const adopted = git(projectDir, ["ls-tree", "-r", "--name-only", commit, "--", "architecture/adoption-state.json"], run);
     const priorIndex = git(projectDir, ["log", "-1", "--format=%H", commit, "--", MAP_INDEX], run);
     if (adopted === null || priorIndex === null) return { ok: false, reason: "candidate architecture adoption history cannot be checked" };
-    if (adopted !== "" || priorIndex !== "") return { ok: false, reason: "candidate architecture map was removed after adoption" };
+    if (priorIndex !== "") return { ok: false, reason: "candidate architecture map was removed after adoption" };
+    if (adopted !== "") {
+      const raw = git(projectDir, ["show", `${commit}:architecture/adoption-state.json`], run);
+      if (raw === null || Buffer.byteLength(raw, "utf8") > 65536) return { ok: false, reason: "candidate architecture adoption state is unreadable" };
+      let state;
+      try { state = JSON.parse(raw); } catch { return { ok: false, reason: "candidate architecture adoption state is malformed" }; }
+      if (state?.schema !== "pipeline.adoption-state.v1" || state?.state !== "deferred"
+        || !Array.isArray(state.scope) || state.scope.some((scope) => typeof scope !== "string" || scope.length === 0)) {
+        return { ok: false, reason: "candidate architecture adoption state requires a map" };
+      }
+    }
     return { ok: true, applicable: false, commit, tree, stalenessDebt: [] };
   }
   const index = git(projectDir, ["show", `${commit}:${MAP_INDEX}`], run);
