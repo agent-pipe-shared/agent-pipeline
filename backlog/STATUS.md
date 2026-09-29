@@ -62,6 +62,7 @@
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
 | pipeline.agy-greenfield-run-used-stale-plugin | closed | requirement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.agy-managed-copy-first-start-lacks-attestation | open | bug | pipeline | none | 2026-09-29 | — | — |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | closed | requirement | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
@@ -163,6 +164,7 @@
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | rejected | requirement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.commandpath-sibling-tilde-gap-and-test-pins | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — T1 Critic review of NVA-B-TILDEFIX-1 (PASS, 4 minor findings). F3: commandPath() in guard-lifecycle-ready.mjs still builds resolve(root, value) with no tilde reject, so a leading-~ argument still resolves as inside root wherever a caller trusts that result directly (named call sites: lines 2783, 2956, 2979, 2987) -- not proven exploitable, disclosed as such. F1: the cat-pipeline and git-pipeline lane tests added by NVA-B-TILDEFIX-1 assert only exitCode 2, not the specific denial code, unlike their single-command/rg siblings, so a future refactor could silently change which code those two lanes report with the suite still green. |
+| pipeline.commit-grammar-hint-still-requires-scratch-message-file | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | The commit parser already accepts repeated -m and Git --trailer, but the lifecycle grammar denial and commit skill still direct ordinary multi-paragraph commits through a scratch message file. |
 | pipeline.commit-guards-reject-safe-literal-multiline-messages | closed | defect | pipeline | nova-b | 2026-09-13 | 2026-09-30 | — |
 | pipeline.commit-trailer-authoring-needs-a-typed-single-command-route | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — newline-free shell grammar makes ordinary multi-paragraph git commit commands expensive; retain strict trailer validation while removing scratch-file choreography from the normal path. |
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
@@ -450,6 +452,7 @@
 | pipeline.onboarding-guidance-never-asks-about-an-existing-signing-key | closed | defect | pipeline | — | 2026-08-30 | — | Retrospective-analysis follow-up item #2, PO-confirmed 2026-08-30 ('auch verdrahten und fixen! das muss der runner zwingend abfragen') |
 | pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'. |
 | pipeline.onboarding-home-override-does-not-bind-machine-plane | open | workflow-improvement | pipeline | none | 2026-09-28 | — | — |
+| pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | The four targeted onboarding-init greenfield cases pass but take over six minutes because independent runner/key fixtures are sequential inside individual tests. |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | — | 2026-08-06 | — | — |
 | pipeline.onboarding-must-bootstrap-the-trust-anchor-once | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly |
 | pipeline.onboarding-must-elicit-the-real-verify-contract | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step |
@@ -734,6 +737,7 @@
 | pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.windows-directory-durability | closed | defect | pipeline | — | 2026-07-22 | — | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error | open | bug | pipeline | none | 2026-09-29 | — | — |
 | pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.windows-private-state-assurance | closed | defect | pipeline | — | 2026-07-22 | — | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-runtime-baseline-containment | closed | defect | pipeline | — | 2026-07-22 | — | PO-approved Sentinel scope extension; no implementation or closure claim. |
@@ -753,7 +757,7 @@
 
 ## Counts
 
-- open: 88
+- open: 92
 - in_progress: 0
 - closed: 643
 - rejected: 3

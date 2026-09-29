@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6982e66bf83ce28ea7765c0f625a35bd5bf80f3b759a920e4b15c440c571e733"
+    "transitionHead": "e6aac4fabb18561b69c03128498c64dc09458b0ffb4040e144ee3edbe9093132"
   },
   "counts": {
-    "open": 88,
+    "open": 92,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -775,6 +775,16 @@
       "source": "PO Claude handover and independent read-only verification, 2026-09-28; backlog/evidence/agy-imported-snapshot-20260928-readback.json and -verification.md. Physical stale copy/current registry and one stale-version fixture lock confirmed; exact load precedence remains pending.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Antigravity greenfield report for the stamped 0.7 local candidate; verified against installer and preflight source.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
@@ -2111,6 +2121,17 @@
       "closureRepository": "self",
       "closureCommit": "94fe6cc6e38bd690ee87af68092ac75789af00a0",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+    },
+    {
+      "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "PO feedback on 2026-09-29; guard-lifecycle-ready.mjs commitMessageFileRemediation; commit-message-policy.test.mjs CMP3a/CMP3c.",
+      "deferred": false,
+      "tracking": "The commit parser already accepts repeated -m and Git --trailer, but the lifecycle grammar denial and commit skill still direct ordinary multi-paragraph commits through a scratch message file.",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.commit-guards-reject-safe-literal-multiline-messages",
@@ -5943,6 +5964,17 @@
       "source": "Controlled Codex onboarding first-answer verification; source dependency mismatch and a synthetic differing OS-home/CLI-home counterprobe. See scratch/onboarding-answer-route-evidence.md. No ordinary native-home defect or release blocker is claimed.",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Focused onboarding-init test run on 2026-09-29: 4/4 pass in 368.5 seconds.",
+      "deferred": false,
+      "tracking": "The four targeted onboarding-init greenfield cases pass but take over six minutes because independent runner/key fixtures are sequential inside individual tests.",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
@@ -9782,6 +9814,16 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows greenfield onboarding report for the stamped 0.7 local candidate; verified against current source before correction.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs",
