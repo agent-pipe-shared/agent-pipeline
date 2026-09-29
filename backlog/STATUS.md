@@ -433,6 +433,7 @@
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.no-uninstall-path-for-a-repository-that-once-opted-in | open | requirement | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.nonblocking-interaction-continuity | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
+| pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.nothing-checks-that-a-capability-is-reachable | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three. |
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | closed | workflow-improvement | pipeline | — | 2026-08-16 | — | — |
 | pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -744,7 +745,7 @@
 
 ## Counts
 
-- open: 79
+- open: 80
 - in_progress: 0
 - closed: 643
 - rejected: 3
