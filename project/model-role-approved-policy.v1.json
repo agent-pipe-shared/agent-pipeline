@@ -1,0 +1,24 @@
+{
+  "schema": "pipeline.model-role-approved-policy.v1",
+  "candidateAtApproval": {"commit":"96ccb175e401d7e2d44a19eacb710594958e9a78","tree":"6ba69aba414b1504e94aa2dce49a2c9bb768cb45"},
+  "approvedPolicies": [
+    {"runner":"codex","role":"efficient","effort":"high","policy":{"schema":"pipeline.model-role-policy.v1","runner":"codex","role":"efficient","approved":[{"modelId":"gpt-6-luna","rank":1,"efforts":["high","medium"],"compatibilityEvidenceSha256":"f82601a8584132711d8cebc602d336e3590939b1cec57e2b051d1e667ffd03b5"}]}},
+    {"runner":"codex","role":"efficient","effort":"medium","policy":{"schema":"pipeline.model-role-policy.v1","runner":"codex","role":"efficient","approved":[{"modelId":"gpt-6-luna","rank":1,"efforts":["high","medium"],"compatibilityEvidenceSha256":"f82601a8584132711d8cebc602d336e3590939b1cec57e2b051d1e667ffd03b5"}]}},
+    {"runner":"codex","role":"frontier","effort":"high","policy":{"schema":"pipeline.model-role-policy.v1","runner":"codex","role":"frontier","approved":[{"modelId":"gpt-6.1-sol","rank":1,"efforts":["high","max","medium","xhigh"],"compatibilityEvidenceSha256":"fd3415a4638f4931ae29fcf6fe3f480acaa6a94882af15ce308c3cab4e83d81e"}]}},
+    {"runner":"codex","role":"frontier","effort":"max","policy":{"schema":"pipeline.model-role-policy.v1","runner":"codex","role":"frontier","approved":[{"modelId":"gpt-6.1-sol","rank":1,"efforts":["high","max","medium","xhigh"],"compatibilityEvidenceSha256":"fd3415a4638f4931ae29fcf6fe3f480acaa6a94882af15ce308c3cab4e83d81e"}]}},
+    {"runner":"codex","role":"frontier","effort":"medium","policy":{"schema":"pipeline.model-role-policy.v1","runner":"codex","role":"frontier","approved":[{"modelId":"gpt-6.1-sol","rank":1,"efforts":["high","max","medium","xhigh"],"compatibilityEvidenceSha256":"fd3415a4638f4931ae29fcf6fe3f480acaa6a94882af15ce308c3cab4e83d81e"}]}},
+    {"runner":"codex","role":"frontier","effort":"xhigh","policy":{"schema":"pipeline.model-role-policy.v1","runner":"codex","role":"frontier","approved":[{"modelId":"gpt-6.1-sol","rank":1,"efforts":["high","max","medium","xhigh"],"compatibilityEvidenceSha256":"fd3415a4638f4931ae29fcf6fe3f480acaa6a94882af15ce308c3cab4e83d81e"}]}},
+    {"runner":"codex","role":"worker","effort":"high","policy":{"schema":"pipeline.model-role-policy.v1","runner":"codex","role":"worker","approved":[{"modelId":"gpt-6-luna","rank":1,"efforts":["high"],"compatibilityEvidenceSha256":"d699c49d1788c17bec31ad78428f09370da8da15eae4f3335a81addd6e24df5b"}]}}
+  ],
+  "approvalIntent": {
+    "value": {"schema":"pipeline.po-approval-intent.v1","kind":"model-role-policy","featureId":"model-role-routes","planSha256":"b34a6f3db47cf0a1b2e4d217a9dac72a39c99a7b209715a38e20f5b5ea9081d1","specSha256":"5f798fa5c511347faa861e359cdb3c541e16b10016896ff667418341a40e1bd9","candidate":{"commit":"96ccb175e401d7e2d44a19eacb710594958e9a78","tree":"6ba69aba414b1504e94aa2dce49a2c9bb768cb45"},"policyRevision":"model-roles-v1","subjectSha256":"5f798fa5c511347faa861e359cdb3c541e16b10016896ff667418341a40e1bd9","decision":"approved"},
+    "sha256": "c4eb0b7ddcaae18474c054550fe4497d25ec532df5682737e628b42acdcfb049"
+  },
+  "proof": {
+    "schema": "pipeline.po-approval-proof.v1",
+    "intentSha256": "c4eb0b7ddcaae18474c054550fe4497d25ec532df5682737e628b42acdcfb049",
+    "keyReference": "local-po-key",
+    "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
+    "signatureBase64": "fHA0UUIeP42C0E30LAxwCvNyhkUD8k6mE/Ly8UqiINyg/hiU4B0+/yycpJymyAHsiBCDMPush1YuruSXO0UwDw=="
+  }
+}
