@@ -316,6 +316,8 @@
           "docs/adr/draft-design-stage-architecture-materialization.md",
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.json",
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.md",
+          "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.json",
+          "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-scanner-diagnostic-sidecar.json",
           "docs/adr/draft-scanner-diagnostic-sidecar.md",
