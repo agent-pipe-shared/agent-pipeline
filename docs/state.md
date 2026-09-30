@@ -9,6 +9,8 @@
 
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
+**PO-Ergänzung 2026-09-30:** [Modellfamilien einmal freigeben und neue Versionen automatisch einsetzen](../backlog/items/2026-09-30-model-family-approval-with-automatic-version-upgrades.md); Umsetzung und Abnahme sind offen. Die aktuelle Codex-Zuordnung Sol 6.1/Luna 6 ist signiert und im Host bestätigt.
+
 **PO-Auftrag:** Den genehmigten 0.7-Umfang als lokalen Kandidaten fertigstellen.
 Der PO installiert den gestempelten Build selbst; keine Veröffentlichung.
 
