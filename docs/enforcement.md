@@ -36,8 +36,8 @@ no hand-maintained guard count or command list.
 | Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;Agent&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs" |
 | Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs" |
 | Claude Code | PreToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs" |
-| Claude Code | PreToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs" --runner claude |
 | Claude Code | PreToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs" |
+| Claude Code | PreToolUse | Bash&#124;PowerShell&#124;Read&#124;Grep&#124;Glob | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs" --runner claude |
 | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs" |
 | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-el01-tripwire.mjs" |
 | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs" |
@@ -79,6 +79,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
 
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `e1a67026eb36e4d5ec52d6db8e04e568a799496dab93bb17a7e4c13448bafe48` |
+| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `130b87bd2eafab2738ec22aba16d76f8fa0194ade863583d4c45bbc93fba931b` |
 | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `dcc23075e81a254603c9b7ab96bc6e2bc046830532b1cc0535934e6af67aa010` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96` |
