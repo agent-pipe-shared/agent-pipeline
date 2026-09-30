@@ -119,6 +119,7 @@
         "audience": "maintainer",
         "lifecycle": "maintained",
         "paths": [
+          "docs/0.7-alfred-transfer-2026-09-30.md",
           "docs/artifact-topology.md",
           "docs/audit-bundles-technical.md",
           "docs/bootstrap-step-accounting.md",
@@ -319,10 +320,13 @@
           "docs/adr/draft-scanner-diagnostic-sidecar.json",
           "docs/adr/draft-scanner-diagnostic-sidecar.md",
           "docs/adr/draft-session-cut-recommended-by-readiness.md",
+          "docs/adr/draft-three-main-update-channels.json",
+          "docs/adr/draft-three-main-update-channels.md",
           "docs/codex-isolated-critic-foundation.md",
           "docs/handover-0.5.2-findings.md",
           "docs/human-authorization-inventory.md",
           "docs/known-issues.md",
+          "docs/pipeline-review-greenfield-2026-09-29.md",
           "docs/sprint-alfred-completion-report.md"
         ]
       },
