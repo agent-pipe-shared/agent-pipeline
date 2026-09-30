@@ -24,6 +24,36 @@ permissions:
   contents: read
 
 jobs:
+  greenfield-platform-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Physical scratch boundary
+        run: node --test plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs
+      - name: Passive host read boundary
+        run: node --test plugins/pipeline-core/lib/passive-read-policy.test.mjs
+      - name: Runner read guard boundary
+        run: node --test --test-name-pattern="external reports stay readable|greenfield passive PowerShell" plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+      - name: Existing signing key reuse
+        run: node --test --test-name-pattern="signature anchor reuses a key" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+      - name: Language transaction and attended anchor recovery
+        run: node --test plugins/pipeline-core/lib/onboarding-initial-answers-transaction.test.mjs plugins/pipeline-core/scripts/bootstrap-trust-recovery.test.mjs
+      - name: Consumer pre-push installation
+        run: node --test --test-name-pattern="onboarding pre-push offer executes" plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
+      - name: Native runner activation
+        run: node --test --test-name-pattern="actual inactive/declined scope" plugins/pipeline-core/scripts/antigravity-topology-integration.test.mjs
+
   verify:
     runs-on: ubuntu-latest
     steps:

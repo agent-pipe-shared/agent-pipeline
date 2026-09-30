@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e6aac4fabb18561b69c03128498c64dc09458b0ffb4040e144ee3edbe9093132"
+    "transitionHead": "180bee5447da799c6cf0a81beebcdd034e99dd4e7a196eb04b083d99ba724d46"
   },
   "counts": {
-    "open": 92,
+    "open": 105,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -896,6 +896,16 @@
       "closureEvidence": "backlog/items/2026-08-07-anchor-check-passes-on-wrong-language-content.md"
     },
     {
+      "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Antigravity greenfield 0.7.0 report: installed agy 1.2.13 is refused by the source's exact 1.2.12 topology refresh checks; a stale managed copy remains loaded.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths",
       "status": "closed",
       "type": "defect",
@@ -1747,6 +1757,16 @@
       "closureEvidence": "backlog/items/2026-08-09-what-the-claude-greenfield-run-adds-to-the-happy-path-findings.md"
     },
     {
+      "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows greenfield review M3: a Claude-only project enabled Codex and generated .codex targets, then reported missing Codex runtime files.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
       "status": "closed",
       "type": "idea",
@@ -1828,6 +1848,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
     },
     {
+      "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Codex greenfield 0.7.0 review: a fourth design-readiness preparation failed with advisor-private-execution-binding-invalid after a plugin/host refresh, although the retained advisor-finalization document passed its structural validator.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
       "status": "open",
       "type": "defect",
@@ -1884,6 +1914,16 @@
       "closureRepository": "self",
       "closureCommit": "0aeaef18f6e14edd2dc7271e36e4784237408ad6",
       "closureEvidence": "plugins/pipeline-core/lib/worktree-lifecycle.mjs"
+    },
+    {
+      "id": "pipeline.codex-own-session-audit-export-missing",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Codex 0.7.0 greenfield review: the approved transcript recovery lists prior sessions only and cannot provide an own-session path or reliable phase/token accounting for the running session.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.codex-plugin-validator-host-parity",
@@ -2637,6 +2677,16 @@
       "closureEvidence": "backlog/items/2026-08-12-cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary.md"
     },
     {
+      "id": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows greenfield review M5: the agent emitted an existing chat request twice into a scratch write, about 7k output tokens per failed attempt.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.dead-key-directory-pointer-is-permanent-and-silent",
       "status": "closed",
       "type": "defect",
@@ -3275,6 +3325,16 @@
       "source": "PO observation (chat), 2026-08-26: updating a consumer repo onto the sprint_agy ruleset changes pipeline.user.yaml's expected shape; an already-onboarded repository that does not also update its own pipeline.user.yaml drifts and the pipeline breaks with no repair path.",
       "deferred": false,
       "sprint": "nightwing"
+    },
+    {
+      "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows greenfield review B2/B3: onboarding tried to import a key already at the canonical destination, while its human override needed that key.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise",
@@ -3954,6 +4014,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md"
     },
     {
+      "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Codex 0.7.0 greenfield review: an approximately 3 h 41 min elapsed design course ended before implementation, with three completed readiness rounds, two material authority signatures, ten local commits and no product files. The reported time split is an estimate, not measured telemetry.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.greenfield-handover-claims-absent-supersession-marker",
       "status": "open",
       "type": "defect",
@@ -3962,6 +4032,16 @@
       "source": "Codex/WSL greenfield review B9; current consumer docs/state.md claims SUPERSEDED.md, tracked tree has none, and onboarding-continuity.mjs emits the sentence unconditionally.",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.greenfield-machine-output-and-skill-budget",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows greenfield review M6/M7: pending asks appear twice, guard denials emit lengthy inline override instructions, and the mandatory start skill is roughly 35 KB across three runner contexts.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference",
@@ -7394,6 +7474,16 @@
       "closureEvidence": "backlog/items/2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md"
     },
     {
+      "id": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-30",
+      "source": "Independent security critique of the proposed external passive-read repair; existing guard source examined before mutation.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.read-scope-denial-code-accuracy-f3",
       "status": "closed",
       "type": "defect",
@@ -7569,6 +7659,16 @@
       "closureRepository": "self",
       "closureCommit": "2eaf90fe326e13fc552e1966d6c1ca7845dc89a4",
       "closureEvidence": "backlog/items/2026-08-18-reconcile-lock-reuse-regression-test-needs-a-tp5-window.md"
+    },
+    {
+      "id": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Codex reconnect reproduced: pipeline-start preflight ready, then project-onboarding-v3 inspect printed Unexpected end of JSON input because a nested Node reader received empty stdout in the managed sandbox; the same read-only command at the host boundary returned ready.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
@@ -9425,6 +9525,16 @@
       "closureEvidence": "plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md"
     },
     {
+      "id": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+      "status": "open",
+      "type": "privacy-bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows greenfield review M2: fresh pipeline.user.yaml set advisor_export.consent to approved before the PO answered an export question.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime",
       "status": "closed",
       "type": "defect",
@@ -9816,6 +9926,16 @@
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
+      "id": "pipeline.windows-greenfield-scratch-write-denied",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows 11 greenfield review B1: intake-required rejected native absolute Write and PowerShell scratch paths.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
       "status": "open",
       "type": "bug",
@@ -9837,6 +9957,16 @@
       "closureRepository": "self",
       "closureCommit": "f12c335034c524c325e960d3c508df1d0530fed5",
       "closureEvidence": "backlog/items/2026-08-18-windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md"
+    },
+    {
+      "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "status": "open",
+      "type": "bug",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Claude Windows greenfield review H1: fsync on a read-only descriptor returned EPERM; the offered installer argv was relative to the plugin rather than the consumer repository.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.windows-private-state-assurance",
