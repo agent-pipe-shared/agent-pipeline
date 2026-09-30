@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: SUL-1.0
-/** Recoverable, exact-byte three-target onboarding preference projection. */
+/** Recoverable, exact-byte onboarding preference projection. */
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 export const INITIAL_ANSWERS_PENDING_SCHEMA = "pipeline.onboarding-preference-projection-pending.v1";
 const ROLES_BY_PURPOSE = Object.freeze({
-  "first-answers": ["source", "machine", "receipt"],
-  "later-language": ["source", "machine", "receipt"],
+  "first-answers": ["source", "machine", "receipt", "manifest"],
+  "later-language": ["source", "machine", "receipt", "manifest"],
 });
+const LEGACY_ROLES = ["source", "machine", "receipt"];
 const PURPOSES = new Set(["first-answers", "later-language"]);
 const CAPABILITIES = new Set(["local", "host-managed"]);
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -89,7 +90,8 @@ function syncParent(path) {
     // Some hosts cannot fsync directories. The completed file/link is still
     // available after a process crash; do not turn its publication into a
     // false success/failure ambiguity solely for this unsupported operation.
-    if (!["EINVAL", "ENOTSUP", "EOPNOTSUPP", "EBADF"].includes(error?.code)) throw error;
+    if (!["EINVAL", "ENOTSUP", "EOPNOTSUPP", "EBADF"].includes(error?.code)
+      && !(process.platform === "win32" && error?.code === "EPERM")) throw error;
   } finally { if (fd !== undefined) closeSync(fd); }
 }
 
@@ -121,20 +123,22 @@ export function readInitialAnswersJournal({ markerPath, root, runner, targets,
     || !CAPABILITIES.has(repositoryCapability) || value.repositoryCapability !== repositoryCapability
     || value.runner !== runner
     || !TXID.test(value.transactionId) || !HEX.test(value.answerSha256)
-    || !Array.isArray(value.entries) || value.entries.length !== roles.length
+    || !Array.isArray(value.entries) || ![LEGACY_ROLES.length, roles.length].includes(value.entries.length)
     || !Array.isArray(targets) || targets.length !== roles.length) {
     throw new Error("INITIAL-ANSWERS-JOURNAL-BINDING");
   }
+  const legacy = value.entries.length === LEGACY_ROLES.length;
+  const recordedRoles = legacy ? LEGACY_ROLES : roles;
   const entries = value.entries.map((entry, index) => {
     if (!exactKeys(entry, ["role", "path", "pre", "post"])
-      || entry.role !== roles[index] || entry.path !== targets[index].path
-      || targets[index].role !== roles[index]) throw new Error("INITIAL-ANSWERS-JOURNAL-BINDING");
+      || entry.role !== recordedRoles[index] || entry.path !== targets[index].path
+      || targets[index].role !== recordedRoles[index]) throw new Error("INITIAL-ANSWERS-JOURNAL-BINDING");
     const pre = decode(entry.pre);
     const post = decode(entry.post);
     if (post.bytes === null) throw new Error("INITIAL-ANSWERS-JOURNAL-SHAPE");
     return { role: entry.role, path: entry.path, pre, post };
   });
-  return { value, marker, entries, linkedTemporary: linkedTemporary(markerPath, value, marker) };
+  return { value, marker, entries, legacy, linkedTemporary: linkedTemporary(markerPath, value, marker) };
 }
 
 export function beginInitialAnswersJournal({ markerPath, root, runner, answerSha256, targets,
@@ -205,7 +209,7 @@ export function beginInitialAnswersJournal({ markerPath, root, runner, answerSha
   return readInitialAnswersJournal({ markerPath, root, runner, targets, purpose, repositoryCapability });
 }
 
-export function completeInitialAnswersJournal({ markerPath, root, runner, answerSha256, targets, publish,
+export function completeInitialAnswersJournal({ markerPath, root, runner, answerSha256, targets, publish, completeLegacy = null,
   purpose = "first-answers", repositoryCapability = "host-managed" }) {
   const journal = readInitialAnswersJournal({ markerPath, root, runner, targets, purpose, repositoryCapability });
   if (journal === null) throw new Error("INITIAL-ANSWERS-JOURNAL-MISSING");
@@ -225,6 +229,10 @@ export function completeInitialAnswersJournal({ markerPath, root, runner, answer
     publish(entry.role, entry.path, entry.post.bytes, entry.post.mode);
     if (!sameBytes(snapshot(entry.path), entry.post)) throw new Error("INITIAL-ANSWERS-JOURNAL-READBACK");
   }
+  if (journal.legacy) {
+    if (typeof completeLegacy !== "function") throw new Error("INITIAL-ANSWERS-JOURNAL-LEGACY-RECOVERY-REQUIRED");
+    completeLegacy();
+  }
   const after = markerSnapshot(markerPath);
   if (after === null || after.dev !== journal.marker.dev || after.ino !== journal.marker.ino
     || after.digest !== journal.marker.digest) throw new Error("INITIAL-ANSWERS-JOURNAL-CHANGED");
@@ -235,5 +243,6 @@ export function completeInitialAnswersJournal({ markerPath, root, runner, answer
   }
   unlinkSync(markerPath);
   syncParent(markerPath);
-  return { status: states.every((state) => state === "post") ? "replayed" : "completed" };
+  return { status: states.every((state) => state === "post") ? "replayed" : "completed",
+    ...(journal.legacy ? { legacy: true } : {}) };
 }

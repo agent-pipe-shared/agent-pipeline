@@ -3,7 +3,7 @@
 
 import { lstatSync, readFileSync } from "node:fs";
 import { spawnSync as hostSpawnSync } from "node:child_process";
-import { isAbsolute, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -16,6 +16,7 @@ import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-p
 import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
 import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
 import { resolveActiveRunner } from "./pipeline-start-preflight.mjs";
+import { readIntakeMaterialReference, unavailableChatTurnReference } from "../lib/intake-material-reference.mjs";
 import {
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeCapture,
@@ -105,17 +106,20 @@ function privateIntakeRepositoryCapability(options, deps) {
 }
 
 /**
- * NVA-INTAKEARGV-1: resolve one PO material-input chunk from exactly one of its two routes.
+ * NVA-INTAKEARGV-1: resolve one PO material-input chunk from one explicit route.
  * `--text` carries the value inline. `--text-file` reads it from a file, and is the only way a
  * real design document can reach the intake at all: the closed Pipeline shell grammar refuses
  * any command text containing a newline, while this very input is declared multi-line prose by
  * intakeCaptureAction() itself (`singleLine: false`). Measured 2026-08-27 on a Codex greenfield
  * run -- the PO's design document could not be passed, in any quoting.
  *
- * The file must resolve INSIDE the project root. A capture is repository-scoped material, and
+ * The file must physically resolve INSIDE the project root. A capture is repository-scoped material, and
  * reading an arbitrary host path on the strength of a relative-looking argument is exactly the
  * shape the containment rules exist to refuse; `scratch/` is the intended home for it and is
- * inside the root. Returns `options.text` untouched when no file route was used, so
+ * inside the root. An existing in-repo document may be referenced directly with its SHA-256;
+ * no extra scratch copy or repeated chat output is needed. Chat-turn references are explicitly
+ * unavailable until each host supplies a trusted capture contract. Returns `options.text`
+ * untouched when no file route was used, so
  * applyOnboardingIntakeCapture's own non-empty validation stays the single authority on an
  * absent or empty value.
  *
@@ -125,29 +129,19 @@ function privateIntakeRepositoryCapability(options, deps) {
  * either caller, so this stays the one place that owns them.
  */
 function resolveIntakeCaptureText(options) {
-  if (options.text !== undefined && options.textFile !== undefined) {
-    const conflict = new Error("accepts exactly one of --text or --text-file, never both");
+  if ([options.text, options.textFile, options.textTurnRef].filter((value) => value !== undefined).length > 1) {
+    const conflict = new Error("accepts exactly one of --text, --text-file, or --text-turn-ref");
     conflict.code = "INTAKE-CAPTURE-TEXT-AMBIGUOUS";
     throw conflict;
   }
+  if (options.textTurnRef !== undefined) unavailableChatTurnReference();
+  if (options.textFileSha256 !== undefined && options.textFile === undefined) {
+    throw Object.assign(new Error("--text-file-sha256 requires --text-file"), { code: "INTAKE-CAPTURE-TEXT-FILE-DIGEST-WITHOUT-FILE" });
+  }
   if (options.textFile === undefined) return options.text;
-  const root = resolve(options.root);
-  const candidate = resolve(root, options.textFile);
-  const inside = relative(root, candidate);
-  if (inside === "" || inside.startsWith("..") || isAbsolute(inside)) {
-    const escape = new Error("--text-file must name a path inside the project root");
-    escape.code = "INTAKE-CAPTURE-TEXT-FILE-OUTSIDE-ROOT";
-    throw escape;
-  }
-  let bytes;
-  try {
-    bytes = readFileSync(candidate, "utf8");
-  } catch {
-    const unreadable = new Error("--text-file could not be read");
-    unreadable.code = "INTAKE-CAPTURE-TEXT-FILE-UNREADABLE";
-    throw unreadable;
-  }
-  return bytes;
+  return readIntakeMaterialReference({
+    rootDir: options.root, filePath: options.textFile, expectedSha256: options.textFileSha256 ?? null,
+  }).text;
 }
 
 // GUARDDERIVE-1 (backlog:
@@ -375,6 +369,8 @@ function parse(args) {
     else if (arg === "--git-author-email") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-email requires an email" }; output.gitAuthorEmail = value; index += 1; }
     else if (arg === "--text") { const value = args[index + 1]; if (value === undefined) return { error: "--text requires one argv text element" }; output.text = value; index += 1; }
     else if (arg === "--text-file") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--text-file requires one file path" }; output.textFile = value; index += 1; }
+    else if (arg === "--text-file-sha256") { const value = args[index + 1]; if (!/^[a-f0-9]{64}$/u.test(value ?? "")) return { error: "--text-file-sha256 requires one lowercase SHA-256 digest" }; output.textFileSha256 = value; index += 1; }
+    else if (arg === "--text-turn-ref") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--text-turn-ref requires one host turn reference" }; output.textTurnRef = value; index += 1; }
     else if (arg === "--answers-json") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-json requires a JSON array or no-open-questions disposition" }; output.answersJson = value; index += 1; }
     else if (arg === "--summary") output.summary = true;
     else if (arg === "--request-create-git") output.requestCreateGit = true;
@@ -609,8 +605,9 @@ function buildPrePushHookOfferAction({ rootDir }) {
   const unbackedGate = isPushGateDeclaredBlocking(rootDir);
   return {
     kind: "command",
-    executable: "node",
-    argv: ["plugins/pipeline-core/scripts/pre-push-hook-install.mjs", "--install"],
+    executable: process.execPath,
+    argv: [fileURLToPath(new URL("./pre-push-hook-install.mjs", import.meta.url)), "--install"],
+    cwd: rootDir,
     mutation: true,
     requiresConfirmation: true,
     expected: { schema: PRE_PUSH_HOOK_MARKER_SCHEMA, statuses: ["installed"] },
@@ -625,8 +622,9 @@ function buildPrePushHookOfferAction({ rootDir }) {
     ...(unbackedGate ? { gap: PRE_PUSH_HOOK_GAP_TEXT[language] ?? PRE_PUSH_HOOK_GAP_TEXT[PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE] } : {}),
     declineAction: {
       kind: "command",
-      executable: "node",
-      argv: ["plugins/pipeline-core/scripts/pre-push-hook-install.mjs", "--decline"],
+      executable: process.execPath,
+      argv: [fileURLToPath(new URL("./pre-push-hook-install.mjs", import.meta.url)), "--decline"],
+      cwd: rootDir,
       mutation: true,
       requiresConfirmation: false,
       expected: { schema: PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA, statuses: ["declined"] },

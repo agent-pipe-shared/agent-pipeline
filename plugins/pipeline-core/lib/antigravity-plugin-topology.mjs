@@ -9,6 +9,7 @@ export const AGY_TOPOLOGY_SCHEMA='pipeline.antigravity-plugin-topology.v1';
 export const AGY_FILE_LIMIT=262144, AGY_TREE_BYTES=67108864, AGY_TREE_FILES=4096;
 const PUBLIC_FILE_LIMIT=2097152;
 const snapshots=new WeakMap(), hash=b=>createHash('sha256').update(b).digest('hex');
+export const supportsAntigravityPluginCliVersion=version=>version==='1.2.12'||version==='1.2.13';
 const valueHash=v=>hash(canonicalizeJson(v));
 const freeze=v=>{if(v&&typeof v==='object'){for(const x of Object.values(v))freeze(x);Object.freeze(v);}return v;};
 function same(a,b){return a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&a.mtimeNs===b.mtimeNs&&a.ctimeNs===b.ctimeNs;}
@@ -99,7 +100,7 @@ export function planAntigravityTopologyRefresh({observation,scope,globalChangeAp
   const binding=snapshots.get(observation);if(!binding)throw Error('AT-NOT-PHYSICAL-OBSERVATION');
   const held=reason=>freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:'held',reason,observationSha256:binding.digest,actions:[]});
   if(!['workspace','global'].includes(scope))return held('AT-SCOPE');
-  if(cliVersion!=='1.2.12')return held('AT-CLI-CAPABILITY-UNOBSERVED');
+  if(!supportsAntigravityPluginCliVersion(cliVersion))return held('AT-CLI-CAPABILITY-UNOBSERVED');
   if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable'||Object.values(observation.registries).some(r=>r.status==='unavailable')||observation.wiring.some(w=>w.status==='unavailable'||w.status==='observed'))return held('AT-UNVERIFIABLE-SURFACE');
   const managed=observation.managed.candidates,imports=observation.importState.entries;
   if(managed.length>1||imports.length>1||(imports.length===1&&managed.length!==1)||(managed.length===1&&imports.length!==1))return held('AT-MANAGED-IMPORT-AMBIGUOUS');

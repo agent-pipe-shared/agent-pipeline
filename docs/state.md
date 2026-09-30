@@ -5,6 +5,8 @@
 
 **Release state:** version `0.6.3` · tag `v0.6.3` · commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` · tree `6821503f8f4fd72ed31459cb843d97bf8bfaa049` · status `published`
 
+**Transfer 2026-09-30:** [Alfred 0.7 feature checkpoint and exact resume notes](0.7-alfred-transfer-2026-09-30.md). This branch transfer is not a qualified release.
+
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
 **PO-Auftrag:** Den genehmigten 0.7-Umfang als lokalen Kandidaten fertigstellen.

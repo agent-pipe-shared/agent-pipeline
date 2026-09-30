@@ -351,7 +351,7 @@ function hasDurableHostInitAdmission(root, deps) {
     return false;
   }
 }
-function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false, overlayCalibration = true } = {}) {
+function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false, overlayCalibration = true, enabledRunners = [] } = {}) {
   const legacy = ["v0", "v1", "v2"].includes(sourceKind);
   const initializeSlimV3 = ["v3", "v3-refresh"].includes(sourceKind)
     && initializeMissingRuntimeForSlimV3 === true;
@@ -373,6 +373,10 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
       const seed = legacy
         ? resolveLegacyRuntimeSeed(relative)
         : initializeSlimV3 ? slimRuntimeSeed(relative, { overlayCalibration })
+          // Disabled native Codex targets are renderer inputs only. They are
+          // neither required on disk nor published into a non-Codex project.
+          : !enabledRunners.includes("codex") && relative.startsWith(".codex/")
+            ? slimRuntimeSeed(relative, { overlayCalibration })
           // A reserved Codex mount supplies `.codex` at runtime.  Missing
           // Claude compatibility projections are renderer baselines only in
           // this mode; they must not make a freshly project-seeded root
@@ -673,7 +677,7 @@ export function planRunnerProfileMigrationV3({
   if (!validation.ok) return result("invalid-intent", validation.errors, { root, sourceKind: classified.kind, targets: [], changes: [] });
   let projection; let seeded; let hostManagedCodex;
   try {
-    const runtime = runtimeBaselines(root, deps, classified.kind, { initializeMissingRuntimeForSlimV3, overlayCalibration });
+    const runtime = runtimeBaselines(root, deps, classified.kind, { initializeMissingRuntimeForSlimV3, overlayCalibration, enabledRunners: classified.intent.runners.enabled });
     seeded = runtime.seeded;
     hostManagedCodex = runtime.hostManagedCodex;
     projection = planRuntimeProjectionV3(classified.intent, { source: SOURCE_FILE, baselines: runtime.baselines });
@@ -685,9 +689,14 @@ export function planRunnerProfileMigrationV3({
     return result("invalid-authority-lock", [diagnostic("$.authorityLock", "invalid_authority_lock", "authority lock update is not one accepted core.lock.json", "supply one rendered core.lock.json from the authenticated authority update")], { root, sourceKind: classified.kind, targets: [], changes: [] });
   }
   const renderedSource = classified.kind === "v3" ? classified.source.bytes : renderYaml(classified.intent);
-  const projectedTargets = hostManagedCodex
-    ? projection.targets.filter((target) => !target.path.startsWith(".claude/"))
-    : projection.targets;
+  // The neutral/Claude authority targets remain the portable project
+  // projection. Native Codex agent targets belong only to projects that
+  // explicitly enable Codex. A fresh Claude or Antigravity project must not
+  // acquire a Codex restart barrier or a missing-Codex-target diagnostic.
+  const codexEnabled = classified.intent.runners.enabled.includes("codex");
+  const projectedTargets = projection.targets.filter((target) =>
+    (!hostManagedCodex || !target.path.startsWith(".claude/"))
+    && (codexEnabled || !target.path.startsWith(".codex/")));
   const internal = projectedTargets.map((target) => ({
     path: target.path,
     kind: "runtime",
@@ -846,6 +855,7 @@ function validateTargetBoundary(entries) {
   // only with a present preimage, so this boundary cannot create authority.
   const full = runtimePaths().sort((a, b) => a.localeCompare(b));
   const hostManagedCodex = full.filter((path) => !path.startsWith(".claude/"));
+  const nonCodex = full.filter((path) => !path.startsWith(".codex/"));
   const mirrorPaths = new Set(neutralAuthorityMirrorPaths());
   const hasAuthorityLock = entries?.at(-2)?.path === AUTHORITY_LOCK_FILE && entries?.at(-2)?.kind === "authority-lock";
   if (!Array.isArray(entries)) throw new Error("V3 transaction has an incomplete target boundary");
@@ -857,6 +867,7 @@ function validateTargetBoundary(entries) {
   const corePaths = paths.filter((path) => full.includes(path));
   const expectedCore = corePaths.length === full.length && full.every((path) => corePaths.includes(path)) ? full
     : corePaths.length === hostManagedCodex.length && hostManagedCodex.every((path) => corePaths.includes(path)) ? hostManagedCodex
+      : corePaths.length === nonCodex.length && nonCodex.every((path) => corePaths.includes(path)) ? nonCodex
       : null;
   if (!expectedCore) throw new Error("V3 transaction has an incomplete target boundary");
   const mirrors = runtime.filter((entry) => mirrorPaths.has(entry.path));

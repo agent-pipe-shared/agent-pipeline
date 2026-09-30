@@ -52,7 +52,8 @@ function atomicReplace(path, bytes, mode) {
       directoryFd = openSync(dirname(path), constants.O_RDONLY | (constants.O_DIRECTORY ?? 0));
       fsyncSync(directoryFd);
     } catch (error) {
-      if (!["EINVAL", "ENOTSUP", "EOPNOTSUPP", "EBADF"].includes(error?.code)) throw error;
+      if (!["EINVAL", "ENOTSUP", "EOPNOTSUPP", "EBADF"].includes(error?.code)
+        && !(process.platform === "win32" && error?.code === "EPERM")) throw error;
     } finally { if (directoryFd !== undefined) closeSync(directoryFd); }
   } catch (error) {
     if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve first failure */ } }
@@ -84,6 +85,18 @@ function correctedSource(bytes, language) {
   return Buffer.from(corrected, "utf8");
 }
 
+function correctedManifest(bytes, language) {
+  const source = bytes.toString("utf8");
+  const pattern = /^(language:\r?\n[ ]+human_facing):[ \t]*"?(?:de|en)"?[ \t]*$/gmu;
+  if ([...source.matchAll(pattern)].length !== 1) fail("LATER-LANGUAGE-MANIFEST-SHAPE");
+  const corrected = source.replace(pattern, `$1: ${language}`);
+  let parsed;
+  try { parsed = parseYaml(corrected); }
+  catch { fail("LATER-LANGUAGE-MANIFEST-INVALID"); }
+  if (parsed?.language?.human_facing !== language) fail("LATER-LANGUAGE-MANIFEST-INVALID");
+  return Buffer.from(corrected, "utf8");
+}
+
 /** Read-only: never manufacture consent or mutate a missing private state. */
 export function inspectConfirmedIntakeLanguageProjection({ rootDir, repositoryCapability, deps = {} } = {}) {
   try {
@@ -112,7 +125,9 @@ export function inspectConfirmedIntakeLanguageProjection({ rootDir, repositoryCa
     const machine = readMachinePlane({ homedirFn: deps.homedir ?? homedir });
     const source = physicalFile(join(root, "pipeline.user.yaml"));
     const sourceLanguage = parseYaml(source.bytes.toString("utf8"))?.language?.human_facing;
-    if (machine.status !== "valid" || !LANGUAGES.has(sourceLanguage)) return { status: "invalid" };
+    const manifest = physicalFile(join(root, "project", "pipeline.yaml"));
+    const manifestLanguage = parseYaml(manifest.bytes.toString("utf8"))?.language?.human_facing;
+    if (machine.status !== "valid" || !LANGUAGES.has(sourceLanguage) || !LANGUAGES.has(manifestLanguage)) return { status: "invalid" };
     if (auditFile === null) return { status: "required", language };
     const audit = JSON.parse(auditFile.bytes.toString("utf8"));
     if (audit?.schema !== LATER_LANGUAGE_AUDIT_SCHEMA || audit.root !== root
@@ -122,7 +137,7 @@ export function inspectConfirmedIntakeLanguageProjection({ rootDir, repositoryCa
       || audit.consentAt !== checkpoint.value.consent.at) {
       return { status: "invalid" };
     }
-    return sourceLanguage === language && machine.plane.language === language
+    return sourceLanguage === language && manifestLanguage === language && machine.plane.language === language
       ? { status: "current", language } : { status: "invalid" };
   } catch { return { status: "invalid" }; }
 }
@@ -131,7 +146,7 @@ export function inspectConfirmedIntakeLanguageProjection({ rootDir, repositoryCa
  * Consent is written by the existing intake coordinator first. Its private
  * checkpoint is the durable authorization for this derived projection. A
  * crash before journal publication is discoverable from that checkpoint;
- * after publication the exact-byte journal resumes all three target writes.
+ * after publication the exact-byte journal resumes all four target writes.
  */
 export function projectConfirmedIntakeLanguage({
   rootDir, repositoryCapability, runner, deps = {}, afterPublication = null,
@@ -168,10 +183,12 @@ export function projectConfirmedIntakeLanguage({
   const markerPath = join(directory, "language-projection-pending.json");
   const auditPath = join(directory, "language-projection.json");
   const sourcePath = join(root, "pipeline.user.yaml");
+  const manifestPath = join(root, "project", "pipeline.yaml");
   const targets = [
     { role: "source", path: sourcePath },
     { role: "machine", path: machinePath },
     { role: "receipt", path: auditPath },
+    { role: "manifest", path: manifestPath },
   ];
   const firstReceiptSha256 = sha256(first.bytes);
   // The confirmed choice belongs to the repository, not to whichever runner
@@ -185,6 +202,16 @@ export function projectConfirmedIntakeLanguage({
     if (role === "machine") writeMachinePlane(JSON.parse(bytes.toString("utf8")), machineDependencies);
     else atomicReplace(path, bytes, mode);
     afterPublication?.(role);
+  };
+  const completeLegacyManifest = () => {
+    const manifest = physicalFile(manifestPath);
+    let observed;
+    try { observed = parseYaml(manifest.bytes.toString("utf8"))?.language?.human_facing; }
+    catch { fail("LATER-LANGUAGE-LEGACY-MANIFEST-INVALID"); }
+    if (observed === language) return;
+    if (observed !== firstValue.language) fail("LATER-LANGUAGE-LEGACY-MANIFEST-DRIFT");
+    atomicReplace(manifestPath, correctedManifest(manifest.bytes, language), manifest.mode);
+    afterPublication?.("manifest");
   };
   if (!existsSync(markerPath)) {
     const existingAudit = physicalFile(auditPath, { optional: true, maxBytes: 4096 });
@@ -200,12 +227,16 @@ export function projectConfirmedIntakeLanguage({
         fail("LATER-LANGUAGE-AUDIT-CONFLICT");
       }
       const source = physicalFile(sourcePath);
+      const manifest = physicalFile(manifestPath);
       if (parseYaml(source.bytes.toString("utf8"))?.language?.human_facing !== language
+        || parseYaml(manifest.bytes.toString("utf8"))?.language?.human_facing !== language
         || machine.plane.language !== language) fail("LATER-LANGUAGE-READBACK-DRIFT");
       return { status: "replayed", audit };
     }
     const source = physicalFile(sourcePath);
     const nextSource = correctedSource(source.bytes, language);
+    const manifest = physicalFile(manifestPath);
+    const nextManifest = correctedManifest(manifest.bytes, language);
     const nextMachine = { ...machine.plane, language, updatedAt: new Date().toISOString() };
     const audit = {
       schema: LATER_LANGUAGE_AUDIT_SCHEMA, root, repositoryCapability, runner,
@@ -219,9 +250,12 @@ export function projectConfirmedIntakeLanguage({
       postMode: 0o600, expectedPre: { bytes: machineFile.bytes, mode: machineFile.mode } };
     targets[2] = { ...targets[2], postBytes: Buffer.from(`${JSON.stringify(audit, null, 2)}\n`),
       postMode: 0o600, expectedPre: { bytes: null, mode: null } };
+    targets[3] = { ...targets[3], postBytes: nextManifest, postMode: manifest.mode,
+      expectedPre: { bytes: manifest.bytes, mode: manifest.mode } };
     beginInitialAnswersJournal(journalArgs);
   }
-  const completed = completeInitialAnswersJournal({ ...journalArgs, publish });
+  const completed = completeInitialAnswersJournal({ ...journalArgs, publish,
+    completeLegacy: completeLegacyManifest });
   const audit = JSON.parse(readFileSync(auditPath, "utf8"));
   return { status: completed.status, audit };
 }

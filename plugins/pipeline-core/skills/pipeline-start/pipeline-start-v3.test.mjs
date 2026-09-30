@@ -17,6 +17,7 @@ const cases = [
   { id: "PSV05", name: "push approval reference keeps the signed and chat contracts", run: checkPushApprovalContract },
   { id: "PSV06", name: "kickoff reference pointer carries every trigger state", run: checkKickoffPointer },
   { id: "PSV07", name: "session bootstrap obligations remain embedded or typed", run: checkSessionBootstrap },
+  { id: "PSV08", name: "mandatory skill stays under 24 KiB and loads only the active runner's model detail", run: checkRunnerBudget },
 ];
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
@@ -31,7 +32,7 @@ function loadInputs() {
   const core = readFileSync(join(here, "SKILL.md"), "utf8");
   const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "utf8");
   const kickoffDesign = readFileSync(join(here, "references", "kickoff-design.md"), "utf8");
-  const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md", "push-approval.md", "kickoff-design.md"]
+  const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md", "push-approval.md", "kickoff-design.md", "resume-hint.md"]
     .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
   return { all: `${core}\n${refs}`, closeBlock, core, kickoffDesign };
 }
@@ -54,6 +55,18 @@ assert.ok(namedReferences.length > 0, "the core must name at least one reference
 for (const name of new Set(namedReferences)) {
   assert.ok(readFileSync(join(here, "references", name), "utf8").length > 0, `SKILL.md names references/${name}, which is missing or empty`);
 }
+}
+
+function checkRunnerBudget() {
+  const { core } = loadInputs();
+  assert.ok(Buffer.byteLength(core, "utf8") <= 24 * 1024,
+    "the mandatory start skill exceeded 24 KiB; move conditional detail to a typed reference");
+  assert.match(core, /`references\/model-role-codex-claude\.md` for Codex\/Claude or\n   `references\/model-role-antigravity\.md` for Antigravity/u);
+  const codexClaude = readFileSync(join(here, "references", "model-role-codex-claude.md"), "utf8");
+  const antigravity = readFileSync(join(here, "references", "model-role-antigravity.md"), "utf8");
+  assert.doesNotMatch(codexClaude, /host-session-id/u, "Codex/Claude must not load Antigravity hook requirements");
+  assert.match(antigravity, /host-session-id/u);
+  assert.doesNotMatch(antigravity, /--runner <current-runner>/u, "Antigravity must use its named runner identity");
 }
 
 function checkBootstrapAuthority() {
@@ -80,7 +93,7 @@ assert.ok(
 assert.match(core, /full Elephant bootstrap is session-bound/u);
 assert.match(core, /never for an ordinary task, message, tool result, commit, test,/u);
 assert.match(core, /does not trigger a second full Elephant bootstrap unless a real SessionStart or\n+typed recovery follows/u);
-assert.match(core, /No happy-path reference is mandatory/u);
+assert.match(core, /A new-session model readback\nand a ready architecture readback each load their matching reference/u);
 assert.match(core, /project-onboarding-v3\.mjs inspect --root "\$PWD" --intent bootstrap/u);
 assert.match(core, /Agent Pipeline start: version/u);
 assert.match(all, /codex-project-runtime-readback-host\.mjs/u);
@@ -106,14 +119,15 @@ assert.match(core, /input received\n   after a short kickoff goal has already in
 assert.match(core, /do not;? ?\n?\s*reduce it to a new short kickoff goal or merely promise to remember it/u);
 assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
 
-assert.match(core, /checkpoint-origin material chunks are the original\n   product-material record/u);
-assert.match(core, /retain their bytes and capture order, do not\n   recapture an existing chunk merely to satisfy a tool ritual/u);
-assert.match(core, /answered onboarding values separate from product requirements/u);
-assert.match(core, /label it as a recovered\n   summary with its available source pointer; never manufacture a verbatim\n   `materialInput` chunk from that summary/u);
-assert.match(core, /collect the specific missing confirmation together rather than\n   silently substituting settings as requirements/u);
-assert.match(core, /Follow the current returned\n   `nextAction` from onboarding inspection/u);
-assert.match(core, /do not add `pipeline-state inspect`\n   or an Operating Model hash as an unavailable pre-binding prerequisite/u);
-assert.match(core, /State\/authority orientation follows ready binding/u);
+assert.match(core, /load `references\/resume-hint\.md` before capture or consumption/u);
+assert.match(all, /checkpoint-origin material chunks are the original\nproduct-material record/u);
+assert.match(all, /retain their bytes and capture order, do not\nrecapture an existing chunk merely to satisfy a tool ritual/u);
+assert.match(all, /answered onboarding values separate from product requirements/u);
+assert.match(all, /label it as a recovered\nsummary with its available source pointer; never manufacture a verbatim\n`materialInput` chunk from that summary/u);
+assert.match(all, /collect the specific missing confirmation together rather than silently\nsubstituting settings as requirements/u);
+assert.match(all, /Follow the current returned\n`nextAction` from onboarding inspection/u);
+assert.match(all, /do not add `pipeline-state inspect`\nor an Operating Model hash as an unavailable pre-binding prerequisite/u);
+assert.match(all, /State\/authority orientation follows ready binding/u);
 }
 
 // RHSHAPE-1. The skill's description of the card must be a shape the validator

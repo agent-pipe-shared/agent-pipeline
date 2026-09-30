@@ -20,11 +20,16 @@ Resolve the plugin root, then run exactly:
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
 
 Accept only schema `pipeline.start-preflight.v1`, status `ready`,
-`plugin-refresh-required`, or the hard recovery status below, absolute matching `pluginRoot`, valid
+`pipeline-governance-inactive`, `plugin-refresh-required`, or the hard recovery status below, absolute matching `pluginRoot`, valid
 version/source/boundary/handoff, and a read-only `nextAction` when ready.
 Goldfish/Critic validate but never execute onboarding; Elephant executes the
 returned action at its declared boundary. Resolve role before preflight:
 conflicting or unknown carriers stop — Critic is closed, never Elephant.
+
+For `pipeline-governance-inactive`, ask the human once whether this project
+should use the Pipeline. Only after an affirmative answer, execute the exact
+read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+subsequent consent and mutations. A decline leaves the project inactive.
 
 Status `plugin-attestation-required` is a closed hard recovery, never the
 soft `plugin-refresh-required` advisory. For Codex, accept it only with
@@ -39,21 +44,10 @@ asking the PO, accepts only its exact expected result, then reruns the identical
 `plugin-attestation-required`, or any other non-ready status stops bootstrap.
 Goldfish and Critic never perform this mutation and remain blocked for Elephant
 recovery. Never reconstruct the argv or add a source path from conversation.
-For Claude, an exact directory-marketplace registration whose selected plugin
-root is the loaded root is a direct local-development source and needs no
-receipt. A gitless Claude cache or copied marketplace tree cannot recover its
-clean Git source from the registry, so it returns
-`plugin-attestation-required` with `nextAction: null`. Follow the shipped
-`references/local-plugin-attestation.md` recovery guidance from the clean source
-checkout; never treat the marketplace copy as provenance authority or infer a
-source path from conversation. Rerun bootstrap afterward.
-For Antigravity, the repository installer writes the same receipt before it
-registers a copied marketplace tree. Every gitless loaded Antigravity root needs
-one exact path-registry binding plus the verified receipt. A missing, ambiguous,
-or mismatched binding, or a legacy copied registration with no installer locator,
-returns `plugin-attestation-required` with `nextAction: null`: stop and rerun
-`install-agy.mjs` from the source checkout. The source path cannot be recovered
-safely from Antigravity's path-only registry and must not be guessed.
+For a Claude or Antigravity `plugin-attestation-required` result with no
+`nextAction`, stop and load `references/local-plugin-attestation.md`; recover
+from a verified source checkout, never a guessed source path or gitless copy.
+Rerun preflight after the documented recovery.
 
 Print only after a ready result:
 
@@ -67,72 +61,18 @@ A canon pointer here (`roles/`, `guardrails/`, `templates/prompts/`,
 
 ## Scratch space
 
-For any temporary file (probe script, held note, throwaway fixture) use the
-repository's own `scratch/` directory: inside the project root, permitted by
-the containment guard without an exception, and exempt from the dev-plan gate
-in every phase — including `draft`, which is the phase a fresh project starts
-in and where a write there used to be refused. The onboarding-readiness check
-(`GUARD-LIFECYCLE-NOT-READY`) admits it too while a session sits at
-`intake-required` or `intake-design-questions-required` — the two statuses a
-fresh project passes through before onboarding completes, where a scratch
-write used to be refused with no route named forward. Never a host-temp path —
-the guard refuses a write outside the project root; do not fall back to
-guessing one when a write is refused. Never `.git/` either:
-`.git/agent-pipeline/**` is pipeline-owned private state, not agent scratch.
-A session needing disciplined cleanup (bind at start, release at close,
-retire a crashed session's orphan on a later bootstrap) uses
-`bindScratchDescriptor`/`releaseScratchDescriptor`/`retireOrphanScratchDescriptors`
-in `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`; an ad hoc file
-needing no lifecycle can be written directly under `scratch/`.
-
-Onboarding writes a `.gitignore` ignoring `/scratch/`, `/evidence/`, and
-`/project/pipeline-state.json` when the project has none. A project that
-already owns one is never touched — add those three entries yourself if you
-want these files kept out of history. `/evidence/` matters beyond tidiness:
-`security-scan.mjs` refuses a dirty working tree, so leaving the evidence
-artifacts tracked makes the security gate unsatisfiable.
-
-**Directory contract, beyond scratch (ADR-0063):** where anything ELSE new
-belongs — a durable evidence artifact, a spec package, a decision record —
-is governed by `docs/adr/0063-repository-directory-contract.md`'s
-directory-kinds table, not invented per session. Condensed: normative canon
-stays in its existing location (`docs/`, `roles/`, `guardrails/`,
-`policies/`); decision records live in `docs/adr/`; specifications live in
-`specs/<feature-id>/` (ADR-0045); evidence a gate or backlog
-`closure_evidence` field actually cites lives in `backlog/evidence/` or
-`specs/*/evidence/` (tracked); machine-regenerated evidence lives in the
-ignored root `evidence/`; agent-authored temporary material lives in the
-ignored `scratch/` above; plugin-owned private runtime state lives under
-`.git/agent-pipeline/**` and declared `.claude/` paths. Never invent a new
-top-level directory for a kind this table already names a home for.
+Use only the repository's `scratch/` for temporary files in every lifecycle
+phase, including intake. Do not use host temp or `.git/` as agent scratch; a
+scratch refusal needs typed recovery. For cleanup-bound files, ignored evidence,
+or any new durable directory, load `references/scratch-and-directory.md`.
 
 ## Normal bootstrap command sequence
 
 ### One onboarding consent, not a chain of prompts
 
-Private Critic export has a separate bounded setup decision: use the installed
-`scripts/critic-export-consent.mjs --help` contract when preparing it. Disclose the
-physical project, declared provider/runner/service, approved source/evidence roots,
-and excluded secrets/authentication/caches/transcripts/unrelated files once.
-Record only the actual decision reference and digest against the displayed plan
-digest. Normal candidate and evidence changes inside that scope reuse consent;
-check and disclose exact paths/digests on each invocation without another PO gate.
-For the shipped native host, call `invokeCodexNativeCriticHost` from
-`scripts/codex-native-critic-host.mjs` with a closed `exportContext` containing
-`provider`, `service`, `hostGate`, `providerGate`, and `observedEndpoint` (`null` if unknown).
-Declare provider `OpenAI` or `openai` explicitly, matching the saved grant's label
-exactly; other providers do not select this host's OpenAI route.
-Use the explicitly declared selected OpenAI/Codex service and observed external
-gate values (`not-observed|approved|additional-check-required|denied`). The host
-checks the saved physical-project decision and normalizes its physically bound
-source/evidence records before any candidate-bearing child; retain the returned
-`exportConsent` disclosure with execution evidence. A `consent-unavailable`
-failure names the detailed consent reason and proves no child was created.
-Never substitute a source-project grant or a scratch coordinator for this path.
-Changed project, recipient or scope needs an amendment; revocation stops reuse.
-The saved decision is attribution, never host approval. Preserve denied or
-additional-check-required host status, never infer an endpoint from a model label,
-and never request Full Access as a prerequisite for this consent mechanism.
+Private Critic export requires a separate, project-bound consent decision before
+candidate-bearing child creation. Load `references/critic-export.md` when
+preparing it; never infer host approval from a saved consent or model label.
 
 When the user has directly agreed to use Agent Pipeline for this repository,
 consent authorizes the bounded local onboarding happy path: read-only plans
@@ -180,18 +120,11 @@ recommendation.
    prohibitions, freshness/update availability, handover/state and Verify
    availability. Machine-read full sources and emit digest-bound compact
    facts; never claim a skipped or cached check passed.
-   For a new session, also run the installed
-   `scripts/model-role-bootstrap.mjs --repo-root <absolute-repo> --runner <current-runner>`
-   for Codex or Claude. Antigravity uses the same command with
-   `--runner antigravity --host-session-id <id-from-this-session's-native-hook>`;
-   its CLI first checks the exact fresh hook lock and plugin version. This
-   probes only the installed runner, never demands the other two. A first or
-   changed mapping needs the displayed digest confirmed by the human in an
-   attended terminal; an already confirmed unchanged mapping is reused.
-   A missing or defective optional model-role source, approval, host
-   observation, identity, or receipt is reported as such: retain the existing
-   independently governed V3 route for that session, never silently promote a
-   new model or turn the entire ready bootstrap into a partial lifecycle.
+   In a new session run the optional model-role bootstrap for the installed
+   runner only: `references/model-role-codex-claude.md` for Codex/Claude or
+   `references/model-role-antigravity.md` for Antigravity. A changed
+   mapping needs an attended digest confirmation; absent optional evidence
+   keeps the existing governed V3 route and does not degrade lifecycle.
 3. **Boundary:** one simple shell command per tool call; never compose
    `&&`, `;`, redirects or pipelines except bounded, expansions-free
    `rg … | rg …`, `rg … | head -n 1..500`, or `rg … | tail -n 1..500`
@@ -243,20 +176,8 @@ recommendation.
 
 6. **Architecture orientation, never a bootstrap prerequisite:** consume the
    mandatory `architectureOrientation` readback in the ready preflight
-   envelope. It is runner-neutral and is produced by the same normal entry
-   point for Claude, Codex and Antigravity; do not replace it with a guess from
-   an `AGENTS.md` pointer. When its status is `adoption-required`, execute its
-   nested, read-only `nextAction` verbatim to obtain the staged proposal and
-   surface it to the PO. When it is `design-pending`, state that the physical
-   greenfield scaffold exists but is not an adopted baseline; finish initial
-   design before asking the PO for a scoped disposition. When it is
-   `decision-recorded`, read the declared architecture map and compiled
-   decision summary in the AGENTS re-entry order, then only concepts for the
-   touched modules. `unavailable` is an honest retry/diagnosis, never a claim
-   that a map exists. The orientation and proposal are not authority to write
-   a map or make a PO decision. The later implementation-authority boundary,
-   not bootstrap, refuses an unresolved, out-of-scope, or physically unready
-   architecture estate.
+   envelope. Follow `references/architecture-orientation.md` for its typed
+   status. The proposal is not authority to write a map or make a PO decision.
 
 7. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or
@@ -300,51 +221,10 @@ recommendation.
    URLs, credentials, secrets, or private identifiers. The validator rejects
    those forms rather than persisting them.
 
-   The same one guard-admitted argv shape above also accepts two further,
-   OPTIONAL top-level card keys — never a new flag: `materialInput`, an array
-   of the user's own material design input, one verbatim, unbounded,
-   possibly multi-line entry per chunk. This is additive: the existing
-   `intent`/`constraints`/`scope`/`questions` keys keep their shape, caps and
-   meaning exactly, and their "distilled statement, never a transcript" rule
-   is unaffected. That rule does NOT apply to `materialInput` — it is
-   explicitly exempt from the 4/4/3 short-string caps and the single-line/
-   480-byte limit, because a user-authored design document legitimately
-   contains fenced code, several paragraphs, or a quoted line. It is still
-   screened, like every other key, for credential, secret, host-path, URL and
-   private-identifier shapes; a chunk that fails this screen is refused and
-   nothing is persisted.
-
-   The same shape also accepts `values`, an object of already-answered
-   onboarding input (commit-author name and email, operator-facing language,
-   PO profile) captured before the restart barrier, so a session after the
-   mandatory restart finds them instead of asking twice. It is persisted into
-   the onboarding intake checkpoint, not into `project/resume-hint.json`, and
-   an already-answered value is never overwritten by a later capture — ask
-   once. `git config user.name`/`user.email` is still written only
-   immediately before the first commit, in this repository's local config
-   only, never sooner: only the SOURCE of that value changes, from
-   conversation memory to this persisted state, never the timing.
-
-   The MUST-DO consumption step above extends to both: at the start of the
-   next session, when `resume-hint.mjs inspect` reports them, the agent MUST
-   also read the persisted material-input chunks and the persisted answered
-   values in that same turn and incorporate them — never re-ask a value
-   already answered — with the same honesty duty on a failed or skipped read
-   and the same never-a-gate rule: this stays a consumption duty, never a
-   readiness precondition.
-
-   On resumed intake, checkpoint-origin material chunks are the original
-   product-material record: retain their bytes and capture order, do not
-   recapture an existing chunk merely to satisfy a tool ritual, and keep
-   answered onboarding values separate from product requirements. When only a
-   recovered summary is available while drafting, label it as a recovered
-   summary with its available source pointer; never manufacture a verbatim
-   `materialInput` chunk from that summary. If the requirements remain
-   uncertain, collect the specific missing confirmation together rather than
-   silently substituting settings as requirements. Follow the current returned
-   `nextAction` from onboarding inspection; do not add `pipeline-state inspect`
-   or an Operating Model hash as an unavailable pre-binding prerequisite.
-   State/authority orientation follows ready binding.
+   If the card contains verbatim `materialInput` or already-answered onboarding
+   `values`, read and use both at the next session start; never re-ask an
+   answered value. For their exact shapes, screens, and resumed-intake source
+   rules, load `references/resume-hint.md` before capture or consumption.
 
 7. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated
@@ -411,10 +291,27 @@ presented or a restart proposed.
 
 ## Typed lazy loading
 
-The happy path loads no reference file. Load only the exact condition:
+Load each reference only at its stated condition. A new-session model readback
+and a ready architecture readback each load their matching reference at that
+step; later implementation or Critic work loads its reference when reached:
 
 - `references/onboarding-recovery.md` for non-ready V4, restart, kickoff,
   private handoff or host-bound recovery;
+- `references/local-plugin-attestation.md` for Claude/Antigravity
+  `plugin-attestation-required` with no executable action;
+- `references/model-role-codex-claude.md` for Codex/Claude model readback,
+  or `references/model-role-antigravity.md` for Antigravity's own hook-bound
+  model readback;
+- `references/scratch-and-directory.md` for temporary-file cleanup, ignored
+  evidence or any new durable directory;
+- `references/critic-export.md` before private Critic export;
+- `references/resume-hint.md` before material-input capture or consumption;
+- `references/architecture-orientation.md` for the ready preflight's typed
+  architecture readback;
+- `references/implementation-continuation.md` before implementation dispatch
+  or Critic preparation;
+- `references/design-course.md` before first `submit-plan` for an `epic` or
+  `feature`, and again when `inspect` requests a design-workflow package;
 - `references/private-overlay.md` for private overlay, cleanup or
   project-authority privatization;
 - `references/roles.md` for Goldfish/Critic role-specific prohibitions;
@@ -444,9 +341,8 @@ The happy path loads no reference file. Load only the exact condition:
 - `references/antigravity-feature-close.md` when an Antigravity session is
   actually closing an approved feature, not for a normal restart.
 
-No happy-path reference is mandatory. Lazy loading never widens authority and
-must preserve lifecycle, V3 authority, calibration, handover, Verify and
-continuation checks.
+Lazy loading never widens authority and must preserve lifecycle, V3 authority,
+calibration, handover, Verify and continuation checks.
 
 ## Gate authority and autonomous continuation
 
@@ -458,69 +354,13 @@ Once bootstrap is ready and the required plan gate is recorded, continue the
 approved implementation autonomously: scoped edits, focused tests, state
 readback, one-line commits, Verify, Critic preparation, execution and ordinary block
 continuation are agent work. A standing approval is not a fresh human touch.
-**"Agent work" here means Goldfish-dispatched work, starting with the very
-first implementation edit of the plan — not this Elephant session writing
-the diff itself.** Implementation work under an `epic`- or `feature`-profile
-plan is dispatched to a Goldfish subagent (via the Agent/Task tool,
-optionally fanned out with the Workflow tool) rather than written directly
-by this session; a `mini`-profile plan is the sole exception and may be
-implemented directly. Build the dispatch briefing from
-`templates/prompts/goldfish-task.md` (never freehand); for the Workflow-tool
-variant, see `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`
-for its additive
-requirements. This is a followed instruction, not a technically
-guard-enforced rule — no guard blocks or detects a non-dispatched write, so
-skipping the dispatch right here produces no refusal to catch it: get this
-right by reading this paragraph now, not by expecting a later guard to stop
-a miss.
-Before sealing a model-bearing native dispatch packet, run the installed
-`scripts/model-role-dispatch-select.mjs --repo-root <absolute-repo> --runner <current-runner> --task-route <registered-route>`.
-For Antigravity, append `--host-session-id <id-from-this-session's-native-hook>`.
-Use the declared `profile.<profile>.<phase>` or `duty.<duty>` route from the
-registered source; the role is task-derived, never guessed from model names.
-`ready` selects the exact returned `modelId`/effort; `legacy-v3` explicitly
-keeps the returned `v3Route.selector` and `v3Route.effort` from the validated
-V3 cell. Copy that selector and effort into the native packet before sealing;
-do not leave the model blank or silently inherit the Elephant's model. A
-missing identity, policy, observation or defective optional model-role
-receipt or derived role source yields a visible diagnostic and this exact V3
-fallback, never a partial lifecycle or an unapproved new model.
-`unavailable` is reserved for an invalid V3 source or a task with no admitted
-V3 route; it stops only that
-dispatch, never the whole otherwise-ready session. Do not derive a new model from its name or
-probe an uninstalled runner. The selected model must enter the packet before
-its digest is sealed; changing it in a host after sealing is not a recovery.
-Before constructing a native Antigravity `invoke_subagent` request that
-includes any Pipeline role, load
-`references/antigravity-native-dispatch.md`. Its preparation route is required
-independently of Workflow and worktree choices.
-A feature's implementation is not complete until a Critic review
-(`critic-review` skill) has been dispatched against it and returned a
-result — pass, or a documented fail-then-fix cycle; this is a requirement to
-satisfy before treating the block as done, not an optional or ambient step.
-This duty applies in consuming user projects too: after the applicable plan and
-deterministic gates, the Elephant prepares and validates the bounded review
-input, starts the supported Critic route, monitors it, reads its actual result,
-and continues authorized disposition and repair. Do not add a Pipeline PO
-approval or obligatory user terminal step for ordinary Critic execution. Use
-the host's normal execution-permission mechanism when needed; do not invent a
-Pipeline PO gate from it. Actual host/security denials or unavailable execution
-must be reported, never bypassed or treated as a completed review. These
-instructions do not guarantee host execution capability. Review admission,
-isolation, correction/review budgets and expressly defined PO gates still apply.
-The Workflow tool and the Agent tool's own fan-out capability are
-Elephant-only — never delegate them to a fork or `general-purpose` subagent,
-which inherit the full parent toolset unlike the tool-scoped
-`goldfish-*`/`critic` roles; see `references/workflow-dispatch.md` before
-using either.
-
-A recorded PRD/Spec approval is an execution mandate for its accepted scope.
-Choose implementation details, sequencing, bounded recovery, test fixes and
-internal alternatives without asking again; record material choices and
-return results for acceptance. Ask only where alternatives materially change
-accepted scope, acceptance criteria, priority, risk, cost, an external or
-irreversible consequence, or a configured decision/acceptance gate. Never
-turn routine uncertainty or several options into a series of PO approvals.
+**Agent work under `epic` or `feature` starts with Goldfish dispatch from the
+first implementation edit; the Elephant does not write that diff.** `mini` is
+the sole direct-implementation exception. A completed feature requires a
+returned `critic-review` result. Load `references/implementation-continuation.md`
+before dispatch or Critic preparation for the model route, sealed packet,
+review and autonomous-continuation contracts. A recorded PRD/Spec approval
+mandates its accepted scope; routine work needs no fresh PO approval.
 
 Ask the human only for a configured decision gate, required final acceptance,
 an irreversible or externally consequential action, or a typed hard block

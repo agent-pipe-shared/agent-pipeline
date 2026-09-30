@@ -42,7 +42,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
+import { inspectGitHookSourceSnapshot, publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
 function decorateInstalledImpl(content, pluginLibDir) {
   const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/pre-push-hook\/runtime-([a-f0-9]{64}))\/lib$/);
@@ -577,7 +577,17 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
         detail: "existing hook, implementation, or install marker was modified after this installer wrote it",
       };
     }
-    const current = installedArtifactsMatch({ hookPath, commonDir, pluginLibDir, record: markerRecord });
+    let current = recordedPluginLibDir === pluginLibDir;
+    if (!current) {
+      // The installed implementation points at an immutable runtime snapshot,
+      // while callers present the source plugin path. Compare its exact
+      // content digest without publishing or mutating anything during plan.
+      const match = recordedPluginLibDir.replaceAll("\\", "/").match(/\/runtime-([a-f0-9]{64})\/lib$/u);
+      if (match) {
+        try { current = inspectGitHookSourceSnapshot({ pluginLibDir }).manifestSha256 === match[1]; }
+        catch { current = false; }
+      }
+    }
     return {
       status: "ready-to-upgrade",
       hookPath,
@@ -687,9 +697,16 @@ if (isDirectInvocation(import.meta.url)) {
   const [verb] = process.argv.slice(2);
   const rootDir = process.cwd();
   if (verb === "--install") {
-    const result = applyInstall({ rootDir });
-    console.log(JSON.stringify(result, null, 2));
-    process.exit(result.status === "installed" ? 0 : 1);
+    try {
+      const result = applyInstall({ rootDir });
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(result.status === "installed" ? 0 : 1);
+    } catch (error) {
+      const code = typeof error?.code === "string" && /^GHS-[A-Z-]+$/.test(error.code)
+        ? error.code : "PREPUSH-INSTALL-UNAVAILABLE";
+      console.log(JSON.stringify({ status: "refused", code }));
+      process.exit(1);
+    }
   } else if (verb === "--remove") {
     const result = applyRemoval({ rootDir });
     console.log(JSON.stringify(result, null, 2));

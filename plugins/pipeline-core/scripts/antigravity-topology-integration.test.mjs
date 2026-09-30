@@ -32,7 +32,13 @@ function fixture(t){
 test('actual inactive/declined scope precedes plugin/runtime callbacks; unrelated instructions and registration never activate',t=>{
  const f=fixture(t);writeFileSync(join(f.work,'AGENTS.md'),'unrelated instructions');
  let called=0;const options={env:{ANTIGRAVITY_AGENT:'1'},cwd:f.work,observeGovernanceScopeFn:f.scope,read:()=>{called++;throw Error('must not read');},pluginList:()=>{called++;throw Error('must not enumerate');},observeAntigravityLoadedTopologyFn:()=>{called++;throw Error('must not inspect distribution');}};
- let r=observePipelineStartPreflight(options);assert.equal(r.status,'pipeline-governance-inactive');assert.equal(r.pipelineWorkPerformed,false);assert.equal(called,0);assert.equal(pipelineStartPreflightExitCode(r),0);assert.equal(freshnessHostActionForPreflight(r),null);assert.equal(r.nextAction.kind,'opt-in-hint');
+ let r=observePipelineStartPreflight(options);assert.equal(r.status,'pipeline-governance-inactive');assert.equal(r.pipelineWorkPerformed,false);assert.equal(called,0);assert.equal(pipelineStartPreflightExitCode(r),0);assert.equal(freshnessHostActionForPreflight(r),null);assert.equal(r.nextAction.kind,'command');assert.equal(r.nextAction.executable,process.execPath);assert.match(r.nextAction.argv[0],/onboarding-init\.mjs$/u);assert.deepEqual(r.nextAction.argv.slice(-4),['--root',f.work,'--runner','antigravity']);
+ for(const [signal,runner] of [[{CLAUDECODE:'1'},'claude'],[{CODEX_THREAD_ID:'fixture'},'codex']]){
+  const inactive=observePipelineStartPreflight({...options,env:signal});
+  assert.equal(inactive.status,'pipeline-governance-inactive');
+  assert.deepEqual(inactive.nextAction.argv.slice(-4),['--root',f.work,'--runner',runner]);
+  assert.equal(inactive.nextAction.mutation,false);
+ }
  f.enroll('decline');r=observePipelineStartPreflight(options);assert.equal(r.status,'pipeline-governance-declined');assert.equal(r.nextAction,null);assert.equal(called,0);assert(!existsSync(join(f.work,'scratch')));assert(!existsSync(join(f.work,'.git')));
 });
 test('malformed or unverifiable active scope is blocked rather than silently inactive',t=>{

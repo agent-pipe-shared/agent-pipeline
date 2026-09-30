@@ -13,7 +13,7 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "initial-answers-tx-"));
   mkdirSync(join(root, "private"));
-  const targets = ["source", "machine", "receipt"].map((role) => ({
+  const targets = ["source", "machine", "receipt", "manifest"].map((role) => ({
     role, path: join(root, `${role}.json`), postBytes: Buffer.from(`${role}-new\n`), postMode: 0o600,
   }));
   writeFileSync(targets[0].path, "source-old\n");
@@ -25,19 +25,19 @@ test("a journal binds exact bytes, then a matching completion is replay-safe", (
   try {
     assert.equal(readInitialAnswersJournal(input), null);
     const started = beginInitialAnswersJournal(input);
-    assert.equal(started.entries.length, 3);
+    assert.equal(started.entries.length, 4);
     assert.equal(existsSync(input.markerPath), true);
     const writes = [];
     const publish = (role, path, bytes, mode) => { writes.push(role); writeFileSync(path, bytes); chmodSync(path, mode); };
     assert.deepEqual(completeInitialAnswersJournal({ ...input, publish }), { status: "completed" });
-    assert.deepEqual(writes, ["source", "machine", "receipt"]);
+    assert.deepEqual(writes, ["source", "machine", "receipt", "manifest"]);
     assert.equal(existsSync(input.markerPath), false);
     for (const target of input.targets) assert.deepEqual(readFileSync(target.path), target.postBytes);
   } finally { rmSync(input.root, { recursive: true, force: true }); }
 });
 
 test("an interruption after each publication resumes only exact bound postimages", () => {
-  for (const cutAfter of [1, 2, 3]) {
+  for (const cutAfter of [1, 2, 3, 4]) {
     const input = fixture();
     try {
       beginInitialAnswersJournal(input);
@@ -54,7 +54,7 @@ test("an interruption after each publication resumes only exact bound postimages
         resumed.push(role);
         writeFileSync(path, bytes);
         chmodSync(path, mode);
-      } }), { status: cutAfter === 3 ? "replayed" : "completed" });
+      } }), { status: cutAfter === 4 ? "replayed" : "completed" });
       assert.deepEqual(resumed, input.targets.slice(cutAfter).map((target) => target.role));
       assert.equal(existsSync(input.markerPath), false);
     } finally { rmSync(input.root, { recursive: true, force: true }); }
@@ -122,6 +122,33 @@ test("a later-language journal binds its purpose and repository capability", () 
       writeFileSync(path, bytes);
       chmodSync(path, mode);
     } }), { status: "completed" });
+  } finally { rmSync(input.root, { recursive: true, force: true }); }
+});
+
+test("a three-target marker from the prior plugin is completed only with an explicit manifest migration", () => {
+  const input = fixture();
+  try {
+    beginInitialAnswersJournal(input);
+    const value = JSON.parse(readFileSync(input.markerPath, "utf8"));
+    value.entries.pop();
+    writeFileSync(input.markerPath, `${JSON.stringify(value)}\n`);
+    const publish = (_role, path, bytes, mode) => { writeFileSync(path, bytes); chmodSync(path, mode); };
+    assert.throws(() => completeInitialAnswersJournal({ ...input, publish }), /LEGACY-RECOVERY-REQUIRED/u);
+    assert.equal(existsSync(input.markerPath), true);
+    let attempts = 0;
+    assert.throws(() => completeInitialAnswersJournal({ ...input, publish, completeLegacy() {
+      attempts += 1;
+      throw new Error("simulated legacy migration stop");
+    } }), /simulated legacy migration stop/u);
+    assert.equal(existsSync(input.markerPath), true);
+    const result = completeInitialAnswersJournal({ ...input, publish, completeLegacy() {
+      attempts += 1;
+      publish("manifest", input.targets[3].path, input.targets[3].postBytes, input.targets[3].postMode);
+    } });
+    assert.deepEqual(result, { status: "replayed", legacy: true });
+    assert.equal(attempts, 2);
+    assert.equal(existsSync(input.markerPath), false);
+    assert.deepEqual(readFileSync(input.targets[3].path), input.targets[3].postBytes);
   } finally { rmSync(input.root, { recursive: true, force: true }); }
 });
 
@@ -203,6 +230,6 @@ test("an orphaned partial temporary without a marker never blocks a new journal"
   try {
     writeFileSync(`${input.markerPath}.tmp-${"a".repeat(32)}`, "interrupted pre-publication bytes");
     assert.equal(readInitialAnswersJournal(input), null);
-    assert.equal(beginInitialAnswersJournal(input).entries.length, 3);
+    assert.equal(beginInitialAnswersJournal(input).entries.length, 4);
   } finally { rmSync(input.root, { recursive: true, force: true }); }
 });

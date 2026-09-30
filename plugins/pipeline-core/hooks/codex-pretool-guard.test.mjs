@@ -1134,7 +1134,7 @@ function nonReadyLifecycleFixture() {
   return root;
 }
 
-check("Codex adapter refuses a passive inventory pipeline against an arbitrary host path", () => {
+check("Codex adapter refuses recursive inventory of an external directory", () => {
   const root = nonReadyLifecycleFixture();
   const outside = mkdtempSync(join(tmpdir(), "codex-pretool-read-outside-"));
   try {
@@ -1145,7 +1145,6 @@ check("Codex adapter refuses a passive inventory pipeline against an arbitrary h
     }, root);
     const output = decision(result);
     assert.equal(output.permissionDecision, "deny");
-    assert.match(output.permissionDecisionReason, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });

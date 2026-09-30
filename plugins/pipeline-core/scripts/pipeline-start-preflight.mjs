@@ -1075,7 +1075,16 @@ export function observePipelineStartPreflight({
       governanceScope: validScope ? governanceScope : null,
       pipelineWorkPerformed: false,
       nextAction: state === "inactive" && governanceScope.hintAllowed
-        ? { kind: "opt-in-hint", mutation: false, requiresConfirmation: false, message: "Agent-Pipeline is inactive in this repository. Start onboarding explicitly if you want this project governed." }
+        ? {
+            kind: "command",
+            executable: process.execPath,
+            argv: [resolve(dirname(fileURLToPath(scriptUrl)), "onboarding-init.mjs"), "--root", resolve(cwd), "--runner", resolveActiveRunner({ env, read })],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary: "host",
+            expected: { schema: "pipeline.onboarding-init.v1" },
+            guidance: "Ask once whether the project should use Agent-Pipeline. Run this read-only onboarding entry only after affirmative consent; it collects the remaining answers before any mutation.",
+          }
         : null,
     };
   }

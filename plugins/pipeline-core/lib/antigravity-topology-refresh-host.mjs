@@ -5,7 +5,7 @@ import {mkdirSync,lstatSync,realpathSync,openSync,closeSync,writeFileSync,fsyncS
 import {join,dirname,resolve,isAbsolute} from 'node:path';
 import {homedir} from 'node:os';
 import {randomUUID} from 'node:crypto';
-import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256} from './antigravity-plugin-topology.mjs';
+import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion} from './antigravity-plugin-topology.mjs';
 import {rewriteAntigravityJsonBytes} from './antigravity-json-spans.mjs';
 import {createHash} from 'node:crypto';
 const NAME='agent-pipeline-core';
@@ -90,7 +90,7 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
  const args={configRoot,workspaceRoot,approvedSourceRoot},plans=new WeakMap();let active=false;
  const host={prepare(){
   try{
-   const version=invoke(['--version']);if(version?.status!=='ok'||version.version!=='1.2.12')throw Error('ATR-CLI-CAPABILITY');
+   const version=invoke(['--version']);if(version?.status!=='ok'||!supportsAntigravityPluginCliVersion(version.version))throw Error('ATR-CLI-CAPABILITY');
    const observation=observeAntigravityPluginTopology(args);
    if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable'||Object.values(observation.registries).some(r=>r.status==='unavailable'))throw Error('ATR-TOPOLOGY-UNVERIFIABLE');
    const hooks=wiring(observation,configRoot,workspaceRoot),copy=observation.managed.candidates[0];
@@ -114,7 +114,7 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
  },refresh(){
   if(active)return {status:'refused',reason:'ATR-REENTRANT'};active=true;const completed=[];let changed=false;
   try{
-   const version=invoke(['--version']);if(version?.status!=='ok'||version.version!=='1.2.12')throw Error('ATR-CLI-CAPABILITY');
+   const version=invoke(['--version']);if(version?.status!=='ok'||!supportsAntigravityPluginCliVersion(version.version))throw Error('ATR-CLI-CAPABILITY');
    let observation=observeAntigravityPluginTopology(args);
    if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable'||Object.values(observation.registries).some(r=>r.status==='unavailable'))throw Error('ATR-TOPOLOGY-UNVERIFIABLE');
    const source=observation.source,managed=observation.managed.candidates,imports=observation.importState.entries;

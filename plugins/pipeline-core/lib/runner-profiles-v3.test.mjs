@@ -198,10 +198,10 @@ const cases = [
       properties: { consent: { enum: ["approved", "declined"] } },
     });
   }],
-  ["missing advisor export consent remains valid and leaves advisory enabled by default", () => {
+  ["missing advisor export consent remains valid and leaves advisory disabled", () => {
     const checked = validatePipelineUserV3(completeIntent());
     assert.equal(checked.ok, true);
-    assert.deepEqual(checked.advisoryExport, { consent: "missing", enabled: true });
+    assert.deepEqual(checked.advisoryExport, { consent: "missing", enabled: false });
   }],
   ["declined advisor export consent resolves advisory disabled", () => {
     const value = completeIntent(); value.advisor_export = { consent: "declined" };
@@ -209,7 +209,7 @@ const cases = [
     assert.equal(checked.ok, true);
     assert.deepEqual(checked.advisoryExport, { consent: "declined", enabled: false });
   }],
-  ["approved advisor export consent remains compatible with the enabled default", () => {
+  ["approved advisor export consent enables advisory explicitly", () => {
     const value = completeIntent(); value.advisor_export = { consent: "approved" };
     const checked = validatePipelineUserV3(value);
     assert.equal(checked.ok, true);

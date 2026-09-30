@@ -17,7 +17,7 @@ const digest = (value) => createHash("sha256").update(value, "utf8").digest("hex
 const fail = (code) => ({ ok: false, code });
 
 function runGit(root, args, input = undefined) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", input });
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
   if (result.error || result.status !== 0) throw new Error(`QUALITY-PACKAGE-GIT-${args[0]}`);
   return result.stdout;
 }
@@ -25,7 +25,7 @@ function runGit(root, args, input = undefined) {
 function safeRepositoryPath(value) {
   if (typeof value !== "string" || value.length === 0 || /[\u0000-\u001f\\]/u.test(value) || value.startsWith("/") || /^[A-Za-z]:/u.test(value)) return false;
   const parts = value.split("/");
-  return parts.every((part) => part !== "" && part !== "." && part !== "..") && !parts[0].startsWith(".git");
+  return parts.every((part) => part !== "" && part !== "." && part !== "..") && parts[0] !== ".git";
 }
 
 function packagePayload(record) {
@@ -64,7 +64,7 @@ function stagedPackageMatches(root, record, paths) {
     for (const path of paths) {
       const indexEntry = runGit(root, ["ls-files", "-s", "--", path]).trim();
       if (!/^100(?:644|755)\s+[0-9a-f]{40,64}\s+0\t/u.test(indexEntry)) return false;
-      const result = spawnSync("git", ["show", `:${path}`], { cwd: root, encoding: null });
+      const result = spawnSync("git", ["show", `:${path}`], { cwd: root, encoding: null, maxBuffer: 64 * 1024 * 1024 });
       if (result.error || result.status !== 0 || createHash("sha256").update(result.stdout).digest("hex") !== record.expectedDigests[path]) return false;
     }
     return true;

@@ -407,7 +407,7 @@ function invokeEnrollmentRetirement(command,{root,scopeKey,barrierSha256,by}){
  const result=JSON.parse(execFileSync(process.execPath,[ENROLLMENT_WRITER,command,'--root',root,'--scope-key',scopeKey,'--barrier-sha256',barrierSha256,'--by',by],{encoding:'utf8',maxBuffer:4194304,stdio:['ignore','pipe','pipe']}));
  if(result.schema!=='pipeline.enrollment-retirement-result.v1')fail('GS-RETIREMENT-RESULT');return result;
 }
-export function readGovernanceEnrollmentRetirement({rootDir}){
+export function readGovernanceEnrollmentRetirement({rootDir,exec=execFileSync}){
  const ctx=physicalContext(rootDir);
  if(ctx.hostControlIdentity){
   let retained;try{retained=enrollmentHistory(ctx);}catch{fail('GS-HOST-MANAGED-RETAINED-HISTORY');}
@@ -421,7 +421,11 @@ export function readGovernanceEnrollmentRetirement({rootDir}){
   if(scope.state==='unverifiable-active')fail(scope.diagnostics[0]??'GS-NONGIT-RETAINED-HISTORY');
   if(scope.state==='active')return null;if(noGitEnrollmentHistory(ctx.root))fail('GS-NONGIT-RETAINED-HISTORY');return null;
  }
- const result=JSON.parse(execFileSync(process.execPath,[ENROLLMENT_WRITER,'inspect-enrollment-retirement','--root',rootDir],{encoding:'utf8',maxBuffer:4194304,stdio:['ignore','pipe','pipe']}));
+ const output=exec(process.execPath,[ENROLLMENT_WRITER,'inspect-enrollment-retirement','--root',rootDir],{encoding:'utf8',maxBuffer:4194304,stdio:['ignore','pipe','pipe']});
+ // A successful child launch with no bytes is a host readback failure, not
+ // evidence that the retirement journal is absent or safe to bypass.
+ if(typeof output!=='string'||output.trim()==='')fail('GS-RETIREMENT-READBACK-EMPTY');
+ let result;try{result=JSON.parse(output);}catch{fail('GS-RETIREMENT-READBACK-INVALID');}
  if(result.schema!=='pipeline.enrollment-retirement-inspection.v1')fail('GS-RETIREMENT-INSPECTION');return result.journal;
 }
 export const withGovernanceRetirementScopeLock=(options,operation)=>defaultController.withRetirementScopeLock(options,operation);

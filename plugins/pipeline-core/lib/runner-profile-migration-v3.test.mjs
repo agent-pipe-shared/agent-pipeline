@@ -1700,19 +1700,19 @@ record("the shipped v1 seed converts directly to V3 without a persistent V2 inte
 // runtime initialization in this module. While both were written from separate
 // literals, adding the gate chapter to the neutral seed alone silently split
 // the two tiers: a reader resolving the legacy tier saw no gates at all.
-function freshlyOnboardedRoot() {
+function freshlyOnboardedRoot(runner = "claude") {
   const root = mkdtempSync(join(tmpdir(), "runner-profile-v3-fresh-"));
   try {
-    const portable = planProjectOnboardingV3({ rootDir: root, runner: "claude" });
+    const portable = planProjectOnboardingV3({ rootDir: root, runner });
     assert.equal(portable.status, "ready", "fresh onboarding must plan");
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: root, activate: true }).status, "applied");
-    const runtime = planProjectOnboardingLifecycleV4({ rootDir: root, operation: "runtime", runner: "claude" });
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: root, operation: "runtime", runner });
     assert.equal(runtime.status, "runtime-initialization-required");
     const argv = runtime.nextAction?.argv ?? [];
     const initialized = applyProjectOnboardingLifecycleV4({
       rootDir: root,
       operation: "runtime",
-      runner: "claude",
+      runner,
       planSha256: argv[argv.indexOf("--plan-sha256") + 1],
       activate: true,
     });
@@ -1774,7 +1774,46 @@ record("a customised existing manifest is never replaced by the fresh seed", () 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 54, "the complete runner profile migration corpus must be registered before execution begins");
+record("fresh single-runner projects project only enabled native targets, including after runtime apply", () => {
+  for (const runner of ["claude", "antigravity"]) {
+    const root = freshlyOnboardedRoot(runner);
+    try {
+      const source = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+      assert.deepEqual(source.runners, { enabled: [runner], default: runner });
+      assert.equal(existsSync(join(root, ".codex")), false, `${runner} must not receive Codex files`);
+      const after = planRunnerProfileMigrationV3({ rootDir: root });
+      assert.equal(after.status, "noop", `${runner} must be current after runtime apply`);
+      assert.equal(after.decisionConflicts.length, 0, `${runner} must not owe Codex model decisions`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  const codex = mkdtempSync(join(tmpdir(), "runner-profile-v3-fresh-codex-"));
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: codex, runner: "codex" });
+    assert.equal(seed.status, "ready");
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: codex, activate: true }).status, "applied");
+    const source = parseYaml(readFileSync(join(codex, "pipeline.user.yaml"), "utf8"));
+    assert.deepEqual(source.runners, { enabled: ["codex"], default: "codex" });
+    const runtime = planRunnerProfileMigrationV3({ rootDir: codex, initializeMissingRuntimeForSlimV3: true, overlayCalibration: false });
+    assert.equal(runtime.status, "ready");
+    assert.ok(runtime.targets.some((target) => target.path === ".codex/agents/consult-advisor.toml"));
+  } finally { rmSync(codex, { recursive: true, force: true }); }
+});
+
+record("a Claude project can explicitly enable Codex after its initial runner-only seed", () => {
+  const root = freshlyOnboardedRoot();
+  try {
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const before = readFileSync(sourcePath, "utf8");
+    const after = before.replace('enabled:\n    - "claude"\n', 'enabled:\n    - "claude"\n    - "codex"\n');
+    assert.notEqual(after, before);
+    writeFileSync(sourcePath, after);
+    const runtime = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true, overlayCalibration: false });
+    assert.equal(runtime.status, "ready");
+    assert.ok(runtime.targets.some((target) => target.path === ".codex/agents/consult-advisor.toml"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 56, "the complete runner profile migration corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

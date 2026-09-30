@@ -12,6 +12,7 @@
 // subcommand, an unrecognized flag, and a flag used where the grammar forbids it.
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -122,6 +123,29 @@ function commitGlobalHumanApproval(root, mode) {
   const committed = git("commit", "-q", "-m", "configure global human approval");
   assert.equal(committed.status, 0, committed.stderr);
 }
+
+test("project-onboarding-v3 accepts a digest-bound existing project file without a scratch copy", () => {
+  const dir = neutralGitFixture("intake-reference");
+  try {
+    const material = "Projektziel: Amon Sûl.\r\nSicher und schnell starten.\n";
+    writeFileSync(join(dir, "requirements.md"), material);
+    const digest = createHash("sha256").update(Buffer.from(material, "utf8")).digest("hex");
+    const argv = ["intake-consent-apply", "--root", dir, "--granted", "--git-author-name", "PO",
+      "--git-author-email", "po@example.invalid", "--language", "de", "--profile", "feature",
+      "--text-file", "requirements.md", "--text-file-sha256", digest, "--activate", "--runner", "claude"];
+    const mismatch = invoke(argv.map((value) => value === digest ? "0".repeat(64) : value));
+    assert.equal(mismatch.status, 2, mismatch.output);
+    assert.match(mismatch.output, /INTAKE-CAPTURE-TEXT-FILE-DIGEST-MISMATCH/u);
+    const captured = invoke(argv);
+    assert.equal(captured.status, 0, captured.output);
+    const checkpoint = JSON.parse(captured.output).checkpoint;
+    assert.equal(checkpoint.materialInput[0].sha256, digest);
+    const unsupported = invoke(["intake-capture-apply", "--root", dir,
+      "--text-turn-ref", "host:current-user-turn", "--activate", "--runner", "claude"]);
+    assert.equal(unsupported.status, 2, unsupported.output);
+    assert.match(unsupported.output, /INTAKE-CHAT-TURN-CAPTURE-UNAVAILABLE/u);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
 
 test("project-onboarding-v3 CLI: generated intake cannot bypass its acknowledgement before bootstrap binding", () => {
   const dir = neutralGitFixture("bootstrap-bind-e2e");

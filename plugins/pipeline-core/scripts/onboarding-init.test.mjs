@@ -29,14 +29,35 @@ import test, { after } from "node:test";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_STEP_CAP, SCHEMA, applyInitialOnboardingAnswers, applyTrustAnchorBootstrap, driveOnboardingInit } from "./onboarding-init.mjs";
+import { DEFAULT_STEP_CAP, SCHEMA, applyInitialOnboardingAnswers, applyTrustAnchorBootstrap, driveOnboardingInit, main } from "./onboarding-init.mjs";
+import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
 import { projectConfirmedIntakeLanguage } from "../lib/onboarding-later-language.mjs";
 import { readMachinePlane } from "../lib/machine-plane.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
 import { applyProjectOnboardingLifecycleV4, planProjectOnboardingLifecycleV4 } from "../lib/project-onboarding-v3.mjs";
+import "./bootstrap-trust-recovery.test.mjs";
 
 const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
+
+test("a failed first-anchor action returns an attended digest-bound recovery command", () => {
+  let output = "";
+  const root = join(tmpdir(), "onboarding-recovery-fixture");
+  const destination = join(tmpdir(), "onboarding-recovery-key");
+  const code = main(["--root", root, "--runner", "claude", "--trust-anchor-mode", "new",
+    "--trust-anchor-directory", destination, "--trust-anchor-human-name", "PO",
+    "--trust-anchor-existing-key", "none"], {
+    write: (value) => { output += value; },
+    applyTrustAnchor: () => ({ ok: false, code: "TRUST-ANCHOR-SETUP-UNAVAILABLE" }),
+    drive: () => { throw new Error("failed anchor must stop the driver"); },
+  });
+  assert.equal(code, 1);
+  const result = JSON.parse(output);
+  assert.equal(result.recovery.code, "BTR-EXTERNAL-ATTENDED-RECOVERY");
+  assert.deepEqual(result.recovery.argv.slice(1), ["plan", "--root", root, "--mode", "new",
+    "--directory", destination, "--human-name", "PO", "--existing-key", "none"]);
+});
 
 function freshRoot() {
   return mkdtempSync(join(tmpdir(), "onboarding-init-test-"));
@@ -146,8 +167,11 @@ async function runMatrix(group) {
   // A bounded process pool lets synchronous CLI walks overlap without sharing roots or
   // test fixtures. Each child runs exactly one named cell and reports its own failure.
   const cells = MATRIX_CASES[group];
-  for (let offset = 0; offset < cells.length; offset += 3) {
-    const settled = await Promise.allSettled(cells.slice(offset, offset + 3).map((cell) => runMatrixCell(group, cell)));
+  // Each matrix cell runs a nested test process plus many Git/Node child calls.
+  // Two concurrent cells retain overlap without exhausting transient host spawn
+  // capacity on WSL and Windows runners.
+  for (let offset = 0; offset < cells.length; offset += 2) {
+    const settled = await Promise.allSettled(cells.slice(offset, offset + 2).map((cell) => runMatrixCell(group, cell)));
     const failures = settled.filter((result) => result.status === "rejected").map((result) => result.reason.message);
     assert.deepEqual(failures, [], failures.join("\n"));
   }
@@ -359,6 +383,7 @@ test("a later explicit intake language override is reported by the real CLI", ()
     assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.values.language, "de");
     assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_facing:\s*"de"/u);
     assert.equal(readMachinePlane({ homedirFn: () => home }).plane.language, "de");
+    assert.equal(parseYaml(readFileSync(join(root, "project", "pipeline.yaml"), "utf8")).language.human_facing, "de");
     const receipt = JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json"), "utf8"));
     assert.equal(receipt.language, "en");
   } finally {
@@ -379,7 +404,7 @@ test("host-managed initial answers publish privately and never write reserved Gi
     const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
     assert.equal(first.outcome, "pending-asks");
     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
     const sourcePath = join(root, "pipeline.user.yaml");
     const sourceBefore = readFileSync(sourcePath);
     const missingIdentity = applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env, pushApproval: "chat", language: "de" });
@@ -389,6 +414,7 @@ test("host-managed initial answers publish privately and never write reserved Gi
       gitAuthorEmail: "host@example.invalid", pushApproval: "chat", language: "de" };
     const applied = applyInitialOnboardingAnswers(answers);
     assert.equal(applied.code, "INITIAL-ANSWERS-APPLIED", JSON.stringify(applied));
+    assert.match(readFileSync(join(root, "project", "pipeline.yaml"), "utf8"), /human_facing: de/u);
     const state = resolveInitialAnswersState(root, "host-managed");
     assert.equal(JSON.parse(readFileSync(state.receipt, "utf8")).gitAuthorName, "Host User");
     assert.equal(existsSync(state.pending), false);
@@ -418,7 +444,7 @@ test("host-managed first stop asks identity, approval and language before intake
     assert.equal(first.outcome, "pending-asks");
     assert.equal(first.pendingAsks.length, 1);
     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
   } finally {
     dispose(root);
@@ -455,6 +481,7 @@ test("host-managed consent CLI routes its later explicit language into private i
     const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: "host-managed" });
     assert.equal(checkpoint.value.values.language, "de");
     assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_facing:\s*"de"/u);
+    assert.match(readFileSync(join(root, "project", "pipeline.yaml"), "utf8"), /human_facing: de/u);
     assert.equal(readMachinePlane({ homedirFn: () => home }).plane.language, "de");
     const sourceAfter = readFileSync(join(root, "pipeline.user.yaml"));
     const machineAfter = readFileSync(join(home, ".agent-pipeline", "machine.json"));
@@ -586,8 +613,38 @@ test("later-language recovery refuses foreign edits without publishing an audit"
   } finally { dispose(root); dispose(home); }
 });
 
+test("later-language projection completes a prior three-target journal after plugin upgrade", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+    assert.equal(applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env,
+      gitAuthorName: "Upgrade User", gitAuthorEmail: "upgrade@example.invalid",
+      pushApproval: "chat", language: "en" }).code, "INITIAL-ANSWERS-APPLIED");
+    applyOnboardingIntakeConsent({ rootDir: root, repositoryCapability: "host-managed",
+      granted: true, language: "de", profile: "mini", activate: true });
+    const args = { rootDir: root, repositoryCapability: "host-managed", runner: "codex",
+      deps: { homedir: () => home } };
+    assert.throws(() => projectConfirmedIntakeLanguage({ ...args, afterPublication(role) {
+      if (role === "source") throw new Error("simulated old-plugin stop");
+    } }), /simulated old-plugin stop/u);
+    const pendingPath = join(root, ".claude", ".runtime", "agent-pipeline", "onboarding", "language-projection-pending.json");
+    const pending = JSON.parse(readFileSync(pendingPath, "utf8"));
+    pending.entries.pop();
+    writeFileSync(pendingPath, `${JSON.stringify(pending)}\n`);
+    assert.equal(projectConfirmedIntakeLanguage(args).status, "completed");
+    assert.equal(existsSync(pendingPath), false);
+    assert.equal(parseYaml(readFileSync(join(root, "project", "pipeline.yaml"), "utf8")).language.human_facing, "de");
+  } finally { dispose(root); dispose(home); }
+});
+
 test("host-managed first answers recover after every publication boundary", () => {
-  for (const stoppedRole of ["source", "machine", "receipt"]) {
+  for (const stoppedRole of ["source", "machine", "receipt", "manifest"]) {
     const root = freshRoot();
     const home = freshHome();
     try {
@@ -613,6 +670,32 @@ test("host-managed first answers recover after every publication boundary", () =
       assert.deepEqual(readdirSync(join(root, ".codex")), []);
     } finally { dispose(root); dispose(home); }
   }
+});
+
+test("host-managed first answers complete a prior three-target journal after plugin upgrade", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+    const answers = { rootDir: root, runner: "codex", env, gitAuthorName: "Upgrade PO",
+      gitAuthorEmail: "upgrade@example.invalid", pushApproval: "chat", language: "de" };
+    const stopped = applyInitialOnboardingAnswers({ ...answers, afterInitialPublication(role) {
+      if (role === "source") throw new Error("simulated old-plugin stop");
+    } });
+    assert.equal(stopped.code, "INITIAL-ANSWERS-TRANSACTION-RECOVERY-REQUIRED");
+    const state = resolveInitialAnswersState(root, "host-managed");
+    const pending = JSON.parse(readFileSync(state.pending, "utf8"));
+    pending.entries.pop();
+    writeFileSync(state.pending, `${JSON.stringify(pending)}\n`);
+    assert.equal(applyInitialOnboardingAnswers(answers).code, "INITIAL-ANSWERS-APPLIED");
+    assert.equal(existsSync(state.pending), false);
+    assert.equal(parseYaml(readFileSync(join(root, "project", "pipeline.yaml"), "utf8")).language.human_facing, "de");
+  } finally { dispose(root); dispose(home); }
 });
 
 test("host-managed recovery refuses changed answers and foreign post-interruption bytes", () => {
@@ -673,7 +756,7 @@ function checkApprovalCell(selectedCell) {
       assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
       const initialAsk = first.pendingAsks[0];
-      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"],
+      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"],
         `${runner}/${pushApproval}: initial action must confirm identity, shared approval mode and language together`);
       assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
         `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
@@ -681,6 +764,7 @@ function checkApprovalCell(selectedCell) {
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield Anchor PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-anchor@example.invalid"],
         ["<signature|chat>", pushApproval],
+        ["<approved|declined>", "approved"],
         ["<de|en>", "de"],
       ]);
       const argv = initialAsk.applyAction.argv.map((value) => replacements.get(value) ?? value);
@@ -694,11 +778,16 @@ function checkApprovalCell(selectedCell) {
       assert.equal(applied.status, 0, `${runner}: ${applied.stderr}\n${applied.stdout}`);
       assert.doesNotMatch(applied.stdout, /PRIVATE KEY|BEGIN [A-Z ]+KEY/u, `${runner}: no key bytes reach driver JSON`);
       const result = JSON.parse(applied.stdout);
+      if (result.outcome === "pending-asks") {
+        assert.equal(result.final?.nextAction?.pendingAsks, undefined,
+          "the CLI prints sibling asks once while the library retains its full result");
+      }
       assert.deepEqual(result.initialAnswers, {
         ok: true,
         code: "INITIAL-ANSWERS-APPLIED",
         pushApprovalPreference: pushApproval,
         language: "de",
+        advisorExportConsent: "approved",
         trustAnchor: "not-requested",
       });
       assertPinnedRunner(result, runner, `${runner}/post-bootstrap`);
@@ -710,6 +799,12 @@ function checkApprovalCell(selectedCell) {
       assert.equal(held.gitAuthorName, "Greenfield Anchor PO");
       assert.equal(held.gitAuthorEmail, "greenfield-anchor@example.invalid");
       assert.equal(held.language, "de");
+      assert.equal(held.advisorExportConsent, "approved");
+      const confirmedIntent = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+      assert.equal(confirmedIntent.language.human_facing, "de", "confirmed PO language is projected before intake");
+      assert.equal(parseYaml(readFileSync(join(root, "project", "pipeline.yaml"), "utf8")).language.human_facing,
+        "de", "confirmed PO language keeps the active manifest coherent");
+      assert.equal(confirmedIntent.advisor_export.consent, "approved", "Advisor export is attributed to this exact initial answer");
       assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).status, "absent",
         `${runner}: first-round answers must not manufacture intake consent`);
       const effectivePlane = JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8"));
@@ -718,7 +813,7 @@ function checkApprovalCell(selectedCell) {
       const confirmedReceiptBytes = readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json"));
       const confirmedSourceBytes = readFileSync(join(root, "pipeline.user.yaml"));
       const replay = applyInitialOnboardingAnswers({
-        rootDir: root, runner, env, pushApproval, language: "de",
+        rootDir: root, runner, env, pushApproval, language: "de", advisorExportConsent: "approved",
         gitAuthorName: held.gitAuthorName, gitAuthorEmail: held.gitAuthorEmail,
         runGit: (...args) => { gitCalls.push(args); throw new Error("initial answers must never invoke Git config"); },
       });
@@ -735,7 +830,7 @@ function checkApprovalCell(selectedCell) {
       ]) {
         writeFileSync(planePath, `${JSON.stringify({ ...JSON.parse(planeBytes.toString("utf8")), ...drift }, null, 2)}\n`);
         const driftedReplay = applyInitialOnboardingAnswers({
-          rootDir: root, runner, env, pushApproval, language: "de",
+          rootDir: root, runner, env, pushApproval, language: "de", advisorExportConsent: "approved",
           gitAuthorName: held.gitAuthorName, gitAuthorEmail: held.gitAuthorEmail,
         });
         assert.equal(driftedReplay.code, "INITIAL-ANSWERS-MACHINE-DRIFT", `${runner}/${pushApproval}: ${JSON.stringify(drift)}`);
@@ -744,7 +839,7 @@ function checkApprovalCell(selectedCell) {
       }
       writeFileSync(planePath, planeBytes);
       const changedLanguage = applyInitialOnboardingAnswers({
-        rootDir: root, runner, env, pushApproval,
+        rootDir: root, runner, env, pushApproval, advisorExportConsent: "approved",
         language: "en", gitAuthorName: held.gitAuthorName, gitAuthorEmail: held.gitAuthorEmail,
       });
       assert.equal(changedLanguage.code, "INITIAL-ANSWERS-RECEIPT-CONFLICT");
@@ -783,12 +878,23 @@ function checkApprovalCell(selectedCell) {
       assert.ok(anchorAsk, `${runner}: signature reaches the separate trust-anchor action`);
       assert.equal(anchorAsk.applyAction.argv.includes("--push-approval"), false,
         `${runner}: signature anchor action is separate from initial push-mode selection`);
-      const anchored = spawnSync(anchorAsk.applyAction.executable, anchorAsk.applyAction.argv.map((value) => new Map([
+      const attendedArgv = anchorAsk.applyAction.argv.map((value) => new Map([
         ["<existing|new>", "existing"],
         ["<absolute external key directory>", destination],
         ["<human attribution>", "Greenfield Anchor PO"],
         ["<absolute existing key path|none>", existingKey],
-      ]).get(value) ?? value), {
+      ]).get(value) ?? value);
+      const attendedCommand = [anchorAsk.applyAction.executable, ...attendedArgv]
+        .map((value) => `'${value.replaceAll("'", "'\\''")}'`).join(" ");
+      assert.equal(isSanctionedLifecycleCommand(attendedCommand, root), true,
+        `${runner}: the emitted and answered anchor action must be admitted by the lifecycle guard`);
+      const invalidArgv = [...attendedArgv];
+      invalidArgv[invalidArgv.indexOf("--trust-anchor-existing-key") + 1] = "none";
+      const invalidCommand = [anchorAsk.applyAction.executable, ...invalidArgv]
+        .map((value) => `'${value.replaceAll("'", "'\\''")}'`).join(" ");
+      assert.equal(isSanctionedLifecycleCommand(invalidCommand, root), false,
+        `${runner}: existing + none is a different, invalid action and must remain refused`);
+      const anchored = spawnSync(anchorAsk.applyAction.executable, attendedArgv, {
         encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
       });
       assert.equal(anchored.status, 0, `${runner}: ${anchored.stderr}\n${anchored.stdout}`);
@@ -827,12 +933,14 @@ test("a failed separate signature-anchor action preserves the completed initial 
       "gitAuthorName",
       "gitAuthorEmail",
       "humanApprovalMode",
+      "advisorExportConsent",
       "language",
     ]);
     const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
       ["<PO_GIT_AUTHOR_NAME>", "Rollback PO"],
       ["<PO_GIT_AUTHOR_EMAIL>", "rollback@example.invalid"],
       ["<signature|chat>", "signature"],
+      ["<approved|declined>", "declined"],
       ["<de|en>", "en"],
     ]).get(value) ?? value), {
       encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
@@ -861,6 +969,8 @@ test("a failed separate signature-anchor action preserves the completed initial 
     assert.equal(initialAnswers.gitAuthorName, "Rollback PO");
     assert.equal(initialAnswers.gitAuthorEmail, "rollback@example.invalid");
     assert.equal(initialAnswers.language, "en");
+    assert.equal(initialAnswers.advisorExportConsent, "declined");
+    assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).advisor_export.consent, "declined");
     assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.name"], { encoding: "utf8" }).status, 1);
     assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.email"], { encoding: "utf8" }).status, 1);
     assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*push_approval:\s*"signature"\s*$/mu);
@@ -947,6 +1057,40 @@ test("new-key bootstrap omits an existing-key operand, requires durable pointer 
     });
     assert.equal(conflict.code, "TRUST-ANCHOR-REPOSITORY-CONFLICT");
     assert.equal(setupCalls, 1, "a differing established anchor fails before setup");
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("signature anchor reuses a key already at the canonical directory path without importing or replacing it", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  const directory = join(home, "existing-po-authority");
+  const source = join(home, "source-private.pem");
+  const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+  try {
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "claude", env }).outcome, "pending-asks");
+    const { privateKey } = generateKeyPairSync("ed25519");
+    writeFileSync(source, privateKey.export({ format: "pem", type: "pkcs8" }), { mode: 0o600 });
+    const setup = spawnSync(process.execPath, [
+      fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "setup",
+      "--repo-root", root, "--directory", directory, "--existing-key", source,
+      "--human-name", "Existing PO",
+    ], { encoding: "utf8", shell: false, env });
+    assert.equal(setup.status, 0, `${setup.stderr}\n${setup.stdout}`);
+    const canonicalKey = join(directory, "po-private.pem");
+    const suppliedKey = process.platform === "win32"
+      ? `${canonicalKey[0].toLowerCase()}${canonicalKey.slice(1)}`.replaceAll("\\", "/")
+      : canonicalKey;
+    const keyBytes = readFileSync(canonicalKey);
+    const applied = applyTrustAnchorBootstrap({
+      rootDir: root, mode: "existing", directory, humanName: "Existing PO",
+      existingKey: suppliedKey, env,
+    });
+    assert.deepEqual(applied, { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode: "existing" });
+    assert.deepEqual(readFileSync(canonicalKey), keyBytes, "reuse never copies or overwrites the private key");
+    assert.equal(JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8")).trustAnchors.length, 1);
   } finally {
     dispose(root);
     dispose(home);

@@ -101,6 +101,28 @@ test("quality package commit authorization binds the whole staged index and comm
   } finally { rmSync(item.root, { recursive: true, force: true }); }
 });
 
+test("commit authorization accepts .github content and staged files above the child-process default buffer", () => {
+  const item = fixture();
+  try {
+    mkdirSync(join(item.root, ".github", "workflows"), { recursive: true });
+    const workflow = "name: verify\n";
+    const large = `${"x".repeat(1_100_000)}\n`;
+    writeFileSync(join(item.root, ".github", "workflows", "verify.yml"), workflow);
+    writeFileSync(join(item.root, "large.txt"), large);
+    git(item.root, ["add", ".github/workflows/verify.yml", "large.txt"]);
+    const record = {
+      schema: SIGNED_QUALITY_PACKAGE_SCHEMA,
+      baseCommit: git(item.root, ["rev-parse", "HEAD"]),
+      unifiedDiff: execFileSync("git", ["diff", "--cached", "--binary", "HEAD"], { cwd: item.root, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }),
+      expectedDigests: { ".github/workflows/verify.yml": sha(workflow), "large.txt": sha(large) },
+    };
+    record.intentSha256 = qualityPackageIntentSha256(record);
+    const proof = proofFor(record, item);
+    assert.equal(authorizeQualityPackageCommit({ repoRoot: item.root, packageIntent: record, proof }).code, "QUALITY-PACKAGE-COMMIT-AUTHORIZED");
+    assert.equal(verifyQualityPackageCommitAuthorization({ repoRoot: item.root }).code, "QUALITY-PACKAGE-COMMIT-VERIFIED");
+  } finally { rmSync(item.root, { recursive: true, force: true }); }
+});
+
 test("quality package refuses symlinked package outputs and receipt-directory ancestors", () => {
   const item = fixture();
   const outside = mkdtempSync(join(tmpdir(), "signed-quality-package-outside-"));

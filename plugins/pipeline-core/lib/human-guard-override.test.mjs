@@ -211,6 +211,29 @@ function tamperPluginFile(plugin, relative, label) {
 // remains a normal HGO denial; the exact NOT-READY code is covered separately.
 const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL" }];
 
+test("M6 plan result adds a mode-specific nextAction without changing the persisted plan", () => {
+  for (const mode of ["chat", "signature"]) {
+    const root = fixtureHumanApproval({ humanApproval: mode });
+    try {
+      const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+      const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT,
+        toolName: "Write", toolInput: { file_path: "note.md", content: "bounded\n" },
+        denials: denial, nowMs: 1_000 });
+      const planned = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256, nowMs: 2_000, scriptPath });
+      assert.equal(planned.approvalMode, mode);
+      assert.equal(planned.nextAction.argv[0], scriptPath);
+      assert.equal(planned.nextAction.argv[1], mode === "chat" ? "prepare-authorization" : "prepare-for-signature");
+      assert.equal(planned.nextAction.argv.includes(request.requestSha256), true);
+      assert.equal(planned.prepareAuthorizationAction.argv[1], "prepare-authorization");
+      const repeated = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256, nowMs: 2_100, scriptPath });
+      assert.equal(repeated.planSha256, planned.planSha256);
+      assert.deepEqual(repeated.nextAction, planned.nextAction);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
 // NVA-HGOTEST-1: `prepareHumanGuardOverrideAuthorization()`, `authorizeHumanGuardOverride()`
 // and `authorizeHumanGuardOverrideBySignature()` re-derive the global-plugin-install plan
 // internally and carry NO `codexSpawn` seam of their own (unlike `recordHumanGuardDenial`,

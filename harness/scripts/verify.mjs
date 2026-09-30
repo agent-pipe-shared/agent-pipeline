@@ -845,6 +845,10 @@ const TEST_SUITES = [
   { name: "project-onboarding-v3-pre-push-hook-offer-tests", file: join(pluginScriptsDir, "project-onboarding-v3-pre-push-hook-offer.test.mjs") },
   { name: "onboarding-init-tests", file: join(pluginScriptsDir, "onboarding-init.test.mjs") },
   { name: "push-gate-satisfiability-tests", file: join(pluginScriptsDir, "push-gate-satisfiability.test.mjs") },
+  { name: "bootstrap-trust-recovery-tests", file: join(pluginScriptsDir, "bootstrap-trust-recovery.test.mjs") },
+  { name: "intake-material-reference-tests", file: join(libDir, "intake-material-reference.test.mjs") },
+  { name: "passive-read-policy-tests", file: join(libDir, "passive-read-policy.test.mjs") },
+  { name: "design-readiness-course-e2e-tests", file: join(pluginScriptsDir, "design-readiness-course.e2e.test.mjs") },
   { name: "chat-gate-ceremony-tests", file: join(libDir, "chat-gate-ceremony.test.mjs") },
   // NVA-A-060: both suites existed on disk but were never registered here, so the
   // gate reported green while neither ever ran. push-init.test.mjs covers the

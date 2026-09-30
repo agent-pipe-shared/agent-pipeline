@@ -32,8 +32,11 @@ export function resolveGitCommonDir(repository, dependencies = {}) {
   let result;
   try { result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: physical, encoding: "utf8", shell: false, timeout: 5000 }); }
   catch { return null; }
-  if (result?.status !== 0 || result?.error) return null;
   const raw = String(result.stdout ?? "").trim();
+  // Some sandboxed WSL hosts report EPERM on the completed child readback
+  // while preserving exit 0 and stdout. Accept only that exact observation.
+  if (result?.status !== 0 || (result?.error
+    && !(result.error.code === "EPERM" && result.status === 0 && raw !== ""))) return null;
   if (raw === "") return null;
   try {
     const common = realpathSync(isAbsolute(raw) ? raw : resolve(physical, raw));

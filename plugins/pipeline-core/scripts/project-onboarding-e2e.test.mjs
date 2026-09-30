@@ -1032,10 +1032,8 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         tool_name: "Bash",
         tool_input: { command: `rg --files -uu '${source}' | rg 'existing-private'` },
       }, { projectDir: path, runner });
-      assert.equal(externalInventory.exitCode, 2,
-        `${runner}: arbitrary host inventory reads stay outside the bounded read scope`);
-      assert.match(externalInventory.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u,
-        `${runner}: the external read must receive the precise scope denial`);
+      assert.equal(externalInventory.exitCode, 0,
+        `${runner}: closed passive host inventory reads remain available`);
       const projectInventory = evaluateLifecycleReadyGuard({
         tool_name: "Bash",
         tool_input: { command: "rg --files -uu . | rg 'pipeline-state'" },

@@ -91,7 +91,10 @@ test('broken physical Git control cannot be recast as non-Git enrollment',t=>{co
 });
 
 test('enrolled current Git root survives an unrelated removed registered worktree and can plan decline',t=>{
- const f=fixture(t,{git:true}),active=decide(f.controller,f.root,'enroll'),ghost=join(f.base,'removed-worktree');
+ const f=fixture(t,{git:true});
+ assert.throws(()=>readGovernanceEnrollmentRetirement({rootDir:f.root,exec:()=>''}),error=>error.code==='GS-RETIREMENT-READBACK-EMPTY');
+ assert.throws(()=>readGovernanceEnrollmentRetirement({rootDir:f.root,exec:()=>'{'}),error=>error.code==='GS-RETIREMENT-READBACK-INVALID');
+ const active=decide(f.controller,f.root,'enroll'),ghost=join(f.base,'removed-worktree');
  runGit(f.root,['worktree','add','--detach',ghost,'HEAD']);const config=readFileSync(join(f.root,'.git/config'),'utf8');rmSync(ghost,{recursive:true});
  const after=f.controller.observe({rootDir:f.root});assert.equal(after.state,'active');assert.equal(after.requiresEnforcement,true);assert.equal(after.root,active.root);assert.equal(after.scopeKey,active.scopeKey);assert.deepEqual(after.diagnostics,[]);assert.equal(readFileSync(join(f.root,'.git/config'),'utf8'),config);
  const plan=f.controller.planDecision({rootDir:f.root,decision:'decline',by:'Fixture'});assert.equal(plan.root,active.root);assert.equal(plan.scopeKey,active.scopeKey);assert.equal(plan.decision,'decline');assert.equal(readFileSync(join(f.root,'.git/config'),'utf8'),config);

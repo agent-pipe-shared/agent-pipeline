@@ -383,21 +383,24 @@ check("Antigravity run_command fails closed for a malformed explicit Cwd", () =>
   assert.match(res.reason, /project root is unavailable/);
 });
 
-check("Antigravity run_command refuses a relative passive read outside the selected project root", () => {
+check("Antigravity run_command admits a relative passive read outside the selected project root", () => {
   const firstWorkspace = cwdReadyRoot;
   const executedWorkspace = readyLifecycleFixture();
+  const reportRoot = mkdtempSync(join(tmpdir(), "agy-passive-report-"));
+  const reportPath = join(reportRoot, "greenfield-review.md");
+  writeFileSync(reportPath, "# report\n");
   try {
     const res = decision(run({
       workspacePaths: [firstWorkspace, executedWorkspace],
       toolCall: {
         name: "run_command",
-        args: { CommandLine: "cat ../outside.txt", Cwd: executedWorkspace },
+        args: { CommandLine: `cat ${reportPath}`, Cwd: executedWorkspace },
       },
     }, firstWorkspace, { hookCwd: firstWorkspace }));
-    assert.equal(res.decision, "deny");
-    assert.match(res.reason, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    assert.notEqual(res.decision, "deny");
   } finally {
     rmSync(executedWorkspace, { recursive: true, force: true });
+    rmSync(reportRoot, { recursive: true, force: true });
   }
 });
 rmSync(cwdReadyRoot, { recursive: true, force: true });

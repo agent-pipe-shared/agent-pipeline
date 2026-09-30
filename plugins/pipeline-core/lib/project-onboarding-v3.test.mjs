@@ -7311,7 +7311,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(planRunnerProfileMigrationV3({ rootDir: path }).status, "noop");
     const source = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
     assert.deepEqual(source.runners, { enabled: ["claude", "codex"], default: "codex" });
-    assert.equal(source.advisor_export.consent, "approved");
+    assert.equal(source.advisor_export.consent, "declined", "the seed cannot claim unasked export consent");
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
     // NVA-R33-SECGATEON (2026-08-29): `blocking` is now what is true, and the manifest
@@ -9001,6 +9001,14 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     ]);
     assert.equal(fresh.nextAction.applyAction.argv.includes("--text"), false,
       "the multiline-safe returned action uses exactly one of --text/--text-file");
+    assert.deepEqual(fresh.nextAction.existingFileApplyAction.argv, [
+      ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
+      "--git-author-name", "<PO_INTAKE_GIT_AUTHOR_NAME>",
+      "--git-author-email", "<PO_INTAKE_GIT_AUTHOR_EMAIL>",
+      "--language", "<PO_INTAKE_LANGUAGE>", "--profile", "<PO_INTAKE_PROFILE>",
+      "--text-file", "<existing-repository-file>", "--text-file-sha256", "<sha256-of-existing-file>",
+      "--activate", "--runner", "codex",
+    ]);
 
     // Consent recorded, no material captured yet: still intake-required, but
     // nextAction switches to intake-capture-apply.
@@ -9015,6 +9023,11 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
       "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", "codex",
     ]);
     assert.equal(afterConsent.nextAction.applyAction.argv.includes("--text"), false);
+    assert.deepEqual(afterConsent.nextAction.existingFileApplyAction.argv, [
+      ONBOARDING_SCRIPT, "intake-capture-apply", "--root", path,
+      "--text-file", "<existing-repository-file>", "--text-file-sha256", "<sha256-of-existing-file>",
+      "--activate", "--runner", "codex",
+    ]);
 
     // First material chunk captured: intake-design-questions-required,
     // nextAction asks for the one bundled design-question round.

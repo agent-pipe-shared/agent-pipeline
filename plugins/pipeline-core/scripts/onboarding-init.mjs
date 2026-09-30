@@ -96,6 +96,7 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmdirSync,
   unlinkSync,
@@ -140,8 +141,10 @@ export const DEFAULT_STEP_CAP = 50;
 
 const ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 const PO_HUMAN_APPROVAL_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url));
+const BOOTSTRAP_TRUST_RECOVERY_SCRIPT_PATH = fileURLToPath(new URL("./bootstrap-trust-recovery.mjs", import.meta.url));
 const TRUST_ANCHOR_MODES = new Set(["existing", "new"]);
 const PUSH_APPROVAL_MODES = new Set(["signature", "chat"]);
+const ADVISOR_EXPORT_CONSENT_MODES = new Set(["approved", "declined"]);
 const TRUST_ANCHOR_RECOVERY_SCHEMA = "pipeline.first-anchor-bootstrap-recovery.v1";
 const INITIAL_JOURNAL_FAILURES = new Map([
   ["INITIAL-ANSWERS-JOURNAL-ANSWER-CONFLICT", "INITIAL-ANSWERS-TRANSACTION-ANSWER-CONFLICT"],
@@ -154,7 +157,7 @@ function initialJournalFailure(error) {
 }
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat --language de|en] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat --language de|en --advisor-export-consent approved|declined] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
 }
 
 // The runner lane, pinned rather than inherited.
@@ -239,6 +242,11 @@ function parseArgs(argv) {
       if (value !== "de" && value !== "en") return { error: "--language requires de or en" };
       output.language = value;
       index += 1;
+    } else if (arg === "--advisor-export-consent") {
+      const value = argv[index + 1];
+      if (!ADVISOR_EXPORT_CONSENT_MODES.has(value)) return { error: "--advisor-export-consent requires approved or declined" };
+      output.advisorExportConsent = value;
+      index += 1;
     } else if (arg === "--help" || arg === "-h") {
       output.help = true;
     } else {
@@ -256,6 +264,8 @@ function parseArgs(argv) {
   }
   if (output.pushApproval !== undefined && output.language === undefined) return { error: "initial answers require --language" };
   if (output.language !== undefined && output.pushApproval === undefined) return { error: "--language requires --human-approval" };
+  if (output.advisorExportConsent !== undefined && output.pushApproval === undefined) return { error: "--advisor-export-consent requires --human-approval" };
+  if (output.pushApproval !== undefined && output.advisorExportConsent === undefined) return { error: "initial answers require --advisor-export-consent" };
   if (output.pushApproval !== undefined && !output.runner) return { error: "initial answers require an explicit --runner" };
   if (output.pushApproval !== undefined && output.stepCap !== undefined) return { error: "initial answers do not accept --step-cap" };
   if (output.pushApproval !== undefined && setupValues.some((value) => value !== undefined)) {
@@ -364,6 +374,21 @@ function removeOwnedPemImportDirectory(directory, { exists, lstat }) {
     for (const name of names) unlinkSync(join(directory, name));
     rmdirSync(directory);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+// A key already located at the canonical authority path is a reuse request, not
+// an import. Resolve physical identities so Windows drive-letter case and slash
+// spelling, as well as an alias to the same file, do not change this decision.
+function isCanonicalExistingKey(existingKey, targetDirectory) {
+  try {
+    const actual = realpathSync.native(existingKey);
+    const canonical = realpathSync.native(join(targetDirectory, "po-private.pem"));
+    return process.platform === "win32"
+      ? actual.toLowerCase() === canonical.toLowerCase()
+      : actual === canonical;
   } catch {
     return false;
   }
@@ -482,7 +507,9 @@ export function applyTrustAnchorBootstrap({
     "--directory", targetDirectory,
     "--human-name", humanName,
   ];
-  if (mode === "existing") setupArgs.push("--existing-key", resolve(existingKey));
+  if (mode === "existing" && !isCanonicalExistingKey(existingKey, targetDirectory)) {
+    setupArgs.push("--existing-key", resolve(existingKey));
+  }
   setupStarted = true;
   if (!recoveringNewAuthority) {
     const setup = runSetup(process.execPath, setupArgs, {
@@ -596,6 +623,7 @@ export function applyInitialOnboardingAnswers({
   gitAuthorEmail = null,
   pushApproval,
   language,
+  advisorExportConsent = "declined",
   trustAnchor = null,
   env = null,
   runGit = spawnSync,
@@ -607,6 +635,7 @@ export function applyInitialOnboardingAnswers({
   if (!RUNNERS.has(runner)) return { ok: false, code: "INITIAL-ANSWERS-RUNNER-INVALID" };
   if (!PUSH_APPROVAL_MODES.has(pushApproval)) return { ok: false, code: "INITIAL-ANSWERS-PUSH-APPROVAL-INVALID" };
   if (language !== "de" && language !== "en") return { ok: false, code: "INITIAL-ANSWERS-LANGUAGE-INVALID" };
+  if (!ADVISOR_EXPORT_CONSENT_MODES.has(advisorExportConsent)) return { ok: false, code: "INITIAL-ANSWERS-ADVISOR-CONSENT-INVALID" };
   if (trustAnchor !== null) return { ok: false, code: "INITIAL-ANSWERS-TRUST-ANCHOR-CONFLICT" };
   if (afterInitialPublication !== null && typeof afterInitialPublication !== "function") {
     return { ok: false, code: "INITIAL-ANSWERS-PUBLISH-HOOK-INVALID" };
@@ -618,6 +647,7 @@ export function applyInitialOnboardingAnswers({
   }
 
   const sourcePath = join(root, "pipeline.user.yaml");
+  const manifestPath = join(root, "project", "pipeline.yaml");
   let receiptPath = join(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH);
   let pendingPath = null;
   let hostManaged = false;
@@ -627,7 +657,7 @@ export function applyInitialOnboardingAnswers({
     ?? homedir();
   const machineDependencies = { homedirFn: () => home };
   const machinePath = machinePlaneFilePath(machineDependencies);
-  if (machinePath === null || !existsSync(sourcePath)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-MISSING" };
+  if (machinePath === null || !existsSync(sourcePath) || !existsSync(manifestPath)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-MISSING" };
   let priorIntake;
   try {
     const repository = observeCodexOnboardingCapabilities({ rootDir: root, intent: "onboarding" });
@@ -646,29 +676,45 @@ export function applyInitialOnboardingAnswers({
     return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-REQUIRED" };
   }
   const answerSha256 = createHash("sha256").update(JSON.stringify({
-    root, runner, gitAuthorName, gitAuthorEmail, pushApproval, language,
+    root, runner, gitAuthorName, gitAuthorEmail, pushApproval, language, advisorExportConsent,
   })).digest("hex");
   const transactionTargets = [
     { role: "source", path: sourcePath },
     { role: "machine", path: machinePath },
     { role: "receipt", path: receiptPath },
+    { role: "manifest", path: manifestPath },
   ];
   const publishHostEntry = (role, path, bytes, mode) => {
     if (role === "machine") writeMachinePlane(JSON.parse(bytes.toString("utf8")), machineDependencies);
     else atomicReplaceFile(path, bytes, mode);
     afterInitialPublication?.(role);
   };
+  const completeLegacyManifest = () => {
+    const before = fileSnapshot(manifestPath, { exists: existsSync, lstat: lstatSync, read: readFileSync });
+    if (!before?.present) throw new Error("INITIAL-ANSWERS-JOURNAL-LEGACY-MANIFEST-UNSAFE");
+    const source = before.bytes.toString("utf8");
+    let observed;
+    try { observed = parseYaml(source)?.language?.human_facing; }
+    catch { throw new Error("INITIAL-ANSWERS-JOURNAL-LEGACY-MANIFEST-INVALID"); }
+    if (observed === language) return;
+    if (observed !== "en" || [...source.matchAll(/^language:\r?\n[ ]+human_facing:\s*"?(?:de|en)"?\s*$/gmu)].length !== 1) {
+      throw new Error("INITIAL-ANSWERS-JOURNAL-LEGACY-MANIFEST-DRIFT");
+    }
+    const next = source.replace(/^(language:\r?\n[ ]+human_facing):\s*"?(?:de|en)"?\s*$/mu, `$1: ${language}`);
+    atomicReplaceFile(manifestPath, next, before.mode);
+    afterInitialPublication?.("manifest");
+  };
   if (hostManaged && existsSync(pendingPath)) {
     try {
       completeInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256,
-        targets: transactionTargets, publish: publishHostEntry });
+        targets: transactionTargets, publish: publishHostEntry, completeLegacy: completeLegacyManifest });
     } catch (error) { return initialJournalFailure(error); }
   }
   const intakeLanguage = priorIntake.status === "present" ? priorIntake.value.values.language : null;
   if (intakeLanguage !== null && intakeLanguage !== language) {
     return { ok: false, code: "INITIAL-ANSWERS-INTAKE-LANGUAGE-CONFLICT" };
   }
-  const snapshots = [sourcePath, machinePath, receiptPath]
+  const snapshots = [sourcePath, machinePath, receiptPath, manifestPath]
     .map((path) => fileSnapshot(path, { exists: existsSync, lstat: lstatSync, read: readFileSync }));
   if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-UNSAFE" };
   const rollback = (code) => {
@@ -681,9 +727,17 @@ export function applyInitialOnboardingAnswers({
   let sourceBytes;
   try { sourceBytes = readFileSync(sourcePath, "utf8"); }
   catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-UNREADABLE" }; }
+  let manifestBytes;
+  try { manifestBytes = readFileSync(manifestPath, "utf8"); }
+  catch { return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-UNREADABLE" }; }
+  const manifestLanguageLines = manifestBytes.match(/^language:\r?\n[ ]+human_facing:\s*(?:"?(?:de|en)"?)\s*$/gmu) ?? [];
+  if (manifestLanguageLines.length !== 1) return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-SHAPE-INVALID" };
   const pushApprovalLines = sourceBytes.match(/^\s*push_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
   const humanApprovalLines = sourceBytes.match(/^\s*human_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
-  if (pushApprovalLines.length !== 1 || humanApprovalLines.length > 1) {
+  const advisorConsentLines = sourceBytes.match(/^advisor_export:\r?\n[ ]+consent:\s*"(?:approved|declined)"\s*$/gmu) ?? [];
+  const humanLanguageLines = sourceBytes.match(/^language:\r?\n(?:[ ]+agent_facing:\s*"(?:de|en)"\r?\n)?[ ]+human_facing:\s*"(?:de|en)"\s*$/gmu) ?? [];
+  if (pushApprovalLines.length !== 1 || humanApprovalLines.length > 1 || advisorConsentLines.length !== 1
+    || humanLanguageLines.length !== 1) {
     return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" };
   }
   if (snapshots[2].present) {
@@ -693,6 +747,7 @@ export function applyInitialOnboardingAnswers({
     if (prior?.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
       || prior.root !== root || prior.runner !== runner
       || prior.pushApprovalPreference !== pushApproval
+      || prior.advisorExportConsent !== advisorExportConsent
       || prior.gitAuthorName !== gitAuthorName || prior.gitAuthorEmail !== gitAuthorEmail
       || (prior.language !== undefined && prior.language !== language)) {
       return { ok: false, code: "INITIAL-ANSWERS-RECEIPT-CONFLICT" };
@@ -701,7 +756,9 @@ export function applyInitialOnboardingAnswers({
       const selected = JSON.stringify(pushApproval);
       if (!pushApprovalLines[0].trim().endsWith(`: ${selected}`)
         || humanApprovalLines.length !== 1
-        || !humanApprovalLines[0].trim().endsWith(`: ${selected}`)) {
+        || !humanApprovalLines[0].trim().endsWith(`: ${selected}`)
+        || !advisorConsentLines[0].trim().endsWith(`: ${JSON.stringify(advisorExportConsent)}`)
+        || !humanLanguageLines[0].trim().endsWith(`: ${JSON.stringify(language)}`)) {
         return { ok: false, code: "INITIAL-ANSWERS-SOURCE-DRIFT" };
       }
       if (currentPlane.status !== "valid"
@@ -709,8 +766,14 @@ export function applyInitialOnboardingAnswers({
         || currentPlane.plane.language !== language) {
         return { ok: false, code: "INITIAL-ANSWERS-MACHINE-DRIFT" };
       }
+      let manifestLanguage;
+      try { manifestLanguage = parseYaml(manifestBytes)?.language?.human_facing; }
+      catch { return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-DRIFT" }; }
+      if (manifestLanguage !== language) {
+        return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-DRIFT" };
+      }
       return { ok: true, code: "INITIAL-ANSWERS-APPLIED", pushApprovalPreference: pushApproval,
-        language, trustAnchor: "not-requested" };
+        language, advisorExportConsent, trustAnchor: "not-requested" };
     }
   }
   let nextSource = sourceBytes.replace(
@@ -726,6 +789,18 @@ export function applyInitialOnboardingAnswers({
       /^(\s*)push_approval:\s*"(?:signature|chat)"\s*$/mu,
       `$1push_approval: ${JSON.stringify(pushApproval)}\n$1human_approval: ${JSON.stringify(pushApproval)}`,
     );
+  nextSource = nextSource.replace(
+    /^(advisor_export:\r?\n[ ]+consent):\s*"(?:approved|declined)"\s*$/mu,
+    `$1: ${JSON.stringify(advisorExportConsent)}`,
+  );
+  nextSource = nextSource.replace(
+    /^(language:\r?\n(?:[ ]+agent_facing:\s*"(?:de|en)"\r?\n)?[ ]+human_facing):\s*"(?:de|en)"\s*$/mu,
+    `$1: ${JSON.stringify(language)}`,
+  );
+  const nextManifest = manifestBytes.replace(
+    /^(language:\r?\n[ ]+human_facing):\s*"?(?:de|en)"?\s*$/mu,
+    `$1: ${language}`,
+  );
   let parsedSource;
   try { parsedSource = parseYaml(nextSource); }
   catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" }; }
@@ -748,6 +823,7 @@ export function applyInitialOnboardingAnswers({
     root,
     runner,
     pushApprovalPreference: pushApproval,
+    advisorExportConsent,
     language,
     gitAuthorName,
     gitAuthorEmail,
@@ -766,13 +842,15 @@ export function applyInitialOnboardingAnswers({
           expectedPre: { bytes: snapshots[1].bytes, mode: snapshots[1].mode } },
         { ...transactionTargets[2], postBytes: Buffer.from(nextReceipt), postMode: 0o600,
           expectedPre: { bytes: snapshots[2].bytes, mode: snapshots[2].mode } },
+        { ...transactionTargets[3], postBytes: Buffer.from(nextManifest), postMode: snapshots[3].mode,
+          expectedPre: { bytes: snapshots[3].bytes, mode: snapshots[3].mode } },
       ];
       beginInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256, targets });
       completeInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256,
         targets, publish: publishHostEntry });
     } catch (error) { return initialJournalFailure(error); }
     return { ok: true, code: "INITIAL-ANSWERS-APPLIED", pushApprovalPreference: pushApproval,
-      language, trustAnchor: "not-requested" };
+      language, advisorExportConsent, trustAnchor: "not-requested" };
   }
   try { atomicReplaceFile(sourcePath, nextSource, lstatSync(sourcePath).mode & 0o777); }
   catch { return rollback("INITIAL-ANSWERS-SOURCE-WRITE-FAILED"); }
@@ -783,6 +861,8 @@ export function applyInitialOnboardingAnswers({
   } catch {
     return rollback("INITIAL-ANSWERS-RECEIPT-WRITE-FAILED");
   }
+  try { atomicReplaceFile(manifestPath, nextManifest, snapshots[3].mode); }
+  catch { return rollback("INITIAL-ANSWERS-MANIFEST-WRITE-FAILED"); }
 
   let bootstrap = null;
   if (trustAnchor !== null) {
@@ -794,6 +874,7 @@ export function applyInitialOnboardingAnswers({
     code: "INITIAL-ANSWERS-APPLIED",
     pushApprovalPreference: pushApproval,
     language,
+    advisorExportConsent,
     trustAnchor: bootstrap?.code ?? "not-requested",
   };
 }
@@ -972,7 +1053,7 @@ function initialAnswersActionWithoutTrustAnchor(action) {
   return {
     ...action,
     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
-    guidance: `Collect this initial PO round: the repository-local Git author and shared human-approval policy${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval, and later intake consent reuses the confirmed language without asking again. A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
+    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval, and later intake consent reuses the confirmed language without asking again. A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
     applyAction: { ...action.applyAction, argv },
   };
 }
@@ -1385,6 +1466,7 @@ export function main(args = process.argv.slice(2), {
       gitAuthorEmail: options.gitAuthorEmail ?? null,
       pushApproval: options.pushApproval,
       language: options.language,
+      advisorExportConsent: options.advisorExportConsent,
       trustAnchor: options.trustAnchorMode ? {
         mode: options.trustAnchorMode,
         directory: options.trustAnchorDirectory,
@@ -1407,14 +1489,30 @@ export function main(args = process.argv.slice(2), {
       env,
     });
     if (!bootstrap.ok) {
-      write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", bootstrap }, null, 2)}\n`);
+      const recovery = {
+        kind: "external-operator",
+        code: "BTR-EXTERNAL-ATTENDED-RECOVERY",
+        executable: process.execPath,
+        argv: [BOOTSTRAP_TRUST_RECOVERY_SCRIPT_PATH, "plan", "--root", resolve(options.root),
+          "--mode", options.trustAnchorMode, "--directory", resolve(options.trustAnchorDirectory),
+          "--human-name", options.trustAnchorHumanName,
+          "--existing-key", options.trustAnchorExistingKey],
+        guidance: "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate.",
+      };
+      write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", bootstrap, recovery }, null, 2)}\n`);
       return 1;
     }
   }
   const result = drive({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap, env });
   if (bootstrap) result.bootstrap = bootstrap;
   if (initialAnswers) result.initialAnswers = initialAnswers;
-  write(`${JSON.stringify(result, null, 2)}\n`);
+  const printed = result.outcome === "pending-asks" && Array.isArray(result.pendingAsks)
+    && result.final?.nextAction && Array.isArray(result.final.nextAction.pendingAsks)
+    ? { ...result, final: { ...result.final,
+        nextAction: Object.fromEntries(Object.entries(result.final.nextAction)
+          .filter(([key]) => key !== "pendingAsks")) } }
+    : result;
+  write(`${JSON.stringify(printed)}\n`);
   return result.outcome === "ready"
     || result.outcome === "collect-input"
     || result.outcome === "external-operator"

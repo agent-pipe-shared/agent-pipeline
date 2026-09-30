@@ -230,6 +230,9 @@ test("wrong attended input explains the exact digest without publishing a confir
   assert.equal(f.rows.size, 0);
   assert.ok(output.some((text) => text.includes("input must match the exact 64-character digest")));
   assert.ok(output.some((text) => text.includes(`Expected digest: ${result.readback.readbackSha256}`)));
+  assert.ok(output.some((text) => text.includes("If this terminal closes before you see a result")));
+  assert.ok(output.some((text) => text.includes(result.attendedAction.text)));
+  assert.match(result.retryGuidance, /current displayed digest/u);
   assert.equal(result.fallback, "legacy-v3");
   assert.equal(modelRoleBootstrapExitCode(result), 0);
 });
@@ -237,12 +240,14 @@ test("wrong attended input explains the exact digest without publishing a confir
 test("exact attended input admits once and unchanged transport reuse preserves all seven receipts", async () => {
   const f = fixture();
   let questions = 0;
+  const output = [];
   const ready = await runModelRoleBootstrapTransport({ ...f.input, bootstrapOptions: f.input,
-    interactive: true, question: async (prompt) => {
+    interactive: true, write: (text) => output.push(text), question: async (prompt) => {
       questions += 1;
       return ` ${prompt.match(/[a-f0-9]{64}/u)[0]} `;
     } });
   assert.equal(ready.code, "MODEL-ROLE-BOOTSTRAP-READY");
+  assert.ok(output.some((text) => text.includes("MODEL-ROLE-BOOTSTRAP-REUSED confirms the recorded mapping")));
   const held = structuredClone(f.rows.get("session-1"));
   assert.equal(held.receipts.length, 7);
   const reused = await runModelRoleBootstrapTransport({ ...f.input, bootstrapOptions: f.input,
@@ -268,6 +273,7 @@ test("noninteractive guidance binds the observed session, current loaded script 
   assert.deepEqual(result.attendedAction.argv, [fileURLToPath(new URL("./model-role-bootstrap.mjs", import.meta.url)),
     "--repo-root", f.input.rootDir, "--runner", "codex", "--host-session-id", "observed-session-42"]);
   assert.ok(output.some((text) => text.includes(result.attendedAction.text)));
+  assert.match(result.retryGuidance, /READY means recorded, REUSED means already recorded/u);
   assert.ok(result.attendedAction.text.split("\n").every((line) => line.length <= 72));
   assert.equal(f.rows.size, 0);
   assert.equal(result.fallback, "legacy-v3");

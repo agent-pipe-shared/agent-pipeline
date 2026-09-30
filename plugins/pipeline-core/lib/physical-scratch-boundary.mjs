@@ -22,6 +22,20 @@ function contained(root, target, equal = false) {
   return (equal || rel !== '') && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
+function samePath(left, right) {
+  // path.relative uses the host's case-insensitive path rules on Windows.
+  return relative(left, right) === '';
+}
+
+function inPhysicalRoot(root, physicalRoot, input) {
+  const path = resolve(root, input);
+  // A native absolute path may use the caller's spelling of the repository
+  // root (including a different drive-letter case). Keep its components for
+  // the symlink walk, but anchor them at the physical repository root.
+  if (contained(root, path, true)) return resolve(physicalRoot, relative(root, path));
+  return path;
+}
+
 /**
  * Recognize inert scratch by physical identity, never by a filename suffix.
  * Callers must supply every active plugin/authority root, including an active
@@ -32,20 +46,22 @@ function contained(root, target, equal = false) {
  */
 export function isPhysicalScratchTarget(filePath, {
   rootDir, liveRoots = scratchLivePluginRoots(), allowScratchRoot = false,
-  lstat = lstatSync, realpath = realpathSync,
+  lstat = lstatSync, realpath = realpathSync.native ?? realpathSync,
 } = {}) {
   if (typeof rootDir !== 'string' || typeof filePath !== 'string' || !filePath
-    || filePath.includes('\0') || filePath.includes('\\')
-    || /^[A-Za-z]:/.test(filePath) || !Array.isArray(liveRoots)) return false;
+    || filePath.includes('\0') || !Array.isArray(liveRoots)
+    || (process.platform !== 'win32' && (filePath.includes('\\') || /^[A-Za-z]:/.test(filePath)))
+    || (process.platform === 'win32' && /^[A-Za-z]:(?![\\/])/.test(filePath))) return false;
   try {
-    const root = resolve(rootDir);
-    if (realpath(root) !== root || !lstat(root).isDirectory()) return false;
+    const entryRoot = resolve(rootDir);
+    if (!lstat(entryRoot).isDirectory()) return false;
+    const root = realpath(entryRoot);
     const scratch = resolve(root, 'scratch');
-    const target = resolve(root, filePath);
+    const target = inPhysicalRoot(entryRoot, root, filePath);
     if (!contained(scratch, target, allowScratchRoot)) return false;
     for (const liveRoot of liveRoots) {
       if (typeof liveRoot !== 'string' || !liveRoot) return false;
-      const declared = resolve(root, liveRoot);
+      const declared = inPhysicalRoot(entryRoot, root, liveRoot);
       let physical;
       try { physical = realpath(declared); }
       catch (error) { if (error?.code !== 'ENOENT') return false; physical = declared; }
@@ -58,7 +74,7 @@ export function isPhysicalScratchTarget(filePath, {
       let stat;
       try { stat = lstat(current); }
       catch (error) { return error?.code === 'ENOENT'; }
-      if (stat.isSymbolicLink() || realpath(current) !== current) return false;
+      if (stat.isSymbolicLink() || !samePath(realpath(current), current)) return false;
       if (index < components.length - 1 && !stat.isDirectory()) return false;
       if (!stat.isDirectory() && (!stat.isFile() || stat.nlink !== 1)) return false;
     }

@@ -188,19 +188,20 @@ new term for this case).
   a proposal whose only justification is human-adversary resistance is a
   SEC-10 violation to flag at design review or Critic review.
 
-## SEC-11 — Bash read-scope containment: project root plus exact resolved exceptions
+## SEC-11 — Passive reads of host-visible paths
 
-- The lifecycle guard's passive Bash lane permits a read target only inside the
-  project root or an exact, realpathed exception controlled by the runtime:
-  the loaded plugin root, the host-provided current transcript file, or that
-  transcript's derived `memory/` directory. It never grants a shared runner
-  session collection, an arbitrary host path, a guessed layout, or a
-  pattern-matched directory.
-- **Why:** session transcripts can contain data from other projects, private
-  user content, or credentials. A legitimate cross-session diagnostic must
-  therefore go through a dedicated project-filtering reader, not a generic
-  shell exception.
-- **Verification:** regression cases cover every admitted command family,
-  direct external paths, leading tildes, direct symlinks, symlink-plus-`..`
-  escapes, and sibling-session refusal. Decision history:
+- The lifecycle guard admits exact, existing regular files in user-visible
+  host paths outside the active repository. Names-only directory listing is
+  separately bounded. Recursive content search remains scoped and checks its
+  traversed inventory before admission; native Grep requires an exact file.
+  Filesystem permissions remain enforced by the host.
+- Both the machine and repository PO key-directory pointers, known credential
+  stores and files, system pseudo-files, and their physical symlink aliases
+  stay excluded. Invalid authority readback does not broaden the read lane.
+- The guard still rejects shell substitution, unsupported operators,
+  redirects that write output, execution through read commands, and all
+  cross-repository mutation without its configured authority.
+- **Verification:** regression cases cover a user-provided sibling Markdown
+  report, key and alias denials, and rejected mutation and command-composition
+  shapes. This PO-approved revision supersedes the earlier root-only draft in
   `docs/adr/draft-read-scope-containment-boundary.md`.

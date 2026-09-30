@@ -4,6 +4,7 @@ import { isPhysicalScratchTarget, isBoundedScratchOnlyWords } from "../lib/physi
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
 import { spawnSync } from "node:child_process";
+import { homedir } from "node:os";
 import {
   appendFileSync,
   existsSync,
@@ -66,13 +67,13 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 // here rather than writing a fourth independent copy of WSL/Windows path-identity logic
 // (see that module's own header for the three prior copies this consolidated).
 import { repositoryPathIdentityOrSelf } from "../lib/repository-path-identity.mjs";
-import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   consumeHumanGuardOverride,
   humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
+import { readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   DEVPLAN_SHELL_DENIAL_CODE,
   devPlanGateVerdict,
@@ -96,6 +97,7 @@ import {
   TESTPATH_SHELL_DENIAL_CODE,
 } from "../lib/protected-test-paths.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { isAllowedPassiveReadTarget } from "../lib/passive-read-policy.mjs";
 // NVA-BOOTRECEIPT-1: the identity chain and git-common-dir resolution are proven and
 // already keyed on the same agentId/private-state tree by guard-dispatch-budget.mjs --
 // reused here rather than copied, per that dispatch's own briefing.
@@ -103,6 +105,7 @@ import { resolveGitCommonDir, subagentIdentity } from "./guard-dispatch-budget.m
 import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 import {
   isBoundedReadOnlyPipeline,
+  isBoundedSingleRg,
   parseGuardCommand,
 } from "./guard-command-grammar.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -946,102 +949,32 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
   let repeatOverrideGuidance = "";
   if (consumed.status === "absent" || consumed.status === "replan") {
     let approvalMode = "signature";
-    const readModeFn = dependencies.readPushApprovalModeFn ?? readPushApprovalMode;
-    try { approvalMode = readModeFn(root)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+    try {
+      if ((dependencies.readHumanApprovalModeFn ?? readHumanApprovalMode)(root, { legacyKind: "push" })?.mode === "chat") approvalMode = "chat";
+    } catch { /* Keep the fail-closed signature posture. */ }
     try {
       const recordFn = dependencies.recordHumanGuardDenialFn ?? recordHumanGuardDenial;
       const planned = recordFn({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
       if (planned.status === "planned") {
         const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
-        // NVA-W12-COPYSAFE: every ceremony command line built through the shared
-        // renderer instead of a hand-assembled `${JSON.stringify(...)}` template
-        // (the exact "hand-assembled from prose" failure mode the backlog item
-        // names). A human fill-in slot like "<plan-sha256>" passes through
-        // placeholder() verbatim -- never shellWord()-quoted like a literal
-        // value, which is what the backlog item's mode targets. script/root are
-        // ALSO passed through placeholder() here, pre-rendered with
-        // JSON.stringify(), but since NVA-CF-TOFUFIX-adjacent copy-safe-command.mjs
-        // narrowing (placeholder() no longer renders a JSON.stringify()'d live
-        // path verbatim -- only a genuine "<...>" template slot) this now goes
-        // through the SAME shellWord() conditional quoting request-sha256 always
-        // used: an already-safe absolute path renders unquoted. The
-        // JSON.stringify() wrapping is harmless but no longer changes the
-        // rendered shape -- kept only so a future path containing a shell-special
-        // character still round-trips through shellWord() correctly.
-        // NVA-B-DENIALBOILER-1: every step below except sign-intent is labelled
-        // "in this session" (or, for chat mode, "the human confirms in-session") -- it runs
-        // through the SAME tool that produced this very denial, so that tool's dialect is
-        // determined, not guessed: the PowerShell tool renders PowerShell, anything else
-        // (including Edit/Write/NotebookEdit, which never runs a shell command itself but
-        // whose remediation still runs through this session's own Bash-equivalent tool)
-        // renders POSIX -- mirroring CLAUDE_BASH_SHELL_DIALECT_PLATFORM above ("Claude's Bash
-        // tool always executes through Git-Bash/POSIX, on every host including Windows").
-        // sign-intent runs OUTSIDE this session, on a human's own machine this
-        // code never observes -- no signal here determines its shell, so it alone keeps the
-        // full POSIX+PowerShell rendering (platform omitted below); this is deliberate and
-        // load-bearing, not an oversight (see scratch/strip-boilerplate.md's own stop
-        // condition for this exact case).
+        // Render only the request-bound plan action here. Its JSON supplies a
+        // mode-specific nextAction; the signature preparation result supplies
+        // the attended external sign-intent action and the in-session proof step.
         const inSessionPlatform = toolName === "PowerShell" ? "powershell" : "posix";
-        const ceremonyCommand = (label, subcommand, platform, ...extraArgv) =>
-          renderHumanCopySafeCommand({
-            label,
-            executable: process.execPath,
-            argv: [
-              placeholder(JSON.stringify(script)), subcommand, "--repo", placeholder(JSON.stringify(root)),
-              "--request-sha256", planned.requestSha256, ...extraArgv,
-            ],
-            platform,
-          });
-        const planCommand = ceremonyCommand("plan", "plan", inSessionPlatform);
-        const prepareAuthorizationChat = ceremonyCommand(
-          "prepare-authorization", "prepare-authorization", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
-        );
-        const authorizeChat = ceremonyCommand(
-          "authorize", "authorize", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
-          "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
-        );
-        const prepareAuthorizationSignature = ceremonyCommand(
-          "prepare-authorization", "prepare-authorization", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
-        );
-        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256>"));
-        // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand;
-        // this is the only step that crosses into the attended private-key boundary.
-        const signIntent = renderHumanCopySafeCommand({
-          label: "sign-intent",
+        const planCommand = renderHumanCopySafeCommand({
+          label: "plan",
           executable: process.execPath,
-          argv: [
-            placeholder(JSON.stringify(PO_HUMAN_APPROVAL_SCRIPT)), "sign-intent",
-            "--repo-root", placeholder(JSON.stringify(root)),
-            "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
-          ],
+          argv: [placeholder(JSON.stringify(script)), "plan", "--repo",
+            placeholder(JSON.stringify(root)), "--request-sha256", planned.requestSha256],
+          platform: inSessionPlatform,
         });
-        const authorizeBySignature = ceremonyCommand(
-          "authorize-by-signature", "authorize-by-signature", inSessionPlatform,
-          "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
-        );
-        // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
-        // mode -- mirrors guard-testpath.mjs's own continuation exactly in shape.
-        const continuation = approvalMode === "chat"
-          ? [
-            `Then (the human confirms in-session; this is attribution, not proof):`,
-            prepareAuthorizationChat.text,
-            authorizeChat.text,
-          ].join("\n")
-          : [
-            `Then, in this session (pure digest computation against data already in the ` +
-              `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-            prepareAuthorizationSignature.text,
-            emitSignatureDigest.text,
-            "Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above. sign-intent resolves the configured local approval directory itself, so the command contains no private path and needs no second apply step:",
-            signIntent.text,
-            "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
-            authorizeBySignature.text,
-          ].join("\n");
         overrideGuidance = [
           "",
           `Human override available for this exact ${subject} (one use; audited; the human confirms):`,
           planCommand.text,
-          continuation,
+          approvalMode === "chat"
+            ? "The plan JSON gives the mode-specific nextAction; follow each returned action. The human confirms in-session; chat is attribution, not proof."
+            : "The plan JSON gives the mode-specific nextAction; follow each returned action. The PO signs with a human-held Ed25519 key in an attended external terminal; this session only prepares digests and verifies the proof.",
           "",
         ].join("\n");
         // A repeated parser denial must stay directly actionable without dumping
@@ -1051,7 +984,7 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
           "",
           `Human override remains available for this exact ${subject}; run this exact next command:`,
           planCommand.text,
-          "The remaining mode-specific ceremony was printed on the earlier denial of this kind in this scope.",
+          "Follow the plan JSON's mode-specific nextAction and each action it returns.",
           "",
         ].join("\n");
       } else {
@@ -2388,39 +2321,17 @@ export function isRestartResumeHintInspect(command, root, options = {}) {
 // pipeline SOURCE never means a second, parallel copy of this rule -- NVA-CATPIPE-1 briefing
 // field 3, "reuse the SAME argv predicates the existing grep/head sinks already use".
 function isValidPipelineGrepArgs(argv) {
-  return !argv.some((arg) => arg === "--files-with-matches");
+  const safeFlags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count"]);
+  let index = 0;
+  while (safeFlags.has(argv[index])) index += 1;
+  const endedOptions = argv[index] === "--";
+  if (endedOptions) index += 1;
+  return index === argv.length - 1 && typeof argv[index] === "string" && argv[index] !== ""
+    && (endedOptions || !argv[index].startsWith("-"));
 }
 
 function isValidScopedPipelineGrepSourceArgs(argv, root, extraRoots) {
-  if (!isValidPipelineGrepArgs(argv)) return false;
-  const booleanShortFlags = new Set(["n", "r", "R", "i", "v", "E", "F", "G", "w", "x", "c", "l", "L", "q", "s", "H", "h", "o", "a", "I", "z", "b", "T", "Z"]);
-  const valueOptions = new Set([
-    "-e", "--regexp", "-f", "--file", "-m", "--max-count", "-A", "--after-context",
-    "-B", "--before-context", "-C", "--context", "--color", "--binary-files", "--directories",
-    "--exclude", "--exclude-from", "--include", "--label",
-  ]);
-  let patternSeen = false;
-  let afterDashDash = false;
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (!afterDashDash && arg === "--") { afterDashDash = true; continue; }
-    if (!afterDashDash && arg.startsWith("-")) {
-      if (valueOptions.has(arg)) {
-        const value = argv[index + 1];
-        if (typeof value !== "string" || value === "" || value.startsWith("-")) return false;
-        if (["-f", "--file", "--exclude-from"].includes(arg)
-          && !isApprovedSingleCommandReadArg(value, root, extraRoots)) return false;
-        if (["-e", "--regexp"].includes(arg)) patternSeen = true;
-        index += 1;
-        continue;
-      }
-      if (arg.length < 2 || [...arg.slice(1)].some((flag) => !booleanShortFlags.has(flag))) return false;
-      continue;
-    }
-    if (!patternSeen) { patternSeen = true; continue; }
-    if (!isApprovedSingleCommandReadArg(arg, root, extraRoots)) return false;
-  }
-  return patternSeen;
+  return isSafeExactGrepArgs(argv, root);
 }
 
 // Shared by every bounded-pipeline SINK ending in `head`: the exact two-token `-n N` shape
@@ -2637,29 +2548,10 @@ function rawReadCandidatePath(value, root) {
   return isAbsolute(value) ? value : `${root}${sep}${value}`;
 }
 
-// A local twin of guard-command-grammar.mjs's approvedReadPath(): resolve `value` against
-// `root` and require it to stay inside `root`, through the realpath-resolving discipline
-// isRealpathedWithinBoundary() just above (NVA-B-READCONTAIN-1 fix round, F2 -- a symlink
-// inside `root` pointing outside it used to pass this check on lexical grounds alone; round
-// 2, F4 -- the candidate fed to that check is now the RAW, un-collapsed value from
-// rawReadCandidatePath() above, not `resolve(root, value)`, for the same reason
-// isApprovedSingleCommandReadArg below no longer feeds commandPath()'s resolved return value
-// in). Not imported -- approvedReadPath is not exported from that file (only
-// parseGuardCommand and isBoundedReadOnlyPipeline are), and this dispatch's briefed scope
-// excludes editing it. Uses this file's own already-local `pathInside` (below), the same
-// containment logic guard-command-grammar.mjs's copy applies.
-// A separate copy from isApprovedSingleCommandReadArg's near-identical containment check
-// (isReadOnlySimpleWords' single-command rule, above) on purpose -- this pipeline family
-// keeps its own copy rather than merging the two, a different pipeline family from the
-// single-command shape (pipeline.read-scope-single-command-root-check).
+// Cat source operands use the same exact-path policy as direct passive reads.
 function isApprovedCatPipelineReadPath(value, root, extraRoots = []) {
-  const path = commandPath(value, root);
-  if (path === null) return false;
-  const candidate = rawReadCandidatePath(value, root);
-  return candidate !== null
-    && [root, ...extraRoots].some((boundary) => typeof boundary === "string"
-      && boundary !== ""
-      && isRealpathedWithinBoundary(candidate, boundary));
+  return typeof value === "string" && !value.startsWith("-")
+    && isAllowedPassiveReadTarget(value, { rootDir: root });
 }
 
 // cat's argv, source side: zero or more CAT_PIPELINE_DISPLAY_FLAGS entries (an optional `--`
@@ -3096,31 +2988,70 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, ex
     && isReadOnlySimpleWords(words, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots]);
 }
 
-/**
- * A single un-piped read command's path-taking argument, checked against the identical
- * containment rule isOutsideRootBoundedDiagnosticRead() already applies to the piped shape:
- * a flag (commandPath() returns null) is never a path token and is always approved; a real
- * path argument must resolve inside `root` or one of `extraRoots`, through the SAME
- * ancestor-walk-then-realpath discipline isRealpathedWithinBoundary() applies for the cat
- * pipeline lane above (NVA-B-READCONTAIN-1 fix round, F2 -- a symlink inside `root` or an
- * extra root, pointing outside it, used to pass this check on lexical grounds alone; round
- * 2, F4 -- commandPath()'s RESOLVED return value is used only to detect a flag, never fed
- * into the containment check itself; the containment candidate is rawReadCandidatePath()'s
- * un-collapsed value instead, so `<symlink>/../<outside>/<file>` cannot cancel itself into a
- * string that lexically reads as inside `root` before any symlink is examined). Also the
- * sole containment check isBoundedGitPipeline's subargs loop reuses, so this one fix covers
- * both the single-command and the bounded git-pipeline callers. Reused rather than a second
- * copy of the containment logic (see isOutsideRootBoundedDiagnosticRead's own scopeLifted
- * comment for why a second copy is exactly the drift this repository's guardrails warn
- * against).
- */
-function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
+/** Passive operands use the shared path policy; executable inputs stay contained. */
+function isApprovedSingleCommandReadArg(arg, root, extraRoots, executableInput = false) {
   if (commandPath(arg, root) === null) return true;
+  if (!executableInput) return isAllowedPassiveReadTarget(arg, { rootDir: root, recursive: true });
   const candidate = rawReadCandidatePath(arg, root);
   return candidate !== null
     && [root, ...extraRoots].some((boundary) => typeof boundary === "string"
       && boundary !== ""
       && isRealpathedWithinBoundary(candidate, boundary));
+}
+
+function passiveCandidate(raw, root) {
+  if (raw === "~") return homedir();
+  if (raw.startsWith("~/") || (process.platform === "win32" && raw.startsWith("~\\"))) {
+    return join(homedir(), raw.slice(2));
+  }
+  return isAbsolute(raw) ? raw : join(root, raw);
+}
+
+function isSafeExactPassiveFile(raw, root) {
+  if (typeof raw !== "string" || !raw || !isAllowedPassiveReadTarget(raw, { rootDir: root })) return false;
+  try { return statSync(passiveCandidate(raw, root)).isFile(); }
+  catch { return false; }
+}
+
+function isSafeExactGrepArgs(args, root) {
+  const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename"]);
+  let index = 0;
+  while (flags.has(args[index])) index += 1;
+  const endedOptions = args[index] === "--";
+  if (endedOptions) index += 1;
+  const pattern = args[index++];
+  if (typeof pattern !== "string" || !pattern || (!endedOptions && pattern.startsWith("-"))) return false;
+  const paths = args.slice(index);
+  return paths.length > 0 && paths.every((path) => !path.startsWith("-")
+    && isSafeExactPassiveFile(path, root));
+}
+
+// Directory enumeration may expose immediate child names only. Checking the
+// physical directory again closes aliases to protected roots and ancestors.
+function isSafeNamesOnlyDirectory(raw, root) {
+  if (!isAllowedPassiveReadTarget(raw, { rootDir: root, directoryListing: true })) return false;
+  const candidate = passiveCandidate(raw, root);
+  try {
+    const physical = realpathSync(candidate);
+    return statSync(candidate).isDirectory()
+      && isAllowedPassiveReadTarget(physical, { rootDir: physical, directoryListing: true });
+  } catch { return false; }
+}
+
+function isNamesOnlyLsArgs(args, root) {
+  const flags = new Set(["-1", "-a", "-A", "--"]);
+  let paths = 0;
+  let afterDashDash = false;
+  for (const arg of args) {
+    if (!afterDashDash && arg === "--") { afterDashDash = true; continue; }
+    if (!afterDashDash && arg.startsWith("-")) {
+      if (!flags.has(arg)) return false;
+      continue;
+    }
+    if (!isSafeNamesOnlyDirectory(arg, root)) return false;
+    paths += 1;
+  }
+  return paths > 0;
 }
 
 /**
@@ -3156,15 +3087,15 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
     if (args.length === 2
       && args[0] === "--check"
       && !args[1].startsWith("-")
-      && isApprovedSingleCommandReadArg(args[1], root, extraRoots)) {
+      && isApprovedSingleCommandReadArg(args[1], root, extraRoots, true)) {
       return true;
     }
     if (args.length >= 1 && args[0] === "--test") {
       const rest = args.slice(1);
-      return rest.every((arg) => arg.startsWith("-") || isApprovedSingleCommandReadArg(arg, root, extraRoots));
+      return rest.every((arg) => !arg.startsWith("-") && isApprovedSingleCommandReadArg(arg, root, extraRoots, true));
     }
     if (args.length >= 1 && (args[0].endsWith(".test.mjs") || args[0].endsWith(".test.js") || args[0].endsWith(".test.cjs"))
-      && isApprovedSingleCommandReadArg(args[0], root, extraRoots)) {
+      && isApprovedSingleCommandReadArg(args[0], root, extraRoots, true)) {
       return true;
     }
 
@@ -3197,6 +3128,9 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
       && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
   }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
+    if (executable === "rg") return isBoundedSingleRg(args, root);
+    if (executable === "grep") return isSafeExactGrepArgs(args, root);
+    if (executable === "ls" && isNamesOnlyLsArgs(args, root)) return true;
     if (args.some((arg) => arg === "--files-with-matches" && executable === "grep")) return false;
     // The single-command sibling of isOutsideRootBoundedDiagnosticRead's containment check --
     // see isOutsideRootSingleCommandRead() below, whose comment carries the item's done_when
@@ -3204,10 +3138,35 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
     return args.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots));
   }
   if (executable === "sed") {
-    return !args.some((arg) => /^-[^-]*[iew]/u.test(arg) || /^--(?:in-place|expression|file)(?:=|$)/u.test(arg));
+    // Only numeric print programs. sed's `e` command executes shell text, and
+    // `w`/`i`/`a` can write or produce effects even without -i.
+    const script = args[0] === "-n" ? args[1] : args[0];
+    const paths = args.slice(args[0] === "-n" ? 2 : 1);
+    return /^(?:[0-9]+(?:,[0-9]+)?|\$)p$/u.test(script ?? "")
+      && paths.length > 0 && paths.every((path) => !path.startsWith("-")
+        && isAllowedPassiveReadTarget(path, { rootDir: root }));
   }
   if (executable === "find") {
-    return !args.some((arg) => ["-delete", "-exec", "-execdir", "-fprint", "-fprintf", "-fls", "-ok", "-okdir"].includes(arg));
+    // A closed predicate subset avoids -exec/-ok/-delete and output writers.
+    let index = 0;
+    while (index < args.length && !args[index].startsWith("-")) {
+      if (!isAllowedPassiveReadTarget(args[index], { rootDir: root, recursive: true })) return false;
+      index += 1;
+    }
+    if (index === 0) return false;
+    while (index < args.length) {
+      const option = args[index++];
+      if (option === "-print") continue;
+      if (["-maxdepth", "-mindepth"].includes(option)) {
+        if (!/^(?:0|[1-9][0-9]*)$/u.test(args[index++] ?? "")) return false;
+      } else if (option === "-type") {
+        if (!["f", "d", "l"].includes(args[index++])) return false;
+      } else if (["-name", "-iname"].includes(option)) {
+        if (typeof args[index] !== "string" || !args[index] || args[index].startsWith("-")) return false;
+        index += 1;
+      } else return false;
+    }
+    return true;
   }
   if (executable !== "git") return false;
   let index = 0;
@@ -3232,6 +3191,8 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
 // function nor isBoundedGitPipeline support it, keeping both callers free of the
 // cross-repository-reaching `-C` shape.
 function isReadOnlyGitSubcommand(subcommand, subargs) {
+  if (subargs.some((arg) =>
+    /^(?:--output(?:=|$)|--ext-diff$|--textconv$|--no-index$|-o(?:$|[^-]))/u.test(arg))) return false;
   if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref", "describe"].includes(subcommand)) {
     return true;
   }
@@ -3279,6 +3240,22 @@ export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
   if (isBoundedReadOnlyAndChain(command, root, extraRoots)) return true;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots)) return true;
   return isReadOnlySimpleWords(simpleWords(command, root), root, pipelineRoots);
+}
+
+function isRejectedReadFamilyCommand(command, root) {
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  const name = basename(executable).toLowerCase();
+  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls"].includes(name)) return true;
+  if (name === "git" && argv[0] === "diff"
+    && argv.some((arg) => arg === "--output" || arg.startsWith("--output=")
+      || arg === "--ext-diff" || arg === "--textconv")) return true;
+  if (["node", "node.exe"].includes(name)
+    && argv.some((arg) => arg === "--test-reporter-destination"
+      || arg.startsWith("--test-reporter-destination="))) return true;
+  return false;
 }
 
 /**
@@ -4312,6 +4289,8 @@ function sanctionedDriverArgs(args, root) {
     requiredValue: {
       "--root": (value) => value === root,
       "--runner": (value) => VALID_RUNNERS.has(value),
+      "--language": (value) => value === "de" || value === "en",
+      "--advisor-export-consent": (value) => value === "approved" || value === "declined",
     },
     // The public driver emits --human-approval. --push-approval remains a
     // read-compatible spelling for previously copied commands, but an action
@@ -4322,7 +4301,6 @@ function sanctionedDriverArgs(args, root) {
       "--push-approval": (value) => value === "signature" || value === "chat",
     },
     optionalValue: {
-      "--language": (value) => value === "de" || value === "en",
       "--git-author-name": (value) => nonEmpty(value) && value.length <= 320,
       "--git-author-email": (value) => nonEmpty(value) && value.length <= 320,
       "--trust-anchor-mode": (value) => value === "existing" || value === "new",
@@ -4336,12 +4314,7 @@ function sanctionedDriverArgs(args, root) {
     const identityComplete = has("--git-author-name") === has("--git-author-email");
     const trustFlags = ["--trust-anchor-mode", "--trust-anchor-directory", "--trust-anchor-human-name", "--trust-anchor-existing-key"];
     const trustCount = trustFlags.filter(has).length;
-    if (!identityComplete || (trustCount !== 0 && trustCount !== trustFlags.length)) return false;
-    if (trustCount === 0) return true;
-    const valueAfter = (flag) => args[args.indexOf(flag) + 1];
-    const mode = valueAfter("--trust-anchor-mode");
-    const existingKey = valueAfter("--trust-anchor-existing-key");
-    return mode === "new" ? existingKey === "none" : existingKey !== "none";
+    return identityComplete && trustCount === 0;
   }
   const bootstrap = matchFlagSpec(args, {
     requiredValue: {
@@ -4716,6 +4689,11 @@ function sanctionedHumanOverrideArgs(args, root) {
   if (args[0] === "plan") {
     const base = args[1] === "--repo" && args[2] === root
       && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
+    return base && (args.length === 5 || (exactAuthorRoot(5) && args.length === 7));
+  }
+  if (args[0] === "prepare-for-signature") {
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--request-sha256" && HEX.test(args[4] ?? "");
     return base && (args.length === 5 || (exactAuthorRoot(5) && args.length === 7));
   }
   if (args[0] === "prepare-authorization") {
@@ -5996,18 +5974,26 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
 }
 
 function containedLiteralReadPath(value, root, dependencies = {}, extraRoots = []) {
-  if (typeof value !== "string" || value === "" || /[\0$`*?\[\]{}]/u.test(value)
-    || value.startsWith("~") || (process.platform !== "win32" && win32.isAbsolute(value))) return false;
-  const candidate = rawReadCandidatePath(value, root);
-  return candidate !== null && [root, ...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots]
-    .some((boundary) => isRealpathedWithinBoundary(candidate, boundary, dependencies));
+  return typeof value === "string" && !/[\0$`*?\[\]{}]/u.test(value)
+    && isAllowedPassiveReadTarget(value, { rootDir: root, recursive: true });
 }
 
 function containedRelativeGlob(value) {
-  return typeof value === "string" && value !== "" && !value.includes("\0")
-    && !value.includes("\\") && !value.startsWith("~")
-    && !isAbsolute(value) && !win32.isAbsolute(value)
-    && !value.split("/").includes("..");
+  // Wildcards are useful inside the project, but broad patterns and hidden
+  // selectors could enumerate private key files. Keep wildcard forms to
+  // ordinary source/document extensions; exact entries use the read policy.
+  if (typeof value !== "string" || value === "" || /[\0$`\[\]{}\\]/u.test(value)
+    || value.startsWith("~") || isAbsolute(value) || win32.isAbsolute(value)
+    || !value.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
+  if (!/[?*]/u.test(value)) return true;
+  return /\.(?:md|mjs|js|cjs|ts|tsx|css|html|svg|txt|yaml|yml)$/iu.test(value);
+}
+
+function containedGlobBase(path, root) {
+  const candidate = rawReadCandidatePath(path, root);
+  if (candidate === null || !isRealpathedWithinBoundary(candidate, root)) return false;
+  try { return statSync(candidate).isDirectory(); }
+  catch { return false; }
 }
 
 function readToolScopeVerdict(input, root, dependencies) {
@@ -6016,10 +6002,19 @@ function readToolScopeVerdict(input, root, dependencies) {
   const sessionRoots = sessionReadScopeRoots(input, dependencies);
   const path = toolName === "Read" ? params.file_path : params.path ?? ".";
   const selector = toolName === "Glob" ? params.pattern : params.glob;
-  const scoped = containedLiteralReadPath(path, root, dependencies, sessionRoots)
-    && (selector === undefined || containedRelativeGlob(selector));
+  const targetSafe = (toolName === "Read"
+    ? isAllowedPassiveReadTarget(path, { rootDir: root })
+    : toolName === "Grep" ? isSafeExactPassiveFile(path, root)
+    : containedLiteralReadPath(path, root, dependencies, sessionRoots));
+  const selectorSafe = toolName === "Glob"
+    ? containedRelativeGlob(selector)
+      && (/[?*]/u.test(selector)
+        ? containedGlobBase(path, root)
+        : isAllowedPassiveReadTarget(join(path, selector), { rootDir: root }))
+    : selector === undefined;
+  const scoped = targetSafe && selectorSafe;
   if (scoped) return verdict(0);
-  return verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_SCOPE_DENIAL_CODE}: read target must remain inside the physical project or an approved session read root.\n`);
+  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
 }
 
 function powerShellNamedArgs(argv, valueFlags, bareFlags = []) {
@@ -6078,14 +6073,18 @@ function powerShellScopeVerdict(input, root, dependencies) {
     return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: content writes are limited to physically contained scratch files.\n");
   }
   if (["get-content", "get-childitem", "get-item", "test-path"].includes(name)) {
+    const namesOnly = name === "get-childitem"
+      && argv.filter((arg) => arg.toLowerCase() === "-name").length === 1;
+    const readArgv = namesOnly ? argv.filter((arg) => arg.toLowerCase() !== "-name") : argv;
     let target;
-    if (argv.length === 0 && name === "get-childitem") target = ".";
-    else if (argv.length === 1) target = argv[0];
-    else if (argv.length === 2 && ["-literalpath", "-path"].includes(argv[0].toLowerCase())) target = argv[1];
+    if (readArgv.length === 0 && name === "get-childitem") target = ".";
+    else if (readArgv.length === 1) target = readArgv[0];
+    else if (readArgv.length === 2 && ["-literalpath", "-path"].includes(readArgv[0].toLowerCase())) target = readArgv[1];
     else return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: unsupported read arguments.\n");
-    return containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
+    return (containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
+      || (namesOnly && isSafeNamesOnlyDirectory(target, root)))
       ? verdict(0)
-      : verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_SCOPE_DENIAL_CODE}: read target outside approved roots.\n`);
+      : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
   }
   if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use a sanctioned Pipeline action or a contained literal read.\n");
@@ -6316,6 +6315,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   if (toolName === "Bash"
     && isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots)) {
     return withLifts(lifts, verdict(0));
+  }
+  if (toolName === "Bash"
+    && isRejectedReadFamilyCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+    return withLifts(lifts, blocked(READ_SCOPE_DENIAL_CODE, null, []));
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return withLifts(lifts, verdict(0));

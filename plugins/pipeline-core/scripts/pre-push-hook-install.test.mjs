@@ -15,7 +15,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -29,9 +29,24 @@ import {
   applyDecline,
   DECLINE_MARKER_SCHEMA,
 } from "./pre-push-hook-install.mjs";
+import { buildPrePushHookOfferAction } from "./project-onboarding-v3.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const PLUGIN_LIB_DIR = fileURLToPath(new URL("../lib", import.meta.url));
 const ZERO40 = "0".repeat(40);
+
+test("onboarding pre-push offer executes from a consumer repository with an absolute installer path", () => {
+  const { dir } = freshRepo("consumer-offer");
+  writeManifest(dir);
+  const offer = buildPrePushHookOfferAction({ rootDir: dir });
+  assert.equal(offer?.kind, "command");
+  assert.equal(offer.cwd, dir);
+  assert.equal(offer.executable, process.execPath);
+  assert.equal(isAbsolute(offer.argv[0]), true);
+  const installed = spawnSync(offer.executable, offer.argv, { cwd: offer.cwd, encoding: "utf8", timeout: 30000 });
+  assert.equal(installed.status, 0, installed.stderr || installed.stdout);
+  assert.equal(JSON.parse(installed.stdout).status, "installed");
+});
 
 /** The generated impl.mjs is self-contained (it must run standalone in a project that
  * never imported this installer), so its pure helpers (`parseRefUpdates`,
@@ -59,7 +74,11 @@ function freshRepo(prefix) {
   git("add", "README.md");
   git("commit", "-q", "-m", "init");
   const head = git("rev-parse", "HEAD").stdout.trim();
-  return { dir, head, git };
+  const fixtureHome = join(dir, ".git", "fixture-home");
+  const controller = createGovernanceScopeController({ hostStateRoot: join(fixtureHome, ".local", "state", "agent-pipeline", "activation") });
+  const plan = controller.planDecision({ rootDir: dir, decision: "enroll", by: "Fixture Owner" });
+  controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  return { dir, head, git, fixtureHome };
 }
 
 function writeManifest(dir, { mode = "blocking", approval = "required", security = null } = {}) {
@@ -83,7 +102,11 @@ function writeEvidence(dir, relPath, obj) {
 function runInstalledHook(dir, stdin, { remote = "origin", url = "https://example.invalid/repo.git" } = {}) {
   const install = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
   assert.equal(install.status, "installed", `precondition: install must succeed (${JSON.stringify(install)})`);
-  const result = spawnSync(install.hookPath, [remote, url], { cwd: dir, input: stdin, encoding: "utf8", timeout: 15000 });
+  const common = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: dir, encoding: "utf8" });
+  assert.equal(common.status, 0, common.stderr);
+  const fixtureHome = join(common.stdout.trim(), "fixture-home");
+  const result = spawnSync(install.hookPath, [remote, url], { cwd: dir, input: stdin, encoding: "utf8", timeout: 15000,
+    env: { ...process.env, HOME: fixtureHome, USERPROFILE: fixtureHome } });
   return { code: result.status, stderr: result.stderr ?? "", stdout: result.stdout ?? "" };
 }
 
@@ -345,8 +368,16 @@ test("planInstall then applyInstall: reinstalling over our OWN prior install upg
 
 test("planInstall: an intact pipeline hook bound to an older plugin library is stale and applyInstall upgrades it", () => {
   const { dir } = freshRepo("stale-plugin-library");
-  const oldLib = "/pipeline-cache/a/lib";
-  const currentLib = "/pipeline-cache/b/lib";
+  const fixturePluginLib = (label) => {
+    const root = mkdtempSync(join(tmpdir(), `pre-push-plugin-${label}-`));
+    const lib = join(root, "lib");
+    mkdirSync(lib);
+    writeFileSync(join(root, "protected-baseline.json"), readFileSync(join(PLUGIN_LIB_DIR, "..", "protected-baseline.json")));
+    writeFileSync(join(lib, "governance-scope.mjs"), `export const fixture = ${JSON.stringify(label)};\n`);
+    return lib;
+  };
+  const oldLib = fixturePluginLib("old");
+  const currentLib = fixturePluginLib("current");
   const first = applyInstall({ rootDir: dir, pluginLibDir: oldLib });
   assert.equal(first.status, "installed");
 

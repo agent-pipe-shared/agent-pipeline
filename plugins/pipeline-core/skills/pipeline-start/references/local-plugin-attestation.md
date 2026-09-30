@@ -16,5 +16,15 @@ For a Claude cache or copied marketplace tree, the source-checkout owner must
 run the source-bound host attestation command before bootstrap. Rerun the same
 preflight afterward and continue only on `status: "ready"`. The command must
 name a known clean source checkout and the actual installed root; never guess
-either value. Antigravity copied registrations follow the same rule through
-`install-agy.mjs` in that clean source checkout.
+either value. A gitless Claude cache or copied marketplace tree cannot recover
+its clean Git source from the registry, so it returns
+`plugin-attestation-required` with `nextAction: null`.
+
+For Antigravity, the repository installer writes the receipt before it
+registers a copied marketplace tree. Every gitless loaded Antigravity root
+needs one exact path-registry binding plus the verified receipt. A missing,
+ambiguous, or mismatched binding, or a legacy copied registration with no
+installer locator, returns `plugin-attestation-required` with
+`nextAction: null`. Run `install-agy.mjs` from the clean source checkout and
+restart the runner as instructed by the installer. The source path cannot be
+recovered safely from Antigravity's path-only registry and must not be guessed.

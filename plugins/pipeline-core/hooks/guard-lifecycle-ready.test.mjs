@@ -63,6 +63,7 @@ import {
 // (GATE_STRENGTH_PATHS), never restated here as a copy or a fixed count -- the same
 // single-source discipline TPSHELL-5 pins for its own protected-test-path table.
 import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
+import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
 // AC-10: imported straight from the library module the guard now defers to, never
 // through the guard's own re-export, so this test cannot pass merely because both
 // names happen to reference the identical function object.
@@ -151,6 +152,15 @@ function root() {
   const path = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-"));
   mkdirSync(join(path, ".claude"), { recursive: true });
   return path;
+}
+
+function markGovernedFixture(path) {
+  mkdirSync(join(path, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(path, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-09-29T00:00:00.000Z",
+  }));
 }
 
 function activeGitRoot() {
@@ -1010,7 +1020,7 @@ test("host-init admission never masks App Server, runtime, continuity, or malfor
             return true;
           },
         });
-        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}`);
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}/${input.tool_input?.file_path ?? input.tool_input?.command ?? ""}`);
         assert.match(result.stderr, /guard-lifecycle-ready/u, `${status}/${input.tool_name}`);
       }
     }
@@ -1845,7 +1855,7 @@ test("NVA-CATPIPE-1: exactness -- an outside-root read and unsafe composition st
     writeFileSync(join(path, "notes.txt"), "keep this open line\n");
     writeFileSync(join(outside, "secret.txt"), "outside\n");
     const outsideRead = `cat ${join(outside, "secret.txt")} | grep open`;
-    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), false, outsideRead);
+    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
     for (const command of [
       "cat notes.txt | grep open | wc -l",
       "cat notes.txt | wc -l",
@@ -1910,7 +1920,7 @@ test("NVA-CF-GITPIPEALLOWLIST: exactness -- outside-root reads, mutation, and un
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-gitpipe-outside-"));
   try {
     const outsideRead = `git log ${join(outside, "secret.txt")} | head -5`;
-    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), false, outsideRead);
+    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
     for (const command of [
       "git log | head -n 0",
       "git log | head -n 501",
@@ -2790,7 +2800,7 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     for (const status of [
-      "portable-seed-required", "kickoff-required", "intake-required",
+      "portable-seed-required", "runtime-initialization-required", "kickoff-required", "intake-required",
       "bootstrap-binding-required",
       "migration-required", "partial",
     ]) {
@@ -2819,15 +2829,18 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
       admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 10`);
       admit(`node '${DRIVER_SCRIPT}' --step-cap 5 --root '${path}' --runner antigravity`);
       for (const language of ["de", "en"]) {
-        admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language ${language}`);
-        admit(`node '${DRIVER_SCRIPT}' --language ${language} --human-approval signature --git-author-email fixture@example.invalid --runner codex --root '${path}' --git-author-name Fixture`);
+        admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language ${language} --advisor-export-consent declined`);
+        admit(`node '${DRIVER_SCRIPT}' --language ${language} --human-approval signature --advisor-export-consent approved --git-author-email fixture@example.invalid --runner codex --root '${path}' --git-author-name Fixture`);
       }
-      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language fr`);
-      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --language en`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language fr --advisor-export-consent declined`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --language en --advisor-export-consent declined`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent unknown`);
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --language de`);
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --git-author-name Fixture`);
       const externalDirectory = join(tmpdir(), "guard-first-anchor-directory");
       const externalKey = join(tmpdir(), "guard-existing-po-key.pem");
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval signature --language de --advisor-export-consent declined --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
       for (const runner of ["claude", "codex", "antigravity"]) {
         admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner ${runner} --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
         admit(`node '${DRIVER_SCRIPT}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none --runner ${runner} --root '${path}' --trust-anchor-directory '${externalDirectory}' --trust-anchor-mode new`);
@@ -2946,6 +2959,36 @@ test("non-ready Bash admits the repair script's own --human-facing argv, positio
  * admission assertion proves the branch exists, and only the mutations prove it did not
  * arrive as a blanket allowance.
  */
+test("signature plan's prepare-for-signature action remains admitted during lifecycle recovery", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const request = "f".repeat(64);
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const action = `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-for-signature --repo '${path}' --request-sha256 ${request}`;
+    for (const command of [action, `${action} --author-source-root '${authorRoot}'`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      `${action} --activate`,
+      `${action} --author-source-root /tmp/other`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-for-signature --repo '${path}' --request-sha256 ${"g".repeat(64)}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-for-signature --request-sha256 ${request} --repo '${path}'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("signature mode's authorize-by-signature is admitted in exactly its printed shape and refused when mutated", () => {
   const path = root();
   const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-proof-"));
@@ -5121,48 +5164,28 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
 
     const chatRoot = hgoGitFixture("chat");
     roots.push(chatRoot);
+    markGovernedFixture(chatRoot);
     const chatResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
     assert.equal(chatResult.exitCode, 2);
     assert.match(chatResult.stderr, /Human override available for this exact command/u);
     assert.match(chatResult.stderr, /guard-human-override\.mjs/u);
     assert.match(chatResult.stderr, /Step: plan/u);
-    assert.match(chatResult.stderr, /Step: prepare-authorization/u);
-    assert.match(chatResult.stderr, /Step: authorize\n/u);
-    assert.doesNotMatch(chatResult.stderr, /Step: authorize-by-signature/u);
-    assert.doesNotMatch(chatResult.stderr, /Step: emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
-    assert.doesNotMatch(chatResult.stderr, /Step: sign-intent|human-held Ed25519 key/u,
-      "chat mode must not advertise the external PO/operator signing step");
+    assert.match(chatResult.stderr, /mode-specific nextAction/u);
+    assert.match(chatResult.stderr, /chat is attribution, not proof/u);
+    assert.doesNotMatch(chatResult.stderr, /Step: prepare-authorization|Step: authorize-by-signature|human-held Ed25519 key/u);
     assert.doesNotMatch(chatResult.stderr, /capability consumed/u);
 
     const sigRoot = hgoGitFixture("signature");
     roots.push(sigRoot);
+    markGovernedFixture(sigRoot);
     const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
     assert.equal(sigResult.exitCode, 2);
     assert.match(sigResult.stderr, /Human override available for this exact command/u);
     assert.match(sigResult.stderr, /Step: plan/u);
-    assert.match(sigResult.stderr, /Step: prepare-authorization/u);
-    // NVA-SIGENTRY-2 F2: the digest-emission step must appear before the human is expected
-    // to sign anything out-of-band -- i.e. between prepare-authorization and
-    // authorize-by-signature, not merely somewhere in the guidance text.
-    assert.match(sigResult.stderr, /Step: emit-signature-digest/u);
-    // PO decision 2026-08-18 #12: prepare-authorization/emit-signature-digest run in
-    // this session. Only sign-intent crosses into the PO/operator's attended external
-    // terminal; authorize-by-signature returns to the agent session to verify and
-    // consume the proof without private-key access.
-    const prepareIndex = sigResult.stderr.indexOf("Step: prepare-authorization");
-    const emitIndex = sigResult.stderr.indexOf("Step: emit-signature-digest");
-    const signIndex = sigResult.stderr.indexOf("Step: sign-intent");
-    const authorizeIndex = sigResult.stderr.indexOf("Step: authorize-by-signature");
-    assert.ok(prepareIndex !== -1 && prepareIndex < emitIndex && emitIndex < signIndex && signIndex < authorizeIndex,
-      "sign-intent must sit between digest emission and authorize-by-signature");
-    assert.ok(sigResult.stderr.indexOf("Then, in this session") < prepareIndex,
-      "prepare-authorization must be labelled as running in this session");
-    assert.match(sigResult.stderr, /PO\/operator[^\n]*human-held Ed25519 key/u);
-    assert.match(sigResult.stderr, /--intent-sha256/u);
-    assert.match(sigResult.stderr, /<intent-sha256-from-emit-signature-digest>/u);
-    assert.match(sigResult.stderr, /back in this session[^\n]*proof path, not the private key/u);
-    assert.match(sigResult.stderr, /--proof/u);
-    assert.match(sigResult.stderr, /<proof-path-from-sign-intent>/u);
+    assert.match(sigResult.stderr, /mode-specific nextAction/u);
+    assert.match(sigResult.stderr, /human-held Ed25519 key in an attended external terminal/u);
+    assert.match(sigResult.stderr, /this session only prepares digests and verifies the proof/u);
+    assert.doesNotMatch(sigResult.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
     assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
@@ -5176,8 +5199,7 @@ test("signature-mode HGO guidance resolves the configured key directory without 
       ...hgoReadyDeps(),
     });
     assert.equal(result.exitCode, 2);
-    assert.match(result.stderr, /resolves the configured local approval directory itself/u);
-    assert.match(result.stderr, /no private path/u);
+    assert.match(result.stderr, /human-held Ed25519 key in an attended external terminal/u);
     assert.doesNotMatch(result.stderr, new RegExp(directory.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
     assert.doesNotMatch(result.stderr, /--directory/u);
   } finally { rmSync(projectRoot, { recursive: true, force: true }); }
@@ -5189,11 +5211,9 @@ test("signature-mode HGO guidance resolves the configured key directory without 
 // now distinguishes a determined shell (an in-session step, re-run through the SAME tool
 // that produced this denial -- here always Bash, via bash()) from a genuinely unknown one
 // (sign-intent, which a human runs later on a machine this code never observes).
-// Chat mode has no out-of-session step at all (its `authorize` also runs in-session, per the
-// "the human confirms in-session" label), so chat mode's denial now carries POSIX only, with
-// no reconstruction: PowerShell was never computed away, it was never the determined answer
-// for this mode in the first place. Signature mode keeps both, for sign-intent
-// alone -- that assertion is unchanged from before.
+// Chat mode has no out-of-session step; signature mode's attended command is
+// emitted by the later prepare-for-signature action. The first denial in both
+// modes carries only the in-session plan action in the current tool's dialect.
 test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determined command block without an unsafe primary command or rendering prerequisite", () => {
   const roots = [];
   try {
@@ -5205,23 +5225,9 @@ test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determin
       assert.equal(result.exitCode, 2);
       assert.match(result.stderr, /Step: plan\nPOSIX:/u);
       assert.match(result.stderr, /eval "\$CMD"/u);
-      if (mode === "signature") {
-        // Only sign-intent is out-of-session; it alone keeps both renderings.
-        assert.match(result.stderr, /Step: sign-intent\nPOSIX:/u);
-        assert.match(result.stderr, /Step: authorize-by-signature\nPOSIX:/u);
-        assert.match(result.stderr, /PowerShell:/u);
-        assert.match(result.stderr, /Invoke-Expression \$CMD/u);
-        const authorizeBlock = result.stderr.slice(result.stderr.indexOf("Step: authorize-by-signature"));
-        assert.doesNotMatch(authorizeBlock, /PowerShell:|Invoke-Expression \$CMD/u,
-          "local proof verification must use the current session's determined shell only");
-      } else {
-        // Chat mode: every step (plan/prepare-authorization/authorize) runs in-session
-        // through the same Bash tool that produced this denial -- POSIX is determined, and
-        // no step ever reaches the "outside this session" label that would justify a second
-        // platform.
-        assert.doesNotMatch(result.stderr, /PowerShell:/u);
-        assert.doesNotMatch(result.stderr, /Invoke-Expression \$CMD/u);
-      }
+      assert.match(result.stderr, /mode-specific nextAction/u);
+      assert.doesNotMatch(result.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
+      assert.doesNotMatch(result.stderr, /PowerShell:|Invoke-Expression \$CMD/u);
       assert.doesNotMatch(result.stderr, /available on demand|render-copy-safe/u);
       assert.doesNotMatch(
         result.stderr,
@@ -5230,7 +5236,7 @@ test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determin
       );
       const commandLines = result.stderr.split(/\r?\n/u).filter((line) =>
         /^(?:Step: |POSIX:|PowerShell:|cmd\.exe:|CMD=|\$CMD (?:=|\+=) |set "CMD=|eval "\$CMD"|Invoke-Expression \$CMD|%CMD%)/u.test(line));
-      assert.ok(commandLines.length > 10, result.stderr);
+      assert.ok(commandLines.length >= 3, result.stderr);
       assert.equal(commandLines.every((line) => line.length <= 72), true, commandLines.join("\n"));
     }
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
@@ -5239,7 +5245,7 @@ test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determin
 // NVA-B-DENIALBOILER-1: each remediation command appears exactly ONCE in a denial whose
 // ceremony steps are all in-session (chat mode) -- the DoD's own measured claim, pinned as a
 // regression guard rather than left to the prose assertions above alone.
-test("NVA-B-DENIALBOILER-1: chat-mode denial renders each of its three ceremony commands exactly once", () => {
+test("NVA-B-DENIALBOILER-1: chat-mode denial renders its exact plan command once", () => {
   const roots = [];
   try {
     const command = "rg -n lifecycle . && touch output.txt";
@@ -5247,12 +5253,10 @@ test("NVA-B-DENIALBOILER-1: chat-mode denial renders each of its three ceremony 
     roots.push(projectRoot);
     const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: projectRoot });
     assert.equal(result.exitCode, 2);
-    for (const label of ["Step: plan", "Step: prepare-authorization", "Step: authorize\n"]) {
-      const first = result.stderr.indexOf(label);
-      assert.notEqual(first, -1, `${label} missing`);
-      const second = result.stderr.indexOf(label, first + 1);
-      assert.equal(second, -1, `${label} appeared more than once`);
-    }
+    const first = result.stderr.indexOf("Step: plan");
+    assert.notEqual(first, -1);
+    assert.equal(result.stderr.indexOf("Step: plan", first + 1), -1);
+    assert.doesNotMatch(result.stderr, /Step: prepare-authorization|Step: authorize\n/u);
     assert.doesNotMatch(result.stderr, /cmd\.exe:/u);
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
@@ -5317,11 +5321,9 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     assert.doesNotMatch(sig.stderr, /capability consumed/u);
     assert.match(sig.stderr, /Human override available for this exact command/u);
     assert.match(sig.stderr, /Step: plan/u);
-    assert.match(sig.stderr, /Step: prepare-authorization/u);
-    assert.match(sig.stderr, /Step: emit-signature-digest/u);
-    assert.match(sig.stderr, /Step: sign-intent/u);
-    assert.match(sig.stderr, /PO\/operator[^\n]*human-held Ed25519 key/u);
-    assert.match(sig.stderr, /Step: authorize-by-signature/u);
+    assert.match(sig.stderr, /mode-specific nextAction/u);
+    assert.match(sig.stderr, /human-held Ed25519 key in an attended external terminal/u);
+    assert.doesNotMatch(sig.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
     assert.doesNotMatch(sig.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
 
     const chatRoot = hgoGitFixture("chat");
@@ -5329,7 +5331,8 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     const chat = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: chatRoot, ...hgoReadyDeps() });
     assert.equal(chat.exitCode, 2, "an unarmed agent gained admission");
     assert.match(chat.stderr, /GUARD-CROSS-REPO-MUTATION/u);
-    assert.match(chat.stderr, /Step: authorize\n/u);
+    assert.match(chat.stderr, /Step: plan/u);
+    assert.match(chat.stderr, /chat is attribution, not proof/u);
     assert.doesNotMatch(chat.stderr, /Step: authorize-by-signature/u);
     assert.doesNotMatch(chat.stderr, /Step: emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
     assert.doesNotMatch(chat.stderr, /Step: sign-intent|human-held Ed25519 key/u,
@@ -5587,9 +5590,8 @@ function overrideReachability(command, projectDir) {
     return { code, reach: `never-liftable:${recorded.status}:${recorded.code ?? "<none>"}` };
   }
   assert.match(result.stderr, /Human override available for this exact command/u, command);
-  assert.match(result.stderr, /Step: emit-signature-digest/u, command);
-  assert.match(result.stderr, /Step: sign-intent/u, command);
-  assert.match(result.stderr, /Step: authorize-by-signature/u, command);
+  assert.match(result.stderr, /Step: plan/u, command);
+  assert.match(result.stderr, /mode-specific nextAction/u, command);
   const planned = planHumanGuardOverride({
     rootDir: projectDir,
     pluginRoot: HGO_PLUGIN_ROOT,
@@ -6670,15 +6672,16 @@ test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter
 
 // ---------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------
-// Read-only commands remain containment-bound. The admissible exceptions are derived
-// roots only: the loaded plugin and the host-provided session transcript/memory roots.
+// Passive read commands may name host-visible paths. Mutation and execution
+// remain governed by their separate closed grammar and scope checks.
 // ---------------------------------------------------------------------------------
 
 function readScopeFixture() {
   const projectDir = hgoGitFixture("signature");
+  markGovernedFixture(projectDir);
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-read-scope-outside-"));
-  const outsideFile = join(outside, "verify-latest.json");
-  writeFileSync(outsideFile, "{\"Overall\":\"pass\"}\n");
+  const outsideFile = join(outside, "pipeline-greenfield-review.md");
+  writeFileSync(outsideFile, "# User report\nOverall pass\n");
   writeFileSync(join(projectDir, "verify-latest.json"), "{\"Overall\":\"pass\"}\n");
   return { projectDir, outside, outsideFile };
 }
@@ -6700,7 +6703,7 @@ function bashWithTranscript(command, transcriptPath) {
   return { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath };
 }
 
-test("read-only diagnostics reject arbitrary external roots in every supported shell shape", () => {
+test("read-only diagnostics accept host-visible external roots in every supported shell shape", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
     for (const command of [
@@ -6712,10 +6715,8 @@ test("read-only diagnostics reject arbitrary external roots in every supported s
       `rg -n Overall ${outsideFile} | head -n 5`,
       `rg -n Overall ${outsideFile} && git status`,
     ]) {
-      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
-      const denied = readScopeRun(command, projectDir);
-      assert.equal(denied.exitCode, 2, command);
-      assert.match(denied.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
+      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
     }
     assert.equal(readScopeRun("cat verify-latest.json", projectDir).exitCode, 0);
   } finally {
@@ -6724,7 +6725,37 @@ test("read-only diagnostics reject arbitrary external roots in every supported s
   }
 });
 
-test("read-only diagnostics admit only the exact host-provided transcript and memory roots", () => {
+test("external reports stay readable while key files and effectful read options are refused", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    const key = join(outside, "po-private.pem");
+    writeFileSync(key, "fixture key\n");
+    assert.equal(readScopeRun(`cat ${outsideFile}`, projectDir).exitCode, 0);
+    assert.equal(readScopeRun(`cat ${key}`, projectDir).exitCode, 2);
+    assert.equal(readScopeRun(`rg --pre sh fixture ${outsideFile}`, projectDir).exitCode, 2);
+    assert.equal(readScopeRun("grep -R fixture .", projectDir).exitCode, 2);
+    assert.equal(readScopeRun("git diff --output scratch/escaped.txt", projectDir).exitCode, 2);
+    assert.equal(readScopeRun("node --test-reporter-destination scratch/escaped.txt --test", projectDir).exitCode, 2);
+    writeFileSync(join(projectDir, "po-private.pem"), "fixture key\n");
+    assert.equal(readScopeRun("rg fixture", projectDir).exitCode, 2);
+    assert.equal(readScopeRun("rg --hidden --no-ignore fixture .", projectDir).exitCode, 2);
+    const priorConfig = process.env.RIPGREP_CONFIG_PATH;
+    try {
+      process.env.RIPGREP_CONFIG_PATH = join(outside, "rg.conf");
+      writeFileSync(process.env.RIPGREP_CONFIG_PATH, "--hidden\n--no-ignore\n");
+      assert.equal(isReadOnlyDiagnosticCommand("rg fixture .", projectDir), false);
+      assert.equal(isReadOnlyDiagnosticCommand("rg --files", projectDir), false);
+    } finally {
+      if (priorConfig === undefined) delete process.env.RIPGREP_CONFIG_PATH;
+      else process.env.RIPGREP_CONFIG_PATH = priorConfig;
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("host-provided transcript, memory and sibling paths share passive read behavior", () => {
   const projectDir = hgoGitFixture("signature");
   const { transcriptPath, memoryDir } = transcriptReadFixture();
   const memoryFile = join(memoryDir, "learned.md");
@@ -6735,14 +6766,14 @@ test("read-only diagnostics admit only the exact host-provided transcript and me
     assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir, [transcriptPath]), true);
     assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${transcriptPath}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
     assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${memoryFile} | head -n 5`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${sibling}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${sibling}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(dirname(transcriptPath), { recursive: true, force: true });
   }
 });
 
-test("runner session collections never widen the exact current-session read scope", () => {
+test("runner session paths are ordinary host-visible passive read targets", () => {
   const projectDir = hgoGitFixture("signature");
   const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-home-"));
   const sessionsDir = join(codexHome, "sessions");
@@ -6751,15 +6782,15 @@ test("runner session collections never widen the exact current-session read scop
   writeFileSync(prior, "{\"cwd\":\"fixture\"}\n");
   try {
     const deps = { projectDir, ...hgoReadyDeps(), runner: "codex", env: { CODEX_HOME: codexHome } };
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), { ...deps, runner: "claude" }).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), { ...deps, runner: "claude" }).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(codexHome, { recursive: true, force: true });
   }
 });
 
-test("the dedicated Codex transcript recovery routes are exact before readiness while every raw session read stays denied", () => {
+test("the dedicated Codex transcript recovery routes stay exact before readiness", () => {
   const projectDir = hgoGitFixture("signature");
   const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-recovery-home-"));
   const prior = join(codexHome, "sessions", "2026", "09", "prior-rollout.jsonl");
@@ -6781,14 +6812,14 @@ test("the dedicated Codex transcript recovery routes are exact before readiness 
     assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} list --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
     assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session`), nonReady).exitCode, 2);
     assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session --session-id prior-session --extra no`), nonReady).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), nonReady).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(codexHome, { recursive: true, force: true });
   }
 });
 
-test("Claude cannot use the current transcript to reach a sibling project transcript", () => {
+test("a sibling transcript path follows the same passive read policy", () => {
   const projectDir = hgoGitFixture("signature");
   const claudeHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-home-"));
   const current = join(claudeHome, "projects", "current-project", "current.jsonl");
@@ -6799,15 +6830,15 @@ test("Claude cannot use the current transcript to reach a sibling project transc
   writeFileSync(prior, "{\"cwd\":\"prior\"}\n");
   try {
     const deps = { projectDir, ...hgoReadyDeps(), runner: "claude" };
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), deps).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), { ...deps, runner: "codex" }).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), { ...deps, runner: "codex" }).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(claudeHome, { recursive: true, force: true });
   }
 });
 
-test("read-only containment rejects leading tilde and symlink escapes", () => {
+test("passive reads accept leading tilde and symlink paths", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   const linkPath = join(projectDir, "linked-outside.json");
   symlinkSync(outsideFile, linkPath);
@@ -6820,14 +6851,14 @@ test("read-only containment rejects leading tilde and symlink escapes", () => {
       `cat ${linkPath}`,
       `cat ${linkPath} | head -n 5`,
       `rg private ${linkPath} | head -n 5`,
-    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("read-only containment rejects a symlink-plus-dotdot escape in every supported pipeline family", () => {
+test("passive reads accept host-resolved symlink-plus-dotdot paths", () => {
   const projectDir = hgoGitFixture("signature");
   const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-dotdot-outside-"));
   const targetDir = join(outsideRoot, "target");
@@ -6845,7 +6876,7 @@ test("read-only containment rejects a symlink-plus-dotdot escape in every suppor
       "cat " + escaped + " | head -n 5",
       "rg outside " + escaped + " | head -n 5",
       "git log " + escaped + " | head -n 5",
-    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outsideRoot, { recursive: true, force: true });
@@ -6897,9 +6928,12 @@ test("a leading-tilde mutation is classified as a cross-repository target in eve
   }
 });
 
-test("a leading-tilde read is refused in the rg pipeline lane", () => {
-  const { projectDir, outside } = readScopeFixture();
+test("a leading-tilde read is admitted in the rg pipeline lane", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
+    const report = `rg x ${outsideFile} | head -n 5`;
+    assert.equal(isReadOnlyDiagnosticCommand(report, projectDir), true);
+    assert.equal(readScopeRun(report, projectDir).exitCode, 0);
     for (const marker of ["~", "~/.ssh/id_rsa"]) {
       const command = `rg x ${marker} | head -n 5`;
       assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
@@ -6911,7 +6945,7 @@ test("a leading-tilde read is refused in the rg pipeline lane", () => {
   }
 });
 
-test("NVA-B-TILDEFIX-1: an ordinary in-root read is unaffected -- the fix narrows only a leading `~`, nothing else", () => {
+test("ordinary in-root passive reads remain available", () => {
   const { projectDir, outside } = readScopeFixture();
   try {
     for (const command of ["cat verify-latest.json", "rg -n 'Overall' verify-latest.json | head -n 5", "git log | head -n 3"]) {
@@ -6934,6 +6968,7 @@ test("NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain r
   try {
     for (const [command, code] of [
       [`cat ${outsideFile} > captured.json`, "GUARD-REDIRECT-UNAPPROVED"],
+      ["cat $(printf test)", "GUARD-PARSE-UNSUPPORTED"],
       [`sed -i s/pass/fail/ ${outsideFile}`, "GUARD-CROSS-REPO-MUTATION"],
       [`find ${outside} -delete`, "GUARD-LIFECYCLE-NOT-READY"],
       [`git -C ${outside} commit -m mutation`, "GUARD-CROSS-REPO-MUTATION"],
@@ -7294,13 +7329,15 @@ test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signatur
       assert.match(first.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), mode);
       // ADR-0059 Decision 4: the denial names the CURRENTLY CONFIGURED mode's next command.
       if (mode === "chat") {
-        assert.match(first.stderr, /Step: authorize\n/u, "chat denial must name its own activate step");
+        assert.match(first.stderr, /Step: plan/u);
+        assert.match(first.stderr, /chat is attribution, not proof/u);
         assert.doesNotMatch(first.stderr, /Step: authorize-by-signature/u, "chat denial must not name signature's step");
         assert.doesNotMatch(first.stderr, /Step: sign-intent|human-held Ed25519 key/u,
           "chat denial must not advertise an external signing step");
       } else {
-        assert.match(first.stderr, /Step: sign-intent/u, "signature denial must name the PO/operator signing step");
-        assert.match(first.stderr, /Step: authorize-by-signature/u, "signature denial must name the signed step");
+        assert.match(first.stderr, /Step: plan/u);
+        assert.match(first.stderr, /human-held Ed25519 key in an attended external terminal/u);
+        assert.match(first.stderr, /mode-specific nextAction/u);
         assert.doesNotMatch(first.stderr, /--activate/u, "signature denial must not offer in-session activation");
       }
 
@@ -8091,24 +8128,29 @@ test("greenfield scratch recovery: ordinary contained writes and mkdir survive e
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("greenfield read security: PowerShell and native read tools enforce physical read scope", () => {
+test("greenfield passive PowerShell and native reads accept host-visible paths", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "read-scope-fixture-"));
   try {
+    markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     writeFileSync(join(path, "in-root.md"), "safe\n");
-    writeFileSync(join(outside, "synthetic-key-name.txt"), "fixture\n");
+    mkdirSync(join(path, "scratch"));
+    writeFileSync(join(outside, "pipeline-greenfield-review.md"), "fixture\n");
     symlinkSync(outside, join(path, "escape"));
     const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
     const ps = (command) => evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, deps);
     assert.equal(ps("Get-Content -LiteralPath in-root.md").exitCode, 0);
     for (const command of [
       `Get-ChildItem -LiteralPath '${outside}'`,
+      `Get-Content -LiteralPath '${join(outside, "pipeline-greenfield-review.md")}'`,
       "Get-ChildItem -LiteralPath escape",
       "Get-Content -LiteralPath C:\\Users\\Synthetic\\key",
     ]) {
-      assert.match(ps(command).stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+      const allowed = command.startsWith("Get-Content -LiteralPath '");
+      assert.equal(ps(command).exitCode, allowed ? 0 : 2, command);
     }
+    assert.equal(ps(`Get-ChildItem -LiteralPath '${outside}' -Name`).exitCode, 0);
     assert.match(ps("New-Item -Path src/escaped.md -ItemType File").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
     assert.match(ps("Get-Content $env:SECRET").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
     for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
@@ -8116,6 +8158,9 @@ test("greenfield read security: PowerShell and native read tools enforce physica
       const action = (command) => evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, stateDeps);
       assert.equal(action("New-Item -Path scratch/nested -ItemType Directory -Force").exitCode, 0, status);
       assert.equal(action("Set-Content -LiteralPath scratch/nested/report.md -Value report").exitCode, 0, status);
+      if (process.platform === "win32") {
+        assert.equal(action(`New-Item -Path '${join(path, "scratch", "native-report.md")}' -ItemType File`).exitCode, 0, status);
+      }
     }
     for (const command of [
       "New-Item -Path src/not-scratch -ItemType File",
@@ -8131,14 +8176,14 @@ test("greenfield read security: PowerShell and native read tools enforce physica
 
     const native = (tool_name, tool_input) => evaluateLifecycleReadyGuard({ tool_name, tool_input }, deps);
     assert.equal(native("Read", { file_path: "in-root.md" }).exitCode, 0);
-    assert.equal(native("Grep", { pattern: "safe", path: "." }).exitCode, 0);
+    assert.equal(native("Grep", { pattern: "safe", path: "in-root.md" }).exitCode, 0);
     assert.equal(native("Glob", { pattern: "**/*.md", path: "." }).exitCode, 0);
+    assert.equal(native("Read", { file_path: join(outside, "pipeline-greenfield-review.md") }).exitCode, 0);
     for (const input of [
-      ["Read", { file_path: join(outside, "synthetic-key-name.txt") }],
       ["Grep", { pattern: "fixture", path: outside }],
       ["Glob", { pattern: "**/*", path: "escape" }],
       ["Glob", { pattern: "../outside/*", path: "." }],
-    ]) assert.match(native(...input).stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, input[0]);
+    ]) assert.equal(native(...input).exitCode, 2, input[0]);
 
     const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
     assert.ok(manifest.hooks.PreToolUse.some((entry) =>
@@ -8294,7 +8339,10 @@ test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes re
 
       // First creation has no existing scratch ancestor to realpath. It remains bounded by the
       // physical project root and must stay admitted for a legitimate nested scratch path.
-      const firstCreationInputs = [write("scratch/nested/first-note.md")];
+      const firstCreationInputs = [
+        write("scratch/nested/first-note.md"),
+        write(join(path, "scratch", "nested", "absolute-first-note.md")),
+      ];
       // Bootstrap binding deliberately grants its bounded scratch lane only to document
       // authoring tools; its Bash mkdir boundary stays denied by the ordinary lifecycle gate.
       if (status !== "bootstrap-binding-required") firstCreationInputs.push(bash("mkdir -p scratch/nested"));
@@ -8307,6 +8355,7 @@ test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes re
       mkdirSync(join(path, ".claude"), { recursive: true });
       external = mkdtempSync(join(tmpdir(), "physical-scratch-external-"));
       symlinkSync(join(path, "src"), join(path, "scratch", "to-product"), "dir");
+      assert.equal(isPhysicalScratchTarget("scratch/to-product/escaped.mjs", { rootDir: path, liveRoots: [] }), false);
       symlinkSync(join(path, ".claude"), join(path, "scratch", "to-authority"), "dir");
       symlinkSync(external, join(path, "scratch", "to-external"), "dir");
       symlinkSync(join(path, "src", "not-yet-created.mjs"), join(path, "scratch", "dangling-product.mjs"), "file");
@@ -8319,7 +8368,7 @@ test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes re
         bash("mkdir -p scratch/to-product/nested"),
       ]) {
         const result = evaluateLifecycleReadyGuard(input, deps);
-        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}`);
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}/${input.tool_input?.file_path ?? input.tool_input?.command ?? ""}`);
         assert.match(result.stderr, /GUARD-(?:LIFECYCLE-NOT-READY|CROSS-REPO-MUTATION)/u, `${status}/${input.tool_name}`);
       }
 

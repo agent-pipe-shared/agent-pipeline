@@ -63,13 +63,14 @@ export function modelRoleBootstrapAttendedAction({ rootDir, runner, sessionId,
 }
 
 /** Host-owned terminal input is compared with the displayed proposal, once. */
-export async function confirmModelRoleMapping(readback, { question, write } = {}) {
+export async function confirmModelRoleMapping(readback, { question, write, retryAction = null } = {}) {
   write(`${JSON.stringify(readback, null, 2)}\n`);
+  if (retryAction) write(`If this terminal closes before you see a result, run the same attended command again. A recorded mapping returns MODEL-ROLE-BOOTSTRAP-REUSED; an unrecorded mapping asks for its current digest.\n${retryAction.text}\n`);
   const entered = await question(
     `Paste this exact 64-character mapping digest to confirm: ${readback.readbackSha256}\nDigest: `,
   );
   if (typeof entered === "string" && entered.trim() === readback.readbackSha256) return true;
-  write(`Mapping not confirmed: the input must match the exact 64-character digest shown above.\nExpected digest: ${readback.readbackSha256}\nRun the attended action again and paste that digest; no confirmation was recorded.\n`);
+  write(`Mapping not confirmed: the input must match the exact 64-character digest shown above.\nExpected digest: ${readback.readbackSha256}\nRun the attended command again and paste its current digest; no confirmation was recorded.\n`);
   return false;
 }
 
@@ -84,16 +85,21 @@ export async function runModelRoleBootstrapTransport({ rootDir, runner, env = pr
   const identityEnv = runner === "codex"
     ? { ...env, CODEX_SESSION_ID: identity.sessionId, CODEX_THREAD_ID: identity.sessionId }
     : runner === "claude" ? { ...env, CLAUDE_CODE_SESSION_ID: identity.sessionId } : env;
+  const attendedAction = modelRoleBootstrapAttendedAction({ rootDir, runner,
+    sessionId: identity.sessionId });
   const result = await runModelRoleBootstrap({ ...bootstrapOptions, rootDir, runner,
     env: identityEnv, hostHookSessionId: runner === "antigravity" ? identity.sessionId : null,
-    confirm: interactive ? (readback) => confirmModelRoleMapping(readback, { question, write }) : null });
+    confirm: interactive ? (readback) => confirmModelRoleMapping(readback,
+      { question, write, retryAction: attendedAction }) : null });
   const diagnostic = modelRoleBootstrapCliResult(result);
   if (result.status === "confirmation-required") {
-    const action = modelRoleBootstrapAttendedAction({ rootDir, runner, sessionId: identity.sessionId });
-    if (action) {
-      diagnostic.attendedAction = action;
-      write(`Human mapping confirmation requires an attended terminal for session ${identity.sessionId}.\n${action.text}\n`);
+    if (attendedAction) {
+      diagnostic.attendedAction = attendedAction;
+      diagnostic.retryGuidance = "Run the attended command again; READY means recorded, REUSED means already recorded. Only the current displayed digest can confirm a pending mapping.";
+      write(`Human mapping confirmation requires an attended terminal for session ${identity.sessionId}.\n${diagnostic.retryGuidance}\n${attendedAction.text}\n`);
     }
+  } else if (result.ok && result.status === "ready") {
+    write(`Model mapping result: ${result.code}. If the terminal closes before you can read this result, rerun the same attended command; MODEL-ROLE-BOOTSTRAP-REUSED confirms the recorded mapping.\n`);
   }
   return diagnostic;
 }

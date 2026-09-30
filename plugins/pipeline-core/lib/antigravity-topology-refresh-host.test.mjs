@@ -12,8 +12,8 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,cpSync,existsSyn
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createAntigravityRefreshHost,observeAntigravityLoadedTopologyWithWiring} from './antigravity-topology-refresh-host.mjs';
-import {observeAntigravityLoadedTopology} from './antigravity-plugin-topology.mjs';
-function fixture(t){
+import {observeAntigravityLoadedTopology,observeAntigravityPluginTopology,planAntigravityTopologyRefresh} from './antigravity-plugin-topology.mjs';
+function fixture(t,cliVersion='1.2.12'){
  const base=mkdtempSync(join(tmpdir(),'agy-refresh-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
  const configRoot=join(base,'gemini'),workspaceRoot=join(base,'workspace'),approvedSourceRoot=join(base,'source'),old=join(configRoot,'config','plugins','agent-pipeline-core'),foreign=join(base,'foreign');
  const put=(path,v)=>{mkdirSync(join(path,'..'),{recursive:true});writeFileSync(path,JSON.stringify(v)+'\n');};
@@ -23,7 +23,7 @@ function fixture(t){
  put(imports,{imports:[{name:'agent-pipeline-core',source:'antigravity'},{name:'foreign-plugin',source:'claude'}],preserved:'import-key'});
  const unrelated={path:foreign,enabled:false};put(global,{entries:[{path:approvedSourceRoot},unrelated],custom:{keep:true}});put(local,{entries:[unrelated]});
  const calls=[];let failAt=null,drift=null,noCopy=false,afterAction=null;
- const cli=argv=>{calls.push([...argv]);if(argv[0]==='--version')return {status:'ok',version:'1.2.12'};if(drift){drift();drift=null;}if(argv.includes(failAt))return {status:'failed'};
+ const cli=argv=>{calls.push([...argv]);if(argv[0]==='--version')return {status:'ok',version:cliVersion};if(drift){drift();drift=null;}if(argv.includes(failAt))return {status:'failed'};
   if(argv[1]==='uninstall'){rmSync(old,{recursive:true});const v=JSON.parse(readFileSync(imports));put(imports,{...v,imports:v.imports.filter(x=>x.name!=='agent-pipeline-core')});}
   if(argv[1]==='install'&&!noCopy){cpSync(approvedSourceRoot,old,{recursive:true});const v=JSON.parse(readFileSync(imports));put(imports,{...v,imports:[...v.imports,{name:'agent-pipeline-core',source:'antigravity'}]});}
   if(afterAction)afterAction(argv);return {status:'ok'};};
@@ -84,6 +84,15 @@ test('arbitrary JSON callback and unknown CLI version never authorize refresh',t
  const f=fixture(t);assert.throws(()=>createAntigravityRefreshHost({...f.args,runCli:{approved:true}}),/ATR-SEALED-CLI/);
  const before=readFileSync(f.imports);const r=createAntigravityRefreshHost({...f.args,runCli:()=>({status:'ok',version:'unobserved'})}).refresh();assert.equal(r.reason,'ATR-CLI-CAPABILITY');assert.deepEqual(readFileSync(f.imports),before);
 });
+test('observed Antigravity 1.2.13 admits the same bounded plugin refresh route',t=>{
+ const f=fixture(t,'1.2.13');
+ const observation=observeAntigravityPluginTopology(f.args);
+ assert.equal(planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion:'1.2.13'}).status,'prepared');
+ assert.equal(planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion:'1.2.14'}).reason,'AT-CLI-CAPABILITY-UNOBSERVED');
+ const result=createAntigravityRefreshHost(f.args).refresh();
+ assert.equal(result.status,'refreshed',JSON.stringify(result));
+ assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'uninstall','validate','install']);
+});
 test('actual incident hooks.json surfaces and newly CLI-created wiring converge with untouched foreign command bytes',t=>{
  const f=fixture(t),globalHooks=join(f.configRoot,'config','hooks.json'),workspaceHooks=join(f.workspaceRoot,'.agents','hooks.json');
  f.put(workspaceHooks,{hooks:[{command:'node "'+join(f.old,'hooks','antigravity-start-hint.mjs')+'"'}]});
@@ -119,7 +128,7 @@ test('prepared source, actual hook bytes and registry preimages are bound before
 });
 
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 12) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 13) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

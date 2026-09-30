@@ -785,6 +785,7 @@ function projectValidatedIntent(intent, { source, baselines }) {
   }
 
   const decisionConflicts = committedOwnedKeys.manifest.targets.flatMap((target) => {
+    if (!intent.runners.enabled.includes("codex")) return [];
     if (!target.decision || target.projection !== "codex-custom-agent-v3") return [];
     const bytes = baselineBytes(baselines?.[target.path]);
     if (bytes === null) return [];

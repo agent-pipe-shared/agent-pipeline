@@ -3167,9 +3167,7 @@ export function recordHumanGuardDenial({
 }
 
 function buildPlanResult(record, scriptPath) {
-  return {
-    ...record,
-    prepareAuthorizationAction: {
+  const prepareAuthorizationAction = {
       executable: process.execPath,
       argv: [
         scriptPath,
@@ -3191,7 +3189,26 @@ function buildPlanResult(record, scriptPath) {
         schema: "pipeline.human-guard-override-authorization-selection.v1",
         status: "prepared",
       },
-    },
+    };
+  let approvalMode = "signature";
+  try {
+    if (readHumanApprovalMode(record.root, { legacyKind: "push" }).mode === "chat") approvalMode = "chat";
+  } catch { /* A missing or unreadable policy keeps the signature route. */ }
+  const prepareForSignatureAction = {
+    executable: process.execPath,
+    argv: [scriptPath, "prepare-for-signature", "--repo", record.root,
+      "--request-sha256", record.requestSha256,
+      ...(record.authorSourceRoot === null ? [] : ["--author-source-root", record.authorSourceRoot])],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "local-process",
+    expected: { schema: "pipeline.human-guard-override-prepare-for-signature.v1", status: "prepared" },
+  };
+  return {
+    ...record,
+    prepareAuthorizationAction,
+    approvalMode,
+    nextAction: approvalMode === "chat" ? prepareAuthorizationAction : prepareForSignatureAction,
   };
 }
 

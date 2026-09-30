@@ -10,28 +10,29 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { decodeBashAnsiCEscape } from "../lib/git-cmd.mjs";
+import { isAllowedPassiveReadTarget } from "../lib/passive-read-policy.mjs";
 
 const CONTROL = new Set([";", "&&", "||", "&", "(", ")"]);
 const SEARCH_BOOLEAN = new Set([
   "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
   "-x", "--line-regexp", "-l", "--files-with-matches", "-L",
-  "--files-without-match", "--hidden", "--no-ignore", "--no-messages", "-u", "-uu",
+  "--files-without-match", "--no-messages",
 ]);
 const SEARCH_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
-  "-g", "--glob", "-t", "--type", "-T", "--type-not", "-e", "--regexp",
+  "-t", "--type", "-T", "--type-not", "-e", "--regexp",
   "--max-count", "--max-depth",
 ]);
-// -u/-uu are the compact forms of the already admitted ignore/hidden modes.
-// Keep -uuu refused because it additionally searches binary files.
-const FILE_BOOLEAN = new Set(["--hidden", "--no-ignore", "--no-messages", "-u", "-uu"]);
-const FILE_VALUE = new Set(["-g", "--glob", "-t", "--type", "-T", "--type-not", "--max-depth"]);
+// Recursive rg must use its default hidden/ignore policy. A glob can force
+// hidden private paths back into scope, so exclude it alongside -u/--hidden.
+const FILE_BOOLEAN = new Set(["--no-messages"]);
+const FILE_VALUE = new Set(["-t", "--type", "-T", "--type-not", "--max-depth"]);
 const NUMERIC_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "--max-count", "--max-depth",
 ]);
-const REPEATABLE_SEARCH_VALUE = new Set(["-g", "--glob", "-t", "--type", "-T", "--type-not"]);
+const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
 
 function denied(code = "GUARD-PARSE-UNSUPPORTED") {
   return Object.freeze({
@@ -304,25 +305,17 @@ export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}
   }
 }
 
-/**
- * NVA-B-READCONTAIN-1 / pipeline.rg-pipe-lexical-containment-gap:
- * Resolves `value` against `root` and requires it to stay inside `root` or one of
- * `additionalRoots`, through the realpath-resolving discipline isRealpathedWithinBoundary().
- * A direct symlink inside `root` pointing outside it is refused, not admitted.
- * Like the single-command, cat-pipeline, and git-pipeline lanes in guard-lifecycle-ready.mjs,
- * the candidate fed to that check is the raw un-collapsed path from rawReadCandidatePath(),
- * so `..` through symlinks cannot bypass containment.
- */
+/** Exact passive file reads may use host paths; recursive searches stay scoped. */
 function approvedReadPath(value, root, additionalRoots = []) {
-  if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
-  const candidate = rawReadCandidatePath(value, root);
-  return candidate !== null
-    && [root, ...additionalRoots].some((boundary) => typeof boundary === "string"
-      && boundary !== ""
-      && isRealpathedWithinBoundary(candidate, boundary));
+  return isAllowedPassiveReadTarget(value, { rootDir: root, recursive: true });
 }
 
 function validateRg(argv, root, windows, additionalRoots = []) {
+  // The policy's recursive inventory intentionally clears this variable.
+  // A real rg process inheriting a config could re-enable hidden traversal or
+  // --pre, so no rg read lane is valid while the host setting is active.
+  if (typeof process.env.RIPGREP_CONFIG_PATH === "string"
+    && process.env.RIPGREP_CONFIG_PATH !== "") return false;
   const args = [...argv];
   const filesMode = args[0] === "--files";
   if (filesMode) args.shift();
@@ -358,8 +351,15 @@ function validateRg(argv, root, windows, additionalRoots = []) {
   }
   if ((!filesMode && !regexpProvided && patternCount !== 1)
     || (!filesMode && regexpProvided && patternCount !== 0)) return false;
-  return paths.every((path) => approvedReadPath(path, root, additionalRoots))
+  return (paths.length > 0 ? paths : ["."])
+    .every((path) => approvedReadPath(path, root, additionalRoots))
     && (windows ? true : true);
+}
+
+// Reuse the pipeline's closed rg option grammar for the direct-command lane.
+// In particular, --pre and output options cannot be mistaken for path data.
+export function isBoundedSingleRg(argv, root) {
+  return validateRg(argv, root, false);
 }
 
 /**

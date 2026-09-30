@@ -9,6 +9,11 @@ nonResponsibilities:
 ownedPaths:
   - plugins/pipeline-core/**
 publicContracts:
+  - plugins/pipeline-core/lib/passive-read-policy.mjs
+  - plugins/pipeline-core/lib/intake-material-reference.mjs
+  - plugins/pipeline-core/lib/po-key-directory.mjs
+  - plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs
+  - plugins/pipeline-core/skills/pipeline-start/SKILL.md
   - plugins/pipeline-core/lib/design-advisor-course-store.mjs
   - plugins/pipeline-core/lib/design-advisory-coordinator-v2.mjs
   - plugins/pipeline-core/lib/design-workflow-package-v2.mjs
@@ -122,6 +127,9 @@ authorityEffects:
   - read-write-workspace
   - execute-node-scripts
 verificationEntryPoints:
+  - plugins/pipeline-core/lib/passive-read-policy.test.mjs
+  - plugins/pipeline-core/lib/intake-material-reference.test.mjs
+  - plugins/pipeline-core/scripts/bootstrap-trust-recovery.test.mjs
   - plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs
   - plugins/pipeline-core/lib/advisory-route-selection.test.mjs
   - plugins/pipeline-core/install-agy.test.mjs

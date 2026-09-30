@@ -928,7 +928,10 @@ function freshIntent(runner, fs) {
     schema: "pipeline.user.v3",
     language: { human_facing: "en", agent_facing: "en" },
     agent_runtime: "other",
-    runners: { enabled: ["claude", "codex", ...(runner === "antigravity" ? ["antigravity"] : [])], default: runner },
+    // A fresh project enables the runner that actually enrolled it. Other
+    // runners can be enabled explicitly later through the V3 source authority;
+    // seeding them here causes unused native targets to become mandatory.
+    runners: { enabled: [runner], default: runner },
     routing: { profiles: clone(registry.profiles), duties: clone(registry.duties) },
     usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 },
@@ -1001,10 +1004,10 @@ function freshIntent(runner, fs) {
     critic_export: clone(registry.criticExportPolicy),
     roles: { po: { display_label: "Human" } },
     session: { keep_awake: true },
-    // This is repository-scoped standing consent for the already closed
-    // allowlist. It is not a per-consultation prompt or approval of a wider
-    // data class, provider, or packet boundary.
-    advisor_export: { consent: "approved" },
+    // Repository-data export is disabled until the PO explicitly selects
+    // approved in the bundled first-answer round. The policy allowlist alone
+    // never constitutes consent.
+    advisor_export: { consent: "declined" },
   };
 }
 // A seeded verify command that FAILS until a human replaces it, and says what
@@ -2536,6 +2539,8 @@ const INTAKE_LANGUAGE_PLACEHOLDER = "<PO_INTAKE_LANGUAGE>";
 const INTAKE_PROFILE_PLACEHOLDER = "<PO_INTAKE_PROFILE>";
 const INTAKE_DESIGN_ANSWERS_PLACEHOLDER = "<PO_INTAKE_DESIGN_ANSWERS_JSON>";
 const INTAKE_TEXT_FILE = "scratch/onboarding-intake.txt";
+const INTAKE_EXISTING_FILE_PLACEHOLDER = "<existing-repository-file>";
+const INTAKE_EXISTING_FILE_SHA256_PLACEHOLDER = "<sha256-of-existing-file>";
 
 function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, initialLanguage = null) {
   const values = checkpoint.status === "present"
@@ -2566,8 +2571,13 @@ function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, in
     mutation: false,
     requiresConfirmation: false,
     ...(needsLanguage && initialLanguage !== null ? { reviewedDefaults: { language: { value: initialLanguage, source: "confirmed-initial-answer", requiresConfirmation: true } } } : {}),
-    guidance: `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. ${needsLanguage && initialLanguage !== null ? `The earlier confirmed onboarding language was ${initialLanguage}; present it as a default, but accept a different explicitly confirmed intake language. The later intake answer governs project material, and the CLI reports the difference for audit. ` : ""}Write the projectDescription bytes verbatim to ${INTAKE_TEXT_FILE} inside this repository (create scratch/ if absent); the returned applyAction deliberately uses only --text-file, never --text, so multiline text remains copy-safe and the two mutually exclusive forms can never collide. Replace only the typed placeholders present in applyAction.argv with the matching verbatim single-line answers, then execute that exact action. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
+    guidance: `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. ${needsLanguage && initialLanguage !== null ? `The earlier confirmed onboarding language was ${initialLanguage}; present it as a default, but accept a different explicitly confirmed intake language. The later intake answer governs project material, and the CLI reports the difference for audit. ` : ""}If the PO's material already exists in a regular file inside this repository, use existingFileApplyAction directly with that file's repository-relative path and SHA-256; do not copy it to scratch or repeat its contents. If material exists only in chat, write the bytes once to ${INTAKE_TEXT_FILE} and use applyAction. A host turn reference is unavailable until its capture adapter is installed. Replace only typed placeholders with the matching verbatim answers. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
     applyAction: commandAction(argv, true, true, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"]),
+    existingFileApplyAction: commandAction(
+      [...argv.slice(0, argv.indexOf("--text-file")), "--text-file", INTAKE_EXISTING_FILE_PLACEHOLDER,
+        "--text-file-sha256", INTAKE_EXISTING_FILE_SHA256_PLACEHOLDER, "--activate", "--runner", runner],
+      true, true, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"],
+    ),
     expected: { schema: SCHEMA, statuses: ["intake-required"] },
   };
 }
@@ -2590,9 +2600,14 @@ function intakeCaptureAction(root, runner) {
     input: { name: "text", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: `consent is already recorded; ask for the next project-material message, write its bytes verbatim to ${INTAKE_TEXT_FILE}, and execute the exact returned applyAction. It uses only --text-file, never the mutually exclusive --text form, so multiline content is copy-safe. Do not reconstruct intake-capture-apply.`,
+    guidance: `consent is already recorded. If the next project material already exists in a regular file inside this repository, use existingFileApplyAction with its repository-relative path and SHA-256; do not copy or repeat it. For chat-only material, write the bytes once to ${INTAKE_TEXT_FILE} and execute applyAction. A host turn reference is unavailable until its capture adapter is installed. Both actions use only --text-file, never the mutually exclusive --text form.`,
     applyAction: commandAction(
       [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", root, "--text-file", INTAKE_TEXT_FILE, "--activate", "--runner", runner],
+      true, true, INTAKE_CAPTURE_APPLY_SCHEMA, ["applied"],
+    ),
+    existingFileApplyAction: commandAction(
+      [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", root, "--text-file", INTAKE_EXISTING_FILE_PLACEHOLDER,
+        "--text-file-sha256", INTAKE_EXISTING_FILE_SHA256_PLACEHOLDER, "--activate", "--runner", runner],
       true, true, INTAKE_CAPTURE_APPLY_SCHEMA, ["applied"],
     ),
     expected: { schema: SCHEMA, statuses: ["intake-required"] },
@@ -4791,7 +4806,7 @@ function v4InspectionWithoutFirstIntakeBoundary(rootDir, fs, intent = "onboardin
             runtime,
             continuity,
             nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, initialize ? "plan-runtime" : "plan-repair", "--root", legacy.root], runner, intent), false, false, SCHEMA, [initialize ? "runtime-initialization-required" : "projection-drift"]),
-            diagnostics: [lifecycleDiagnostic("$.runtime", initialize ? "runtime_missing" : "projection_drift", initialize ? "required Codex runtime targets are absent" : "generated runtime bytes differ from the V3 projection", "review the lifecycle runtime plan")],
+            diagnostics: [lifecycleDiagnostic("$.runtime", initialize ? "runtime_missing" : "projection_drift", initialize ? "required enabled-runner runtime targets are absent" : "generated runtime bytes differ from the V3 projection", "review the lifecycle runtime plan")],
           });
         }
       }
@@ -5160,6 +5175,16 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
   if (result.root === null || result.status === "unsafe") return result;
   const enrollmentResult=Object.fromEntries(PROJECT_ONBOARDING_BASE_RESULT_KEYS.map(key=>[key,result[key]]));
   let retired;try{retired = readGovernanceEnrollmentRetirement({rootDir: result.root ?? rootDir});}catch(error){
+    if(error.code==="GS-RETIREMENT-READBACK-EMPTY"){
+      const root=result.root??rootDir;
+      return {...enrollmentResult,status:"enrollment-history-recovery-required",
+        diagnostics:[...result.diagnostics,diagnostic("$.enrollmentRetirement",error.code,"the read-only retirement writer returned no host readback","repeat the exact inspection at the host boundary; do not assume enrollment history is absent")],
+        nextAction:{kind:"external-operator",executable:process.execPath,
+          argv:[fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs",import.meta.url)),"inspect","--root",root,"--intent",intent,"--runner",runner],
+          executionBoundary:"host-authorized-wsl",mutation:false,requiresConfirmation:false,
+          expected:{schema:SCHEMA,statuses:["enrollment-history-recovery-required","ready","partial","intake-required","enrollment-retirement-required","enrollment-activation-required"]},
+          guidance:"Run this exact read-only inspection at the host boundary. A blank nested-process readback cannot prove that enrollment history is absent; do not approve, activate, or skip a gate from this result."}};
+    }
     if(!["GS-NONGIT-RETAINED-HISTORY","GS-HOST-MANAGED-RETAINED-HISTORY"].includes(error.code))throw error;
     return {...enrollmentResult,status:"enrollment-history-recovery-required",nextAction:governanceEnrollmentRecoveryAction({rootDir:result.root??rootDir,runner})};
   }
@@ -5338,6 +5363,7 @@ const AUTHOR_IDENTITY_FIELD_MAX_BYTES = 320;
 const INITIAL_GIT_AUTHOR_NAME_PLACEHOLDER = "<PO_GIT_AUTHOR_NAME>";
 const INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_GIT_AUTHOR_EMAIL>";
 const INITIAL_PUSH_APPROVAL_PLACEHOLDER = "<signature|chat>";
+const INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER = "<approved|declined>";
 const INITIAL_LANGUAGE_PLACEHOLDER = "<de|en>";
 
 // Same `collect-input` shape as `collectGoalAction()`, asking for both fields
@@ -6447,6 +6473,7 @@ function collectInitialAnswersAction(observed, fs) {
   const inputs = [
     ...authorInputs,
     observed.pushApprovalSetupAction.input,
+    { name: "advisorExportConsent", encoding: "utf8", trim: true, minBytes: 8, maxBytes: 8, singleLine: true, rejectNul: true },
     ...(answeredLanguage === null ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
     ...(trustSetup?.inputs ?? []),
   ];
@@ -6462,6 +6489,7 @@ function collectInitialAnswersAction(observed, fs) {
   // `--push-approval` as a read-compatible alias for old copied commands, but
   // every newly rendered action names the shared policy it actually applies.
   argv.push("--human-approval", INITIAL_PUSH_APPROVAL_PLACEHOLDER);
+  argv.push("--advisor-export-consent", INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER);
   argv.push("--language", answeredLanguage ?? INITIAL_LANGUAGE_PLACEHOLDER);
   if (trustSetup) {
     argv.push(
@@ -6483,8 +6511,9 @@ function collectInitialAnswersAction(observed, fs) {
         : { value: answeredLanguage, source: "confirmed-intake-checkpoint", requiresConfirmation: false },
       gitIdentity: identityProvenance,
       humanApproval: { value: machinePushApprovalPreference(fs) ?? "signature", source: "machine-plane-or-fail-closed-default", requiresConfirmation: true },
+      advisorExportConsent: { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
     },
-    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author and confirmed language, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
     applyAction: commandAction(
       argv,
       true,

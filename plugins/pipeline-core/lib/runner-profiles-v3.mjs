@@ -228,7 +228,7 @@ function validateSession(value, errors) {
 }
 
 function validateAdvisorExport(value, errors) {
-  if (!Object.hasOwn(value, "advisor_export")) return { consent: "missing", enabled: true };
+  if (!Object.hasOwn(value, "advisor_export")) return { consent: "missing", enabled: false };
   const advisorExport = value.advisor_export;
   if (!validateClosedObject(advisorExport, "$.advisor_export", ["consent"], errors, "supply exactly approved or declined advisor export consent")) {
     return { consent: "invalid", enabled: false };
