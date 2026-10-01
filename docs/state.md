@@ -7,9 +7,38 @@
 
 **Transfer 2026-09-30:** [Alfred 0.7 feature checkpoint and exact resume notes](0.7-alfred-transfer-2026-09-30.md). This branch transfer is not a qualified release.
 
+## Archived history
+
+| Date range | Summary | Archive |
+|---|---|---|
+| 2026-09-27 | Überholter Kandidaten-Checkpoint; offene Abnahme und Installationsreihenfolge bleiben im aktuellen Abschnitt erhalten. | [docs/state-archive/2026-10-01--superseded-local-candidate-2026-09-27.md](state-archive/2026-10-01--superseded-local-candidate-2026-09-27.md) |
+| 2026-09-01 bis 2026-09-19 | Historischer Nova-Checkpoint; aktueller Alfred-Intake bleibt live. | [docs/state-archive/2026-09-20--nova-historical-checkpoint.md](state-archive/2026-09-20--nova-historical-checkpoint.md) |
+| 2026-09-09 | Archive superseded 2026-09-09 candidate and lifecycle checkpoints | [Archive](state-archive/2026-09-14--superseded-lifecycle-and-candidate-checkpoints.md) |
+| 2026-09-06 | Historical candidate assembly; current decisions and remaining rules retained in the live handover. | [Archive](state-archive/2026-09-07--nova-candidate-assembly-2026-09-06.md) |
+| 2026-09-06 | Closed Nova-B blocks 2026-09-02..06: rebase deadlock, evidence-slot fix, worktree liveness, read containment, full gate green, five Critic-cleared items | [Archive](state-archive/2026-09-06--closed-blocks-2026-09-02-06.md) |
+| 2026-09-02 | The 0.6.0-to-0.6.1 release run, the overnight Nova B block, and the four dispatcher errors it recurred: superseded by the 0.6.1 release entry. | [Archive](state-archive/2026-09-02--where-the-release-stands-interim-update-2026-09-01-evening.md) |
+| 2026-09-01 | The 2026-08-31 interim-release handover: the 0.6.0 candidate pushed to nova and stopped one step short of main, the nine ordered PO terminal actions, the privacy sweep disposition, and the carried-forward open questions. Extraction pass performed first and recorded in the survey behind commit 53262b1d; its homeless durable rules and still-live carry-forwards were re-stated in the 2026-09-01 handover. | [Archive](state-archive/2026-09-01--current-handover-0-6-0-is-an-interim-release-nova-b-continue.md) |
+| 2026-08-25 to 2026-08-26 | The 2026-08-25/26 chat-gate-ceremony standardization block: AGY-HGOFIX-2/3, the four chat-gate regressions and their closure, the Agent-tool worktree-isolation incident, the 17-agent AFK sweep and its reconciliation, and the 2026-08-26 sprint_agy push. Extraction pass performed first: every durable rule in it already lives in CLAUDE.md or its own backlog item; the single carry-forward with no home (GWM has no chat-mode activation path) was moved into the current handover before rotation. | [Archive](state-archive/2026-09-01--chat-gate-standardization-and-afk-sweep.md) |
+| 2026-08-23 | The Phoenix-line pointer block: a preamble stating that Nova became the authoritative line and that Phoenix's own checkpoints 61-71 are history. Its content was already archived separately and indexed; the block itself carried no live carry-forward. | [Archive](state-archive/2026-09-01--phoenix-line-pointer-block.md) |
+| 2026-08-31 | The CI release blocker: diagnosis, the measured repair at ed491309, the PO decision to repair rather than bypass, and the inverted push-before-CI sequencing. Its live carry-forwards were extracted into the 2026-08-31 release handover before rotation. | [Archive](state-archive/2026-08-31--ci-release-blocker-diagnosed-and-repaired.md) |
+| 2026-08-31 | The 2026-08-30 block: the 6a93fec2 candidate stamp at 501/503, the six closed retrospective follow-up items, ADR-0076, and the unapproved emergency push of both branches. Its two live carry-forwards -- retro items 7 and 8 deferred to Nova B, and the unresolved Critic FAIL on the sandbox quickfix -- were extracted into the 2026-08-31 handover first. | [Archive](state-archive/2026-08-31--prior-current-handover-nova-0-6-0-local-candidate-stamped-re.md) |
+| 2026-08-31 | The 2026-08-28 three-runner greenfield block: rounds A-U2, the ready-gate blocker T, the 2+2 Critic round, and the candidate's state on the night of 2026-08-28/29. Its still-live carry-forward items were extracted into the 2026-08-31 handover before rotation. | [Archive](state-archive/2026-08-31--prior-current-handover-the-three-runner-greenfield-findings-.md) |
+| 2026-08-28 | Ledger merge across parallel sprints (ADR-0068), ADR renumbering at acceptance (ADR-0069), and the first handover rotation; its four live open items -- ADR collision 0063, the unregistered check-adr-consistency, BS25/BS26 durability, and the Nova A candidate list -- are carried forward to the current handover. | [Archive](state-archive/2026-08-28--earlier-handover-ledger-merge-capability-adr-renumbering-han.md) |
+| 2026-08-28 | Verify green 471/471 in one run at candidate 5fd963fc; EP07 tree-dirtying cause named and fixed; +build stamp convention restored; AK-5 closed, AK-6 ready to re-dispatch; the open 0.6.0 combined-release decision carried forward to the current handover. | [Archive](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
+| 2026-08-27 | sprint_agy fetch, fast-forward, and the 2026-08-26 clean local candidate | [Archive](state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md) |
+| 2026-08-19 through 2026-08-23 | Phoenix-line checkpoints 61-71 (2026-08-19 through 2026-08-23), preserved verbatim as history after the Nova merge made the Nova line authoritative. | [Archive](state-archive/2026-08-27--phoenix-checkpoints-61-71.md) |
+| through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
+| 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [Archive](state-archive/2026-08-19--checkpoints-1-through-60.md) |
+| 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [Archive](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
+
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-29
 
 **PO-Ergänzung 2026-09-30:** [Modellfamilien einmal freigeben und neue Versionen automatisch einsetzen](../backlog/items/2026-09-30-model-family-approval-with-automatic-version-upgrades.md); Umsetzung und Abnahme sind offen. Die aktuelle Codex-Zuordnung Sol 6.1/Luna 6 ist signiert und im Host bestätigt.
+
+**Fortsetzung:** Der [ADR-Entwurf](adr/draft-model-family-approval-and-automatic-version-upgrades.md) und die synthetischen Entwurfsprototypen unter `scratch/model-family-upgrade-proposal/` sind vorbereitet; die Automatik ist noch nicht produktiv eingebaut. Neue Versionen müssen ohne weitere PO-Bestätigung und ohne manuell ergänzten Eintrag je Release erkannt werden.
+**Kandidatenfortschritt, 2026-10-01:** Die isolierte Reparaturserie ist konsolidiert: 41 Dateien, Diff-SHA256 `986195ff3969be484ca781a5783d7d892a1852a09780e25a0ae347a6b3e03485`, 543 ausgeführte Fälle bestanden. Sie repariert unter anderem den nativen Codex-Typ `worker`, die Caller-/Template-Bindung, den bereits geprüften Ruleset-Digest und die begrenzte Materializer-Zulassung. Kein voller Verify-PASS; die Signatur `c2a6765d…` deckt nur ihren ursprünglichen Teilumfang. Das angeforderte direkte Operator-Skript unter `scratch/live-hook-repair-20261001/repair.mjs` ist eingefroren und mit 19/19 Fällen an Wegwerfkopien geprüft: Sicherung, synchronisierte 26 Source-/25 Cache-Ziele und Rollback. Noch kein Live-Aufruf bestätigt, keine Quellintegration oder Installation. Modellfamilien-Automatik, finale Signatur-/Review-Bindung und Gesamtqualifikation bleiben offen. Ein separater Backlog-Audit ist auf PO-Wunsch gestoppt; bestehende Ledger- und State-Änderungen bleiben erhalten. Kein qualifizierter lokaler 0.7-Kandidat.
+
+**Weiter geltende Abnahme:** Der [Abschlussplan](../specs/sprint-alfred-epic/design/local-candidate-completion-plan.md), die [Alfred-Matrix mit 25 ACs und 4 Incident-Kriterien](../specs/sprint-alfred-epic/evidence/0.7-local-candidate-handover-2026-09-27.md) und die [Nova-Issue-Matrix](../specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md) bleiben maßgeblich. Historische Lieferung ist kein PASS am finalen Kandidaten; NVA-A8 benötigt eine neue Bindung. Erst den vollständigen Source-Kandidaten qualifizieren und stempeln, dann PO-Installation und runner-eigene Host-Abnahme. AC-24/E3 braucht den A1-Beleg, AC-19 zwei Runner-Readbacks und AC-25 echte Host-Beobachtung. Finale Verify-, Security-, Reader-, Critic- und AC-Belege müssen den exakten Kandidaten nennen; Push, Tag und Veröffentlichung bleiben ohne Freigabe.
 
 **PO-Auftrag:** Den genehmigten 0.7-Umfang als lokalen Kandidaten fertigstellen.
 Der PO installiert den gestempelten Build selbst; keine Veröffentlichung.
@@ -33,69 +62,6 @@ drei AC-18-Tests im geschützten Verify-Gate signiert. Voller Verify, Security,
 Critic, Build-Stempel, kandidatengebundene Gesamtqualifikation und Installation
 sind noch offen. Keine weitere Reader-Korrekturrunde. Release-Push, Tag und
 Veröffentlichung haben keine Freigabe.
-
-## Historischer Übergang — lokaler 0.7-Kandidat, 2026-09-27
-
-Alfred ist jetzt die aktive 0.7-Arbeitslinie; die älteren Nova-/Alfred-
-Abschnitte weiter unten sind historische Checkpoints, keine Anweisung, die
-Nova-Quelle erneut zu mergen. Der PO übernimmt die lokale Installation selbst.
-Danach setzt eine **neue Codex-Session** die Abnahme und den getrennten
-Release-Pfad fort. Diese Übergabe ist kein Feature-Close und keine Freigabe
-zum Push, Tag, Release oder zur Marketplace-Veröffentlichung.
-
-- Gestempelter Drei-Runner-Pluginstand: Commit
-  `3f29294f7a3cfec334a899e292920d729b011a09`, Tree
-  `135124a3bc13f7bbaae20ebe726edd2abe02bf70`, Build-Identität
-  `20260927174722.15c963ef`. Der Checkout war nach dem normalen
-  Stempel-Commit sauber; Manifest-Parität grün. Das Stempelskript hat
-  nichts installiert. Der Quellcommit `ef471b03` wurde gegen die exakte
-  PO-Signatur materialisiert; `15c963ef` band danach das Capability-Inventar.
-- Work Verify auf `15c963ef`: 93/93 ausgewählte Suiten grün; Inventar-Suite
-  nach Commit 30/30. **Kein** Full-Verify-, Security-, Reader- oder
-  unabhängiger Critic-PASS für den gestempelten Commit. Der lokale Readiness-
-  Status ist `not-yet-qualified`, ohne technischen Source-Blocker. Ein
-  dokumentarischer Übergabe-Nachfolgecommit ändert HEAD; finale Gate-Belege
-  müssen deshalb den dann aktuellen Commit/Tree nennen.
-- Die [ausführliche 0.7-Übergabe samt Alfred-AC-Abschlussmatrix](../specs/sprint-alfred-epic/evidence/0.7-local-candidate-handover-2026-09-27.md)
-  ist die aktuelle Fortsetzungsreferenz. 25 Alfred-ACs + 4 Incident-Kriterien
-  sind vollständig definiert, aber am finalen 0.7-Kandidaten noch **nicht
-  einzeln abgenommen**. Der [Abschlussplan](../specs/sprint-alfred-epic/design/local-candidate-completion-plan.md)
-  lässt 21 volle Abnahmezeilen offen. Nova zählt 20 globale und 164 Issue-
-  Kriterien in 17 Issues; die [Nova-Issue-Matrix](../specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md)
-  trennt historische Lieferung von gegenwärtiger 0.7-Abnahme. Die
-  NVA-A8-Bindung ist stale. Geschlossene Backlog-Items ersetzen keinen AC-
-  oder GitHub-Issue-Abnahmebeleg.
-- Nächster Einstieg: `pipeline-core:pipeline-start`, diese operative State-
-  Notiz und die verlinkte Matrix lesen; nach PO-Installation den echten
-  Installed-Host-Stand feststellen. AC-24/E3 bleibt ohne aktuellen A1-
-  Runner-Beleg `unavailable`; AC-19 braucht zwei frische Runner-Readbacks;
-  AC-25 braucht je Runner echte Host-Beobachtung. Danach finalen Verify,
-  Security, Reader, Critic, AC-/Issue-Reconciliation und separate PO-Release-
-  Autorität in der im Übergabedokument festgelegten Reihenfolge erledigen.
-
-
-## Archived history
-
-| Date range | Summary | Archive |
-|---|---|---|
-| 2026-09-01 bis 2026-09-19 | Historischer Nova-Checkpoint; aktueller Alfred-Intake bleibt live. | [docs/state-archive/2026-09-20--nova-historical-checkpoint.md](state-archive/2026-09-20--nova-historical-checkpoint.md) |
-| 2026-09-09 | Archive superseded 2026-09-09 candidate and lifecycle checkpoints | [Archive](state-archive/2026-09-14--superseded-lifecycle-and-candidate-checkpoints.md) |
-| 2026-09-06 | Historical candidate assembly; current decisions and remaining rules retained in the live handover. | [Archive](state-archive/2026-09-07--nova-candidate-assembly-2026-09-06.md) |
-| 2026-09-06 | Closed Nova-B blocks 2026-09-02..06: rebase deadlock, evidence-slot fix, worktree liveness, read containment, full gate green, five Critic-cleared items | [Archive](state-archive/2026-09-06--closed-blocks-2026-09-02-06.md) |
-| 2026-09-02 | The 0.6.0-to-0.6.1 release run, the overnight Nova B block, and the four dispatcher errors it recurred: superseded by the 0.6.1 release entry. | [Archive](state-archive/2026-09-02--where-the-release-stands-interim-update-2026-09-01-evening.md) |
-| 2026-09-01 | The 2026-08-31 interim-release handover: the 0.6.0 candidate pushed to nova and stopped one step short of main, the nine ordered PO terminal actions, the privacy sweep disposition, and the carried-forward open questions. Extraction pass performed first and recorded in the survey behind commit 53262b1d; its homeless durable rules and still-live carry-forwards were re-stated in the 2026-09-01 handover. | [Archive](state-archive/2026-09-01--current-handover-0-6-0-is-an-interim-release-nova-b-continue.md) |
-| 2026-08-25 to 2026-08-26 | The 2026-08-25/26 chat-gate-ceremony standardization block: AGY-HGOFIX-2/3, the four chat-gate regressions and their closure, the Agent-tool worktree-isolation incident, the 17-agent AFK sweep and its reconciliation, and the 2026-08-26 sprint_agy push. Extraction pass performed first: every durable rule in it already lives in CLAUDE.md or its own backlog item; the single carry-forward with no home (GWM has no chat-mode activation path) was moved into the current handover before rotation. | [Archive](state-archive/2026-09-01--chat-gate-standardization-and-afk-sweep.md) |
-| 2026-08-23 | The Phoenix-line pointer block: a preamble stating that Nova became the authoritative line and that Phoenix's own checkpoints 61-71 are history. Its content was already archived separately and indexed; the block itself carried no live carry-forward. | [Archive](state-archive/2026-09-01--phoenix-line-pointer-block.md) |
-| 2026-08-31 | The CI release blocker: diagnosis, the measured repair at ed491309, the PO decision to repair rather than bypass, and the inverted push-before-CI sequencing. Its live carry-forwards were extracted into the 2026-08-31 release handover before rotation. | [Archive](state-archive/2026-08-31--ci-release-blocker-diagnosed-and-repaired.md) |
-| 2026-08-31 | The 2026-08-30 block: the 6a93fec2 candidate stamp at 501/503, the six closed retrospective follow-up items, ADR-0076, and the unapproved emergency push of both branches. Its two live carry-forwards -- retro items 7 and 8 deferred to Nova B, and the unresolved Critic FAIL on the sandbox quickfix -- were extracted into the 2026-08-31 handover first. | [Archive](state-archive/2026-08-31--prior-current-handover-nova-0-6-0-local-candidate-stamped-re.md) |
-| 2026-08-31 | The 2026-08-28 three-runner greenfield block: rounds A-U2, the ready-gate blocker T, the 2+2 Critic round, and the candidate's state on the night of 2026-08-28/29. Its still-live carry-forward items were extracted into the 2026-08-31 handover before rotation. | [Archive](state-archive/2026-08-31--prior-current-handover-the-three-runner-greenfield-findings-.md) |
-| 2026-08-28 | Ledger merge across parallel sprints (ADR-0068), ADR renumbering at acceptance (ADR-0069), and the first handover rotation; its four live open items -- ADR collision 0063, the unregistered check-adr-consistency, BS25/BS26 durability, and the Nova A candidate list -- are carried forward to the current handover. | [Archive](state-archive/2026-08-28--earlier-handover-ledger-merge-capability-adr-renumbering-han.md) |
-| 2026-08-28 | Verify green 471/471 in one run at candidate 5fd963fc; EP07 tree-dirtying cause named and fixed; +build stamp convention restored; AK-5 closed, AK-6 ready to re-dispatch; the open 0.6.0 combined-release decision carried forward to the current handover. | [Archive](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
-| 2026-08-27 | sprint_agy fetch, fast-forward, and the 2026-08-26 clean local candidate | [Archive](state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md) |
-| 2026-08-19 through 2026-08-23 | Phoenix-line checkpoints 61-71 (2026-08-19 through 2026-08-23), preserved verbatim as history after the Nova merge made the Nova line authoritative. | [Archive](state-archive/2026-08-27--phoenix-checkpoints-61-71.md) |
-| through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
-| 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [Archive](state-archive/2026-08-19--checkpoints-1-through-60.md) |
-| 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [Archive](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
 ## Durable rules carried forward — these have no other home
 

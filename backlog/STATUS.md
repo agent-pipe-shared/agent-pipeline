@@ -422,6 +422,7 @@
 | pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart | closed | requirement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.model-family-approval-with-automatic-version-upgrades | open | workflow-improvement | pipeline | alfred | 2026-09-30 | — | — |
 | pipeline.model-role-confirmation-prompt-obscures-required-digest | open | workflow-improvement | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
@@ -770,7 +771,7 @@
 
 ## Counts
 
-- open: 105
+- open: 106
 - in_progress: 0
 - closed: 643
 - rejected: 3

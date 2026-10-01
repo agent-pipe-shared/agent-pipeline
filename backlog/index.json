@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "180bee5447da799c6cf0a81beebcdd034e99dd4e7a196eb04b083d99ba724d46"
+    "transitionHead": "a4d68aa0cf584cc411ca3cb444b9b7bc1bc4ccb72faad0bf896091c73640fb93"
   },
   "counts": {
-    "open": 105,
+    "open": 106,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -5533,6 +5533,16 @@
       "closureRepository": "self",
       "closureCommit": "9ab96e01fab4a013ea9a8e8cb88fda546be2fe7f",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-vendored-package-sync-closure.md"
+    },
+    {
+      "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-30",
+      "source": "Explicit PO direction: approve new model types once; automatically select their latest version; retain old versions only on explicit PO request.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
