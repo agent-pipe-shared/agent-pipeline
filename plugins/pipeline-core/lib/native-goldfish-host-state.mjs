@@ -127,15 +127,17 @@ export function prepareNativeGoldfishHostState({ root, runner, input } = {}, dep
   if (!safeRunner(runner)) return fail("NGHS-RUNNER");
   const fields = toolFields(runner, input);
   if (!fields || !safeCorrelation(fields.correlation) || !ID.test(fields.sessionId ?? "")) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
-  const hostMarker = "<!-- pipeline-native-goldfish-host-commit:v1";
-  if (typeof fields.prompt !== "string" || !fields.prompt.includes(hostMarker)) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
+  const hostMarkers = ["<!-- pipeline-native-goldfish-host-commit:v1", "<!-- pipeline-native-goldfish-host-commit:v2"];
+  if (typeof fields.prompt !== "string" || !hostMarkers.some((marker) => fields.prompt.includes(marker))) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
   const parsed = parseNativeGoldfishBriefing(fields.prompt);
   if (!parsed.ok) return fail(parsed.code);
   if (runner === "claude" && fields.runInBackground !== false) return fail("NGHS-CLAUDE-FOREGROUND-REQUIRED");
   const binding = parsed.binding;
   if (binding.runner !== runner) return fail("NGHS-RUNNER-MISMATCH");
   const role = fields.role.startsWith("pipeline-core:") ? fields.role : `pipeline-core:${fields.role}`;
-  if (role !== binding.role) return fail("NGHS-ROLE-MISMATCH");
+  const nativeTypeMatches = binding.adapterVersion === 2 && runner === "codex"
+    ? fields.role === binding.nativeAgentType : role === binding.role;
+  if (!nativeTypeMatches) return fail("NGHS-ROLE-MISMATCH");
   const physicalRoot = realpathSync(resolve(root ?? input.cwd ?? process.cwd()));
   const readGit = dependencies.git ?? git;
   const head = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{commit}"]);
@@ -162,7 +164,8 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
   if (!ID.test(input?.session_id ?? "") || !ID.test(input?.agent_id ?? "")
     || input?.hook_event_name !== "SubagentStart" || !Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) return fail("NGHS-CODEX-START-INPUT");
   const dir = privateDirectory(commonDir, false);
-  const expectedRole = typeof input.agent_type === "string" ? input.agent_type.replace(/^pipeline-core:/u, "") : "";
+  const observedAgentType = typeof input.agent_type === "string" ? input.agent_type : "";
+  const expectedRole = observedAgentType.replace(/^pipeline-core:/u, "");
   const expectedModel = typeof input.model === "string" ? input.model : "";
   const claimedPendingFiles = new Set();
   for (const filename of readdirSync(dir)) {
@@ -184,7 +187,8 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
     try {
       const { value } = readPrivate(commonDir, filename);
       if (value.schema === NATIVE_GOLDFISH_HOST_STATE_SCHEMA && value.runner === "codex"
-        && value.sessionId === input.session_id && value.binding.agentType === expectedRole
+        && value.sessionId === input.session_id
+        && (value.binding.adapterVersion === 2 ? value.binding.nativeAgentType === observedAgentType : value.binding.agentType === expectedRole)
         && value.binding.model === expectedModel && value.agentId === null
         && Number.isSafeInteger(value.createdAtMs) && nowEpochMs >= value.createdAtMs
         && nowEpochMs - value.createdAtMs <= NATIVE_GOLDFISH_CODEX_START_BINDING_TTL_MS) {
@@ -197,7 +201,7 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
   const association = { schema: "pipeline.native-goldfish-host-agent-binding.v1", runner: "codex",
     sessionId: input.session_id, agentId: input.agent_id,
     pendingFile: pending.filename, pendingSha256: digest(Buffer.from(`${JSON.stringify(pending.value, null, 2)}\n`, "utf8")),
-    agentType: expectedRole, createdAtMs: nowEpochMs };
+    agentType: pending.value.binding?.adapterVersion === 2 ? observedAgentType : expectedRole, createdAtMs: nowEpochMs };
   try { return writeExclusive(commonDir, key("agent", "codex", `${input.session_id}\0${input.agent_id}`), association); }
   catch { return fail("NGHS-CODEX-ASSOCIATION-WRITE"); }
 }
@@ -228,7 +232,9 @@ export function readNativeCodexPending({ commonDir, input } = {}) {
     const pending = readPrivate(commonDir, association.pendingFile);
     if (pending.sha256 !== association.pendingSha256 || pending.value.schema !== NATIVE_GOLDFISH_HOST_STATE_SCHEMA
       || pending.value.runner !== "codex" || pending.value.sessionId !== input.session_id
-      || pending.value.binding?.agentType !== association.agentType) return fail("NGHS-CODEX-PENDING-BINDING");
+      || (pending.value.binding?.adapterVersion === 2
+        ? pending.value.binding?.nativeAgentType !== association.agentType
+        : pending.value.binding?.agentType !== association.agentType.replace(/^pipeline-core:/u, ""))) return fail("NGHS-CODEX-PENDING-BINDING");
     return { ok: true, code: "NGHS-CODEX-PENDING-READ", state: { ...pending.value, agentId: input.agent_id }, sha256: pending.sha256 };
   } catch { return fail("NGHS-CODEX-PENDING-MISSING"); }
 }

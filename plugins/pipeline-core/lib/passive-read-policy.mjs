@@ -96,6 +96,7 @@ function safeRecursiveTree(start, protectedRoots, realpath, stat) {
  */
 export function isAllowedPassiveReadTarget(raw, {
   rootDir, homeDir = homedir(), credentialRoots = [], recursive = false, directoryListing = false,
+  additionalRecursiveRoots = [],
   realpath = realpathSync.native ?? realpathSync, stat = statSync,
   repoKeyDirectory = resolveRepoScopedDirectory,
   machinePlaneRead = readMachinePlane,
@@ -103,7 +104,8 @@ export function isAllowedPassiveReadTarget(raw, {
   if (typeof raw !== "string" || !raw || /[\0$`*?\[\]{}]/u.test(raw)
     || typeof rootDir !== "string" || !rootDir
     || typeof homeDir !== "string" || !homeDir
-    || !Array.isArray(credentialRoots)) return false;
+    || !Array.isArray(credentialRoots)
+    || !Array.isArray(additionalRecursiveRoots)) return false;
   const candidate = rawCandidate(raw, rootDir, homeDir);
   if (candidate === null) return false;
   const lexical = resolve(candidate);
@@ -146,7 +148,25 @@ export function isAllowedPassiveReadTarget(raw, {
           && (within(identity, protectedRoot) || within(identity, physicalRoot)))) return false;
     }
   }
-  if (!within(rootDir, lexical) || !within(rootDir, physical)) {
+  // Caller-owned resolved directory boundaries extend only recursive inventory.
+  // Keep rootDir unchanged: relative operands and the repository key pointer
+  // always belong to the original project. Reject ambiguous/missing boundaries.
+  const recursiveRoots = [];
+  if (recursive) {
+    for (const boundary of additionalRecursiveRoots) {
+      if (typeof boundary !== "string" || !isAbsolute(boundary)
+        || resolve(boundary) !== boundary || /[\0$`*?\[\]{}]/u.test(boundary)) return false;
+      try {
+        if (realpath(boundary) !== boundary || !stat(boundary).isDirectory()) return false;
+      } catch { return false; }
+      recursiveRoots.push(boundary);
+    }
+  }
+  const inProject = within(rootDir, lexical) && within(rootDir, physical);
+  const inAdditional = recursive && recursiveRoots.some((boundary) =>
+    within(boundary, lexical) && within(boundary, physical));
+  if (!inProject && inAdditional && raw.split(/[\\/]/u).includes("..")) return false;
+  if (!inProject && !inAdditional) {
     if (!identities.every((identity) => userVisibleHostPath(identity, homeDir))) return false;
     try {
       const observed = stat(candidate);

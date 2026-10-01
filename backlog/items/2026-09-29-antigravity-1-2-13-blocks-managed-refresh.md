@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.antigravity-1-2-13-blocks-managed-refresh
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-09-29

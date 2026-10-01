@@ -307,7 +307,7 @@ export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}
 
 /** Exact passive file reads may use host paths; recursive searches stay scoped. */
 function approvedReadPath(value, root, additionalRoots = []) {
-  return isAllowedPassiveReadTarget(value, { rootDir: root, recursive: true });
+  return isAllowedPassiveReadTarget(value, { rootDir: root, recursive: true, additionalRecursiveRoots: additionalRoots });
 }
 
 function validateRg(argv, root, windows, additionalRoots = []) {
@@ -358,8 +358,8 @@ function validateRg(argv, root, windows, additionalRoots = []) {
 
 // Reuse the pipeline's closed rg option grammar for the direct-command lane.
 // In particular, --pre and output options cannot be mistaken for path data.
-export function isBoundedSingleRg(argv, root) {
-  return validateRg(argv, root, false);
+export function isBoundedSingleRg(argv, root, additionalRoots = []) {
+  return validateRg(argv, root, false, additionalRoots);
 }
 
 /**

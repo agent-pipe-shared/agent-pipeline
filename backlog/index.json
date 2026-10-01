@@ -779,7 +779,7 @@
     {
       "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Antigravity greenfield report for the stamped 0.7 local candidate; verified against installer and preflight source.",
@@ -898,7 +898,7 @@
     {
       "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Antigravity greenfield 0.7.0 report: installed agy 1.2.13 is refused by the source's exact 1.2.12 topology refresh checks; a stale managed copy remains loaded.",
@@ -1759,7 +1759,7 @@
     {
       "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Claude Windows greenfield review M3: a Claude-only project enabled Codex and generated .codex targets, then reported missing Codex runtime files.",
@@ -1850,7 +1850,7 @@
     {
       "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Codex greenfield 0.7.0 review: a fourth design-readiness preparation failed with advisor-private-execution-binding-invalid after a plugin/host refresh, although the retained advisor-finalization document passed its structural validator.",
@@ -3329,7 +3329,7 @@
     {
       "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Claude Windows greenfield review B2/B3: onboarding tried to import a key already at the canonical destination, while its human override needed that key.",
@@ -7486,7 +7486,7 @@
     {
       "id": "pipeline.read-only-guard-admits-execution-and-output-options",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-30",
       "source": "Independent security critique of the proposed external passive-read repair; existing guard source examined before mutation.",
@@ -7673,7 +7673,7 @@
     {
       "id": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Codex reconnect reproduced: pipeline-start preflight ready, then project-onboarding-v3 inspect printed Unexpected end of JSON input because a nested Node reader received empty stdout in the managed sandbox; the same read-only command at the host boundary returned ready.",
@@ -9537,7 +9537,7 @@
     {
       "id": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
       "status": "open",
-      "type": "privacy-bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Claude Windows greenfield review M2: fresh pipeline.user.yaml set advisor_export.consent to approved before the PO answered an export question.",
@@ -9938,7 +9938,7 @@
     {
       "id": "pipeline.windows-greenfield-scratch-write-denied",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Claude Windows 11 greenfield review B1: intake-required rejected native absolute Write and PowerShell scratch paths.",
@@ -9948,7 +9948,7 @@
     {
       "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Claude Windows greenfield onboarding report for the stamped 0.7 local candidate; verified against current source before correction.",
@@ -9971,7 +9971,7 @@
     {
       "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
       "status": "open",
-      "type": "bug",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Claude Windows greenfield review H1: fsync on a read-only descriptor returned EPERM; the offered installer argv was relative to the plugin rather than the consumer repository.",

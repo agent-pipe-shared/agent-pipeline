@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.windows-pre-push-installer-fsync-and-relative-action
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-09-29

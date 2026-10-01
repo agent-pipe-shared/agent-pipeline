@@ -10,10 +10,11 @@ import { nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.m
 import { NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 
 export const NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA = "pipeline.native-goldfish-host-observation.v1";
+export const NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA = "pipeline.native-goldfish-host-observation.v2";
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const HOST_MARKER = (runner) => `Native-Host-Observed: v1 (${runner})`;
+const HOST_MARKER = (runner, version = 1) => `Native-Host-Observed: v${version} (${runner})`;
 const KEYS = ["schema", "runner", "dispatchId", "sessionId", "toolUseId", "agentId", "candidateCommit",
   "candidateTree", "role", "model", "effort", "rulesetSha", "allowedPaths", "resultSha256",
   "reportSha256", "commit", "parent", "tree", "changedPaths", "hostMarker", "assurance",
@@ -47,10 +48,13 @@ function recordMatches(receipt, record, bytes) {
 }
 
 export function validateNativeGoldfishHostObservation(receipt, { record = null, recordBytes = null } = {}) {
-  if (!exact(receipt, [...KEYS, "receiptSha256"])) return false;
+  const version = receipt?.schema === NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA ? 2 : 1;
+  const keys = version === 2 ? [...KEYS.slice(0, 8), "nativeAgentType", ...KEYS.slice(8)] : KEYS;
+  if (!exact(receipt, [...keys, "receiptSha256"])) return false;
   const { receiptSha256, ...subject } = receipt;
-  if (subject.schema !== NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA
+  if (subject.schema !== (version === 2 ? NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA : NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA)
     || !["claude", "codex"].includes(subject.runner)
+    || (version === 2 && (subject.runner !== "codex" || subject.nativeAgentType !== "worker"))
     || !ID.test(subject.dispatchId ?? "") || !ID.test(subject.sessionId ?? "")
     || !ID.test(subject.toolUseId ?? "")
     || (subject.runner === "codex" ? !ID.test(subject.agentId ?? "") : subject.agentId !== null)
@@ -69,10 +73,11 @@ export function validateNativeGoldfishHostObservation(receipt, { record = null, 
     || !subject.changedPaths.every(normalizedPath) || new Set(subject.changedPaths).size !== subject.changedPaths.length
     || [...subject.changedPaths].sort().join("\0") !== subject.changedPaths.join("\0")
     || !subject.changedPaths.every((path) => subject.allowedPaths.includes(path))
-    || subject.hostMarker !== HOST_MARKER(subject.runner)
+    || subject.hostMarker !== HOST_MARKER(subject.runner, version)
     || subject.assurance !== (subject.runner === "claude"
       ? "host-observed-tool-use-and-resolved-model-not-provider-attested"
-      : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested")
+      : version === 2 ? "host-observed-subagent-start-stop-native-worker-and-session-route-not-provider-attested"
+        : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested")
     || !SHA.test(subject.recordSha256 ?? "") || !SHA.test(receiptSha256 ?? "")) return false;
   try { if (receiptSha256 !== hash(canonicalizeJson(subject))) return false; } catch { return false; }
   return record === null && recordBytes === null || !!record && recordMatches(subject, record, recordBytes);
@@ -86,19 +91,22 @@ export function draftNativeGoldfishHostObservation({ state, observation, commitR
     || commitReadback.ok !== true || commitReadback.code !== "NATIVE-HOST-COMMIT-READBACK-VERIFIED") {
     return fail("NGHO-DRAFT-INPUT");
   }
-  const subject = { schema: NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA,
+  const version = state.binding.adapterVersion === 2 ? 2 : 1;
+  const subject = { schema: version === 2 ? NATIVE_GOLDFISH_CODEX_HOST_OBSERVATION_SCHEMA : NATIVE_GOLDFISH_HOST_OBSERVATION_SCHEMA,
     runner: state.runner, dispatchId: state.binding.dispatchId, sessionId: state.sessionId,
     toolUseId: state.toolUseId, agentId: state.agentId,
+    ...(version === 2 ? { nativeAgentType: state.binding.nativeAgentType } : {}),
     candidateCommit: state.binding.candidateCommit, candidateTree: state.binding.candidateTree,
     role: state.binding.role, model: state.binding.model, effort: state.binding.effort,
     rulesetSha: state.binding.rulesetSha, allowedPaths: [...state.binding.allowedPaths].sort(),
     resultSha256: observation.final.resultSha256,
     reportSha256: observation.final.reportSha256,
     commit: commitReadback.commit, parent: commitReadback.parent, tree: commitReadback.tree,
-    changedPaths: [...commitReadback.paths].sort(), hostMarker: HOST_MARKER(state.runner),
+    changedPaths: [...commitReadback.paths].sort(), hostMarker: HOST_MARKER(state.runner, version),
     assurance: state.runner === "claude"
       ? "host-observed-tool-use-and-resolved-model-not-provider-attested"
-      : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested",
+      : version === 2 ? "host-observed-subagent-start-stop-native-worker-and-session-route-not-provider-attested"
+        : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested",
     recordSha256: hash(nativeAuthoredRecordBytes(record)) };
   const receipt = { ...subject, receiptSha256: hash(canonicalizeJson(subject)) };
   return validateNativeGoldfishHostObservation(receipt, { record, recordBytes: nativeAuthoredRecordBytes(record) })

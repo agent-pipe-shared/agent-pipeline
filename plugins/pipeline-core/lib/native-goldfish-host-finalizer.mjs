@@ -85,7 +85,8 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
 
   let committed;
   try {
-    committed = (dependencies.commit ?? commitAdmittedNativeGoldfishReturn)({ runner, baseline: state.baseline,
+    committed = (dependencies.commit ?? commitAdmittedNativeGoldfishReturn)({ runner,
+      adapterVersion: state.binding.adapterVersion ?? 1, baseline: state.baseline,
       final: observation.final, allowedPaths: state.binding.allowedPaths,
       taskId: state.binding.dispatchId, priorAdmission: admission });
   } catch { return { ...fail("NGHF-COMMIT-EXCEPTION"), commit: "unknown" }; }

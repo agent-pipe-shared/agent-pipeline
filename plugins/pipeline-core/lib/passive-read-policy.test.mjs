@@ -7,6 +7,56 @@ import { join } from "node:path";
 import test from "node:test";
 import { isAllowedPassiveReadTarget } from "./passive-read-policy.mjs";
 
+test("recursive additional roots are exact physical boundaries and retain project key authority", (t) => {
+  const fixture = mkdtempSync(join(tmpdir(), "passive-additional-root-"));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const root = join(fixture, "repo"), home = join(fixture, "home");
+  const plugin = join(fixture, "plugin"), sibling = join(fixture, "plugin-sibling");
+  const keys = join(fixture, "keys");
+  for (const directory of [root, home, plugin, sibling, keys]) mkdirSync(directory);
+  writeFileSync(join(plugin, "index.mjs"), "export const value = 1;\n");
+  writeFileSync(join(sibling, "readme.md"), "harmless\n");
+  writeFileSync(join(keys, "ordinary.md"), "synthetic fixture\n");
+  mkdirSync(join(home, ".ssh"));
+  writeFileSync(join(home, ".ssh", "ordinary.md"), "synthetic fixture\n");
+  const context = { rootDir: root, homeDir: home, recursive: true,
+    additionalRecursiveRoots: [plugin],
+    machinePlaneRead: () => ({ status: "absent" }),
+    repoKeyDirectory: (project) => {
+      assert.equal(project, root, "key authority remains bound to original project");
+      return { status: "valid", directory: keys };
+    },
+  };
+  assert.equal(isAllowedPassiveReadTarget(plugin, context), true);
+  assert.equal(isAllowedPassiveReadTarget(plugin, { ...context, additionalRecursiveRoots: [] }), false);
+  assert.equal(isAllowedPassiveReadTarget(sibling, context), false);
+  assert.equal(isAllowedPassiveReadTarget("plugin", context), false, "relative paths resolve only in project");
+  assert.equal(isAllowedPassiveReadTarget(join(plugin, "..", "plugin") + "/../plugin", context), false);
+  for (const boundary of [null, "plugin", plugin + "/..", join(fixture, "missing"), join(plugin, "index.mjs")]) {
+    assert.equal(isAllowedPassiveReadTarget(plugin, { ...context, additionalRecursiveRoots: [boundary] }), false);
+  }
+  assert.equal(isAllowedPassiveReadTarget(plugin, { ...context, additionalRecursiveRoots: plugin }), false);
+  const escape = join(plugin, "outside");
+  symlinkSync(sibling, escape, process.platform === "win32" ? "junction" : "dir");
+  assert.equal(isAllowedPassiveReadTarget(escape, context), false);
+  assert.equal(isAllowedPassiveReadTarget(escape, { ...context, additionalRecursiveRoots: [escape] }), false);
+  const alias = join(plugin, "key-alias");
+  symlinkSync(keys, alias, process.platform === "win32" ? "junction" : "dir");
+  assert.equal(isAllowedPassiveReadTarget(join(alias, "ordinary.md"), context), false);
+  assert.equal(isAllowedPassiveReadTarget(keys, { ...context, additionalRecursiveRoots: [keys] }), false);
+  assert.equal(isAllowedPassiveReadTarget(join(home, ".ssh"), {
+    ...context, additionalRecursiveRoots: [join(home, ".ssh")],
+  }), false);
+  assert.equal(isAllowedPassiveReadTarget(plugin, {
+    ...context, machinePlaneRead: () => ({ status: "invalid" }),
+  }), false);
+  assert.equal(isAllowedPassiveReadTarget(plugin, {
+    ...context, repoKeyDirectory: () => ({ status: "invalid" }),
+  }), false);
+  writeFileSync(join(plugin, "po-private.pem"), "synthetic fixture\n");
+  assert.equal(isAllowedPassiveReadTarget(plugin, context), false, "recursive inventory still excludes keys");
+});
+
 test("an external user report remains readable while key material and aliases are excluded", (t) => {
   const fixture = mkdtempSync(join(tmpdir(), "passive-read-policy-"));
   t.after(() => rmSync(fixture, { recursive: true, force: true }));

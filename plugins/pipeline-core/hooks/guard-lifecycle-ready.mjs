@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { physicalQualityPackageFile, validateQualityPackageCommandArgs } from "../lib/signed-quality-package.mjs";
 import { isPhysicalScratchTarget, isBoundedScratchOnlyWords } from "../lib/physical-scratch-boundary.mjs";
 // SPDX-License-Identifier: SUL-1.0
 
@@ -1397,6 +1398,7 @@ function gateStrengthShellRefusal(command, root, dependencies = {}) {
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
   if (isGateStrengthSafeGitCommand(command, root)) return null;
   if (gateStrengthShellReadOnlyScriptExemption(command, root, dependencies)) return null;
+  if (signedQualityPackageCommandAdmission(command, root, dependencies)) return null;
   // Needles are every entry of GATE_STRENGTH_PATHS (imported above), by basename -- not
   // restated here as a count or a fixed category, because that is what went stale last
   // time: this sentence used to say "the five configuration paths (GS-1..GS-5)" and the
@@ -1504,6 +1506,21 @@ export const GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS = Object.freeze([
  * trusted merely for sharing a relative path; only the installed copy actually running
  * this check is.
  */
+/** Write-capable signed-package lane: skips ONLY the basename classifier. */
+export function signedQualityPackageCommandAdmission(command, root, dependencies = {}) {
+  if (typeof command !== "string" || /[\\$\x60;&|<>\r\n]/u.test(command)) return false;
+  const words = simpleWords(command, root);
+  if (!words || words.length !== 7) return false;
+  const directNode = (dependencies.platform ?? process.platform) === "win32" ? ["node", "node.exe"] : ["node"];
+  if (![...directNode, dependencies.processExecPath ?? process.execPath].includes(words[0])) return false;
+  try {
+    const pluginRoot = realpathSync(PLUGIN_ROOT);
+    const script = join(pluginRoot, "scripts", "quality-package-materializer.mjs");
+    if (words[1] !== script || !physicalQualityPackageFile(script, pluginRoot, 1024 * 1024)) return false;
+    return validateQualityPackageCommandArgs(words.slice(2), root);
+  } catch { return false; }
+}
+
 function gateStrengthShellReadOnlyScriptExemption(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
   if (!words || words.length < 2) return false;
@@ -3070,6 +3087,27 @@ function isNamesOnlyLsArgs(args, root) {
  * (neither of which passes a third argument) keep exactly the piped shape's own allowance
  * for reading this plugin's own installed root, for free.
  */
+function isStandaloneHeadTailReadArgs(args, root, extraRoots) {
+  if (args.length === 0) return true; // Existing bare-command compatibility.
+  let index = 0;
+  let count;
+  if (args[0] === "-n") {
+    if (args.length < 2) return false;
+    count = args[1];
+    index = 2;
+  } else if (/^-[0-9]+$/u.test(args[0])) {
+    count = args[0].slice(1);
+    index = 1;
+  } else if (args[0].startsWith("-")) {
+    return false;
+  }
+  if (count !== undefined && (!/^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u.test(count)
+    || Number(count) < 1 || Number(count) > 500)) return false;
+  const paths = args.slice(index);
+  if (paths.some((path) => path.startsWith("-"))) return false;
+  return paths.length === 0 || paths.every((path) => isApprovedSingleCommandReadArg(path, root, extraRoots));
+}
+
 function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
@@ -3128,9 +3166,10 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
       && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
   }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
-    if (executable === "rg") return isBoundedSingleRg(args, root);
+    if (executable === "rg") return isBoundedSingleRg(args, root, extraRoots);
     if (executable === "grep") return isSafeExactGrepArgs(args, root);
     if (executable === "ls" && isNamesOnlyLsArgs(args, root)) return true;
+    if (["head", "tail"].includes(executable)) return isStandaloneHeadTailReadArgs(args, root, extraRoots);
     if (args.some((arg) => arg === "--files-with-matches" && executable === "grep")) return false;
     // The single-command sibling of isOutsideRootBoundedDiagnosticRead's containment check --
     // see isOutsideRootSingleCommandRead() below, whose comment carries the item's done_when
@@ -3239,7 +3278,7 @@ export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
   if (isBoundedReadOnlyNewlineChain(command, root, extraRoots)) return true;
   if (isBoundedReadOnlyAndChain(command, root, extraRoots)) return true;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots)) return true;
-  return isReadOnlySimpleWords(simpleWords(command, root), root, pipelineRoots);
+  return isReadOnlySimpleWords(simpleWords(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM }), root, pipelineRoots);
 }
 
 function isRejectedReadFamilyCommand(command, root) {

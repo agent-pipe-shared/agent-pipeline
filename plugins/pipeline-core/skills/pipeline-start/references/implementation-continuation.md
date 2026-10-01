@@ -34,6 +34,15 @@ Antigravity `invoke_subagent` request including a Pipeline role, load
 `references/antigravity-native-dispatch.md` regardless of Workflow or
 worktree choice.
 
+For native host-commit dispatches, select the binding from the caller being
+invoked: Claude `Agent`/`Task` uses the v1 functional `agentType`; Codex
+`spawn_agent` uses the v2 `nativeAgentType: "worker"` while retaining the
+functional `pipeline-core:goldfish-implementor` or
+`pipeline-core:goldfish-mechanic` role. Insert one selected binding and one
+host directive into the complete six-field Goldfish briefing. Keep unused
+runner examples out of the dispatched message so hook preparation sees one
+unambiguous marker.
+
 A feature's implementation is incomplete until the `critic-review` skill has
 dispatched a Critic review and returned a result, whether pass or documented
 fail-then-fix. This applies in consuming projects. After applicable plan and

@@ -152,3 +152,78 @@ test("quality package fails closed on tamper, unsafe paths, proof failure, and b
     assert.equal(applyQualityPackage({ repoRoot: item.root, packageIntent: item.record, proof: item.proof, trustPolicy: item.trustPolicy, applyToMain: true }).code, "QUALITY-PACKAGE-BASE-DRIFT");
   } finally { rmSync(item.root, { recursive: true, force: true }); }
 });
+
+import {spawnSync as agentSpawnSync} from "node:child_process";
+import {linkSync as agentLinkSync} from "node:fs";
+import {fileURLToPath as agentFileURLToPath} from "node:url";
+
+
+function signedAgentInputs(item) {
+  const inputDir=join(item.root,"scratch");mkdirSync(inputDir);
+  writeFileSync(join(item.root,".gitignore"),"/scratch/\n");git(item.root,["add",".gitignore"]);git(item.root,["commit","-qm","fixture inputs"]);
+  item.record.baseCommit=git(item.root,["rev-parse","HEAD"]);item.record.intentSha256=qualityPackageIntentSha256(item.record);item.proof=proofFor(item.record,item);
+  const intent=join(inputDir,"intent.json"),proof=join(inputDir,"proof.json"),policy=join(item.root,"project/critical-human-proof.json");
+  writeFileSync(intent,JSON.stringify(item.record));writeFileSync(proof,JSON.stringify(item.proof));
+  return {intent,proof,policy};
+}
+function signedAgentCli(item,inputs,tail=["verify"],policy=inputs.policy,intent=inputs.intent,proof=inputs.proof) {
+  return agentSpawnSync(process.execPath,[agentFileURLToPath(new URL("../scripts/quality-package-materializer.mjs",import.meta.url)),item.root,intent,proof,policy,...tail],{cwd:item.root,encoding:"utf8"});
+}
+
+test("SIGNED-AGENT CLI verifies, applies and authorizes with canonical committed trust",()=>{
+  const item=fixture();try{
+    const input=signedAgentInputs(item);
+    assert.equal(signedAgentCli(item,input).status,0);
+    assert.equal(readFileSync(join(item.root,"subject.txt"),"utf8"),"before\n");
+    assert.equal(signedAgentCli(item,input,["apply"]).status,0);
+    git(item.root,["add","subject.txt"]);
+    assert.equal(signedAgentCli(item,input,["authorize-commit"]).status,0);
+    writeFileSync(join(item.root,"extra.txt"),"extra\n");git(item.root,["add","extra.txt"]);
+    assert.notEqual(signedAgentCli(item,input,["authorize-commit"]).status,0,"whole index");
+  }finally{rmSync(item.root,{recursive:true,force:true});}
+});
+
+for(const kind of ["trailing","alternate-policy","intent-symlink","proof-symlink","intent-escape","oversized-proof","policy-symlink","policy-hardlink","worktree-drift","index-drift","untracked-policy","wrong-key","forged-proof","dirty-apply","base-drift"])test("SIGNED-AGENT rejects "+kind,()=>{
+ const item=fixture();try{
+  let input=signedAgentInputs(item), policy=input.policy,intent=input.intent,proof=input.proof,tail=["verify"];
+  if(kind==="trailing")tail.push("extra");
+  if(kind==="alternate-policy"){policy=join(item.root,"scratch/alternate.json");writeFileSync(policy,readFileSync(input.policy));}
+  if(kind==="intent-symlink"||kind==="proof-symlink"){const link=join(item.root,"scratch/link.json");symlinkSync(kind==="intent-symlink"?intent:proof,link);if(kind==="intent-symlink")intent=link;else proof=link;}
+  if(kind==="intent-escape")intent=item.root+"/scratch/../scratch/intent.json";
+  if(kind==="oversized-proof")writeFileSync(proof,JSON.stringify(item.proof)+" ".repeat(32769));
+  if(kind==="policy-symlink"){const target=join(item.root,"scratch/policy.json");writeFileSync(target,readFileSync(policy));rmSync(policy);symlinkSync(target,policy);}
+  if(kind==="policy-hardlink")agentLinkSync(policy,join(item.root,"scratch/policy-link.json"));
+  if(kind==="worktree-drift")writeFileSync(policy,readFileSync(policy,"utf8")+"\n");
+  if(kind==="index-drift"){const bytes=readFileSync(policy);writeFileSync(policy,bytes.toString()+"\n");git(item.root,["add","project/critical-human-proof.json"]);writeFileSync(policy,bytes);}
+  if(kind==="untracked-policy"){
+    const bytes=readFileSync(policy);rmSync(policy);git(item.root,["add","project/critical-human-proof.json"]);git(item.root,["commit","-qm","fixture absent anchor"]);writeFileSync(policy,bytes);
+    item.record.baseCommit=git(item.root,["rev-parse","HEAD"]);item.record.intentSha256=qualityPackageIntentSha256(item.record);item.proof=proofFor(item.record,item);writeFileSync(intent,JSON.stringify(item.record));writeFileSync(proof,JSON.stringify(item.proof));
+  }
+  if(kind==="wrong-key"){const keys=generateKeyPairSync("ed25519");item.proof.publicKey=keys.publicKey.export({type:"spki",format:"pem"});item.proof.signatureBase64=sign(null,Buffer.from(item.record.intentSha256),keys.privateKey).toString("base64");writeFileSync(proof,JSON.stringify(item.proof));}
+  if(kind==="forged-proof"){item.proof.signatureBase64=Buffer.alloc(64).toString("base64");writeFileSync(proof,JSON.stringify(item.proof));}
+  if(kind==="dirty-apply"){tail=["apply"];writeFileSync(join(item.root,"subject.txt"),"dirty\n");}
+  if(kind==="base-drift"){tail=["apply"];git(item.root,["commit","--allow-empty","-qm","fixture drift"]);}
+  const result=signedAgentCli(item,input,tail,policy,intent,proof);
+  assert.notEqual(result.status,0,kind+": "+result.stdout+result.stderr);
+ }finally{rmSync(item.root,{recursive:true,force:true});}
+});
+
+test("SIGNED-AGENT refuses policy self-mutation even with explicit external trust",()=>{
+ const item=fixture();try{
+  const policy="project/critical-human-proof.json",before=readFileSync(join(item.root,policy),"utf8"),after=before+"\n";
+  writeFileSync(join(item.root,policy),after);
+  const record={schema:SIGNED_QUALITY_PACKAGE_SCHEMA,baseCommit:item.record.baseCommit,unifiedDiff:execFileSync("git",["diff","--",policy],{cwd:item.root,encoding:"utf8"}),expectedDigests:{[policy]:sha(after)}};
+  record.intentSha256=qualityPackageIntentSha256(record);writeFileSync(join(item.root,policy),before);
+  assert.equal(applyQualityPackage({repoRoot:item.root,packageIntent:record,proof:proofFor(record,item),trustPolicy:item.trustPolicy}).ok,false);
+ }finally{rmSync(item.root,{recursive:true,force:true});}
+});
+
+test("SIGNED-AGENT authorize refuses a planted untracked policy",()=>{
+ const item=fixture();try{
+  const policy=join(item.root,"project/critical-human-proof.json"),bytes=readFileSync(policy);
+  rmSync(policy);git(item.root,["add","project/critical-human-proof.json"]);git(item.root,["commit","-qm","fixture absent anchor"]);writeFileSync(policy,bytes);
+  item.record.baseCommit=git(item.root,["rev-parse","HEAD"]);item.record.intentSha256=qualityPackageIntentSha256(item.record);item.proof=proofFor(item.record,item);
+  writeFileSync(join(item.root,"subject.txt"),"after\n");git(item.root,["add","subject.txt"]);
+  assert.equal(authorizeQualityPackageCommit({repoRoot:item.root,packageIntent:item.record,proof:item.proof}).ok,false);
+ }finally{rmSync(item.root,{recursive:true,force:true});}
+});

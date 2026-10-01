@@ -62,6 +62,7 @@ import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-bin
 import { dispatchBudgetBinding, dispatchFindings } from "../lib/dispatch-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
+import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -167,7 +168,22 @@ if (isDirectInvocation(import.meta.url)) {
     process.exit(0);
   }
 
-  const evaluated = dispatches.map((dispatch) => ({
+  const codexV2Marker = "<!-- pipeline-native-goldfish-host-commit:v2";
+  const markedV2 = dispatches.filter((dispatch) => dispatch.prompt.includes(codexV2Marker));
+  let policyDispatches = dispatches;
+  if (markedV2.length > 0) {
+    const parsed = markedV2.length === 1 && dispatches.length === 1 && input?.tool_name === "spawn_agent"
+      ? parseNativeGoldfishBriefing(markedV2[0].prompt) : { ok: false, code: "NGHR-BRIEFING-TRANSPORT" };
+    if (!parsed.ok || toolInput.agent_type !== parsed.binding?.nativeAgentType || Object.hasOwn(toolInput, "agentType")
+      || typeof toolInput.message !== "string" || Object.hasOwn(toolInput, "prompt")) {
+      const code = !parsed.ok ? parsed.code : "NGHR-NATIVE-AGENT-TYPE";
+      process.stderr.write(`BLOCKED (guard-dispatch): ${code}: the version 2 native Goldfish binding requires one Codex worker packet and a valid functional Pipeline role.\n`);
+      process.exit(2);
+    }
+    policyDispatches = [{ ...markedV2[0], subagentType: parsed.binding.role }];
+  }
+
+  const evaluated = policyDispatches.map((dispatch) => ({
     dispatch,
     policy: dispatchFindings(dispatch),
     budget: dispatchBudgetBinding(dispatch),
@@ -223,7 +239,7 @@ if (isDirectInvocation(import.meta.url)) {
       }
     }
     const nativeMarker = "<!-- pipeline-native-goldfish-host-commit:v1";
-    const markedNative = dispatches.filter((dispatch) => dispatch.prompt.includes(nativeMarker));
+    const markedNative = dispatches.filter((dispatch) => dispatch.prompt.includes(nativeMarker) || dispatch.prompt.includes(codexV2Marker));
     if (markedNative.length > 0) {
       const nativeRunner = ["Task", "Agent"].includes(input?.tool_name) ? "claude"
         : input?.tool_name === "spawn_agent" ? "codex" : null;
@@ -233,6 +249,10 @@ if (isDirectInvocation(import.meta.url)) {
         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
         const prepared = prepareNativeGoldfishHostState({ root: rootDir, runner: nativeRunner, input });
         if (!prepared.ok) {
+          if (markedV2.length > 0) {
+            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.\n`);
+            process.exit(2);
+          }
           process.stderr.write(`WARNING (guard-dispatch): native host-commit preparation failed (${prepared.code}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.\n`);
         }
       }

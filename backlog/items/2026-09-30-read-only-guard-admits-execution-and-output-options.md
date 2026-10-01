@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.read-only-guard-admits-execution-and-output-options
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-09-30

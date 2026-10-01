@@ -113,6 +113,105 @@ USAGE (Elephant)
     result for the Elephant's own pre-dispatch orientation, never something to
     paste into PO-facing chat text as a message-budget shortcut.
 ═══════════════════════════════════════════════════════════════════════════
+The dispatcher selects the binding version from the actual caller. Claude uses
+`pipeline.native-goldfish-host-briefing.v1` with `agentType` set to the
+functional role name. Codex `spawn_agent` uses
+`pipeline.native-goldfish-host-briefing.v2` with `nativeAgentType: "worker"`
+and a functional `role` of `pipeline-core:goldfish-implementor` or
+`pipeline-core:goldfish-mechanic`. These are the complete closed bindings; the
+property names and value types are normative. Replace every `{{...}}` value
+with the exact fact selected or observed for this dispatch. In particular,
+`rulesetSha` is the SHA actually loaded by the current dispatcher, never a
+sample, guessed, or looked-up substitute. `candidateCommit` and
+`candidateTree` are the exact dispatched candidate's Git object IDs.
+
+Claude `Agent` (or legacy `Task`) binding, schema v1:
+
+```json
+<!-- pipeline-native-goldfish-host-commit:v1
+{
+  "schema": "pipeline.native-goldfish-host-briefing.v1",
+  "dispatchId": "{{DISPATCH_ID}}",
+  "candidateCommit": "{{CANDIDATE_COMMIT_OID}}",
+  "candidateTree": "{{CANDIDATE_TREE_OID}}",
+  "runner": "claude",
+  "role": "{{FUNCTIONAL_ROLE}}",
+  "agentType": "{{CLAUDE_AGENT_TYPE}}",
+  "model": "{{SELECTED_MODEL_ID}}",
+  "effort": "{{SELECTED_EFFORT}}",
+  "rulesetSha": "{{LOADED_RULESET_SHA256}}",
+  "allowedPaths": ["src/change.mjs"],
+  "criticDecision": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 1,
+      "riskClass": "medium",
+      "riskFlag": false,
+      "diff": {"mechanical": false, "architecture": true, "guardrails": false, "security": false}
+    },
+    "appliedRow": "T1"
+  }
+}
+-->
+```
+
+Codex `spawn_agent` binding, schema v2:
+
+```json
+<!-- pipeline-native-goldfish-host-commit:v2
+{
+  "schema": "pipeline.native-goldfish-host-briefing.v2",
+  "dispatchId": "{{DISPATCH_ID}}",
+  "candidateCommit": "{{CANDIDATE_COMMIT_OID}}",
+  "candidateTree": "{{CANDIDATE_TREE_OID}}",
+  "runner": "codex",
+  "role": "{{FUNCTIONAL_ROLE}}",
+  "nativeAgentType": "worker",
+  "model": "{{SELECTED_MODEL_ID}}",
+  "effort": "{{SELECTED_EFFORT}}",
+  "rulesetSha": "{{LOADED_RULESET_SHA256}}",
+  "allowedPaths": ["src/change.mjs"],
+  "criticDecision": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 1,
+      "riskClass": "medium",
+      "riskFlag": false,
+      "diff": {"mechanical": false, "architecture": true, "guardrails": false, "security": false}
+    },
+    "appliedRow": "T1"
+  }
+}
+-->
+```
+
+`FUNCTIONAL_ROLE` is exactly `pipeline-core:goldfish-implementor` or
+`pipeline-core:goldfish-mechanic`; for v1, `CLAUDE_AGENT_TYPE` is respectively
+`goldfish-implementor` or `goldfish-mechanic`. `SELECTED_MODEL_ID` and
+`SELECTED_EFFORT` are the concrete model and effort returned by the registered
+model-role selector for this task and runner. Replace the illustrative
+`allowedPaths` with a non-empty, sorted, unique JSON array of normalized
+repository-relative paths limited to the exact paths this host transaction may
+commit. `criticDecision` is exactly
+one closed decision: either `pipeline.critic-required-decision.v1` with
+`appliedRow` T1/T2/T3/T4, or `pipeline.critic-skip-decision.v1` with
+`appliedRow` T0/T5; both contain the closed
+`pipeline.critic-trigger-input.v1` trigger (`rigorLevel`: 0/1/2,
+`riskClass`: low/medium/high, boolean `riskFlag`, and the four boolean `diff`
+fields `mechanical`, `architecture`, `guardrails`, `security`). The complete
+example decision is a T1 required-Critic decision; use the exact selected
+decision and ensure its row is the row its trigger evaluates to. Use the
+existing critic disposition contract; do not guess a new schema or row.
+
+Keep the marker and exact directive below out of examples and alternatives in
+the dispatched body: the dispatcher inserts exactly one selected binding in
+the dispatcher-only portion, before `COPY EVERYTHING BELOW THIS LINE`, and
+copies only the body after that sentinel. The copied body therefore has one
+selected binding and exactly one host directive, with no unused example
+markers.
+
 COPY EVERYTHING BELOW THIS LINE
 -->
 
@@ -144,7 +243,7 @@ with the ruleset SHA from field 6):
 If this briefing lacks the ruleset SHA, that is a briefing defect: stop and
 report back to the Elephant — do not research it yourself.
 
-**Native host-commit mode (only when the exact binding block below is present):**
+**Native host-commit mode (only when the dispatcher inserts exactly one binding block):**
 the dispatcher has opted this one foreground Claude `Agent` (or legacy `Task`)
 or Codex `spawn_agent` call into
 the runner-hook host-commit transaction. This mode overrides the ordinary
@@ -174,15 +273,13 @@ response is not a final return and cannot be host-committed. A missing or true
 background flag leaves the ordinary dispatch available but produces no host
 commit authority.
 
-The opt-in binding has this exact shape and must occur once in the prompt; its
-separate host directive must also occur once:
+The dispatcher selects the native binding for the actual caller and inserts it
+before this copied body. Claude uses schema v1 with its functional agent type;
+Codex uses schema v2 with native agent type `worker` and the selected functional
+Pipeline role. The copied body receives only its one selected binding.
 
-```text
-<!-- pipeline-native-goldfish-host-commit:v1
-{"schema":"pipeline.native-goldfish-host-briefing.v1","dispatchId":"...","candidateCommit":"...","candidateTree":"...","runner":"claude|codex","role":"pipeline-core:goldfish-implementor|pipeline-core:goldfish-mechanic","agentType":"goldfish-implementor|goldfish-mechanic","model":"<concrete runner-observed id>","effort":"<resolved effort>","rulesetSha":"<sha256>","allowedPaths":["<exact allowed repo-relative path>"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1|pipeline.critic-skip-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":2,"riskClass":"low","riskFlag":false,"diff":{"mechanical":false,"architecture":false,"guardrails":false,"security":false}},"appliedRow":"T3"}}
--->
 NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
-```
+
 
 **Scratch location:** for any temporary file (probe script, held note,
 throwaway fixture) use the repository's own `scratch/` directory — gitignored,

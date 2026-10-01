@@ -1914,7 +1914,9 @@ function archivePrivateCleanupReleaseReceipt(root, { spawn = defaultGitSpawn } =
   }
   return archiveObservedPrivateCleanupReleaseReceipt(
     observed,
-    observed.receipt?.recoveryPlanSha256 ?? observed.quarantine.recoveryPlanSha256,
+    observed.receipt?.schema === PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA
+      ? observed.sha256
+      : observed.receipt?.recoveryPlanSha256 ?? observed.quarantine.recoveryPlanSha256,
   );
 }
 

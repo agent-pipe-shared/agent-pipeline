@@ -114,10 +114,12 @@ export function commitAdmittedAgyReturn(input = {}, dependencies = {}) {
 }
 
 /** Claude/Codex native hook return adapter; no caller-controlled runner, model, or marker. */
-export function commitAdmittedNativeGoldfishReturn({ runner, ...input } = {}, dependencies = {}) {
+export function commitAdmittedNativeGoldfishReturn({ runner, adapterVersion = 1, ...input } = {}, dependencies = {}) {
   if (runner !== "claude" && runner !== "codex") return fail("NATIVE-HOST-COMMIT-RUNNER");
+  if (!Number.isSafeInteger(adapterVersion) || (runner === "claude" && adapterVersion !== 1)
+    || (runner === "codex" && ![1, 2].includes(adapterVersion))) return fail("NATIVE-HOST-COMMIT-ADAPTER-VERSION");
   return commitAdmittedReturn(input, dependencies, { runner,
     subject: `feat(${runner}): deliver validated Goldfish return`,
     body: `Host commit after validated ${runner} native Goldfish return and exact-path admission.`,
-    marker: `Native-Host-Observed: v1 (${runner})`, codePrefix: "NATIVE" });
+    marker: `Native-Host-Observed: v${adapterVersion} (${runner})`, codePrefix: "NATIVE" });
 }

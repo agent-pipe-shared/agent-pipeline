@@ -11,6 +11,7 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validateRulesetSource } from "../lib/ruleset-source.mjs";
+import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { applyInstall } from "./pre-push-hook-install.mjs";
 import {
@@ -156,6 +157,28 @@ function preflight(options) {
       findings: [{ code: "legacy-decision-without-sidecar", path: "docs/adr/legacy.md" }],
     }),
     ...options,
+  });
+}
+function assertGuidedOnboardingAction(result, root, runner) {
+  assert.deepEqual(result.nextAction, {
+    kind: "command",
+    executable: "node",
+    argv: [join(result.pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", runner],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: result.executionBoundary,
+    expected: { schema: "pipeline.onboarding-init.v1" },
+  });
+}
+function assertRefreshAdvisory(result) {
+  assert.deepEqual(result.nextAction, {
+    kind: "advisory",
+    executable: null,
+    argv: [],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: result.executionBoundary,
+    expected: { schema: "pipeline.plugin-refresh-advisory.v1" },
   });
 }
 
@@ -1100,7 +1123,7 @@ test("two eligible Claude project-scope entries for the same id and cwd still co
   const cwd = "/projects/mine";
   const identity = installedPipelineIdentity(duplicateProjectFixture, "claude", claudeKnownMarketplaces(), cwd);
   assert.deepEqual(identity, { version: null, source: "unknown", ambiguous: true });
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: { CLAUDECODE: "1" },
     pluginList: duplicateProjectFixture,
     knownMarketplaces: claudeKnownMarketplaces(),
@@ -1110,6 +1133,7 @@ test("two eligible Claude project-scope entries for the same id and cwd still co
   assert.equal(result.status, "plugin-refresh-required");
   assert.equal(result.installedVersion, null);
   assert.equal(result.installedSource, "unknown");
+  assertRefreshAdvisory(result);
 });
 
 test("a malformed, non-array, or empty Claude registry yields no identity without crashing", () => {
@@ -1184,7 +1208,10 @@ test("Codex registry binding rejects equal manifest versions with stale cached i
     registrySourcePluginRoot: sourceRoot,
     installedPluginRoot: installedRoot,
     plugin: { name: "pipeline-core", version },
-  }), { status: "ready", reasonCodes: [] });
+  }), {
+    status: "ready", reasonCodes: [],
+    contentSha256: snapshotPhysicalPluginRoot(sourceRoot).contentSha256,
+  });
 
   writeFileSync(join(installedRoot, "scripts", "pre-push-hook-install.mjs"), "export const installer = 'stale';\n");
   assert.deepEqual(observeCodexRegistryContentBinding({
@@ -1195,6 +1222,85 @@ test("Codex registry binding rejects equal manifest versions with stale cached i
     status: "unavailable",
     reasonCodes: ["IPA-HOST-REGISTRY-CONTENT-MISMATCH"],
   });
+
+  const manifestPath = ".codex-plugin/plugin.json";
+  const stableContentSha256 = "e".repeat(64);
+  const manifestSnapshot = (bytes, contentSha256 = stableContentSha256, files = true) => (root) => ({
+    root,
+    contentSha256,
+    files: files ? [{ path: manifestPath, sha256: "a".repeat(64), bytes: Buffer.from(bytes) }] : [],
+  });
+  assert.deepEqual(observeCodexRegistryContentBinding({
+    registrySourcePluginRoot: sourceRoot,
+    installedPluginRoot: installedRoot,
+    plugin: { name: "pipeline-core", version },
+    snapshot: manifestSnapshot(JSON.stringify({ name: "other-plugin", version })),
+  }), {
+    status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-MANIFEST-MISMATCH"],
+  });
+  assert.deepEqual(observeCodexRegistryContentBinding({
+    registrySourcePluginRoot: sourceRoot,
+    installedPluginRoot: installedRoot,
+    plugin: { name: "pipeline-core", version },
+    snapshot: manifestSnapshot(JSON.stringify({ name: "pipeline-core", version }), "malformed"),
+  }), {
+    status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-CONTENT-MISMATCH"],
+  });
+  assert.deepEqual(observeCodexRegistryContentBinding({
+    registrySourcePluginRoot: sourceRoot,
+    installedPluginRoot: installedRoot,
+    plugin: { name: "pipeline-core", version },
+    snapshot: manifestSnapshot("", stableContentSha256, false),
+  }), {
+    status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-CONTENT-MISMATCH"],
+  });
+  const aliasRoot = join(base, "marketplace-alias", "plugins", "pipeline-core");
+  mkdirSync(join(base, "marketplace-alias", "plugins"), { recursive: true });
+  symlinkSync(sourceRoot, aliasRoot, "dir");
+  assert.deepEqual(observeCodexRegistryContentBinding({
+    registrySourcePluginRoot: aliasRoot,
+    installedPluginRoot: installedRoot,
+    plugin: { name: "pipeline-core", version },
+  }), {
+    status: "unavailable", reasonCodes: ["SNT-A2-SOURCE-ROOT-UNSAFE"],
+  });
+});
+
+test("Codex direct local registry binding supplies its verified content identity", (t) => {
+  const base = mkdtempSync(join(tmpdir(), "preflight-codex-registry-identity-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const marketplaceRoot = join(base, "marketplace");
+  const registrySourcePluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
+  const installedPluginRoot = join(base, "cache", "pipeline-core", "0.4.5-test");
+  const version = "0.4.5+test";
+  const pluginManifest = JSON.stringify({ name: "pipeline-core", version, hooks: "./hooks/codex-hooks.json" });
+  for (const root of [registrySourcePluginRoot, installedPluginRoot]) {
+    mkdirSync(join(root, ".codex-plugin"), { recursive: true });
+    mkdirSync(join(root, "scripts"), { recursive: true });
+    writeFileSync(join(root, ".codex-plugin", "plugin.json"), pluginManifest);
+    writeFileSync(join(root, "scripts", "pipeline-start-preflight.mjs"), "export {};\n");
+  }
+  const scriptUrl = pathToFileURL(join(installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href;
+  const contentSha256 = snapshotPhysicalPluginRoot(installedPluginRoot).contentSha256;
+  const result = preflight({
+    env: { CODEX_SESSION_ID: "controlled-test" },
+    cwd: "/projects/current",
+    scriptUrl,
+    read: () => JSON.stringify({ version }),
+    pluginList: () => JSON.stringify({ installed: [{
+      pluginId: "pipeline-core@agent-pipeline-local", name: "pipeline-core",
+      marketplaceName: "agent-pipeline-local", version,
+      installed: true, enabled: true,
+      source: { source: "local", path: registrySourcePluginRoot },
+      marketplaceSource: { sourceType: "local", source: marketplaceRoot },
+    }], available: [] }),
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedPluginAttestation.status, "not-required");
+  assert.deepEqual(result.rulesetSource.loadedIdentity, {
+    status: "available", algorithm: "content-sha256", value: contentSha256,
+  });
+  assert.deepEqual(result.rulesetSource.installedIdentity, result.rulesetSource.loadedIdentity);
 });
 
 test("a Gitless Codex local-development install is ready only with its installer-owned receipt", (t) => {
@@ -1383,7 +1489,7 @@ test("preflight calls observe self-referentially with the loaded plugin root on 
   assert.equal(result.status, "ready");
 });
 
-test("an unattested origin folds into the soft plugin-refresh-required advisory, never a new hard status", () => {
+test("an unattested origin keeps plugin refresh required and returns the controlled onboarding action", () => {
   const result = preflight({
     env: {},
     pluginList: pluginList(),
@@ -1395,15 +1501,7 @@ test("an unattested origin folds into the soft plugin-refresh-required advisory,
   });
   assert.equal(result.status, "plugin-refresh-required");
   assert.equal(pipelineStartPreflightExitCode(result), 0);
-  assert.deepEqual(result.nextAction, {
-    kind: "advisory",
-    executable: null,
-    argv: [],
-    mutation: false,
-    requiresConfirmation: false,
-    executionBoundary: "default",
-    expected: { schema: "pipeline.plugin-refresh-advisory.v1" },
-  });
+  assertGuidedOnboardingAction(result, process.cwd(), "codex");
 });
 
 test("the second reviewed origin (SSH form) also attests as ready", () => {
@@ -1419,7 +1517,7 @@ test("the second reviewed origin (SSH form) also attests as ready", () => {
   assert.equal(result.status, "ready");
 });
 
-test("a rejected observation (dirty tree, missing git, any SNT-A2-* code) folds into the same soft advisory", () => {
+test("a rejected observation keeps plugin refresh required and returns the controlled onboarding action", () => {
   const result = preflight({
     env: {},
     pluginList: pluginList(),
@@ -1428,7 +1526,7 @@ test("a rejected observation (dirty tree, missing git, any SNT-A2-* code) folds 
   });
   assert.equal(result.status, "plugin-refresh-required");
   assert.equal(pipelineStartPreflightExitCode(result), 0);
-  assert.equal(result.nextAction.kind, "advisory");
+  assertGuidedOnboardingAction(result, process.cwd(), "codex");
 });
 
 test("a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation", () => {
@@ -1582,7 +1680,7 @@ test("F4(b): runner codex reaches the real observeCodexPublicCoreIdentity defaul
     // outcome, on the identical fixture, is the proof that the codex-only
     // default branch (not observePublicCoreIdentity) was genuinely reached.
     assert.equal(result.status, "plugin-refresh-required");
-    assert.equal(result.nextAction.kind, "advisory");
+    assertGuidedOnboardingAction(result, process.cwd(), "codex");
     assert.equal(pipelineStartPreflightExitCode(result), 0);
   } finally {
     rmSync(fixture.gitRoot, { recursive: true, force: true });
@@ -1914,9 +2012,9 @@ test("NVA-B8-11: gitless Claude recovery references survive a skill-only install
       assert.equal(existsSync(join(installedSkill, reference)), true, reference);
     }
     const recovery = readFileSync(join(installedSkill, "references/local-plugin-attestation.md"), "utf8");
-    assert.match(skill, /gitless Claude cache[\s\S]*references\/local-plugin-attestation\.md/u);
-    assert.match(recovery, /known clean source checkout/u);
-    assert.match(recovery, /nextAction` is deliberate/u);
+    assert.match(skill, /Claude or Antigravity `plugin-attestation-required` result with no\s+`nextAction`, stop and load `references\/local-plugin-attestation\.md`/u);
+    assert.match(recovery, /A missing\s+`nextAction` is deliberate/u);
+    assert.match(recovery, /gitless Claude cache or copied marketplace tree cannot recover\s+its clean Git source from the registry, so it returns\s+`plugin-attestation-required` with `nextAction: null`/u);
     assert.doesNotMatch(recovery, /(?:^|\s)(?:docs|specs|architecture)\//mu,
       "the isolated installed skill must not depend on an unavailable repository-root document");
   } finally {

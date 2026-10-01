@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, openSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NATIVE_GOLDFISH_BRIEFING_SCHEMA, NATIVE_GOLDFISH_RETURN_SCHEMA,
+import { NATIVE_GOLDFISH_BRIEFING_SCHEMA, NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA, NATIVE_GOLDFISH_RETURN_SCHEMA,
   NATIVE_GOLDFISH_HOST_DIRECTIVE, observeClaudeGoldfishReturn, observeCodexGoldfishReturn, parseNativeGoldfishBriefing,
   validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
 
@@ -25,6 +25,9 @@ const final = { schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispa
 const finalText = JSON.stringify(final);
 const claudePending = { runner: "claude", sessionId: "session-1", toolUseId: "tool-use-1", binding };
 const codexBinding = { ...binding, runner: "codex" };
+const { agentType: _legacyAgentType, ...bindingWithoutNativeAlias } = binding;
+const codexWorkerBinding = { ...bindingWithoutNativeAlias, schema: NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA, runner: "codex",
+  nativeAgentType: "worker" };
 const codexPending = { runner: "codex", sessionId: "session-1", agentId: "agent-1", binding: codexBinding };
 
 const cases = [
@@ -80,6 +83,30 @@ const cases = [
     assert.equal(observeCodexGoldfishReturn({ ...input, agent_type: "critic" }, codexPending).ok, false);
     assert.equal(observeCodexGoldfishReturn({ ...input, model: "other-model" }, codexPending).ok, false);
     assert.equal(observeCodexGoldfishReturn({ ...input, last_assistant_message: "partial" }, codexPending).ok, false);
+  }],
+  ["NGHR06 v2 binds Codex worker transport separately from the functional Goldfish role", () => {
+    const prompt = `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(codexWorkerBinding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
+    const parsed = parseNativeGoldfishBriefing(prompt);
+    assert.equal(parsed.ok, true, parsed.code);
+    assert.equal(parsed.binding.nativeAgentType, "worker");
+    assert.equal(parsed.binding.role, "pipeline-core:goldfish-implementor");
+    assert.equal(parsed.binding.agentType, "goldfish-implementor");
+    for (const change of [{ nativeAgentType: "goldfish-implementor" }, { runner: "claude" }, { extra: true }]) {
+      const invalid = `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify({ ...codexWorkerBinding, ...change })}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
+      assert.equal(parseNativeGoldfishBriefing(invalid).ok, false);
+    }
+    assert.equal(parseNativeGoldfishBriefing(`${prompt}\n${prompt}`).ok, false);
+  }],
+  ["NGHR07 v2 SubagentStop requires the exact native worker type", () => {
+    const pending = { ...codexPending, binding: { ...codexWorkerBinding, adapterVersion: 2,
+      agentType: "goldfish-implementor" } };
+    const input = { hook_event_name: "SubagentStop", session_id: "session-1", agent_id: "agent-1",
+      agent_type: "worker", model: codexWorkerBinding.model, last_assistant_message: finalText };
+    assert.equal(observeCodexGoldfishReturn(input, pending).ok, true);
+    for (const change of [{ session_id: "other-session" }, { agent_id: "other-agent" },
+      { model: "other-model" }, { hook_event_name: "SubagentStart" }, { agent_type: "goldfish-implementor" }]) {
+      assert.equal(observeCodexGoldfishReturn({ ...input, ...change }, pending).ok, false);
+    }
   }],
 ];
 

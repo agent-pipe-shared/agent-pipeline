@@ -967,14 +967,15 @@ export function observeCodexRegistryContentBinding({
     const sourceManifest = source.files.find((entry) => entry.path === ".codex-plugin/plugin.json");
     const installedManifest = installed.files.find((entry) => entry.path === ".codex-plugin/plugin.json");
     if (!sourceManifest || !installedManifest || sourceManifest.sha256 !== installedManifest.sha256
-      || source.contentSha256 !== installed.contentSha256) {
+      || source.contentSha256 !== installed.contentSha256
+      || typeof source.contentSha256 !== "string" || !/^[0-9a-f]{64}$/u.test(source.contentSha256)) {
       return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-CONTENT-MISMATCH"] };
     }
     const manifest = JSON.parse(Buffer.from(sourceManifest.bytes).toString("utf8"));
     if (manifest?.name !== plugin.name || manifest?.version !== plugin.version) {
       return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-MANIFEST-MISMATCH"] };
     }
-    return { status: "ready", reasonCodes: [] };
+    return { status: "ready", reasonCodes: [], contentSha256: source.contentSha256 };
   } catch (error) {
     return { status: "unavailable", reasonCodes: [snapshotReasonCode(error, "IPA-HOST-REGISTRY-CONTENT-UNAVAILABLE")] };
   }
@@ -1336,13 +1337,19 @@ export function observePipelineStartPreflight({
     const installedReceiptIdentity = installedPluginAttestation.status === "verified"
       ? installedPluginAttestation.request.installedContentSha256
       : null;
+    const registryContentIdentity = runner === "codex"
+      && installedIdentity?.source === "local-development"
+      && codexRegistryContentBinding?.status === "ready"
+      ? codexRegistryContentBinding.contentSha256
+      : null;
     const identityAvailable = selfApplicationGit && capturedObservation?.status === "ready"
-      || installedReceiptIdentity !== null;
+      || installedReceiptIdentity !== null
+      || registryContentIdentity !== null;
     const loadedIdentity = identityAvailable
-      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? capturedObservation.plugin.contentSha256 }
+      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? registryContentIdentity ?? capturedObservation.plugin.contentSha256 }
       : { status: "unavailable" };
     const installedIdentityForSource = identityAvailable
-      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? capturedObservation.plugin.contentSha256 }
+      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? registryContentIdentity ?? capturedObservation.plugin.contentSha256 }
       : { status: "unavailable" };
     // selectedPlugin.id: reuses the self-application observation's own
     // resolved plugin name when one was actually derived (the same value
@@ -1351,7 +1358,7 @@ export function observePipelineStartPreflight({
     // already uses internally for installed-registry eligibility, chosen by
     // the same `local-development` vs. everything-else split as `source.class`.
     const selectedPluginId = identityAvailable
-      ? installedReceiptIdentity !== null
+      ? installedReceiptIdentity !== null || registryContentIdentity !== null
         ? LOCAL_PLUGIN_ID
         : capturedObservation.plugin.name
       : installedIdentity?.source === "local-development"

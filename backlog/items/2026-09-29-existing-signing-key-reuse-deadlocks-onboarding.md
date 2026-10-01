@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.existing-signing-key-reuse-deadlocks-onboarding
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-09-29

@@ -2979,3 +2979,47 @@ test("binding-absent orphan release plan is a digest-bound zero-write replay", (
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("ordinary orphan release archives authenticated bytes before a new session binds", () => {
+  const root = neutralFixture("ordinary-orphan-archive");
+  try {
+    const statePath = join(root, "project", "pipeline-state.json");
+    const activeBytes = readFileSync(statePath);
+    const started = invoke(["start", "--repo", root, "--session", "archive-orphan-first"]);
+    assert.equal(started.code, 0);
+    const descriptor = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    });
+    retireSessionDescriptor(root, descriptor);
+    const discard = plannedDiscardState(root);
+    const plan = planOrphanSessionCleanupBindingRelease({
+      rootDir: root, by: "PO", reason: "archive regression",
+      featureId: discard.featureId, expectedStateAfterSha256: discard.afterSha256,
+      deps: { now() { return "2026-09-20T08:00:01.000Z"; } },
+    });
+    assert.equal(plan.status, "ready");
+    writeFileSync(discard.statePath, discard.afterBytes);
+    const released = applyOrphanSessionCleanupBindingRelease({ plan, expectedPlanSha256: plan.planSha256 });
+    assert.equal(released.status, "released");
+    const receiptPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-release-receipt.json");
+    const receiptBytes = readFileSync(receiptPath);
+    const receipt = JSON.parse(receiptBytes);
+    assert.equal(receipt.schema, "pipeline.private-session-cleanup-orphan-release-receipt.v1");
+    assert.equal(Object.hasOwn(receipt, "recoveryPlanSha256"), false);
+    const receiptSha256 = createHash("sha256").update(receiptBytes).digest("hex");
+    // Restore a valid active fixture authority, as in the closed-receipt rotation test.
+    writeFileSync(statePath, activeBytes);
+    const next = invoke(["start", "--repo", root, "--session", "archive-orphan-next"]);
+    assert.equal(next.code, 0);
+    assert.equal(next.output.code, "WT-SESSION-STARTED");
+    const archivePath = join(root, ".git", "agent-pipeline", "onboarding",
+      `session-cleanup-release-receipt.${receiptSha256}.json`);
+    assert.equal(existsSync(receiptPath), false);
+    assert.deepEqual(readFileSync(archivePath), receiptBytes);
+    assert.deepEqual(readFileSync(statePath), activeBytes);
+    const bound = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(bound.status, "bound");
+    assert.equal(bound.sessionCleanup.sessionId, next.output.sessionId);
+    assert.deepEqual(listActiveSessionDescriptors(root), [bound.sessionCleanup]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

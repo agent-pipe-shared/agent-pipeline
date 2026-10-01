@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-09-29
