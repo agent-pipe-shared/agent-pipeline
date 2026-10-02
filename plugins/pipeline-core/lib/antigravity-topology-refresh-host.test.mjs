@@ -60,6 +60,15 @@ test('empty workspace binds an existing matching managed copy and attests its ex
  assert.deepEqual(receipts,[{provider:'antigravity',plugin:{name:'pipeline-core',version:'0.7.0'},sourcePluginRoot:f.approvedSourceRoot,installedPluginRoot:f.old}]);
  assert.equal(observeAntigravityLoadedTopology({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
  assert.equal(observeAntigravityLoadedTopologyWithWiring({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
+ const rel=fixture(t),relSource=join(rel.workspaceRoot,'plugins','pipeline-core');cpSync(rel.approvedSourceRoot,relSource,{recursive:true});rmSync(rel.old,{recursive:true});
+ const imports=JSON.parse(readFileSync(rel.imports));rel.put(rel.imports,{...imports,imports:imports.imports.filter(e=>e.name!=='agent-pipeline-core')});rel.put(rel.local,{entries:[{path:'plugins/pipeline-core'}]});
+ const observed=observeAntigravityPluginTopology(rel.args);assert.equal(observed.registries.workspace.status,'observed');assert.equal(observed.registries.workspace.entries[0].root,relSource);
+ assert.equal(planAntigravityTopologyRefresh({observation:observed,scope:'workspace',cliVersion:'1.2.14'}).status,'prepared');
+ assert.equal(createAntigravityRefreshHost({...rel.args,scope:'workspace',globalChangeApproved:false}).refresh().status,'refreshed');assert.equal(JSON.parse(readFileSync(rel.local)).entries.at(-1).path,rel.approvedSourceRoot);
+ const globalRelative=fixture(t);globalRelative.put(globalRelative.global,{entries:[{path:'plugins/pipeline-core'}]});assert.equal(observeAntigravityPluginTopology(globalRelative.args).registries.global.status,'unavailable');
+ const escaping=fixture(t);escaping.put(escaping.local,{entries:[{path:'../source'}]});assert.equal(observeAntigravityPluginTopology(escaping.args).registries.workspace.status,'unavailable');
+ const aliased=fixture(t),alias=join(aliased.workspaceRoot,'plugins','pipeline-core');mkdirSync(join(alias,'..'),{recursive:true});symlinkSync(aliased.approvedSourceRoot,alias);aliased.put(aliased.local,{entries:[{path:'plugins/pipeline-core'}]});
+ assert.equal(observeAntigravityPluginTopology(aliased.args).registries.workspace.status,'unavailable');
 });
 test('CLI interruption stops after actual partial uninstall; new explicit invocation recovers without hand-editing import metadata',t=>{
  const f=fixture(t);f.setFailure('install');const r=createAntigravityRefreshHost(f.args).refresh();assert.equal(r.status,'partial');assert.deepEqual(r.completed,['uninstall','validate']);assert(!existsSync(f.old));assert.equal(f.calls.length,4);

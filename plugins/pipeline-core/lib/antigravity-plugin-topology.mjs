@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Prepared physical diagnostics, never an executing-path attestation.
 import {openSync,closeSync,readSync,fstatSync,lstatSync,realpathSync,opendirSync,constants} from 'node:fs';
-import {resolve,join,isAbsolute} from 'node:path';
+import {resolve,join,isAbsolute,sep} from 'node:path';
 import {createHash} from 'node:crypto';
 import {parseStrictJson,canonicalizeJson} from './governance-event.mjs';
 
@@ -70,12 +70,14 @@ function candidate(root,pluginName){
     return {root,status:'observed',name:pluginName,version:m.value.version,manifestSha256:m.sha256,content:tree(root)};
   }catch{return {root,status:'unavailable'};}
 }
-function registry(path,pluginName){
+function registry(path,pluginName,workspaceRoot=null){
   const f=optional(path);if(f.status!=='observed')return {path,status:f.status,sha256:null,entries:[]};
   if(!Array.isArray(f.value?.entries)||f.value.entries.length>128)return {path,status:'unavailable',sha256:f.sha256,entries:[]};
   const entries=f.value.entries.map((v,index)=>{
     if(typeof v?.path!=='string')return {index,status:'unavailable'};
-    return {index,...candidate(v.path,pluginName)};
+    const root=isAbsolute(v.path)||workspaceRoot===null?v.path:resolve(workspaceRoot,v.path);
+    if(!isAbsolute(v.path)&&(workspaceRoot===null||!root.startsWith(workspaceRoot+sep)))return {index,status:'unavailable'};
+    return {index,...candidate(root,pluginName)};
   });
   return {path,status:entries.some(e=>e.status==='unavailable')?'unavailable':'observed',sha256:f.sha256,entries};
 }
@@ -94,7 +96,7 @@ export function observeAntigravityPluginTopology({configRoot,workspaceRoot,appro
     if(!Array.isArray(imported.value?.imports)||imported.value.imports.length>128)importState.status='unavailable';
     else importState.entries=imported.value.imports.filter(e=>e?.name===pluginName).map(e=>({name:pluginName,source:typeof e.source==='string'?e.source:null}));
   }
-  const registries={global:registry(join(configRoot,'config','plugins.json'),pluginName),workspace:registry(join(workspaceRoot,'.agents','plugins.json'),pluginName)};
+  const registries={global:registry(join(configRoot,'config','plugins.json'),pluginName),workspace:registry(join(workspaceRoot,'.agents','plugins.json'),pluginName,workspaceRoot)};
   const wiring=[join(configRoot,'config','hooks.json'),join(configRoot,'config','external-hooks.json'),join(workspaceRoot,'.agents','hooks.json'),join(workspaceRoot,'.agents','external-hooks.json')].map(path=>{
     const f=optional(path);return {path,status:f.status,sha256:f.sha256??null,ownership:f.status==='observed'?'unclassified':'not-observed'};
   });
@@ -134,7 +136,7 @@ export function antigravityTopologySha256(value){return valueHash(value);}
 export function observeAntigravityLoadedTopology({loadedPluginRoot,configRoot,workspaceRoot}){
   try{
     const loaded=candidate(loadedPluginRoot,'agent-pipeline-core');if(loaded.status!=='observed')throw Error('AT-LOADED-UNAVAILABLE');
-    const global=registry(join(configRoot,'config','plugins.json'),'agent-pipeline-core'),workspace=registry(join(workspaceRoot,'.agents','plugins.json'),'agent-pipeline-core');
+    const global=registry(join(configRoot,'config','plugins.json'),'agent-pipeline-core'),workspace=registry(join(workspaceRoot,'.agents','plugins.json'),'agent-pipeline-core',workspaceRoot);
     if([global,workspace].some(r=>r.status==='unavailable'))throw Error('AT-REGISTRY-UNAVAILABLE');
     const roots=[...new Set([global,workspace].flatMap(r=>r.entries.filter(e=>e.status==='observed').map(e=>e.root)))];
     if(roots.length!==1)throw Error('AT-REGISTRY-AMBIGUOUS');
