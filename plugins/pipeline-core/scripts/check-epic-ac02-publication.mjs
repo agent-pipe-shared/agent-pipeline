@@ -54,6 +54,12 @@ function epicForRef(refname) {
   return SIBLING_SPRINT_EPICS.find((epic) => segments.has(epic)) ?? null;
 }
 
+/** Only a named Sprint Epic owns its own branch; foreign sibling work stays gated. */
+function ownSiblingEpic(manifest) {
+  const packageId = manifest?.schema === "pipeline.feature-package.v1" ? manifest?.feature?.id : null;
+  return SIBLING_SPRINT_EPICS.find((epic) => packageId === `sprint-${epic}-epic`) ?? null;
+}
+
 /** One resolved tip commit per sibling Epic this repository actually holds a branch for
  * today, preferring the fetched remote-tracking copy over a possibly-stale local branch.
  * Returns `null` (never an empty Map) when the ref listing itself could not be produced. */
@@ -143,9 +149,11 @@ export function gatherPublicationGateInput(root, manifest) {
   if (tips === null) return unobserved();
 
   const publishedTip = publishedTipRecord(root);
+  const ownEpic = ownSiblingEpic(manifest);
   const epics = [];
   const consumptions = [];
   for (const [epic, tip] of tips) {
+    if (epic === ownEpic) continue;
     const attributed = isAncestor(root, tip, boundCommit);
     if (attributed === null) return unobserved(); // any failed probe fails the whole manifest closed
     if (attributed !== 0) continue; // tip is not an ancestor of boundCommit: nothing consumed

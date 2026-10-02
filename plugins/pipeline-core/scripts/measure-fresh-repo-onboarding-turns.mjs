@@ -219,10 +219,8 @@ function authorArchitectureDesign(dir, prdRelPath) {
   const prdFile = join(dir, prdRelPath);
   const contract = "docs/game-contract.md";
   const verification = "tests/game.test.mjs";
-  mkdirSync(join(dir, "docs"), { recursive: true });
-  mkdirSync(join(dir, "tests"), { recursive: true });
-  writeFileSync(join(dir, contract), "# Game contract\nExport playable=true from game.js after keyboard interaction is implemented.\n");
-  writeFileSync(join(dir, verification), "import assert from 'node:assert/strict';\nimport { playable } from '../game.js';\nassert.equal(playable, true);\n");
+  // This walk measures readiness for the first implementation dispatch. Declare
+  // the owner's future contract and test; authoring them belongs to implementation.
   const module = { id: "game", responsibility: "Local keyboard game and its acceptance contract.", nonResponsibilities: ["Network services"],
     ownedPaths: ["game.js", "docs/game-contract.md", "tests/game.test.mjs"], publicContracts: [contract], allowedDependencies: [],
     authorityEffects: [], verificationEntryPoints: [verification], adrReferences: [] };
