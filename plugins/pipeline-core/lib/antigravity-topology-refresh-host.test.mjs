@@ -88,7 +88,8 @@ test('observed Antigravity 1.2.13 admits the same bounded plugin refresh route',
  const f=fixture(t,'1.2.13');
  const observation=observeAntigravityPluginTopology(f.args);
  assert.equal(planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion:'1.2.13'}).status,'prepared');
- assert.equal(planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion:'1.2.14'}).reason,'AT-CLI-CAPABILITY-UNOBSERVED');
+ for(const cliVersion of ['1.2.14','1.3.0','2.0.0'])assert.equal(planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion}).status,'prepared');
+ for(const cliVersion of ['1.2.11','1.1.99','0.99.99','unobserved'])assert.equal(planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion}).reason,'AT-CLI-CAPABILITY-UNOBSERVED');
  const result=createAntigravityRefreshHost(f.args).refresh();
  assert.equal(result.status,'refreshed',JSON.stringify(result));
  assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'uninstall','validate','install']);

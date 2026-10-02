@@ -9,7 +9,14 @@ export const AGY_TOPOLOGY_SCHEMA='pipeline.antigravity-plugin-topology.v1';
 export const AGY_FILE_LIMIT=262144, AGY_TREE_BYTES=67108864, AGY_TREE_FILES=4096;
 const PUBLIC_FILE_LIMIT=2097152;
 const snapshots=new WeakMap(), hash=b=>createHash('sha256').update(b).digest('hex');
-export const supportsAntigravityPluginCliVersion=version=>version==='1.2.12'||version==='1.2.13';
+export function supportsAntigravityPluginCliVersion(version){
+  if(typeof version!=='string')return false;
+  const match=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(version);
+  if(!match)return false;
+  const [major,minor,patch]=match.slice(1).map(Number);
+  if(![major,minor,patch].every(Number.isSafeInteger))return false;
+  return major>1||(major===1&&(minor>2||(minor===2&&patch>=12)));
+}
 const valueHash=v=>hash(canonicalizeJson(v));
 const freeze=v=>{if(v&&typeof v==='object'){for(const x of Object.values(v))freeze(x);Object.freeze(v);}return v;};
 function same(a,b){return a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&a.mtimeNs===b.mtimeNs&&a.ctimeNs===b.ctimeNs;}
