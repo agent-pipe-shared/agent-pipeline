@@ -113,6 +113,26 @@ function answerArgvForCollectInput(dir, action) {
   if (names.includes("answersJson")) {
     return publishedActionWithSingleReplacement("<PO_INTAKE_DESIGN_ANSWERS_JSON>", DEFAULT_ANSWERS.answersJson);
   }
+  if (names.includes("text")) {
+    const applyAction = action.applyAction;
+    if (applyAction?.kind !== "command" || typeof applyAction.executable !== "string" || !Array.isArray(applyAction.argv)) {
+      return { kind: "unanswerable", names, guidance, reason: "text action omitted a usable applyAction" };
+    }
+    const textFileIndex = applyAction.argv.indexOf("--text-file");
+    const textFile = textFileIndex >= 0 ? applyAction.argv[textFileIndex + 1] : null;
+    if (typeof textFile !== "string" || !textFile.startsWith("scratch/") || textFile.includes("..") || textFile.startsWith("/")) {
+      return { kind: "unanswerable", names, guidance, reason: "text applyAction omitted a bounded scratch text file" };
+    }
+    const fixtureTextPath = join(dir, textFile);
+    mkdirSync(join(dir, "scratch"), { recursive: true });
+    writeFileSync(fixtureTextPath, DEFAULT_ANSWERS.text);
+    return {
+      kind: "command",
+      executable: applyAction.executable,
+      argv: [...applyAction.argv],
+      publishedAction: true,
+    };
+  }
   if (guidance.includes("submit-plan")) {
     const pipelineStateScript = resolve(fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)));
     const argv = [pipelineStateScript, "submit-plan", "--by", DEFAULT_ANSWERS.planApproverName];
@@ -334,6 +354,7 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
           ["<PO_GIT_AUTHOR_NAME>", DEFAULT_ANSWERS.gitAuthorName],
           ["<PO_GIT_AUTHOR_EMAIL>", DEFAULT_ANSWERS.gitAuthorEmail],
           ["<signature|chat>", "signature"],
+          ["<approved|declined>", "declined"],
           ["<de|en>", DEFAULT_ANSWERS.language],
         ]);
         const argv = initialAsk.applyAction.argv.map((v) => replacements.get(v) ?? v);
