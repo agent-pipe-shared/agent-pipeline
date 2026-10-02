@@ -6,8 +6,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
+import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-source.mjs";
 import { modelRoleBootstrapCliResult, modelRoleBootstrapExitCode,
   observeAgyModelRoleHookSession, runModelRoleBootstrap,
+  prepareFamilyBootstrapProjection,
   modelRoleBootstrapAttendedAction, modelRoleBootstrapTerminalIdentity,
   runModelRoleBootstrapTransport } from "./model-role-bootstrap.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
@@ -40,6 +42,7 @@ function fixture(overrides = {}) {
     persist: (value) => { rows.set(value.sessionId, value); return { ok: true }; } };
   const input = { rootDir: "/repo", runner: "codex",
     env: { CODEX_SESSION_ID: "session-1", CODEX_THREAD_ID: "session-1" },
+    familyInvocationEntry: { observeActivation: () => ({ ok: true, status: "inactive" }) },
     routeSource, readGitState: () => ({ candidateCommit: "b".repeat(40), commonDir: "/repo/.git" }),
     readApprovedPolicy: () => ({ ok: true, approvedPolicies }),
     collectObservations: async ({ routeSource: scoped }) => { modelCalls += 1;
@@ -316,7 +319,7 @@ test("transferred identity needs an attended terminal and cannot replace conflic
   assert.equal(f.rows.has("observed"), true);
   assert.equal(f.rows.has("session-1"), false);
   const scriptPath = fileURLToPath(new URL("./model-role-bootstrap.mjs", import.meta.url));
-  const child = JSON.parse(execFileSync(process.execPath, [scriptPath, "--repo-root", "/unused",
+  const child = JSON.parse(execFileSync(process.execPath, [scriptPath, "--repo-root", process.cwd(),
     "--runner", "codex", "--host-session-id", "observed"], { encoding: "utf8" }));
   assert.equal(child.code, "MODEL-ROLE-ATTENDED-SESSION-REQUIRES-TERMINAL");
   assert.equal(child.fallback, "legacy-v3");
@@ -338,7 +341,60 @@ test("a previous proposal digest cannot confirm a changed mapping in the same se
   assert.equal(f.rows.size, 0);
 });
 
-assert.equal(cases.length, 16);
+test("active family bootstrap prepares every launchable installed-runner task without confirmation", async () => {
+  const routes = registeredModelFamilyTaskRoutes();
+  const prepared = [];
+  const familyInvocationEntry = { observeActivation: () => ({ ok: true, status: "active" }),
+    prepareModelFamilyInvocation: async (input) => { prepared.push(input); return { ok: true,
+      value: { receipt: Object.freeze({ invocationId: input.invocationId, taskRoute: input.taskRoute }) } }; } };
+  let confirmations = 0;
+  const f = fixture({ familyInvocationEntry, familyRouteSource: routes,
+    readGitState: () => ({ candidateCommit: "b".repeat(40), candidateTree: "c".repeat(40), commonDir: "/repo/.git" }) });
+  const result = await runModelRoleBootstrap({ ...f.input, confirm: async () => { confirmations += 1; return true; } });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.family, true);
+  assert.equal(result.receipts.length, 15);
+  assert.equal(prepared.length, 15);
+  assert.equal(new Set(prepared.map((item) => item.invocationId)).size, 15);
+  assert.equal(prepared.every((item) => item.kind === "bootstrap"), true);
+  assert.equal(confirmations, 0);
+  assert.equal(f.modelCalls, 0);
+  assert.equal(f.rows.size, 0);
+});
+
+test("active family bootstrap failure cannot expose legacy fallback or partial slot success", async () => {
+  const calls = [];
+  const familyInvocationEntry = { observeActivation: () => ({ ok: true, status: "active" }),
+    prepareModelFamilyInvocation: async (input) => { calls.push(input); return calls.length === 3
+      ? { ok: false, code: "CURRENT_EFFORT_UNAVAILABLE" }
+      : { ok: true, value: { receipt: { invocationId: input.invocationId } } }; } };
+  const f = fixture({ familyInvocationEntry,
+    readGitState: () => ({ candidateCommit: "b".repeat(40), candidateTree: "c".repeat(40), commonDir: "/repo/.git" }) });
+  const result = await runModelRoleBootstrap(f.input);
+  const cli = modelRoleBootstrapCliResult(result);
+  assert.equal(cli.ok, false);
+  assert.equal(cli.code, "CURRENT_EFFORT_UNAVAILABLE");
+  assert.equal(cli.fallbackForbidden, true);
+  assert.equal(Object.hasOwn(cli, "fallback"), false);
+  assert.equal(calls.length, 3);
+  assert.equal(f.modelCalls, 0);
+});
+
+test("family bootstrap projection does not silently omit an unavailable task preparation", async () => {
+  const familyRouteSource = registeredModelFamilyTaskRoutes();
+  let calls = 0;
+  const result = await prepareFamilyBootstrapProjection({ familyInvocationEntry: {
+    prepareModelFamilyInvocation: async (input) => ++calls === 4 ? { ok: false, code: "ADAPTER_CONTRACT_UNQUALIFIED" }
+      : { ok: true, value: { receipt: { taskRoute: input.taskRoute } } },
+  }, familyRouteSource, runner: "codex", sessionId: "session-1",
+  candidateCommit: "b".repeat(40), candidateTree: "c".repeat(40), makeInvocationId: () => `id-${calls + 1}` });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "ADAPTER_CONTRACT_UNQUALIFIED");
+  assert.equal(calls, 4);
+  assert.equal(Object.hasOwn(result, "receipts"), false);
+});
+
+assert.equal(cases.length, 19);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

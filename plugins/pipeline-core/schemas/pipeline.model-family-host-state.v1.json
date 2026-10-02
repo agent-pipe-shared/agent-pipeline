@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.model-family-host-state.v1.json",
+  "title": "Private immutable model-family host generation index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generation", "activation", "authoritySha256", "pinStates", "watermarks", "invocationIndex"],
+  "properties": {
+    "schema": { "const": "pipeline.model-family-host-state.v1" },
+    "generation": { "type": "integer", "minimum": 0 },
+    "activation": { "const": "family-active" },
+    "authoritySha256": { "$ref": "#/$defs/sha256" },
+    "pinStates": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/pinState" } },
+    "watermarks": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/watermark" } },
+    "invocationIndex": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/invocationIndexEntry" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "runner": { "enum": ["codex", "claude", "antigravity"] },
+    "family": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "version": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "integer", "minimum": 0 } },
+    "invocationIndexEntry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["runner", "installationBindingSha256", "accountBindingSha256", "sessionId", "invocationId", "receiptSha256"],
+      "properties": {
+        "runner": { "$ref": "#/$defs/runner" },
+        "installationBindingSha256": { "$ref": "#/$defs/sha256" },
+        "accountBindingSha256": { "$ref": "#/$defs/sha256" },
+        "sessionId": { "$ref": "#/$defs/id" },
+        "invocationId": { "$ref": "#/$defs/id" },
+        "receiptSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "watermark": {
+      "type": "object", "additionalProperties": false,
+      "required": ["runner", "installationBindingSha256", "accountBindingSha256", "familyId", "version", "admittedReceiptSha256"],
+      "properties": {
+        "runner": { "$ref": "#/$defs/runner" },
+        "installationBindingSha256": { "$ref": "#/$defs/sha256" },
+        "accountBindingSha256": { "$ref": "#/$defs/sha256" },
+        "familyId": { "$ref": "#/$defs/family" },
+        "version": { "$ref": "#/$defs/version" },
+        "admittedReceiptSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "pinState": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scopeSha256", "decisionSha256", "revision", "state", "runner", "familyId", "role", "effort", "taskRoutes", "modelId"],
+      "properties": {
+        "scopeSha256": { "$ref": "#/$defs/sha256" },
+        "decisionSha256": { "$ref": "#/$defs/sha256" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "state": { "enum": ["pinned", "unpinned"] },
+        "runner": { "$ref": "#/$defs/runner" },
+        "familyId": { "$ref": "#/$defs/family" },
+        "role": { "enum": ["frontier", "worker", "efficient"] },
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+        "taskRoutes": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "pattern": "^(profile|duty)\\.[A-Za-z0-9_.-]{1,120}$" } },
+        "modelId": { "type": ["string", "null"], "maxLength": 128 }
+      }
+    }
+  }
+}

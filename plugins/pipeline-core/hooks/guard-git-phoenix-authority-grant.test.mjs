@@ -21,10 +21,13 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { copyFile, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+const cases = [];
+function test(name, run) { cases.push({ id: "PAG001", name, run }); }
 
 import { canonicalizeJson } from "../lib/governance-event.mjs";
 import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const guard = path.resolve("plugins/pipeline-core/hooks/guard-git.mjs");
 const grantCli = path.resolve("plugins/pipeline-core/scripts/human-authority-grant.mjs");
@@ -85,6 +88,14 @@ async function fixture(publicKeySha256) {
   execFileSync("git", ["init", "-q", root]);
   execFileSync("git", ["-C", root, "add", "-A"]);
   execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"]);
+  const governance = createGovernanceScopeController({ hostStateRoot: path.join(root, ".git", "fixture-hoststate") });
+  const inactive = governance.observe({ rootDir: root });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = governance.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
   await mkdir(path.join(root, ".claude"), { recursive: true });
   const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   const policy = capturePolicy();
@@ -177,3 +188,5 @@ test("A-AC-04 end-to-end: a real human-authority-grant.mjs prepare/sign/install 
   assert.equal(replay.status, 2);
   assert.match(replay.stderr, /canonical human-governance decision/u);
 });
+
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

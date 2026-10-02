@@ -3,14 +3,14 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { closeSync, chmodSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { digestJson } from "../lib/verify-resume.mjs";
-import { applyOnboardingKickoff, planOnboardingKickoff, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
-import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import { applyOnboardingKickoff, bindEphemeralPrivateCleanup, planOnboardingKickoff, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
+import { listActiveSessionDescriptors, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { compileVerifySuites, createVerifyRun, deriveVerifyExecutionMetrics, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 
 // The journal deliberately emits one bounded public progress line per state
@@ -37,6 +37,34 @@ const spawnPass = () => ({ status: 0, stdout: Buffer.from("complete private log\
 const registerRun = (request) => sealVerifyCleanupRegistration({ status: "registered", runId: request.runId, runPath: request.runPath, sessionId: "test-session", descriptorSha256: "d".repeat(64), resourceId: `verify-${request.runId}`, registeredAt: "2026-08-01T00:00:00.000Z" });
 const artifact = verifySuiteArtifactName("fixture-suite");
 const completionPolicy = { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["C01", "C02"], maxBytes: 4096 };
+function snapshotFiles(root) {
+  const files = {};
+  const visit = (directory, prefix = "") => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) visit(path, relative);
+      else files[relative] = readFileSync(path);
+    }
+  };
+  visit(root);
+  return files;
+}
+function sessionlessCheckout(prefix, goal) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  chmodSync(root, 0o700);
+  const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(git.status, 0, git.stderr);
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.project.v1\n");
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({
+    project: "fixture", verify: "node verify.mjs", autonomy: "bounded",
+    branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
+  }, null, 2)}\n`);
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  return { root, common: join(root, ".git"), statePath: join(root, "project", "pipeline-state.json") };
+}
 
 test("execution metrics retain lane/reuse facts and reject malformed measurement inputs", () => {
   const metrics = deriveVerifyExecutionMetrics({
@@ -304,7 +332,7 @@ test("cleanup registration is required before any private run directory is creat
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("a session-less checkout (no Pipeline session, no prior .git/agent-pipeline state -- the CI condition) establishes a private ephemeral cleanup binding and registers the run, instead of aborting with zero suites started", async () => {
+test("session-less passed and numeric failed terminals retain journal bytes, release only their created owner, and issue a fresh next owner", async () => {
   const root = mkdtempSync(join(tmpdir(), "verify-journal-sessionless-"));
   chmodSync(root, 0o700);
   const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
@@ -326,18 +354,33 @@ test("a session-less checkout (no Pipeline session, no prior .git/agent-pipeline
   try {
     // No `registerRun` callback: this is the ordinary, automatic CLI path -- exactly what
     // harness/scripts/verify.mjs's own call site uses.
-    const result = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: sessionlessSuites, policyInputs: { harness: "test" }, runId: "verify-sessionless-1", spawn: spawnPass });
+    const result = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: sessionlessSuites, policyInputs: { harness: "test" }, runId: "verify-sessionless-1" });
     assert.equal(result.terminal.status, "passed");
     assert.equal(result.steps.length, 1);
-    // The tracked authority file is byte-identical before and after: the ephemeral binding
-    // took the private-runtime (.git/agent-pipeline/**) route, never the tracked-file route.
+    const firstBytes = snapshotFiles(result.runDir);
     assert.deepEqual(readFileSync(statePath), beforeStateBytes);
     const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
-    assert.equal(binding.status, "bound");
-    // A second session-less run against the SAME checkout reuses the now-bound descriptor
-    // rather than conflicting with it (WT-SESSION-UNBOUND-DESCRIPTOR).
-    const again = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: sessionlessSuites, policyInputs: { harness: "test" }, runId: "verify-sessionless-2", spawn: spawnPass });
+    assert.equal(binding.status, "unbound");
+    assert.equal(binding.sessionCleanup, null);
+    assert.equal(listActiveSessionDescriptors(root).length, 0);
+
+    writeFileSync(suiteFile, "process.exitCode = 7\n", { mode: 0o600 });
+    const failed = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: sessionlessSuites, policyInputs: { harness: "test" }, runId: "verify-sessionless-2", reuseReceipts: false });
+    assert.equal(failed.terminal.status, "failed");
+    assert.equal(failed.steps[0].exitCode, 7);
+    const afterFailure = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(afterFailure.status, "unbound");
+    assert.equal(listActiveSessionDescriptors(root).length, 0);
+
+    writeFileSync(suiteFile, "process.stdout.write('complete private log\\n')\n", { mode: 0o600 });
+    const again = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: sessionlessSuites, policyInputs: { harness: "test" }, runId: "verify-sessionless-3", reuseReceipts: false });
     assert.equal(again.terminal.status, "passed");
+    assert.notEqual(result.cleanupRegistration.sessionId, failed.cleanupRegistration.sessionId);
+    assert.notEqual(failed.cleanupRegistration.sessionId, again.cleanupRegistration.sessionId);
+    assert.notEqual(result.cleanupRegistration.descriptorSha256, again.cleanupRegistration.descriptorSha256);
+    assert.deepEqual(snapshotFiles(result.runDir), firstBytes);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+    assert.equal(listActiveSessionDescriptors(root).length, 0);
     assert.deepEqual(readFileSync(statePath), beforeStateBytes);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -366,6 +409,191 @@ test("a session-less checkout with an already-active session descriptor falls ba
     await assert.rejects(() => runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "test" }, runId: "verify-sessionless-conflict", spawn: spawnPass }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED/u);
     assert.throws(() => lstatSync(join(common, "agent-pipeline", "verify")));
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("an already-bound cleanup owner remains borrowed after passed and numeric failed terminals", async () => {
+  const f = sessionlessCheckout("verify-journal-borrowed-", "Exercise borrowed Verify ownership");
+  const started = startSessionDescriptor(f.root, {});
+  const unbound = readOnboardingSessionCleanupBinding({ rootDir: f.root });
+  const before = bindEphemeralPrivateCleanup({
+    rootDir: f.root,
+    sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 },
+  });
+  assert.equal(before.status, "bound");
+  const stateBytes = readFileSync(f.statePath);
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  writeFileSync(suiteFile, "process.stdout.write('complete private log\\n')\n", { mode: 0o600 });
+  try {
+    const passed = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "borrowed" }, runId: "verify-borrowed-pass" });
+    assert.equal(passed.terminal.status, "passed");
+    writeFileSync(suiteFile, "process.exitCode = 7\n", { mode: 0o600 });
+    const failed = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "borrowed" }, runId: "verify-borrowed-fail", reuseReceipts: false });
+    assert.equal(failed.terminal.status, "failed");
+    const after = readOnboardingSessionCleanupBinding({ rootDir: f.root });
+    assert.equal(after.status, "bound");
+    assert.equal(after.stateSha256, before.stateSha256);
+    assert.equal(after.revision, before.revision);
+    assert.deepEqual(after.sessionCleanup, before.sessionCleanup);
+    assert.deepEqual(listActiveSessionDescriptors(f.root), [{ sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 }]);
+    assert.deepEqual(readFileSync(f.statePath), stateBytes);
+    assert.equal(unbound.status, "unbound");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a normalized failed receipt after a production spawn error cannot release a newly-created owner", async () => {
+  const f = sessionlessCheckout("verify-journal-null-close-", "Exercise unknown child-close ownership");
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  writeFileSync(suiteFile, "process.stdout.write('never launched\\n')\n", { mode: 0o600 });
+  const originalExecPath = Object.getOwnPropertyDescriptor(process, "execPath");
+  let execPathReads = 0;
+  Object.defineProperty(process, "execPath", {
+    configurable: true,
+    get() {
+      execPathReads += 1;
+      return execPathReads === 1 ? originalExecPath.value : join(f.root, "missing-node-executable");
+    },
+  });
+  try {
+    await assert.rejects(
+      () => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "unknown-close" }, runId: "verify-sessionless-null" }),
+      /VERIFY-OWNER-CLEANUP-REQUIRED:verify-sessionless-null/u,
+    );
+    assert.equal(execPathReads, 2);
+    const runDir = join(f.common, "agent-pipeline", "verify", "runs", "verify-sessionless-null");
+    const terminal = JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8"));
+    const receipt = JSON.parse(readFileSync(join(runDir, "receipts", `${artifact}.json`), "utf8"));
+    assert.equal(terminal.status, "failed");
+    assert.equal(receipt.exitCode, 1);
+    assert.equal(receipt.status, "completed");
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: f.root });
+    assert.equal(binding.status, "bound");
+    assert.equal(listActiveSessionDescriptors(f.root).length, 1);
+    assert.equal(JSON.parse(readFileSync(join(runDir, "run.lock"), "utf8")).status, "closed");
+  } finally {
+    Object.defineProperty(process, "execPath", originalExecPath);
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("SIGINT interruption terminates only its child group, seals distinct immutable evidence, and releases its exact automatic owner", async () => {
+  const f = sessionlessCheckout("verify-journal-interrupted-", "Exercise signal-owned Verify cleanup");
+  const marker = join(f.root, "child-started");
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  writeFileSync(suiteFile, `import { spawn } from "node:child_process";\nimport { writeFileSync } from "node:fs";\nspawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });\nwriteFileSync(${JSON.stringify(marker)}, "started", { mode: 0o600 });\nsetInterval(() => {}, 1000);\n`, { mode: 0o600 });
+  const controller = new AbortController();
+  try {
+    const running = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "interrupted" }, runId: "verify-interrupted", signal: controller.signal });
+    const deadline = Date.now() + 5000;
+    while (!existsSync(marker) && Date.now() < deadline) await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+    assert.equal(existsSync(marker), true, "actual Verify child started");
+    controller.abort("SIGINT");
+    const result = await running;
+    assert.equal(result.status, "interrupted");
+    assert.equal(result.interruption.status, "interrupted");
+    assert.equal(result.interruption.signal, "SIGINT");
+    assert.equal(result.interruption.children.length, 1);
+    assert.equal(result.interruption.children[0].groupCloseProved, true);
+    assert.equal(existsSync(join(result.runDir, "terminal.json")), false);
+    assert.equal(existsSync(join(result.runDir, "receipts", `${artifact}.json`)), false);
+    const interruptionPath = join(result.runDir, "interruption.json");
+    const originalInterruption = readFileSync(interruptionPath);
+    const originalSnapshot = snapshotFiles(result.runDir);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "unbound");
+    assert.equal(listActiveSessionDescriptors(f.root).length, 0);
+    assert.deepEqual(snapshotFiles(result.runDir), originalSnapshot);
+    assert.deepEqual(readFileSync(interruptionPath), originalInterruption);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("interruption keeps a borrowed descriptor and treats unknown child-group closure as unreleasable", async () => {
+  const f = sessionlessCheckout("verify-journal-interrupted-borrowed-", "Exercise borrowed interrupted ownership");
+  const started = startSessionDescriptor(f.root, {});
+  const before = bindEphemeralPrivateCleanup({ rootDir: f.root, sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 } });
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  writeFileSync(suiteFile, "process.stdout.write('not started\\n')\n", { mode: 0o600 });
+  const controller = new AbortController();
+  const unknownSpawn = (_command, _args, options) => new Promise((resolveSpawn) => {
+    options.signal.addEventListener("abort", () => resolveSpawn({ status: null, signal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), closeStatusProved: false, cancellation: { proven: false, method: "identity-unavailable", identity: null, remaining: null } }), { once: true });
+  });
+  try {
+    const running = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "borrowed-interrupted" }, runId: "verify-interrupted-borrowed", signal: controller.signal, spawn: unknownSpawn });
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+    controller.abort("SIGTERM");
+    const result = await running;
+    assert.equal(result.status, "interrupted");
+    assert.equal(result.interruption.children[0].groupCloseProved, false);
+    assert.equal(result.interruption.children[0].terminationMethod, "identity-unavailable");
+    assert.equal(existsSync(join(result.runDir, "terminal.json")), false);
+    const after = readOnboardingSessionCleanupBinding({ rootDir: f.root });
+    assert.equal(after.status, "bound");
+    assert.equal(after.stateSha256, before.stateSha256);
+    assert.equal(after.revision, before.revision);
+    assert.deepEqual(after.sessionCleanup, before.sessionCleanup);
+    assert.deepEqual(listActiveSessionDescriptors(f.root), [{ sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 }]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a caller-supplied registration callback has no automatic owner teardown authority", async () => {
+  const f = sessionlessCheckout("verify-journal-callback-owner-", "Exercise injected registration authority");
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  writeFileSync(suiteFile, "process.stdout.write('complete private log\\n')\n", { mode: 0o600 });
+  try {
+    const result = await runVerifyJournal({
+      gitCommonDir: f.common,
+      repoRoot: f.root,
+      candidate,
+      suites: [{ name: "fixture-suite", file: suiteFile }],
+      policyInputs: { harness: "callback" },
+      runId: "verify-callback-no-authority",
+      spawn: spawnPass,
+      registerRun,
+    });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "unbound");
+    assert.equal(listActiveSessionDescriptors(f.root).length, 0);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a suite-created foreign descriptor blocks owner teardown without losing terminal evidence", async () => {
+  const f = sessionlessCheckout("verify-journal-foreign-descriptor-", "Exercise foreign descriptor refusal");
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  const lifecycleUrl = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../lib/worktree-lifecycle.mjs")).href;
+  writeFileSync(suiteFile, `import { startSessionDescriptor } from ${JSON.stringify(lifecycleUrl)};\nstartSessionDescriptor(process.cwd(), {});\n`, { mode: 0o600 });
+  const stateBytes = readFileSync(f.statePath);
+  try {
+    await assert.rejects(
+      () => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "foreign-descriptor" }, runId: "verify-foreign-descriptor" }),
+      /VERIFY-OWNER-CLEANUP-REQUIRED:verify-foreign-descriptor/u,
+    );
+    const runDir = join(f.common, "agent-pipeline", "verify", "runs", "verify-foreign-descriptor");
+    assert.equal(JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8")).status, "passed");
+    assert.equal(JSON.parse(readFileSync(join(runDir, "run.lock"), "utf8")).status, "closed");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "bound");
+    assert.equal(listActiveSessionDescriptors(f.root).length, 2);
+    assert.deepEqual(readFileSync(f.statePath), stateBytes);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("an extra owner resource blocks retention and preserves the journal and binding", async () => {
+  const f = sessionlessCheckout("verify-journal-extra-resource-", "Exercise extra resource refusal");
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  const continuityUrl = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../lib/onboarding-continuity.mjs")).href;
+  const lifecycleUrl = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../lib/worktree-lifecycle.mjs")).href;
+  const extraPath = join(f.root, "extra-registered-resource");
+  writeFileSync(suiteFile, `import { mkdirSync } from "node:fs";\nimport { readOnboardingSessionCleanupBinding } from ${JSON.stringify(continuityUrl)};\nimport { loadSessionDescriptor, registerTemporaryIntent } from ${JSON.stringify(lifecycleUrl)};\nconst binding = readOnboardingSessionCleanupBinding({ rootDir: process.cwd() });\nconst descriptor = loadSessionDescriptor(process.cwd(), binding.sessionCleanup.sessionId, { expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256 });\nmkdirSync(${JSON.stringify(extraPath)}, { mode: 0o700 });\nregisterTemporaryIntent(process.cwd(), { sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce, resourceId: "extra-resource", type: "scratch-directory", path: ${JSON.stringify(extraPath)}, contentClass: "verify-recovery", soleCopy: false, cleanupPolicy: "remove-directory" });\n`, { mode: 0o600 });
+  const stateBytes = readFileSync(f.statePath);
+  try {
+    await assert.rejects(
+      () => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "extra-resource" }, runId: "verify-extra-resource" }),
+      /VERIFY-OWNER-CLEANUP-REQUIRED:verify-extra-resource/u,
+    );
+    const runDir = join(f.common, "agent-pipeline", "verify", "runs", "verify-extra-resource");
+    assert.equal(JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8")).status, "passed");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "bound");
+    assert.equal(listActiveSessionDescriptors(f.root).length, 1);
+    assert.deepEqual(readFileSync(f.statePath), stateBytes);
+    assert.equal(lstatSync(extraPath).isDirectory(), true);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
 test("a completed receipt owned by a currently live exact writer is never reused", async () => {

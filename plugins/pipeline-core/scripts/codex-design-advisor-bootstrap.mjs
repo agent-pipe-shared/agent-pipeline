@@ -28,12 +28,13 @@ export function exportCodexDesignAdvisorArtifacts(root,prefix,result){
  const targets=artifacts.map(([name,bytes])=>{const ref=prefix+'.'+name+'.json',path=resolve(root,ref);if(!advisorPublicPath(ref)||relative(root,path).startsWith('..')||existsSync(path))throw Error('CADB-PUBLIC-TARGET');let parent=root;for(const p of relative(root,dirname(path)).split('/').filter(Boolean)){parent=join(parent,p);const s=lstatSync(parent);if(!s.isDirectory()||s.isSymbolicLink()||realpathSync(parent)!==parent)throw Error('CADB-PUBLIC-TARGET');}if(bytes.length>65536)throw Error('CADB-PUBLIC-BOUND');return {ref,path,bytes};});
  const refs={};for(let i=0;i<targets.length;i++){const t=targets[i];writeFileSync(t.path,t.bytes,{flag:'wx',mode:0o600});const s=lstatSync(t.path);if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1||realpathSync(t.path)!==t.path||!readFileSync(t.path).equals(t.bytes))throw Error('CADB-PUBLIC-READBACK');refs[artifacts[i][0]]={path:t.ref,sha256:sha(t.bytes)};}return refs;
 }
-export async function runCodexDesignAdvisorBootstrap(argv=process.argv.slice(2),{newCourseParentId=null,observeInitialCourseDecision}={}){
+export async function runCodexDesignAdvisorBootstrap(argv=process.argv.slice(2),{newCourseParentId=null,observeInitialCourseDecision,familyPorts=null}={}){
  const args=parseCodexDesignAdvisorArgs(argv),root=realpathSync(args['repo-root']);if(root!==resolve(args['repo-root']))throw Error('CADB-PHYSICAL-ROOT');
- const observed=inspectCodexInitialAdvisorMetadata({repoRoot:root,sources:args.sources});if(observed.candidate.commit!==args['expected-commit']||observed.candidate.tree!==args['expected-tree'])throw Error('CADB-CANDIDATE-DRIFT');
+ const dispatch={dispatchId:'advisor_'+randomUUID(),queueRevision:0,candidateCommit:args['expected-commit'],candidateTree:args['expected-tree']};
+ const observed=await inspectCodexInitialAdvisorMetadata({repoRoot:root,sources:args.sources,familyPorts,invocationId:dispatch.dispatchId,
+  expectedCommit:args['expected-commit'],expectedTree:args['expected-tree']});
  if(args.inspect)return {ok:true,status:'metadata-admitted',candidate:observed.candidate,route:observed.route,sourceBlobIds:observed.sourceBlobIds,consentSha256:observed.consentSha256,implementationAuthority:false,childStarted:false,inputSubmitted:false};
- const dispatch={dispatchId:'advisor_'+randomUUID(),queueRevision:0,candidateCommit:observed.candidate.commit,candidateTree:observed.candidate.tree};
- const native=createNativeCodexDesignAdvisorExecution({repoRoot:root,sources:args.sources,featureId:args['feature-id'],profile:args.profile,reason:'risk-review',dispatch});
+ const native=await createNativeCodexDesignAdvisorExecution({repoRoot:root,sources:args.sources,featureId:args['feature-id'],profile:args.profile,reason:'risk-review',dispatch,familyPorts,initialObservation:observed});
  const result=await coordinateInitialDesignAdvisory({repoRoot:root,featureId:args['feature-id'],authoringDispatchId:args['authoring-dispatch-id'],sources:args.sources,reason:'risk-review',profile:args.profile,dispatch,route:native.observation.route,hostExecution:native.execution,newCourseParentId,observeInitialCourseDecision});
  if(!result.ok&&result.status!=='unavailable-pending-final-approval')return {ok:false,status:result.status,code:result.code,courseBinding:result.courseBinding??null,implementationAuthority:false};
  const artifacts=exportCodexDesignAdvisorArtifacts(root,args['output-prefix'],result);

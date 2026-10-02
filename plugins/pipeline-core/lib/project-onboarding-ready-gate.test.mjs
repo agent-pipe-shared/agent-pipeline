@@ -506,7 +506,10 @@ test("a non-ready observation carrying the two ready-only fields is rejected (th
 test("every controlling non-ready lifecycle status is preserved and denied without forwarding diagnostics", () => {
   const path = root();
   try {
-    assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 30);
+    assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 33);
+    for (const status of ["enrollment-retirement-required", "enrollment-history-recovery-required", "enrollment-activation-required"]) {
+      assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.includes(status), true);
+    }
     for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
       assert.throws(() => requireProjectOnboardingReady({
         rootDir: path,

@@ -2,112 +2,18 @@
   "schema": "pipeline.verify-suites.v1",
   "suites": [
     {
-      "name": "architecture-adoption-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
-      "invariantPinned": "Adoption demand policy and transition mechanics for architecture governance",
-      "nonOverlapNote": "Unique test suite for architecture-adoption.mjs"
-    },
-    {
-      "name": "architecture-baseline-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
-      "invariantPinned": "Baseline ratchet and drift detection for repository architecture assets",
-      "nonOverlapNote": "Unique test suite for architecture-baseline.mjs"
-    },
-    {
-      "name": "architecture-effective-decisions-tests",
-      "file": "plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs",
-      "invariantPinned": "Validated effective ADR identity, unresolved legacy authority, and typed parity divergence",
-      "nonOverlapNote": "Unique fail-closed decision-estate projection tests; baseline significance tests do not resolve effective decisions"
-    },
-    {
-      "name": "architecture-fitness-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
-      "invariantPinned": "Architecture fitness functions evaluation and threshold adherence",
-      "nonOverlapNote": "Unique test suite for architecture-fitness.mjs"
-    },
-    {
-      "name": "architecture-remedy-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
-      "invariantPinned": "Architecture remedy generation and plan application integrity",
-      "nonOverlapNote": "Unique test suite for architecture-remedy.mjs"
-    },
-    {
-      "name": "check-clone-provisioning-tests",
-      "file": "plugins/pipeline-core/scripts/check-clone-provisioning.test.mjs",
-      "invariantPinned": "Fresh clone machine-local provisioning readback verification",
-      "nonOverlapNote": "Unique test suite for check-clone-provisioning.mjs"
-    },
-    {
-      "name": "check-commit-type-range",
-      "file": "plugins/pipeline-core/scripts/check-commit-type-range.mjs",
-      "invariantPinned": "Conventional commit type compliance across git commit ranges",
-      "nonOverlapNote": "Range-mode commit type audit checker distinct from staged-only hooks"
-    },
-    {
-      "name": "check-commit-type-range-tests",
-      "file": "plugins/pipeline-core/scripts/check-commit-type-range.test.mjs",
-      "invariantPinned": "Unit test suite verifying commit type range auditing behavior",
-      "nonOverlapNote": "Unique test suite for check-commit-type-range.mjs"
-    },
-    {
-      "name": "check-evidence-drift-tests",
-      "file": "plugins/pipeline-core/scripts/check-evidence-drift.test.mjs",
-      "invariantPinned": "Evidence drift detection across active lifecycle transitions",
-      "nonOverlapNote": "Unique test suite for check-evidence-drift.mjs"
-    },
-    {
-      "name": "guard-devplan-policy-tests",
-      "file": "plugins/pipeline-core/lib/guard-devplan-policy.test.mjs",
-      "invariantPinned": "Critic scratch notes and scratch dispatch admission across lifecycles",
-      "nonOverlapNote": "Unique test suite for guard-devplan-policy.mjs scratch persistence"
-    },
-    {
-      "name": "module-inventory-tests",
-      "file": "plugins/pipeline-core/scripts/module-inventory.test.mjs",
-      "invariantPinned": "Module inventory discovery, taxonomy, dependencies, and derived architecture-overview freshness and safety",
-      "nonOverlapNote": "Module inventory and its human-readable derived view share one architecture-map suite"
-    },
-    {
-      "name": "plan-authority-staging-guard-tests",
-      "file": "plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs",
-      "invariantPinned": "Pre-authority staging draft refusal and boundary isolation",
-      "nonOverlapNote": "Unique test suite for plan-authority-staging-guard.mjs"
-    },
-    {
-      "name": "protected-baseline-tests",
-      "file": "plugins/pipeline-core/lib/protected-baseline.test.mjs",
-      "invariantPinned": "Immutable static protected baseline, additive project configuration, physical-path safety, and dynamic continuity bindings",
-      "nonOverlapNote": "Unique fixture suite for protected-baseline.mjs"
-    },
-    {
-      "name": "protected-delta-check-tests",
-      "file": "plugins/pipeline-core/scripts/check-protected-delta.test.mjs",
-      "invariantPinned": "Candidate-bound protected-surface delta classification and baseline identity evidence",
-      "nonOverlapNote": "Unique fixture suite for check-protected-delta.mjs"
-    },
-    {
-      "name": "report-interruptions-tests",
-      "file": "plugins/pipeline-core/scripts/report-interruptions.test.mjs",
-      "invariantPinned": "Interruption receipt aggregation, normalization, and window validation",
-      "nonOverlapNote": "Unique test suite for report-interruptions.mjs"
-    },
-    {
-      "name": "rigor-floor-tests",
-      "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs",
-      "invariantPinned": "Deterministic derivation of minimum rigor profile from mechanical inputs",
-      "nonOverlapNote": "Unique test suite for rigor-floor.mjs"
-    },
-    {
-      "name": "check-audit-evidence-overview-tests",
-      "file": "harness/scripts/check-audit-evidence-overview.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for harness/scripts/check-audit-evidence-overview.test.mjs",
-      "nonOverlapNote": "Unique test suite for harness/scripts/check-audit-evidence-overview.test.mjs"
-    },
-    {
-      "name": "guard-push-promotion-tests",
-      "file": "plugins/pipeline-core/hooks/guard-push-promotion.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs"
+      "name": "advisory-route-selection-tests",
+      "file": "plugins/pipeline-core/lib/advisory-route-selection.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ARS001",
+          "ARS002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "No-child Advisor route selection binds exact receipt bytes, rejects answer or child claims and preserves typed unavailable or permission-denied outcomes",
+      "nonOverlapNote": "Route-selection disposition validation is separate from Advisor execution, admission and durable course provenance"
     },
     {
       "name": "agy-session-authority-tests",
@@ -116,337 +22,16 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/agy-session-authority.test.mjs"
     },
     {
-      "name": "agy-session-dispatch-tests",
-      "file": "plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/agy-session-dispatch.test.mjs"
-    },
-    {
-      "name": "architecture-adoption-orientation-tests",
-      "file": "plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs"
-    },
-    {
-      "name": "architecture-design-test-fixture-tests",
-      "file": "plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs"
-    },
-    {
-      "name": "architecture-design-tests",
-      "file": "plugins/pipeline-core/lib/architecture-design.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-design.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-design.test.mjs"
-    },
-    {
-      "name": "architecture-entry-readiness-tests",
-      "file": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs"
-    },
-    {
-      "name": "architecture-map-scaffold-tests",
-      "file": "plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs"
-    },
-    {
-      "name": "critic-diagnostic-evidence-tests",
-      "file": "plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs"
-    },
-    {
-      "name": "critic-diagnostic-packet-tests",
-      "file": "plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs"
-    },
-    {
-      "name": "critic-lifecycle-admission-tests",
-      "file": "plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs"
-    },
-    {
-      "name": "critic-verify-lifecycle-tests",
-      "file": "plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs"
-    },
-    {
-      "name": "portable-critic-export-tests",
-      "file": "plugins/pipeline-core/lib/portable-critic-export.test.mjs",
-      "invariantPinned": "Anchored detached-signature and exact candidate binding for a redacted Critic export",
-      "nonOverlapNote": "Unique portable export contract; private Critic lifecycle checks remain in critic-verify-lifecycle-tests"
-    },
-    {
-      "name": "portable-critic-export-cli-tests",
-      "file": "plugins/pipeline-core/scripts/portable-critic-export.test.mjs",
-      "invariantPinned": "A consumed Critic receipt prepares one exact signer-visible request; an anchored proof exclusively publishes the clone-portable export and dirty candidate or drift fail closed",
-      "nonOverlapNote": "Unique host preparation and publication coverage; the redacted signature contract and private Critic lifecycle have separate suites"
-    },
-    {
-      "name": "portable-agy-authorship-export-tests",
-      "file": "plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs",
-      "invariantPinned": "A locally checked Agy host receipt may be exported only through a signed redacted subject; fresh-clone Git, trust-anchor and tamper readbacks fail closed",
-      "nonOverlapNote": "Unique portable Agy authorship export contract; private host receipt and commit admission have separate suites"
-    },
-    {
-      "name": "portable-agy-authorship-export-cli-tests",
-      "file": "plugins/pipeline-core/scripts/portable-agy-authorship-export.test.mjs",
-      "invariantPinned": "Agy signature-request and export publication use exclusive inode-checked writes, refuse aliases or absent local authorship evidence, and validate a detached proof before committed clone readback",
-      "nonOverlapNote": "Unique host CLI publication coverage; the portable export contract and clone readback are tested separately"
-    },
-    {
-      "name": "critical-action-authorization-chat-tests",
-      "file": "plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs"
-    },
-    {
-      "name": "design-advisory-admission-tests",
-      "file": "plugins/pipeline-core/lib/design-advisory-admission.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-admission.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-admission.test.mjs"
-    },
-    {
-      "name": "design-advisory-coordinator-tests",
-      "file": "plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs"
-    },
-    {
-      "name": "design-advisory-enforcement-tests",
-      "file": "plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs"
-    },
-    {
-      "name": "design-advisory-transaction-tests",
-      "file": "plugins/pipeline-core/lib/design-advisory-transaction.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-transaction.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-transaction.test.mjs"
-    },
-    {
-      "name": "feature-close-audit-executor-tests",
-      "file": "plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs"
-    },
-    {
-      "name": "feature-close-audit-preflight-tests",
-      "file": "plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs"
-    },
-    {
-      "name": "feature-close-audit-receipt-tests",
-      "file": "plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs"
-    },
-    {
-      "name": "pipeline-commit-tests",
-      "file": "plugins/pipeline-core/lib/pipeline-commit.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pipeline-commit.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pipeline-commit.test.mjs"
-    },
-    {
-      "name": "release-promotion-envelope-tests",
-      "file": "plugins/pipeline-core/lib/release-promotion-envelope.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/release-promotion-envelope.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/release-promotion-envelope.test.mjs"
-    },
-    {
       "name": "agy-session-consent-tests",
       "file": "plugins/pipeline-core/scripts/agy-session-consent.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/agy-session-consent.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/agy-session-consent.test.mjs"
     },
     {
-      "name": "cli-help-tests",
-      "file": "plugins/pipeline-core/scripts/cli-help.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/cli-help.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/cli-help.test.mjs"
-    },
-    {
-      "name": "close-coordinator-audit-lifecycle-tests",
-      "file": "plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs"
-    },
-    {
-      "name": "elephant-agy-implementation-dispatch-tests",
-      "file": "plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs"
-    },
-    {
-      "name": "elephant-implementation-dispatch-tests",
-      "file": "plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs"
-    },
-    {
-      "name": "finish-feature-tests",
-      "file": "plugins/pipeline-core/scripts/finish-feature.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/finish-feature.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/finish-feature.test.mjs"
-    },
-    {
-      "name": "goldfish-antigravity-live-host-tests",
-      "file": "plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs"
-    },
-    {
-      "name": "plugins-pipeline-core-scripts-pipeline-commit-tests",
-      "file": "plugins/pipeline-core/scripts/pipeline-commit.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-commit.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-commit.test.mjs"
-    },
-    {
-      "name": "pipeline-state-close-audit-tests",
-      "file": "plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs"
-    },
-    {
-      "name": "publication-close-audit-binding-tests",
-      "file": "plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
-      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs"
-    },
-    {
-      "name": "architecture-decision-continuity-tests",
-      "file": "plugins/pipeline-core/lib/architecture-decision-continuity.test.mjs",
-      "invariantPinned": "Composition and parity of validated project ADRs with #9 inherited source bindings",
-      "nonOverlapNote": "Cross-layer authority composition is distinct from local sidecar validation and private source admission"
-    },
-    {
-      "name": "architecture-decision-waiver-store-tests",
-      "file": "plugins/pipeline-core/lib/architecture-decision-waiver-store.test.mjs",
-      "invariantPinned": "Exact PO-signed module exception readback, source tamper refusal and expiry",
-      "nonOverlapNote": "Human waiver proof is distinct from inherited source admission and project/inherited composition"
-    },
-    {
-      "name": "organization-architecture-source-tests",
-      "file": "plugins/pipeline-core/lib/organization-architecture-source.test.mjs",
-      "invariantPinned": "Signed, fresh organization/team ADR reference admission fails closed on source or authority drift",
-      "nonOverlapNote": "#9 inherited-source admission is distinct from local ADR applicability and organization document-class policy"
-    },
-    {
-      "name": "organization-architecture-source-store-tests",
-      "file": "plugins/pipeline-core/lib/organization-architecture-source-store.test.mjs",
-      "invariantPinned": "PO-bound source configuration and private signed organization feed readback remain distinct from absent optional guidance",
-      "nonOverlapNote": "The physical source loader checks private bytes and configured authority, beyond the pure inherited-reference resolver"
-    },
-    {
-      "name": "architecture-inherited-sources-cli-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-inherited-sources.test.mjs",
-      "invariantPinned": "Exact source-registry preparation, PO proof activation, CAS readback and tamper refusal",
-      "nonOverlapNote": "The operator-facing source registry writer is distinct from read-only source admission"
-    },
-    {
-      "name": "goldfish-commit-command-flow-tests",
-      "file": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs",
-      "invariantPinned": "Read-only exact-path Goldfish Git command rendering, quoting and real trailer readback",
-      "nonOverlapNote": "Legacy shell-command guidance is distinct from host-owned commit execution and dispatch-record authorship"
-    },
-    {
-      "name": "design-advisory-admission-cli-tests",
-      "file": "plugins/pipeline-core/scripts/design-advisory-admission.test.mjs",
-      "invariantPinned": "The inspect CLI rechecks the private Advisor transaction and cannot reuse a past final-approval claim without current human-authority readback",
-      "nonOverlapNote": "CLI readback coverage distinct from the pure transaction and admission contracts"
-    },
-    {
-      "name": "verify-suite-append-policy-tests",
-      "file": "plugins/pipeline-core/lib/verify-suite-append-policy.test.mjs",
-      "invariantPinned": "A block-level declarative Verify registration may only append suites without altering prior gate coverage",
-      "nonOverlapNote": "Unique append-only transition policy; the registration completeness checker validates the postimage itself"
-    },
-    {
-      "name": "verify-suite-append-history-tests",
-      "file": "harness/scripts/check-verify-suite-append.test.mjs",
-      "invariantPinned": "Every TP-13-era registry commit and the pending worktree postimage must preserve all earlier registrations",
-      "nonOverlapNote": "Git history and candidate-boundary coverage distinct from the pure transition policy"
-    },
-    {
-      "name": "verify-suite-append-history-check",
-      "file": "harness/scripts/check-verify-suite-append.mjs",
-      "invariantPinned": "The actual candidate registry has only append-shaped edits since TP-13 introduction",
-      "nonOverlapNote": "Real Git-history gate distinct from the registry's schema and coverage check"
-    },
-    {
-      "name": "codex-critic-session-route-tests",
-      "file": "plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs",
-      "invariantPinned": "Selected Codex Critic model and receipt digests bind to the valid V3 high-risk duty without making optional selection a lifecycle blocker",
-      "nonOverlapNote": "Direct selected-host producer coverage distinct from the shared Critic finalizer's packet binding"
-    },
-    {
-      "name": "native-goldfish-host-state-tests",
-      "file": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "NGHS01",
-          "NGHS02",
-          "NGHS03",
-          "NGHS04",
-          "NGHS05"
-        ],
-        "maxBytes": 65536
-      },
-      "invariantPinned": "Runner-native Claude and Codex dispatches persist private exact-correlation state only after candidate, role, clean-baseline, and write-scope validation; consumed or expired Codex start candidates cannot poison later runs",
-      "nonOverlapNote": "Private prelaunch binding, bounded unstarted-state TTL, and Codex start-stop correlation are separate from returned-final validation and commit readback"
-    },
-    {
-      "name": "native-goldfish-host-return-tests",
-      "file": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "NGHR01",
-          "NGHR02",
-          "NGHR03",
-          "NGHR04",
-          "NGHR05"
-        ],
-        "maxBytes": 65536
-      },
-      "invariantPinned": "Claude and Codex native Goldfish completions bind to their exact runner-specific dispatch identity and a strict, path-bounded final return",
-      "nonOverlapNote": "Pure runner callback and final-return contracts; Git mutation, private persistence, and full live-hook integration remain separately tested"
-    },
-    {
-      "name": "native-goldfish-host-finalizer-tests",
-      "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "NGHF01",
-          "NGHF02",
-          "NGHF03"
-        ],
-        "maxBytes": 65536
-      },
-      "invariantPinned": "A runner-native Claude/Codex host finalizer commits only a validated exact return, publishes its private observation, then writes one exclusive authored v4 record",
-      "nonOverlapNote": "Ordering and failure-state orchestration is separate from pure callback validation, private receipt integrity, and real-Git commit execution"
-    },
-    {
-      "name": "native-goldfish-host-commit-execution-tests",
-      "file": "plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "NGHC01",
-          "NGHC02"
-        ],
-        "maxBytes": 65536
-      },
-      "invariantPinned": "Claude/Codex native Host-Commit stages only the admitted return diff, runs ordinary Git hooks, and reads back runner-specific exact commit metadata",
-      "nonOverlapNote": "Temporary real-Git mutation coverage is separate from callback validation and the Agy-specific host commit contract"
+      "name": "agy-session-dispatch-tests",
+      "file": "plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/agy-session-dispatch.test.mjs"
     },
     {
       "name": "antigravity-topology-integration-tests",
@@ -493,6 +78,126 @@
       "nonOverlapNote": "Focused antigravity topology refresh host contract coverage; separate from adjacent admission, persistence and runner integration suites"
     },
     {
+      "name": "architecture-adoption-orientation-tests",
+      "file": "plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs"
+    },
+    {
+      "name": "architecture-adoption-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
+      "invariantPinned": "Adoption demand policy and transition mechanics for architecture governance",
+      "nonOverlapNote": "Unique test suite for architecture-adoption.mjs"
+    },
+    {
+      "name": "architecture-baseline-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
+      "invariantPinned": "Baseline ratchet and drift detection for repository architecture assets",
+      "nonOverlapNote": "Unique test suite for architecture-baseline.mjs"
+    },
+    {
+      "name": "architecture-decision-continuity-tests",
+      "file": "plugins/pipeline-core/lib/architecture-decision-continuity.test.mjs",
+      "invariantPinned": "Composition and parity of validated project ADRs with #9 inherited source bindings",
+      "nonOverlapNote": "Cross-layer authority composition is distinct from local sidecar validation and private source admission"
+    },
+    {
+      "name": "architecture-decision-waiver-store-tests",
+      "file": "plugins/pipeline-core/lib/architecture-decision-waiver-store.test.mjs",
+      "invariantPinned": "Exact PO-signed module exception readback, source tamper refusal and expiry",
+      "nonOverlapNote": "Human waiver proof is distinct from inherited source admission and project/inherited composition"
+    },
+    {
+      "name": "architecture-design-test-fixture-tests",
+      "file": "plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs"
+    },
+    {
+      "name": "architecture-design-tests",
+      "file": "plugins/pipeline-core/lib/architecture-design.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-design.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-design.test.mjs"
+    },
+    {
+      "name": "architecture-effective-decisions-tests",
+      "file": "plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs",
+      "invariantPinned": "Validated effective ADR identity, unresolved legacy authority, and typed parity divergence",
+      "nonOverlapNote": "Unique fail-closed decision-estate projection tests; baseline significance tests do not resolve effective decisions"
+    },
+    {
+      "name": "architecture-entry-readiness-tests",
+      "file": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs"
+    },
+    {
+      "name": "architecture-fitness-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+      "invariantPinned": "Architecture fitness functions evaluation and threshold adherence",
+      "nonOverlapNote": "Unique test suite for architecture-fitness.mjs"
+    },
+    {
+      "name": "architecture-inherited-sources-cli-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-inherited-sources.test.mjs",
+      "invariantPinned": "Exact source-registry preparation, PO proof activation, CAS readback and tamper refusal",
+      "nonOverlapNote": "The operator-facing source registry writer is distinct from read-only source admission"
+    },
+    {
+      "name": "architecture-map-scaffold-tests",
+      "file": "plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs"
+    },
+    {
+      "name": "architecture-remedy-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
+      "invariantPinned": "Architecture remedy generation and plan application integrity",
+      "nonOverlapNote": "Unique test suite for architecture-remedy.mjs"
+    },
+    {
+      "name": "check-audit-evidence-overview-tests",
+      "file": "harness/scripts/check-audit-evidence-overview.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for harness/scripts/check-audit-evidence-overview.test.mjs",
+      "nonOverlapNote": "Unique test suite for harness/scripts/check-audit-evidence-overview.test.mjs"
+    },
+    {
+      "name": "check-clone-provisioning-tests",
+      "file": "plugins/pipeline-core/scripts/check-clone-provisioning.test.mjs",
+      "invariantPinned": "Fresh clone machine-local provisioning readback verification",
+      "nonOverlapNote": "Unique test suite for check-clone-provisioning.mjs"
+    },
+    {
+      "name": "check-commit-type-range",
+      "file": "plugins/pipeline-core/scripts/check-commit-type-range.mjs",
+      "invariantPinned": "Conventional commit type compliance across git commit ranges",
+      "nonOverlapNote": "Range-mode commit type audit checker distinct from staged-only hooks"
+    },
+    {
+      "name": "check-commit-type-range-tests",
+      "file": "plugins/pipeline-core/scripts/check-commit-type-range.test.mjs",
+      "invariantPinned": "Unit test suite verifying commit type range auditing behavior",
+      "nonOverlapNote": "Unique test suite for check-commit-type-range.mjs"
+    },
+    {
+      "name": "check-evidence-drift-tests",
+      "file": "plugins/pipeline-core/scripts/check-evidence-drift.test.mjs",
+      "invariantPinned": "Evidence drift detection across active lifecycle transitions",
+      "nonOverlapNote": "Unique test suite for check-evidence-drift.mjs"
+    },
+    {
+      "name": "cli-help-tests",
+      "file": "plugins/pipeline-core/scripts/cli-help.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/cli-help.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/cli-help.test.mjs"
+    },
+    {
+      "name": "close-coordinator-audit-lifecycle-tests",
+      "file": "plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs"
+    },
+    {
       "name": "codex-compact-session-output-tests",
       "file": "plugins/pipeline-core/hooks/codex-compact-session-output.test.mjs",
       "caseCompletion": {
@@ -506,6 +211,64 @@
       },
       "invariantPinned": "Codex compact output exposes bounded session continuity without granting authority",
       "nonOverlapNote": "Focused codex compact session output contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "codex-critic-session-route-tests",
+      "file": "plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs",
+      "invariantPinned": "Selected Codex Critic model and receipt digests bind to the valid V3 high-risk duty without making optional selection a lifecycle blocker",
+      "nonOverlapNote": "Direct selected-host producer coverage distinct from the shared Critic finalizer's packet binding"
+    },
+    {
+      "name": "codex-design-advisor-host-tests",
+      "file": "plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CADH001"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Advisor host invocation and terminal no-child route contract",
+      "nonOverlapNote": "Host behavior suite is distinct from the inactive Advisor execution suite"
+    },
+    {
+      "name": "commit-msg-hook-signed-integration-tests",
+      "file": "plugins/pipeline-core/scripts/commit-msg-hook-signed-integration.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CMSI001",
+          "CMSI002",
+          "CMSI003",
+          "CMSI004",
+          "CMSI005",
+          "CMSI006",
+          "CMSI007",
+          "CMSI008",
+          "CMSI009"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Installed commit message boundary verifies signed integration without weakening normal marker enforcement",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/scripts/commit-msg-hook-signed-integration.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "critic-diagnostic-evidence-tests",
+      "file": "plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs"
+    },
+    {
+      "name": "critic-diagnostic-packet-tests",
+      "file": "plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs"
+    },
+    {
+      "name": "critic-lifecycle-admission-tests",
+      "file": "plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs"
     },
     {
       "name": "critic-route-v3-tests",
@@ -526,6 +289,48 @@
       "nonOverlapNote": "Focused critic route v3 contract coverage; separate from adjacent admission, persistence and runner integration suites"
     },
     {
+      "name": "critic-verify-lifecycle-tests",
+      "file": "plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs"
+    },
+    {
+      "name": "critical-action-authorization-chat-tests",
+      "file": "plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs"
+    },
+    {
+      "name": "design-advisory-admission-cli-tests",
+      "file": "plugins/pipeline-core/scripts/design-advisory-admission.test.mjs",
+      "invariantPinned": "The inspect CLI rechecks the private Advisor transaction and cannot reuse a past final-approval claim without current human-authority readback",
+      "nonOverlapNote": "CLI readback coverage distinct from the pure transaction and admission contracts"
+    },
+    {
+      "name": "design-advisory-admission-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-admission.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-admission.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-admission.test.mjs"
+    },
+    {
+      "name": "design-advisory-coordinator-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs"
+    },
+    {
+      "name": "design-advisory-enforcement-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs"
+    },
+    {
+      "name": "design-advisory-transaction-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-transaction.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-transaction.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-transaction.test.mjs"
+    },
+    {
       "name": "design-workflow-signing-default-tests",
       "file": "plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs",
       "caseCompletion": {
@@ -541,6 +346,90 @@
       },
       "invariantPinned": "Default design signing preserves policy-selected signature requirements",
       "nonOverlapNote": "Focused design workflow signing default contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "elephant-agy-implementation-dispatch-tests",
+      "file": "plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs"
+    },
+    {
+      "name": "elephant-implementation-dispatch-tests",
+      "file": "plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs"
+    },
+    {
+      "name": "enrollment-retirement-coordinator-tests",
+      "file": "plugins/pipeline-core/lib/enrollment-retirement-coordinator.test.mjs",
+      "invariantPinned": "Closed byte-exact generation archive and monotone retirement phases",
+      "nonOverlapNote": "Pure retirement values and fresh consent generation binding",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ERT01",
+          "ERT02"
+        ],
+        "maxBytes": 131072
+      }
+    },
+    {
+      "name": "enrollment-retirement-git-creation-tests",
+      "file": "plugins/pipeline-core/lib/enrollment-retirement-git-creation.test.mjs",
+      "invariantPinned": "Explicit attended local Git creation preserves retained state and foreign scopes; real disposable consent CAS and worktree isolation",
+      "nonOverlapNote": "Ordinary owner filesystem transactions; privileged state-writer handoff is explicitly a fixture callback",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "EGR01",
+          "EGR02",
+          "EGR03",
+          "EGR04",
+          "EGR05",
+          "EGR06",
+          "EGR07",
+          "EGR08",
+          "EGR09",
+          "EGR10"
+        ],
+        "maxBytes": 131072
+      }
+    },
+    {
+      "name": "feature-close-audit-executor-tests",
+      "file": "plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs"
+    },
+    {
+      "name": "feature-close-audit-preflight-tests",
+      "file": "plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs"
+    },
+    {
+      "name": "feature-close-audit-receipt-tests",
+      "file": "plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs"
+    },
+    {
+      "name": "finish-feature-tests",
+      "file": "plugins/pipeline-core/scripts/finish-feature.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/finish-feature.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/finish-feature.test.mjs"
+    },
+    {
+      "name": "goldfish-antigravity-live-host-tests",
+      "file": "plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs"
+    },
+    {
+      "name": "goldfish-commit-command-flow-tests",
+      "file": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs",
+      "invariantPinned": "Read-only exact-path Goldfish Git command rendering, quoting and real trailer readback",
+      "nonOverlapNote": "Legacy shell-command guidance is distinct from host-owned commit execution and dispatch-record authorship"
     },
     {
       "name": "governance-onboarding-tests",
@@ -591,6 +480,51 @@
       "nonOverlapNote": "Focused governance scope contract coverage; separate from adjacent admission, persistence and runner integration suites"
     },
     {
+      "name": "guard-devplan-policy-tests",
+      "file": "plugins/pipeline-core/lib/guard-devplan-policy.test.mjs",
+      "invariantPinned": "Critic scratch notes and scratch dispatch admission across lifecycles",
+      "nonOverlapNote": "Unique test suite for guard-devplan-policy.mjs scratch persistence"
+    },
+    {
+      "name": "guard-dispatch-native-worker-tests",
+      "file": "plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs",
+      "invariantPinned": "Native Goldfish worker dispatch prepares exact pending bindings and blocks mismatched or incomplete worker packets",
+      "nonOverlapNote": "Native worker preparation and packet regressions have dedicated GDW cases; historical dispatch guard policy retains GD01–GD43",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GDW01",
+          "GDW02",
+          "GDW03",
+          "GDW04"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "guard-git-signed-integration-tests",
+      "file": "plugins/pipeline-core/hooks/guard-git-signed-integration.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GSI001",
+          "GSI002",
+          "GSI003",
+          "GSI004",
+          "GSI005"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Signed quality integration requires independently verified proof and intent even when ordinary marker policy is off",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/hooks/guard-git-signed-integration.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "guard-push-promotion-tests",
+      "file": "plugins/pipeline-core/hooks/guard-push-promotion.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs"
+    },
+    {
       "name": "hook-governance-scope-tests",
       "file": "plugins/pipeline-core/hooks/hook-governance-scope.test.mjs",
       "caseCompletion": {
@@ -610,6 +544,492 @@
       },
       "invariantPinned": "Hook entrypoints apply governance scope before project guards",
       "nonOverlapNote": "Focused hook governance scope contract coverage; separate from adjacent admission, persistence and runner integration suites"
+    },
+    {
+      "name": "model-family-acceptance-tests",
+      "file": "plugins/pipeline-core/lib/model-family-acceptance.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFAC001",
+          "MFAC002",
+          "MFAC003",
+          "MFAC004",
+          "MFAC005",
+          "MFAC006",
+          "MFAC007",
+          "MFAC008",
+          "MFAC009",
+          "MFAC010",
+          "MFAC011"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Three-runner acceptance binds source contracts and distinguishes native qualification from fixture-only evidence",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-acceptance.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-antigravity-adapter-tests",
+      "file": "plugins/pipeline-core/lib/model-family-antigravity-adapter.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFAGA001",
+          "MFAGA002",
+          "MFAGA003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Antigravity native catalogue and execution observations do not infer authority from display labels",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-antigravity-adapter.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-authority-tests",
+      "file": "plugins/pipeline-core/lib/model-family-authority.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFA001",
+          "MFA002",
+          "MFA003",
+          "MFA004",
+          "MFA005",
+          "MFA006",
+          "MFA007",
+          "MFA008",
+          "MFA009",
+          "MFA010"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Fresh PO family authority, migration and linked successor proof reject tampering and structural handle clones",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-authority.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-claude-adapter-tests",
+      "file": "plugins/pipeline-core/lib/model-family-claude-adapter.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFCLA001",
+          "MFCLA002",
+          "MFCLA003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Claude catalogue and execution parsing preserve unknown optional facts without inventing release authority",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-claude-adapter.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-codex-adapter-tests",
+      "file": "plugins/pipeline-core/lib/model-family-codex-adapter.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFCA001",
+          "MFCA002",
+          "MFCA003",
+          "MFCA004",
+          "MFCA005"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Codex raw catalogue parsing and exact launch rendering preserve native model and effort facts",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-codex-adapter.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-discovery-tests",
+      "file": "plugins/pipeline-core/lib/model-family-discovery.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFD001",
+          "MFD002",
+          "MFD003",
+          "MFD004",
+          "MFD005",
+          "MFD006",
+          "MFD007",
+          "MFD008",
+          "MFD009",
+          "MFD010",
+          "MFD011",
+          "MFD012",
+          "MFD013",
+          "MFD014",
+          "MFD015",
+          "MFD016",
+          "MFD017",
+          "MFD018",
+          "MFD019",
+          "MFD020",
+          "MFD021",
+          "MFD022",
+          "MFD023"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Opaque native discovery, bounded capture, trusted contracts, freshness and exact runner bindings",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-discovery.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-execution-tests",
+      "file": "plugins/pipeline-core/lib/model-family-execution.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFE001",
+          "MFE002",
+          "MFE003",
+          "MFE004",
+          "MFE005",
+          "MFE006",
+          "MFE007",
+          "MFE008",
+          "MFE009",
+          "MFE010",
+          "MFE011",
+          "MFE012",
+          "MFE013",
+          "MFE014",
+          "MFE015",
+          "MFE016",
+          "MFE017",
+          "MFE018",
+          "MFE019"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Execution verifies one sealed invocation and exact native launch evidence before confirming model identity",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-execution.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-host-store-tests",
+      "file": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFHS001",
+          "MFHS002",
+          "MFHS003",
+          "MFHS004",
+          "MFHS005",
+          "MFHS006",
+          "MFHS007",
+          "MFHS008",
+          "MFHS009",
+          "MFHS010",
+          "MFHS011",
+          "MFHS012",
+          "MFHS013",
+          "MFHS014",
+          "MFHS015",
+          "MFHS016",
+          "MFHS017",
+          "MFHS018",
+          "MFHS019",
+          "MFHS020",
+          "MFHS021",
+          "MFHS022",
+          "MFHS023",
+          "MFHS024",
+          "MFHS025",
+          "MFHS026",
+          "MFHS027",
+          "MFHS028"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "S4 host-store preparation, candidate drift, authority checks, CAS, and launch revalidation",
+      "nonOverlapNote": "Focused host-store contract suite; distinct from invocation and runner renderer suites"
+    },
+    {
+      "name": "model-family-invocation-tests",
+      "file": "plugins/pipeline-core/lib/model-family-invocation.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFI001",
+          "MFI002",
+          "MFI003",
+          "MFI004",
+          "MFI005",
+          "MFI006",
+          "MFI007",
+          "MFI008",
+          "MFI009",
+          "MFI010",
+          "MFI011",
+          "MFI012",
+          "MFI013",
+          "MFI014"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Shared invocation binding, replay, async discovery freshness, and held-selection immutability",
+      "nonOverlapNote": "Invocation lifecycle contract; does not repeat source discovery or runner adapter tests"
+    },
+    {
+      "name": "model-family-latest-selection-tests",
+      "file": "plugins/pipeline-core/lib/model-family-latest-selection.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFLS001",
+          "MFLS002",
+          "MFLS003",
+          "MFLS004",
+          "MFLS005",
+          "MFLS006",
+          "MFLS007",
+          "MFLS008",
+          "MFLS009",
+          "MFLS010",
+          "MFLS011",
+          "MFLS012",
+          "MFLS013",
+          "MFLS014",
+          "MFLS015",
+          "MFLS016"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Numerical selectable family head precedes effort and compatibility checks and preserves downgrade protection",
+      "nonOverlapNote": "Dedicated original callback suite for plugins/pipeline-core/lib/model-family-latest-selection.test.mjs; registration preserves its existing assertions and case completion policy"
+    },
+    {
+      "name": "model-family-main-prelaunch-tests",
+      "file": "plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFMP001",
+          "MFMP002",
+          "MFMP003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "All-runner main prelaunch binds signed S4/S5 context, exact applied configuration, revalidation, and observed main identity",
+      "nonOverlapNote": "Main-session boundary tests are separate from child invocation and model-selection cases"
+    },
+    {
+      "name": "model-family-route-source-tests",
+      "file": "plugins/pipeline-core/lib/model-family-route-source.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFR001",
+          "MFR002",
+          "MFR003",
+          "MFR004",
+          "MFR005"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Trusted source route admission and fail-closed route provenance",
+      "nonOverlapNote": "Route source boundary suite; separate from invocation and runtime host execution"
+    },
+    {
+      "name": "model-family-runtime-host-tests",
+      "file": "plugins/pipeline-core/lib/model-family-runtime-host.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFH001",
+          "MFH002",
+          "MFH003",
+          "MFH004"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Runtime host orchestration and private source-port isolation",
+      "nonOverlapNote": "Runtime composition boundary; distinct from source route and invocation behavior"
+    },
+    {
+      "name": "module-inventory-tests",
+      "file": "plugins/pipeline-core/scripts/module-inventory.test.mjs",
+      "invariantPinned": "Module inventory discovery, taxonomy, dependencies, and derived architecture-overview freshness and safety",
+      "nonOverlapNote": "Module inventory and its human-readable derived view share one architecture-map suite"
+    },
+    {
+      "name": "native-goldfish-host-commit-execution-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHC01",
+          "NGHC02"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Claude/Codex native Host-Commit stages only the admitted return diff, runs ordinary Git hooks, and reads back runner-specific exact commit metadata",
+      "nonOverlapNote": "Temporary real-Git mutation coverage is separate from callback validation and the Agy-specific host commit contract"
+    },
+    {
+      "name": "native-goldfish-host-finalizer-regression-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs",
+      "invariantPinned": "Codex v2 worker finalization commits through real Git and records the versioned worker observation",
+      "nonOverlapNote": "Additive v2 worker finalizer checks; original finalizer policy retains NGHF01–NGHF03 and the NGHF04 gap",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHF05",
+          "NGHF06"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-finalizer-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHF01",
+          "NGHF02",
+          "NGHF03"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "A runner-native Claude/Codex host finalizer commits only a validated exact return, publishes its private observation, then writes one exclusive authored v4 record",
+      "nonOverlapNote": "Ordering and failure-state orchestration is separate from pure callback validation, private receipt integrity, and real-Git commit execution"
+    },
+    {
+      "name": "native-goldfish-host-return-regression-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-return-regression.test.mjs",
+      "invariantPinned": "Native Codex worker return binds runner-specific worker transport separately from the functional Goldfish role",
+      "nonOverlapNote": "Additive Codex v2 return checks; original Claude/Codex return policy retains its historical five cases",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHR06",
+          "NGHR07"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-return-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHR01",
+          "NGHR02",
+          "NGHR03",
+          "NGHR04",
+          "NGHR05"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Claude and Codex native Goldfish completions bind to their exact runner-specific dispatch identity and a strict, path-bounded final return",
+      "nonOverlapNote": "Pure runner callback and final-return contracts; Git mutation, private persistence, and full live-hook integration remain separately tested"
+    },
+    {
+      "name": "native-goldfish-host-state-regression-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs",
+      "invariantPinned": "Codex worker native start association binds worker transport, functional Goldfish role, exact identity, and legacy v1 compatibility",
+      "nonOverlapNote": "Additive v2 worker and legacy association regressions; original Claude/Codex state policy retains its historical five cases",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHS06",
+          "NGHS07",
+          "NGHS08"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-state-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHS01",
+          "NGHS02",
+          "NGHS03",
+          "NGHS04",
+          "NGHS05"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Runner-native Claude and Codex dispatches persist private exact-correlation state only after candidate, role, clean-baseline, and write-scope validation; consumed or expired Codex start candidates cannot poison later runs",
+      "nonOverlapNote": "Private prelaunch binding, bounded unstarted-state TTL, and Codex start-stop correlation are separate from returned-final validation and commit readback"
+    },
+    {
+      "name": "organization-architecture-source-store-tests",
+      "file": "plugins/pipeline-core/lib/organization-architecture-source-store.test.mjs",
+      "invariantPinned": "PO-bound source configuration and private signed organization feed readback remain distinct from absent optional guidance",
+      "nonOverlapNote": "The physical source loader checks private bytes and configured authority, beyond the pure inherited-reference resolver"
+    },
+    {
+      "name": "organization-architecture-source-tests",
+      "file": "plugins/pipeline-core/lib/organization-architecture-source.test.mjs",
+      "invariantPinned": "Signed, fresh organization/team ADR reference admission fails closed on source or authority drift",
+      "nonOverlapNote": "#9 inherited-source admission is distinct from local ADR applicability and organization document-class policy"
+    },
+    {
+      "name": "pipeline-commit-tests",
+      "file": "plugins/pipeline-core/lib/pipeline-commit.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pipeline-commit.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pipeline-commit.test.mjs"
+    },
+    {
+      "name": "pipeline-state-close-audit-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs"
+    },
+    {
+      "name": "plan-authority-staging-guard-tests",
+      "file": "plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs",
+      "invariantPinned": "Pre-authority staging draft refusal and boundary isolation",
+      "nonOverlapNote": "Unique test suite for plan-authority-staging-guard.mjs"
+    },
+    {
+      "name": "plan-spec-state-retirement-tests",
+      "file": "plugins/pipeline-core/lib/plan-spec-state-v2.retirement.test.mjs",
+      "invariantPinned": "Removal-only legacy approval retirement and orphan refusal",
+      "nonOverlapNote": "Retained legacy audit cannot become current through planApproved replay",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ERT03",
+          "ERT04"
+        ],
+        "maxBytes": 131072
+      }
+    },
+    {
+      "name": "plugins-pipeline-core-scripts-pipeline-commit-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-commit.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-commit.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-commit.test.mjs"
+    },
+    {
+      "name": "portable-agy-authorship-export-cli-tests",
+      "file": "plugins/pipeline-core/scripts/portable-agy-authorship-export.test.mjs",
+      "invariantPinned": "Agy signature-request and export publication use exclusive inode-checked writes, refuse aliases or absent local authorship evidence, and validate a detached proof before committed clone readback",
+      "nonOverlapNote": "Unique host CLI publication coverage; the portable export contract and clone readback are tested separately"
+    },
+    {
+      "name": "portable-agy-authorship-export-tests",
+      "file": "plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs",
+      "invariantPinned": "A locally checked Agy host receipt may be exported only through a signed redacted subject; fresh-clone Git, trust-anchor and tamper readbacks fail closed",
+      "nonOverlapNote": "Unique portable Agy authorship export contract; private host receipt and commit admission have separate suites"
+    },
+    {
+      "name": "portable-critic-export-cli-tests",
+      "file": "plugins/pipeline-core/scripts/portable-critic-export.test.mjs",
+      "invariantPinned": "A consumed Critic receipt prepares one exact signer-visible request; an anchored proof exclusively publishes the clone-portable export and dirty candidate or drift fail closed",
+      "nonOverlapNote": "Unique host preparation and publication coverage; the redacted signature contract and private Critic lifecycle have separate suites"
+    },
+    {
+      "name": "portable-critic-export-tests",
+      "file": "plugins/pipeline-core/lib/portable-critic-export.test.mjs",
+      "invariantPinned": "Anchored detached-signature and exact candidate binding for a redacted Critic export",
+      "nonOverlapNote": "Unique portable export contract; private Critic lifecycle checks remain in critic-verify-lifecycle-tests"
     },
     {
       "name": "project-activation-tests",
@@ -693,6 +1113,55 @@
       "nonOverlapNote": "Focused project uninstall contract coverage; separate from adjacent admission, persistence and runner integration suites"
     },
     {
+      "name": "protected-baseline-tests",
+      "file": "plugins/pipeline-core/lib/protected-baseline.test.mjs",
+      "invariantPinned": "Immutable static protected baseline, additive project configuration, physical-path safety, and dynamic continuity bindings",
+      "nonOverlapNote": "Unique fixture suite for protected-baseline.mjs"
+    },
+    {
+      "name": "protected-delta-check-tests",
+      "file": "plugins/pipeline-core/scripts/check-protected-delta.test.mjs",
+      "invariantPinned": "Candidate-bound protected-surface delta classification and baseline identity evidence",
+      "nonOverlapNote": "Unique fixture suite for check-protected-delta.mjs"
+    },
+    {
+      "name": "publication-close-audit-binding-tests",
+      "file": "plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs"
+    },
+    {
+      "name": "quality-package-windows-path-tests",
+      "file": "plugins/pipeline-core/lib/quality-package-windows-path.test.mjs",
+      "invariantPinned": "Canonical Windows path grammar for signed quality-package inputs without admitting files",
+      "nonOverlapNote": "Windows-specific lexical path contract coverage, separate from package proof application and source integrity",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "QWP001"
+        ],
+        "maxBytes": 4096
+      }
+    },
+    {
+      "name": "release-promotion-envelope-tests",
+      "file": "plugins/pipeline-core/lib/release-promotion-envelope.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/release-promotion-envelope.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/release-promotion-envelope.test.mjs"
+    },
+    {
+      "name": "report-interruptions-tests",
+      "file": "plugins/pipeline-core/scripts/report-interruptions.test.mjs",
+      "invariantPinned": "Interruption receipt aggregation, normalization, and window validation",
+      "nonOverlapNote": "Unique test suite for report-interruptions.mjs"
+    },
+    {
+      "name": "rigor-floor-tests",
+      "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs",
+      "invariantPinned": "Deterministic derivation of minimum rigor profile from mechanical inputs",
+      "nonOverlapNote": "Unique test suite for rigor-floor.mjs"
+    },
+    {
       "name": "runtime-projection-removal-tests",
       "file": "plugins/pipeline-core/lib/runtime-projection-removal.test.mjs",
       "caseCompletion": {
@@ -707,94 +1176,6 @@
       },
       "invariantPinned": "Runtime projection retirement removes only exact owned projection entries",
       "nonOverlapNote": "Focused runtime projection removal contract coverage; separate from adjacent admission, persistence and runner integration suites"
-    },
-    {
-      "name": "advisory-route-selection-tests",
-      "file": "plugins/pipeline-core/lib/advisory-route-selection.test.mjs",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "ARS001",
-          "ARS002"
-        ],
-        "maxBytes": 65536
-      },
-      "invariantPinned": "No-child Advisor route selection binds exact receipt bytes, rejects answer or child claims and preserves typed unavailable or permission-denied outcomes",
-      "nonOverlapNote": "Route-selection disposition validation is separate from Advisor execution, admission and durable course provenance"
-    },
-    {
-      "name": "verify-case-completion-augmentation-tests",
-      "file": "harness/scripts/verify-case-completion-augmentation.test.mjs",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "VAC001",
-          "VAC002",
-          "VAC003",
-          "VAC004",
-          "VAC005",
-          "VAC006",
-          "VAC007",
-          "VAC008",
-          "VAC009",
-          "VAC010",
-          "VAC011",
-          "VAC012"
-        ],
-        "maxBytes": 65536
-      },
-      "invariantPinned": "Exact supplementary policy matching preserves original registration rows and completion coverage.",
-      "nonOverlapNote": "Exercises augmentation composition, real FD receipts and candidate JSON identity."
-    },
-    {
-      "name": "enrollment-retirement-coordinator-tests",
-      "file": "plugins/pipeline-core/lib/enrollment-retirement-coordinator.test.mjs",
-      "invariantPinned": "Closed byte-exact generation archive and monotone retirement phases",
-      "nonOverlapNote": "Pure retirement values and fresh consent generation binding",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "ERT01",
-          "ERT02"
-        ],
-        "maxBytes": 131072
-      }
-    },
-    {
-      "name": "plan-spec-state-retirement-tests",
-      "file": "plugins/pipeline-core/lib/plan-spec-state-v2.retirement.test.mjs",
-      "invariantPinned": "Removal-only legacy approval retirement and orphan refusal",
-      "nonOverlapNote": "Retained legacy audit cannot become current through planApproved replay",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "ERT03",
-          "ERT04"
-        ],
-        "maxBytes": 131072
-      }
-    },
-    {
-      "name": "enrollment-retirement-git-creation-tests",
-      "file": "plugins/pipeline-core/lib/enrollment-retirement-git-creation.test.mjs",
-      "invariantPinned": "Explicit attended local Git creation preserves retained state and foreign scopes; real disposable consent CAS and worktree isolation",
-      "nonOverlapNote": "Ordinary owner filesystem transactions; privileged state-writer handoff is explicitly a fixture callback",
-      "caseCompletion": {
-        "schema": "pipeline.verify-case-completion-policy.v1",
-        "caseIds": [
-          "EGR01",
-          "EGR02",
-          "EGR03",
-          "EGR04",
-          "EGR05",
-          "EGR06",
-          "EGR07",
-          "EGR08",
-          "EGR09",
-          "EGR10"
-        ],
-        "maxBytes": 131072
-      }
     },
     {
       "name": "security-scanner-diagnostics-tests",
@@ -831,6 +1212,48 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "verify-case-completion-augmentation-tests",
+      "file": "harness/scripts/verify-case-completion-augmentation.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "VAC001",
+          "VAC002",
+          "VAC003",
+          "VAC004",
+          "VAC005",
+          "VAC006",
+          "VAC007",
+          "VAC008",
+          "VAC009",
+          "VAC010",
+          "VAC011",
+          "VAC012"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Exact supplementary policy matching preserves original registration rows and completion coverage.",
+      "nonOverlapNote": "Exercises augmentation composition, real FD receipts and candidate JSON identity."
+    },
+    {
+      "name": "verify-suite-append-history-check",
+      "file": "harness/scripts/check-verify-suite-append.mjs",
+      "invariantPinned": "The actual candidate registry has only append-shaped edits since TP-13 introduction",
+      "nonOverlapNote": "Real Git-history gate distinct from the registry's schema and coverage check"
+    },
+    {
+      "name": "verify-suite-append-history-tests",
+      "file": "harness/scripts/check-verify-suite-append.test.mjs",
+      "invariantPinned": "Every TP-13-era registry commit and the pending worktree postimage must preserve all earlier registrations",
+      "nonOverlapNote": "Git history and candidate-boundary coverage distinct from the pure transition policy"
+    },
+    {
+      "name": "verify-suite-append-policy-tests",
+      "file": "plugins/pipeline-core/lib/verify-suite-append-policy.test.mjs",
+      "invariantPinned": "A block-level declarative Verify registration may only append suites without altering prior gate coverage",
+      "nonOverlapNote": "Unique append-only transition policy; the registration completeness checker validates the postimage itself"
     }
   ]
 }

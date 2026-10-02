@@ -11,7 +11,8 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import { resolveSessionCodexCriticHighRiskRoute } from "./codex-critic-session-route.mjs";
+import { observeModelFamilyActivation } from "../lib/model-family-runtime-host.mjs";
 
 export const CODEX_APP_SERVER_HEALTH_SCHEMA = "pipeline.codex-app-server-health.v1";
 export const CODEX_APP_SERVER_DOCTOR_SCHEMA = "pipeline.codex-app-server-doctor.v1";
@@ -200,28 +201,36 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const { write: _write, writeError: _writeError, ...operationDeps } = deps;
   try {
     const parsed = parseArgs(argv);
+    const finish = () => {
+      const result = parsed.mode === "doctor" ? doctorCodexAppServer(operationDeps)
+        : checkCodexAppServer({ ...operationDeps, recover: parsed.recover, requireModelReady: parsed.requireModelReady, criticModel: parsed.criticModel ?? null });
+      write(`${JSON.stringify(result)}\n`);
+      return result.status === "ready" || result.status === "completed" ? 0 : 2;
+    };
     if (parsed.requireModelReady) {
       try {
-        parsed.criticModel = (operationDeps.resolveCriticRoute ?? resolveCriticHighRiskRoute)({
+        const activation = observeModelFamilyActivation({ cwd: parsed.rootDir });
+        if (!activation.ok) throw new Error(activation.code);
+        const route = (activation.status === "inactive" && operationDeps.resolveCriticRoute ? operationDeps.resolveCriticRoute : resolveSessionCodexCriticHighRiskRoute)({
+          ...(operationDeps.authorityDependencies ?? {}),
           rootDir: parsed.rootDir,
           candidateCommit: parsed.candidateCommit,
-          ...(operationDeps.authorityDependencies ?? {}),
-        }).model;
+        });
+        if (route && typeof route.then === "function") return route.then(resolved => { parsed.criticModel = resolved.model; return finish(); }).catch(() => {
+          write(`${JSON.stringify(stale("CAS-MODEL-ROUTE-UNAVAILABLE", "observe"))}\n`); return 2;
+        });
+        parsed.criticModel = route.model;
       } catch {
         const unavailableRoute = stale("CAS-MODEL-ROUTE-UNAVAILABLE", "observe");
         write(`${JSON.stringify(unavailableRoute)}\n`);
         return 2;
       }
     }
-    const result = parsed.mode === "doctor"
-      ? doctorCodexAppServer(operationDeps)
-      : checkCodexAppServer({ recover: parsed.recover, requireModelReady: parsed.requireModelReady, criticModel: parsed.criticModel ?? null, ...operationDeps });
-    write(`${JSON.stringify(result)}\n`);
-    return result.status === "ready" || result.status === "completed" ? 0 : 2;
+    return finish();
   } catch (error) {
     writeError(`${error.message}\n`);
     return 64;
   }
 }
 
-if (isDirectInvocation(import.meta.url)) process.exitCode = run();
+if (isDirectInvocation(import.meta.url)) process.exitCode = await run();

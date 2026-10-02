@@ -9,7 +9,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { isSafeTaskId } from "./dispatch-record.mjs";
-import { AGY_HOST_OBSERVED_TRAILER } from "./agy-host-observed-receipt.mjs";
+import { AGY_HOST_OBSERVED_TRAILER, AGY_FAMILY_HOST_OBSERVED_TRAILER } from "./agy-host-observed-receipt.mjs";
 import { commitTypeFindings, finishedCommitMessageFindings } from "./commit-message-policy.mjs";
 import { agyHostGitEnvironment, assessAgyHostCommit } from "./agy-host-commit-admission.mjs";
 
@@ -107,10 +107,12 @@ function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmi
 }
 
 export function commitAdmittedAgyReturn(input = {}, dependencies = {}) {
-  return commitAdmittedReturn(input, dependencies, { runner: "antigravity",
+  const { adapterVersion = 1, ...admittedInput } = input;
+  if (![1, 2].includes(adapterVersion)) return { ok: false, code: "AGY-HOST-COMMIT-ADAPTER-VERSION" };
+  return commitAdmittedReturn(admittedInput, dependencies, { runner: "antigravity",
     subject: "feat(agy): deliver validated Goldfish return",
     body: "Host commit after validated Agy final and exact-path admission.",
-    marker: AGY_HOST_OBSERVED_TRAILER, codePrefix: "AGY" });
+    marker: adapterVersion === 2 ? AGY_FAMILY_HOST_OBSERVED_TRAILER : AGY_HOST_OBSERVED_TRAILER, codePrefix: "AGY" });
 }
 
 /** Claude/Codex native hook return adapter; no caller-controlled runner, model, or marker. */

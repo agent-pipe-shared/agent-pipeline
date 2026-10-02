@@ -34,6 +34,17 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-hook-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
@@ -49,12 +60,14 @@ function freshRepo(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-xledger-${prefix}-`));
   ALL_DIRS.push(dir);
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
-  git("init", "-q", "-b", "main");
+  const initialized = git("init", "-q", "-b", "main");
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
   git("config", "user.email", "goldfish@example.invalid");
   git("config", "user.name", "Goldfish");
   writeFileSync(join(dir, "README.md"), "fixture\n");
   git("add", "README.md");
   git("commit", "-q", "-m", "init");
+  enrollFixtureGovernance(dir);
   const head = git("rev-parse", "HEAD").stdout.trim();
   return { dir, head };
 }

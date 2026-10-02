@@ -25,7 +25,9 @@ import {
   validateNativeCriticTuple,
 } from "../lib/codex-native-critic-policy.mjs";
 import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest } from "../lib/codex-native-critic-tools.mjs";
-import { resolveSessionCodexCriticHighRiskRoute } from "./codex-critic-session-route.mjs";
+import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, criticFamilyExecutionPortsReady, launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
+import { observeModelFamilyActivation } from "../lib/model-family-runtime-host.mjs";
+import { readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, captureNativeCriticPreparedReturn } from "./codex-critic-host.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { admitNativeCriticExport } from "../lib/native-critic-export-admission.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
@@ -39,6 +41,12 @@ const PROMPT = "templates/prompts/critic-review.md";
 const VERDICT = "scripts/critic-verdict.schema.json";
 const PROVIDER = "openai";
 const MAX_BYTES = 8 * 1024 * 1024;
+const validatedNativeReturns = new WeakMap();
+export function readValidatedNativeCriticReturn(handle) {
+  const value = validatedNativeReturns.get(handle);
+  if (!value) throw new Error("CRITIC-NATIVE-VALIDATED-RETURN-HANDLE-REQUIRED");
+  return structuredClone(value);
+}
 // A large candidate may outlast the former eight-minute wall clock. Startup
 // remains short. A child can retain an active turn to the absolute cap, while
 // item-completed heartbeats remain the only evidence of review progress.
@@ -437,6 +445,7 @@ function validateChild(result, selection, tuple, verdictSchema, terminal) {
  * proofs return a closed unavailable record; no legacy sandbox route exists.
  */
 export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
+  const startedAt = Date.now();
   let input; let selection;
   try { input = structuredClone(validateInput(rawInput)); selection = input.selection; }
   catch { return boundedFailure("input-invalid"); }
@@ -447,9 +456,21 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
       authorityDependencies: dependencies.authorityDependencies ?? {},
       env: dependencies.modelRoleEnvironment ?? process.env,
       select: dependencies.selectModelRoleForTaskFn,
+      familyInvocationEntry: dependencies.familyInvocationEntry,
+      familyRuntimeHost: dependencies.familyRuntimeHost,
+      familyExecutionPorts: dependencies.familyExecutionPorts,
     }));
+  let familyRoute = null;
   try {
-    const validateRoute = (route) => resolveRoute({ rootDir: realpathSync(input.repository.root), candidateCommit: input.selection.dispatch.candidateCommit, ...(dependencies.authorityDependencies ?? {}) });
+    const activation = observeModelFamilyActivation({ cwd: realpathSync(input.repository.root) });
+    if (!activation.ok) return boundedFailure("selection-invalid", selection);
+    const resolvedRoute = dependencies.familyContext || activation.status === "active"
+      ? readNativeCriticPreparedRoute(dependencies.familyContext, { repoRoot: realpathSync(input.repository.root), preparedSha256: dependencies.preparedSha256 })
+      : await resolveRoute({ ...(dependencies.authorityDependencies ?? {}), rootDir: realpathSync(input.repository.root), candidateCommit: input.selection.dispatch.candidateCommit });
+    familyRoute = isHeldCriticFamilyRoute(resolvedRoute) ? resolvedRoute : null;
+    if (!activation.ok || activation.status !== "inactive" && !familyRoute) return boundedFailure("selection-invalid", selection);
+    if (familyRoute && !criticFamilyExecutionPortsReady(familyRoute)) return boundedFailure("selection-invalid", selection);
+    const validateRoute = () => resolvedRoute;
     validateNativeCriticSelection(selection, { validateRoute, expectedTuple: input.expectedTuple, nowMs, maxSmokeAgeMs: dependencies.maxSmokeAgeMs ?? 300_000 });
   } catch { return boundedFailure("selection-invalid", selection); }
   let physical;
@@ -482,17 +503,24 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   };
   const dispatchPacket = nativeCriticRoleDispatchPacket({ selection, referenceRecords: input.referenceRecords, boundRuleset });
   let child;
+  let familyObservationFailure = false;
   try {
     child = await runPreflightedFixedChild({
       root: physical.repoRoot,
       packet: dispatchPacket,
       evidenceRecords: input.referenceRecords.filter((record) => record.blobOid === undefined),
       request,
-    }, dependencies);
+    }, familyRoute ? { ...dependencies, runChild: async () => {
+      consumeNativeCriticPreparedContext(dependencies.familyContext, { packet: dispatchPacket, nativeRequest: request });
+      const observed = await launchHeldCriticFamilyRoute({ route: familyRoute, packet: dispatchPacket, nativeRequest: request });
+      if (!observed.ok) { if (!observed.child) throw new Error(observed.code); familyObservationFailure = true; return observed.child; }
+      return observed.value;
+    } } : dependencies);
   }
   catch (error) { return executionFailure(error instanceof NativeCriticDispatchPreflightError ? "dispatch-invalid" : "child-spawn-failed"); }
   const terminal = childTerminal(child.terminal);
   const lifecycle = { ...child.heartbeat, ...(child.result?.observed ?? {}), stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes };
+  if (familyObservationFailure) return executionFailure("child-output-invalid", terminal, lifecycle);
   if (child.timedOut) return executionFailure("child-timeout", terminal, lifecycle);
   if (child.overflow) return executionFailure("child-stream-overflow", terminal, lifecycle);
   if (child.terminal.error !== null || child.terminal.code !== 0 || child.terminal.signal !== null) {
@@ -533,5 +561,12 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
       }),
     }),
   };
+  if (familyRoute) {
+    const handle = Object.freeze(Object.create(null));
+    validatedNativeReturns.set(handle, { packet: dispatchPacket, nativeRequest: request, nativeResult: child,
+      verdict: checked.verdict, receipt, elapsedMs: Math.max(1, Date.now() - startedAt) });
+    try { captureNativeCriticPreparedReturn(dependencies.familyContext, handle); }
+    catch (error) { if (typeof dependencies.onCustodyError === "function") dependencies.onCustodyError(error); return executionFailure("child-output-invalid", terminal, checked.lifecycle); }
+  }
   return { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt, exportConsent };
 }

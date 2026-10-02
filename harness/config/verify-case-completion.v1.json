@@ -81,8 +81,7 @@
     {
       "name": "bootstrap-payload-measure-cli-tests",
       "path": "plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "browser-evidence-preflight-tests",
@@ -118,6 +117,11 @@
       "path": "plugins/pipeline-core/scripts/check-release-state-consistency.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "checkpoint-push-audit-tests",
+      "path": "plugins/pipeline-core/lib/checkpoint-push-audit.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "claude-critic-host-tests",
@@ -163,6 +167,11 @@
       "path": "plugins/pipeline-core/scripts/codex-critic-probe-split.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-design-advisor-host-tests",
+      "path": "plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "codex-goal-host-tests",
@@ -225,14 +234,17 @@
     {
       "name": "codex-session-start-hint-tests",
       "path": "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "commit-message-policy-tests",
       "path": "plugins/pipeline-core/lib/commit-message-policy.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
+    },
+    {
+      "name": "commit-msg-hook-signed-integration-tests",
+      "path": "plugins/pipeline-core/scripts/commit-msg-hook-signed-integration.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "consumer-baseline-verify-tests",
@@ -367,6 +379,11 @@
       "disposition": "required"
     },
     {
+      "name": "design-readiness-course-e2e-tests",
+      "path": "plugins/pipeline-core/scripts/design-readiness-course.e2e.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "design-workflow-package-tests",
       "path": "plugins/pipeline-core/lib/design-workflow-package.test.mjs",
       "disposition": "required"
@@ -399,8 +416,7 @@
     {
       "name": "dispatch-provenance-tests",
       "path": "harness/scripts/check-dispatch-provenance.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "dispatch-record-strip-for-critic-tests",
@@ -509,6 +525,11 @@
       "disposition": "required"
     },
     {
+      "name": "guard-dispatch-native-worker-tests",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "guard-dispatch-tests",
       "path": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
       "disposition": "required"
@@ -516,20 +537,33 @@
     {
       "name": "guard-git-phoenix-authority-grant-tests",
       "path": "plugins/pipeline-core/hooks/guard-git-phoenix-authority-grant.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "guard-git-phoenix-tests",
       "path": "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
+    },
+    {
+      "name": "guard-git-signed-integration-tests",
+      "path": "plugins/pipeline-core/hooks/guard-git-signed-integration.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "guard-handover-size-tests",
       "path": "plugins/pipeline-core/hooks/guard-handover-size.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "guard-push-architecture-tests",
+      "path": "plugins/pipeline-core/hooks/guard-push-architecture.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "guard-testpath-tests",
+      "path": "plugins/pipeline-core/hooks/guard-testpath.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "handover-rotate-tests",
@@ -643,6 +677,71 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "model-family-acceptance-tests",
+      "path": "plugins/pipeline-core/lib/model-family-acceptance.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-antigravity-adapter-tests",
+      "path": "plugins/pipeline-core/lib/model-family-antigravity-adapter.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-authority-tests",
+      "path": "plugins/pipeline-core/lib/model-family-authority.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-claude-adapter-tests",
+      "path": "plugins/pipeline-core/lib/model-family-claude-adapter.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-codex-adapter-tests",
+      "path": "plugins/pipeline-core/lib/model-family-codex-adapter.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-discovery-tests",
+      "path": "plugins/pipeline-core/lib/model-family-discovery.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-execution-tests",
+      "path": "plugins/pipeline-core/lib/model-family-execution.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-host-store-tests",
+      "path": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-invocation-tests",
+      "path": "plugins/pipeline-core/lib/model-family-invocation.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-latest-selection-tests",
+      "path": "plugins/pipeline-core/lib/model-family-latest-selection.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-main-prelaunch-tests",
+      "path": "plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-route-source-tests",
+      "path": "plugins/pipeline-core/lib/model-family-route-source.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-runtime-host-tests",
+      "path": "plugins/pipeline-core/lib/model-family-runtime-host.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "model-role-approved-policy-tests",
       "path": "plugins/pipeline-core/lib/model-role-approved-policy.test.mjs",
       "disposition": "required"
@@ -698,13 +797,28 @@
       "disposition": "required"
     },
     {
+      "name": "native-goldfish-host-finalizer-regression-tests",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "native-goldfish-host-finalizer-tests",
       "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
       "disposition": "required"
     },
     {
+      "name": "native-goldfish-host-return-regression-tests",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-return-regression.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "native-goldfish-host-return-tests",
       "path": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "native-goldfish-host-state-regression-tests",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs",
       "disposition": "required"
     },
     {
@@ -795,6 +909,11 @@
       "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "onboarding-consent-guard-tests",
+      "path": "plugins/pipeline-core/hooks/onboarding-consent-guard.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "onboarding-consent-mark-tests",
@@ -918,8 +1037,7 @@
     {
       "name": "post-compact-reground-tests",
       "path": "plugins/pipeline-core/hooks/post-compact-reground.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "pr-contributor-gate-tests",
@@ -1071,12 +1189,16 @@
     {
       "name": "publication-state-authority-tests",
       "path": "harness/scripts/publication-state-authority.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "push-batch-executor-tests",
       "path": "plugins/pipeline-core/scripts/push-batch-executor.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "quality-package-windows-path-tests",
+      "path": "plugins/pipeline-core/lib/quality-package-windows-path.test.mjs",
       "disposition": "required"
     },
     {
@@ -1312,8 +1434,7 @@
     {
       "name": "toolchain-preflight-tests",
       "path": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "trust-anchor-bootstrap-circularity-repro-tests",
@@ -1388,8 +1509,7 @@
     {
       "name": "worktree-target-binding-tests",
       "path": "plugins/pipeline-core/scripts/worktree-target-binding.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     }
   ]
 }

@@ -34,10 +34,21 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-hook-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 import { criticalProofWaiverFor, readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   HumanGuardOverrideError,
@@ -73,13 +84,28 @@ function fixture({ git = true, mode = null } = {}) {
     // A bare `git init` is NOT enough: the override's repository observation needs a real
     // HEAD, and without one it degrades to "no route offered". Found by probing, after an
     // earlier version of this fixture made the route check pass vacuously.
-    spawnSync("git", ["init", "-q", base], { encoding: "utf8" });
+    const initialized = spawnSync("git", ["init", "-q", base], { encoding: "utf8" });
+    if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
     spawnSync("git", ["-C", base, "config", "user.email", "fixture@example.invalid"]);
     spawnSync("git", ["-C", base, "config", "user.name", "fixture"]);
     spawnSync("git", ["-C", base, "add", "-A"]);
     spawnSync("git", ["-C", base, "commit", "-qm", "fixture"]);
+    enrollFixtureGovernance(base);
   }
   return base;
+}
+
+function makeUnusableOverrideStore(root) {
+  const agentPipelineDir = join(root, ".git", "agent-pipeline");
+  const overrideStore = join(agentPipelineDir, "human-guard-overrides");
+  const target = join(root, "unusable-override-store-target");
+  mkdirSync(agentPipelineDir, { recursive: true });
+  mkdirSync(target);
+  // HGO requires a physical private directory at the Git common-dir path.
+  // This disposable symlink reaches its typed HGO-STORAGE refusal before any
+  // route record can be created.
+  symlinkSync(target, overrideStore, "dir");
+  return target;
 }
 
 function ask(root, filePath) {
@@ -180,12 +206,18 @@ try {
   });
 
   check("OT06 an unusable override store leaves the refusal exactly as it was", () => {
-    // No Git control path -> the override machinery cannot record anything. That must
-    // degrade to the plain refusal, never to an allow.
-    const { blocked, stderr } = ask(fixture({ git: false, mode: "chat" }), PROTECTED);
+    // A canonically active repository reaches HGO's private store, which is
+    // deliberately unusable because its physical directory is a symlink.
+    const root = fixture({ mode: "chat" });
+    const untouchedTarget = makeUnusableOverrideStore(root);
+    const { blocked, stderr } = ask(root, PROTECTED);
     assert.equal(blocked, true, "a broken override store must not become an authorization");
     assert.match(stderr, /Rule ID: TP-3/u);
     assert.doesNotMatch(stderr, /--request-sha256\s+\S/u);
+    assert.doesNotMatch(stderr, /capability consumed/u);
+    assert.doesNotMatch(stderr, /Human override available/u);
+    assert.match(stderr, /planning the route failed with code=HGO-STORAGE/u);
+    assert.deepEqual(readdirSync(untouchedTarget), [], "unusable storage must not receive route records");
   });
 
   check("OT07 an unrelated file is untouched by any of this", () => {
@@ -332,6 +364,7 @@ try {
     spawnSync("git", ["-C", root, "config", "user.name", "fixture"]);
     spawnSync("git", ["-C", root, "add", "-A"]);
     spawnSync("git", ["-C", root, "commit", "-qm", "fixture"]);
+    enrollFixtureGovernance(root);
 
     const source = ask(root, "plugins/pipeline-core/hooks/guard-testpath.test.mjs");
     assert.equal(source.blocked, true);

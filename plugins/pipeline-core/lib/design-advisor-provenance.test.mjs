@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Actual Git/blob/source checks; consultation metadata is a pure contract fixture,
 // not a host/advisor result. Genuine managed-output composition is tested separately.
 import assert from 'node:assert/strict';

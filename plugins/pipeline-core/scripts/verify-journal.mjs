@@ -14,8 +14,8 @@ import {
   validateVerifySuiteReceipt,
 } from "../lib/verify-resume.mjs";
 import { parseVerifyCaseCompletion, validateVerifyCaseCompletionPolicy } from "../lib/verify-case-completion-receipt.mjs";
-import { bindEphemeralPrivateCleanup, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
-import { finalizeTemporaryResource, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import { bindEphemeralPrivateCleanup, readOnboardingSessionCleanupBinding, releaseOnboardingSessionCleanup } from "../lib/onboarding-continuity.mjs";
+import { finalizeTemporaryResource, inspectSessionClosure, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, releaseCompletedVerifyRunSession, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 const MAX_LOG_BYTES = 16 * 1024 * 1024;
@@ -31,6 +31,54 @@ function now(clock) { return new Date(clock()).toISOString(); }
 export function verifySuiteArtifactName(id) {
   if (!SAFE_ID.test(id)) throw new TypeError("VERIFY-SUITE-ID");
   return sha(id);
+}
+
+function linuxProcessGroupIdentity(pid) {
+  if (process.platform !== "linux") return null;
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/u);
+    return { pid, state: fields[0], pgrp: Number(fields[2]), session: Number(fields[3]), startId: fields[19] };
+  } catch { return null; }
+}
+
+function linuxProcessGroupMembers(groupId) {
+  if (process.platform !== "linux") return null;
+  let names;
+  try { names = readdirSync("/proc"); } catch { return null; }
+  const members = [];
+  for (const name of names) {
+    if (!/^\d+$/u.test(name)) continue;
+    const identity = linuxProcessGroupIdentity(Number(name));
+    if (identity?.pgrp === groupId) members.push(identity);
+  }
+  return members;
+}
+
+function delay(ms) { return new Promise((resolveDelay) => setTimeout(resolveDelay, ms)); }
+
+async function terminateOwnedGroup(child, identity, graceMs = 750) {
+  if (process.platform !== "linux" || !identity || identity.pid !== child.pid
+    || identity.pgrp !== child.pid || identity.session !== child.pid) {
+    try { child.kill("SIGTERM"); } catch {}
+    return { proven: false, identity, remaining: null, method: "direct-child-only" };
+  }
+  const current = linuxProcessGroupIdentity(child.pid);
+  if (!current || current.startId !== identity.startId || current.pgrp !== identity.pgrp || current.session !== identity.session) {
+    return { proven: false, identity, remaining: null, method: "identity-drift" };
+  }
+  try { process.kill(-child.pid, "SIGTERM"); } catch (error) { if (error?.code !== "ESRCH") return { proven: false, identity, remaining: null, method: "term-refused" }; }
+  await Promise.race([new Promise((resolveClose) => child.once("close", resolveClose)), delay(graceMs)]);
+  let remaining = linuxProcessGroupMembers(child.pid);
+  if (remaining === null) return { proven: false, identity, remaining: null, method: "group-read-unavailable" };
+  if (remaining.length > 0) {
+    const currentLeader = linuxProcessGroupIdentity(child.pid);
+    if (currentLeader && currentLeader.startId !== identity.startId) return { proven: false, identity, remaining, method: "identity-drift" };
+    try { process.kill(-child.pid, "SIGKILL"); } catch (error) { if (error?.code !== "ESRCH") return { proven: false, identity, remaining, method: "kill-refused" }; }
+    await Promise.race([new Promise((resolveClose) => child.once("close", resolveClose)), delay(graceMs)]);
+    remaining = linuxProcessGroupMembers(child.pid);
+  }
+  return { proven: Array.isArray(remaining) && remaining.length === 0, identity, remaining, method: "verified-process-group" };
 }
 
 function ownerMatches(info) { return typeof process.getuid !== "function" || info.uid === process.getuid(); }
@@ -172,18 +220,17 @@ function validateCleanupRegistration(receipt, { runId, runPath }) {
 // registration: every precondition failure here falls back to the original
 // VERIFY-CLEANUP-REGISTRATION-REQUIRED unchanged, including when a binding of any status other
 // than exactly "unbound" already exists, or another active session descriptor is already
-// present (mirroring session-cleanup.mjs's own "start" safety check) -- so an ordinary session's
-// real binding is never overridden. Deliberately no matching release/retire: this repo's
-// own bindOnboardingSessionCleanup permits binding replay (reused, not re-thrown) precisely so a
-// second session-less run against the SAME checkout reuses this one rather than conflicting.
+// present. The created descriptor and exact binding preimage are returned as private teardown
+// authority for this invocation only; an existing bound tuple is borrowed and never released.
 function establishSessionLessCleanupBinding({ repoRoot, priorBinding }) {
   if (priorBinding.status !== "unbound") throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
   if (listActiveSessionDescriptors(repoRoot).length !== 0) throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
   let started;
   try { started = startSessionDescriptor(repoRoot, {}); }
   catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
+  let binding;
   try {
-    return bindEphemeralPrivateCleanup({
+    binding = bindEphemeralPrivateCleanup({
       rootDir: repoRoot,
       sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 },
     });
@@ -191,14 +238,22 @@ function establishSessionLessCleanupBinding({ repoRoot, priorBinding }) {
     try { retireSessionDescriptor(repoRoot, started); } catch { /* best-effort rollback, never mask the original refusal */ }
     throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
   }
+  if (binding.status !== "bound" || binding.mutated !== true
+    || binding.sessionCleanup?.sessionId !== started.sessionId
+    || binding.sessionCleanup?.descriptorSha256 !== started.descriptorSha256) {
+    throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
+  }
+  return { binding, descriptor: started, created: true };
 }
 
 function registerBoundVerifyRun({ repoRoot, runId, runPath }) {
   let binding;
+  let owner = null;
   try { binding = readOnboardingSessionCleanupBinding({ rootDir: repoRoot }); }
   catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
   if (binding.status !== "bound" || binding.sessionCleanup === null) {
-    binding = establishSessionLessCleanupBinding({ repoRoot, priorBinding: binding });
+    owner = establishSessionLessCleanupBinding({ repoRoot, priorBinding: binding });
+    binding = owner.binding;
   }
   const descriptor = loadSessionDescriptor(repoRoot, binding.sessionCleanup.sessionId, {
     expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
@@ -216,6 +271,11 @@ function registerBoundVerifyRun({ repoRoot, runId, runPath }) {
   });
   return {
     descriptor,
+    owner: owner?.created === true ? {
+      stateSha256: binding.stateSha256,
+      revision: binding.revision,
+      sessionCleanup: structuredClone(binding.sessionCleanup),
+    } : null,
     receipt: sealVerifyCleanupRegistration({
       status: "registered",
       runId,
@@ -522,9 +582,10 @@ function spawnAsync(command, argv, options = {}) {
         cwd: options.cwd,
         env: options.env,
         stdio: completion === null ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "pipe", "pipe"],
+        detached: options.signal instanceof AbortSignal,
       });
     } catch (error) {
-      resolvePromise({ status: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error });
+      resolvePromise({ status: null, closeStatusProved: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error });
       return;
     }
     const stdoutChunks = [];
@@ -539,7 +600,21 @@ function spawnAsync(command, argv, options = {}) {
     let overflowed = false;
     let spawnError;
     let settled = false;
-    const settle = (value) => { if (!settled) { settled = true; resolvePromise(value); } };
+    let cancellation = null;
+    const onAbort = () => {
+      if (cancellation !== null) return;
+      cancellation = terminateOwnedGroup(child, linuxProcessGroupIdentity(child.pid));
+    };
+    if (options.signal instanceof AbortSignal) {
+      if (options.signal.aborted) onAbort();
+      else options.signal.addEventListener("abort", onAbort, { once: true });
+    }
+    const settle = async (value) => {
+      if (settled) return;
+      settled = true;
+      options.signal?.removeEventListener?.("abort", onAbort);
+      resolvePromise({ ...value, cancellation: cancellation === null ? null : await cancellation });
+    };
     const collect = (chunks, addLength) => (chunk) => {
       // Data handlers stay attached (never removed) after overflow so the child's pipes keep
       // draining -- detaching them here would let the killed child hang on backpressure.
@@ -572,10 +647,10 @@ function spawnAsync(command, argv, options = {}) {
       // Preserve that one transport anomaly until close so status 0 remains
       // observable; a genuine spawn error still cannot create a success path.
       if (error?.code === "EPERM") return;
-      settle({ status: null, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), caseCompletion: Buffer.concat(completionChunks), error: spawnError });
+        void settle({ status: null, closeStatusProved: false, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), caseCompletion: Buffer.concat(completionChunks), error: spawnError });
     });
-    child.once("close", (code) => {
-      settle({ status: code, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), caseCompletion: Buffer.concat(completionChunks), error: spawnError });
+    child.once("close", (code, signal) => {
+      void settle({ status: code, signal: signal ?? null, closeStatusProved: Number.isSafeInteger(code), stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), caseCompletion: Buffer.concat(completionChunks), error: spawnError });
     });
   });
 }
@@ -738,7 +813,7 @@ function createSemaphore(limit) {
 //   - `serialLaneSuites` members share ONE dedicated 1-slot semaphore (`laneSemaphore`) instead of
 //     the main pool semaphore, so they never overlap EACH OTHER, but still run concurrently
 //     alongside ordinary pool suites during the concurrent phase.
-async function runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
+async function runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal = null, serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
   const total = suites.length;
   const steps = new Array(total);
   const receiptBySuite = {};
@@ -749,6 +824,8 @@ async function runSuitePool({ suites, registrations, plan, prior, run, candidate
     const promise = new Promise((resolve) => { resolveFn = resolve; });
     return [suite.name, { promise, resolveFn }];
   }));
+  const closeProofBySuite = new Map();
+  const childEvidence = [];
   const registrationByName = new Map(suites.map((suite, offset) => [suite.name, registrations[offset]]));
   for (const suite of suites) {
     if (!exclusiveSuites.has(suite.name)) continue;
@@ -756,16 +833,28 @@ async function runSuitePool({ suites, registrations, plan, prior, run, candidate
     if (badDependency) throw new Error(`VERIFY-EXCLUSIVE-SUITE-DEPENDS-ON-POOL-SUITE:${suite.name}->${badDependency}`);
   }
   async function runOne(suite, offset, gate) {
+    if (signal?.aborted) return;
     const registration = registrations[offset];
     await Promise.all((registration.dependsOn ?? []).map((name) => completion.get(name)?.promise ?? Promise.resolve()));
+    if (signal?.aborted) { completion.get(suite.name).resolveFn(); return; }
     let receipt;
     const reused = plan.reusable.includes(suite.name);
     if (reused) {
       receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total, clock });
+      closeProofBySuite.set(suite.name, true);
     } else {
       await gate.acquire();
       try {
-        receipt = await executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total, clock, spawn });
+        if (signal?.aborted) return;
+        const execution = await executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total, clock, spawn, signal });
+        if (execution.interrupted) {
+          childEvidence.push(execution.childEvidence);
+          closeProofBySuite.set(suite.name, execution.groupCloseProved);
+          completion.get(suite.name).resolveFn();
+          return;
+        }
+        receipt = execution.receipt;
+        closeProofBySuite.set(suite.name, execution.childCloseProved);
       } finally {
         gate.release();
       }
@@ -782,15 +871,16 @@ async function runSuitePool({ suites, registrations, plan, prior, run, candidate
   // rather than via Promise.all so a second exclusive suite never starts before the first's
   // child process (if any) has fully settled.
   for (const { suite, offset } of exclusiveEntries) {
+    if (signal?.aborted) break;
     await runOne(suite, offset, exclusiveGate);
   }
   // Concurrent phase: ordinary pool suites use `semaphore` (bounded by `concurrency`); lane
   // suites use the separate `laneSemaphore` (bounded to 1, independent of `concurrency`).
   await Promise.all(poolEntries.map(({ suite, offset }) => runOne(suite, offset, serialLaneSuites.has(suite.name) ? laneSemaphore : semaphore)));
-  return { steps, receiptBySuite };
+  return { steps: steps.filter(Boolean), receiptBySuite, childCloseProved: [...closeProofBySuite.values()].every((proved) => proved === true), interrupted: signal?.aborted === true, signal: signal?.reason ?? null, childEvidence };
 }
 
-async function executeSuite({ suite, registration, run, candidate, policySha256, index, total, clock, spawn }) {
+async function executeSuite({ suite, registration, run, candidate, policySha256, index, total, clock, spawn, signal = null }) {
   const startedAt = now(clock);
   appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "started", startedAt, completedAt: null, receiptSha256: null, diagnosticDigest: null }, console.log);
   const permissionFlags = isTierBRegistration(registration) ? tierBSpawnFlags(registration, suite.cwd) : [];
@@ -799,6 +889,7 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
     encoding: "buffer",
     cwd: suite.cwd,
     maxBuffer: MAX_LOG_BYTES,
+    signal,
     env: completionPolicy === null ? undefined : {
       ...process.env,
       PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
@@ -808,6 +899,14 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
   });
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? "");
   const stderr = Buffer.isBuffer(result.stderr) ? result.stderr : Buffer.from(result.stderr ?? "");
+  if (signal?.aborted) {
+    const artifact = verifySuiteArtifactName(suite.name);
+    const logBytes = Buffer.concat([stdout, stderr]).subarray(0, MAX_LOG_BYTES);
+    writeDurable(join(run.logsDir, `${artifact}.interrupted.log`), logBytes, "wx");
+    const evidence = { suite: suite.name, childPid: Number.isSafeInteger(result.cancellation?.identity?.pid) ? result.cancellation.identity.pid : null, processStartId: result.cancellation?.identity?.startId ?? null, groupId: result.cancellation?.identity?.pgrp ?? null, terminationMethod: result.cancellation?.method ?? "not-cancelled", groupCloseProved: result.cancellation?.proven === true, remaining: result.cancellation?.remaining ?? null, closeSignal: result.signal ?? null };
+    appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "interrupted", startedAt, completedAt: now(clock), receiptSha256: null, diagnosticDigest: digestJson(evidence) }, console.log);
+    return { interrupted: true, childEvidence: evidence, groupCloseProved: evidence.groupCloseProved };
+  }
   let caseCompletion = null;
   let completionError = null;
   if (completionPolicy !== null) {
@@ -846,7 +945,10 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
   });
   atomicJson(join(run.receiptsDir, `${artifact}.json`), receipt);
   appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "completed", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ exitCode, error: result.error?.code ?? null, caseCompletionError: completionError?.message ?? null }) }, console.log);
-  return receipt;
+  return {
+    receipt,
+    childCloseProved: spawn === spawnAsync && result.closeStatusProved === true && Number.isSafeInteger(result.status),
+  };
 }
 
 function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candidate, policySha256, index, total, clock }) {
@@ -879,7 +981,7 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 // calibration > DEFAULT_VERIFY_CONCURRENCY), raising real production concurrency above 1 for the
 // first time. `environment` mirrors compileVerifySuites' own existing convention (defaults to
 // `process.env`, overridable so a test never depends on ambient environment or leaks into it).
-export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, reuseReceipts = true, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
+export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, signal = null, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, reuseReceipts = true, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new TypeError("VERIFY-JOURNAL-CONCURRENCY");
   if (typeof reuseReceipts !== "boolean") throw new TypeError("VERIFY-JOURNAL-REUSE");
   const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations, environment });
@@ -898,6 +1000,8 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
   if (!validateCleanupRegistration(cleanupRegistration, { runId, runPath })) throw new Error("VERIFY-CLEANUP-REGISTRATION-INVALID");
   const run = createVerifyRun({ gitCommonDir, runId, candidate, policySha256, suites: registrations, cleanupRegistration, clock });
   let terminalWritten = false;
+  let interruptionWritten = false;
+  let childCloseProved = false;
   try {
     const prior = loadVerifyResumeArtifacts({ runsRoot: run.runsRoot, currentRunId: runId, suites: registrations });
     const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256, allowCrossCandidateReuse, reuseReceipts });
@@ -910,7 +1014,24 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
     // would misrepresent both this run's own timing and how much the reuse mechanism is saving.
     // `steps` is materialized in registration order regardless of real completion order (see
     // runSuitePool's own comment) -- never completion order.
-    const { steps, receiptBySuite } = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, serialLaneSuites, exclusiveSuites });
+    const pooled = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal, serialLaneSuites, exclusiveSuites });
+    const { steps, receiptBySuite, childCloseProved: allChildrenClosed } = pooled;
+    childCloseProved = allChildrenClosed;
+    if (pooled.interrupted) {
+      const interruption = {
+        schema: "pipeline.verify-run-interruption.v1", runId, candidate, policySha256,
+        status: "interrupted", signal: typeof pooled.signal === "string" ? pooled.signal : null,
+        startedAt: run.manifest.startedAt, interruptedAt: now(clock),
+        children: pooled.childEvidence,
+        dispatchedSuiteCount: pooled.childEvidence.length,
+        terminal: null,
+      };
+      const { interruptionSha256: omitted, ...body } = interruption;
+      interruption.interruptionSha256 = digestJson(body);
+      atomicJson(join(run.runDir, "interruption.json"), interruption);
+      interruptionWritten = true;
+      return { runId, runDir: run.runDir, policySha256, cleanupRegistration, status: "interrupted", interruption, steps, execution: null };
+    }
     const completedAt = now(clock);
     const execution = deriveVerifyExecutionMetrics({
       steps,
@@ -927,16 +1048,97 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
     terminalWritten = true;
     return { runId, runDir: run.runDir, policySha256, cleanupRegistration, plan, terminal, steps, execution };
   } finally {
-    const closed = Buffer.from(`${JSON.stringify(verifyRunLock(runId, "closed", clock))}\n`);
-    try { ftruncateSync(run.lockFd, 0); writeSync(run.lockFd, closed, 0, closed.length, 0); fsyncSync(run.lockFd); } finally { closeSync(run.lockFd); }
-    if (terminalWritten && automaticRegistration !== null) {
-      finalizeTemporaryResource(repoRoot, {
-        sessionId: automaticRegistration.descriptor.sessionId,
-        ownerNonce: automaticRegistration.descriptor.ownerNonce,
-        resourceId: cleanupRegistration.resourceId,
-        canaryRelative: "terminal.json",
-      });
+    try {
+      const closed = Buffer.from(`${JSON.stringify(verifyRunLock(runId, "closed", clock))}\n`);
+      try { ftruncateSync(run.lockFd, 0); writeSync(run.lockFd, closed, 0, closed.length, 0); fsyncSync(run.lockFd); } finally { closeSync(run.lockFd); }
+      if ((terminalWritten || interruptionWritten) && automaticRegistration !== null) {
+        const canaryRelative = interruptionWritten ? "interruption.json" : "terminal.json";
+        if (automaticRegistration.owner === null) {
+          finalizeTemporaryResource(repoRoot, {
+            sessionId: automaticRegistration.descriptor.sessionId,
+            ownerNonce: automaticRegistration.descriptor.ownerNonce,
+            resourceId: cleanupRegistration.resourceId,
+            canaryRelative,
+          });
+        } else if (terminalWritten && childCloseProved) {
+          finalizeAndReleaseInvocationOwner({ repoRoot, runId, cleanupRegistration, automaticRegistration, canaryRelative });
+        } else if (interruptionWritten) {
+          if (childCloseProved) finalizeAndReleaseInvocationOwner({ repoRoot, runId, cleanupRegistration, automaticRegistration, canaryRelative });
+          else finalizeTemporaryResource(repoRoot, { sessionId: automaticRegistration.descriptor.sessionId, ownerNonce: automaticRegistration.descriptor.ownerNonce, resourceId: cleanupRegistration.resourceId, canaryRelative });
+        } else {
+          throw new Error("numeric child close was not proved for every executed suite");
+        }
+      }
+    } catch (error) {
+      if (automaticRegistration?.owner !== null && automaticRegistration?.owner !== undefined) {
+        throw new Error(`VERIFY-OWNER-CLEANUP-REQUIRED:${runId}`, { cause: error });
+      }
+      throw error;
     }
+  }
+}
+
+function finalizeAndReleaseInvocationOwner({ repoRoot, runId, cleanupRegistration, automaticRegistration, canaryRelative = "terminal.json" }) {
+  const { descriptor, owner } = automaticRegistration;
+  const binding = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
+  if (binding.status !== "bound" || binding.stateSha256 !== owner.stateSha256
+    || binding.revision !== owner.revision
+    || digestJson(binding.sessionCleanup) !== digestJson(owner.sessionCleanup)) {
+    throw new Error("captured cleanup binding changed");
+  }
+  const active = listActiveSessionDescriptors(repoRoot);
+  if (active.length !== 1 || active[0].sessionId !== descriptor.sessionId
+    || active[0].descriptorSha256 !== descriptor.descriptorSha256) {
+    throw new Error("active descriptor inventory changed");
+  }
+  const exactDescriptor = loadSessionDescriptor(repoRoot, descriptor.sessionId, {
+    expectedDescriptorSha256: descriptor.descriptorSha256,
+  });
+  if (exactDescriptor.ownerNonce !== descriptor.ownerNonce) throw new Error("descriptor owner changed");
+
+  finalizeTemporaryResource(repoRoot, {
+    sessionId: descriptor.sessionId,
+    ownerNonce: descriptor.ownerNonce,
+    resourceId: cleanupRegistration.resourceId,
+    canaryRelative,
+  });
+  const retained = releaseCompletedVerifyRunSession(repoRoot, {
+    sessionId: descriptor.sessionId,
+    ownerNonce: descriptor.ownerNonce,
+  });
+  const receipt = retained?.receipt;
+  if (retained?.ok !== true || receipt?.status !== "complete"
+    || receipt?.sessionSha256 !== sha(Buffer.from(descriptor.sessionId))
+    || receipt?.counts?.registered !== 1 || receipt?.counts?.retained !== 1
+    || receipt?.counts?.removed !== 0 || receipt?.counts?.blocked !== 0
+    || receipt?.outcomes?.length !== 1
+    || receipt.outcomes[0].resourceId !== cleanupRegistration.resourceId
+    || receipt.outcomes[0].type !== "verify-run-directory"
+    || receipt.outcomes[0].status !== "retained") {
+    throw new Error("canonical Verify retention receipt did not prove one retained resource");
+  }
+  retireSessionDescriptor(repoRoot, {
+    sessionId: descriptor.sessionId,
+    ownerNonce: descriptor.ownerNonce,
+    descriptorSha256: descriptor.descriptorSha256,
+  });
+  const closure = inspectSessionClosure(repoRoot, descriptor.sessionId, {
+    expectedDescriptorSha256: descriptor.descriptorSha256,
+  });
+  if (closure.status !== "closed" || closure.receiptSha256 !== sha(readFileSync(retained.receiptPath))) {
+    throw new Error("canonical descriptor closure readback failed");
+  }
+  const released = releaseOnboardingSessionCleanup({
+    rootDir: repoRoot,
+    expectedStateSha256: owner.stateSha256,
+    expectedRevision: owner.revision,
+    sessionCleanup: owner.sessionCleanup,
+  });
+  const after = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
+  if (released.status !== "released" || released.sessionCleanup !== null
+    || after.sessionCleanup !== null || after.stateSha256 !== owner.stateSha256
+    || after.revision !== owner.revision || listActiveSessionDescriptors(repoRoot).length !== 0) {
+    throw new Error("private cleanup binding readback failed");
   }
 }
 export function deriveVerifyExecutionMetrics({ steps, startedAt, completedAt, concurrency, serialLaneSuites, exclusiveSuites }) {

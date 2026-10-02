@@ -9,6 +9,8 @@ import { join } from "node:path";
 
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { buildNativeCriticSelection, validateNativeCriticSelection, nativeCriticCanonicalDigest } from "../lib/codex-native-critic-policy.mjs";
+import { readNativeCriticPreparedRoute } from "./codex-critic-host.mjs";
 import {
   NativeCriticDispatchPreflightError,
   nativeCriticRoleDispatchPacket,
@@ -25,10 +27,31 @@ const cases = [
   { id: "NCH06", name: "invalid native return destination reaches no fixed child", run: () => rejectsWithoutChild((packet) => { packet.resultDestination = { kind: "return", path: "result.json" }; }) },
   { id: "NCH07", name: "late required-path drift is rechecked before the fixed child", run: lateDrift },
   { id: "NCH08", name: "late coordinator-evidence drift is rechecked before the fixed child", run: lateEvidenceDrift },
+  { id: "NCH09", name: "ordinary native route retains its own effort under exact construction validation and copied context refuses", run: ordinaryRoute },
 ];
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+}
+
+async function ordinaryRoute() {
+ await withFixture(async ({root,commit,tree}) => {
+  const sha="a".repeat(64), nowMs=Date.parse("2026-10-02T12:00:00.000Z");
+  const route={dutyId:"critic_normal",runner:"codex",model:"gpt-6.1-sol",effort:"xhigh",sourceSha256:sha,candidateCommit:commit};
+  const tuple={cli:{version:"0.153.4",sha256:sha},protocolSchemaSha256:sha,
+   host:{platformClass:"linux-wsl2",kernel:{sysname:"Linux",release:"6",machine:"x86_64"},filesystemClass:"wsl2-native",bootIdSha256:sha},
+   policy:{threadSandbox:"read-only",turn:{type:"readOnly",networkAccess:false}},toolSurface:{configSha256:sha,observationSha256:sha}};
+  const smokeReceipt={schema:"pipeline.codex-native-critic-smoke.v1",status:"passed",tuple,
+   observed:{initialized:true,readObserved:true,writeObserved:true,nativeWriteDenied:true,canaryUnchanged:true,hostWriteControl:true,sourceUnchanged:true,protocolError:false,guardDenial:false,sandboxLaunchDenied:false,timedOut:false,cleanupComplete:true,terminal:{exitCode:0,signal:null,spawnFailed:false}},capturedAt:"2026-10-02T11:59:00.000Z"};
+  const options={validateRoute:value=>{assert.deepEqual(value,route);return route;},expectedTuple:tuple,nowMs,maxSmokeAgeMs:300000};
+  const input={selectionId:"cncs_cccccccccccccccccccccccccc",repoFingerprint:sha,dispatch:{queueRevision:1,candidateCommit:commit,candidateTree:tree,referenceSetSha256:sha,requestSha256:sha},route,poDecisionSha256:sha,smokeReceipt,smokeReceiptSha256:nativeCriticCanonicalDigest(smokeReceipt),createdAt:"2026-10-02T11:59:30.000Z"};
+  const selection=buildNativeCriticSelection(input,options);
+  assert.equal(selection.route.effort,"xhigh");
+  assert.throws(()=>validateNativeCriticSelection(selection,{...options,validateRoute:()=>true}));
+  assert.throws(()=>validateNativeCriticSelection(selection,{...options,validateRoute:()=>({...route,effort:"medium"})}));
+  assert.throws(()=>buildNativeCriticSelection({...input,route:{...route,approved:true}},options));
+  assert.throws(()=>readNativeCriticPreparedRoute(structuredClone({}),{repoRoot:root,preparedSha256:sha}),/CONTEXT-REQUIRED/);
+ });
 }
 
 function fixture() {

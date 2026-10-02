@@ -175,6 +175,8 @@ import {
   isTerminalOutcome,
   readRecordFile,
 } from "../../plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs";
+import { parseIntegrationTrailerBlock } from "../../plugins/pipeline-core/lib/commit-message-policy.mjs";
+import { verifyQualityPackageIntegrationPostCommit } from "../../plugins/pipeline-core/lib/signed-quality-package.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
@@ -213,6 +215,19 @@ export function parseDispatchTrailer(message) {
   const valueMatch = DISPATCH_VALUE_RE.exec(raw);
   if (valueMatch === null) return { present: true, valid: false, taskId: null, role: null, raw };
   return { present: true, valid: true, taskId: valueMatch[1], role: valueMatch[2], raw };
+}
+
+function hasFinalIntegrationSignal(message) {
+  const lines = String(message ?? "").replace(/\r\n/gu, "\n").split("\n");
+  while (lines.length > 0 && lines.at(-1).trim() === "") lines.pop();
+  const entries = [];
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const match = /^([A-Za-z][A-Za-z0-9-]*):\s*(.*)$/u.exec(lines[index]);
+    if (!match) break;
+    entries.unshift({ key: match[1], value: match[2].trim() });
+  }
+  return entries.some((entry) => entry.key.toLowerCase() === "dispatch"
+    && (/^quality-package-/iu.test(entry.value) || /\(integration\)/iu.test(entry.value)));
 }
 
 // ------------------------------------------------------- stage-0 exemption
@@ -403,6 +418,8 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate, 
 
   let commitsTouchingSource = 0;
   let commitsExempt = 0;
+  let commitsSignedArtifactIntegration = 0;
+  const signedArtifactIntegrations = [];
 
   for (const sha of listResult.shas) {
     const statResult = gitDiffTreeNumstat(root, sha);
@@ -424,6 +441,24 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate, 
 
     commitsTouchingSource += 1;
     const message = msgResult.text;
+    if (hasFinalIntegrationSignal(message)) {
+      commitsSignedArtifactIntegration += 1;
+      const parsed = parseIntegrationTrailerBlock(message);
+      let integration;
+      if (!parsed.ok) {
+        integration = { verdict: "FAIL", classification: "signed-artifact-integration", reason: parsed.code };
+      } else {
+        const verified = verifyQualityPackageIntegrationPostCommit({ repoRoot: root, commitSha: sha, intentSha256: parsed.intentSha256 });
+        integration = verified.code === "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT"
+          ? { verdict: "UNVERIFIABLE", classification: "signed-artifact-integration", reason: verified.code }
+          : verified.ok
+            ? { verdict: "PASS", classification: "signed-artifact-integration", reason: verified.code }
+            : { verdict: "FAIL", classification: "signed-artifact-integration", reason: verified.code };
+      }
+      signedArtifactIntegrations.push({ sha, ...integration });
+      if (integration.verdict !== "PASS") findings.push(`${integration.verdict}-SIGNED-ARTIFACT-INTEGRATION ${sha} reason=${integration.reason}`);
+      continue;
+    }
     const trailer = parseDispatchTrailer(message);
 
     if (trailer.present && trailer.valid) {
@@ -471,6 +506,7 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate, 
     commitsInRange: listResult.shas.length,
     commitsTouchingSource,
     commitsExempt,
+    commitsSignedArtifactIntegration,
     findingCount: findings.length,
     recordShapeFindingCount: recordShapeFindings.length,
   };
@@ -494,7 +530,7 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate, 
   //      whether to backfill, narrow the template's claim, or both.
   // Neither precondition is this script's to satisfy; this is the flip
   // point, not a place this script changes itself.
-  return { ok: findings.length === 0, findings, recordShapeFindings, range, coverage };
+  return { ok: findings.length === 0, findings, recordShapeFindings, signedArtifactIntegrations, range, coverage };
 }
 
 /**
@@ -507,14 +543,14 @@ export function summaryLine({ range, coverage }) {
   return [
     `Dispatch provenance: range ${formatRange(range)} -- ${coverage.commitsInRange} commit(s) in range, ` +
       `${coverage.commitsTouchingSource} touching a tracked source file (docs/, scratch/ excluded), ` +
-      `${coverage.commitsExempt} recognized stage-0 exemption(s), ${coverage.findingCount} finding(s), ` +
+      `${coverage.commitsExempt} recognized stage-0 exemption(s), ${coverage.commitsSignedArtifactIntegration ?? 0} signed-artifact integration(s), ${coverage.findingCount} finding(s), ` +
       `${coverage.recordShapeFindingCount ?? 0} dispatch-record-shape finding(s) (reported, not yet fatal -- ` +
       `pipeline.dispatch-record-shape-is-fatal).`,
     "WHAT THIS CHECK CANNOT DO: it cannot verify EL-01's semantic criteria (no architecture/schema/public-API/test/" +
       "guardrail-hook-CI/dependency/security-surface change) or the undefined \"risk flag\" EL-01 names but nowhere " +
       "defines a location/format for; the \"stage-0 fast path\" phrase match is a self-declaration read from commit " +
       "prose, not independent proof -- only the two mechanical caps (<=2 files, <=25 changed lines) are independently " +
-      "checked. A \"Dispatch:\" trailer is validated on its shape only, never against a real task registry. A merge " +
+      "checked. A legacy Goldfish or Critic \"Dispatch:\" trailer is validated on its shape only, never against a real task registry. A merge " +
       "commit shows no per-file diff to this check and is silently out of scope on its own account; the commits it " +
       "merged are still checked individually if present in the range.",
   ].join(" ");

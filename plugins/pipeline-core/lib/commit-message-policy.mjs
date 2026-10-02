@@ -62,6 +62,7 @@
  */
 import { tokenizeArgv } from "./git-cmd.mjs";
 import { SAFE_TASK_ID } from "./dispatch-record.mjs";
+import { createHash } from "node:crypto";
 
 const MAX_MESSAGE_FILE_BYTES = 1_048_576;
 
@@ -86,6 +87,7 @@ const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
 
 function admittedDispatchValue(value) {
   if (value === "stage-0 (elephant)") return true;
+  if (/^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value)) return true;
   const match = DISPATCH_VALUE.exec(value);
   if (!match) return false;
   if (match[2] === "elephant-generated") return /^[A-Za-z0-9._/-]+$/u.test(match[1]) && !match[1].split("/").includes("..");
@@ -113,6 +115,19 @@ export function parseCommitTrailerBlock(message) {
   return entries;
 }
 
+const INTEGRATION_DISPATCH = /^quality-package-([a-f0-9]{64}) \(integration\)$/u;
+const messageDigest = (message) => createHash("sha256").update(String(message ?? "").replace(/\r\n/gu, "\n"), "utf8").digest("hex");
+
+/** Closed parser for the signed-artifact integration role. */
+export function parseIntegrationTrailerBlock(message) {
+  const trailers = parseCommitTrailerBlock(message);
+  if (trailers.length !== 2 || trailers[0]?.key !== "Dispatch" || trailers[1]?.key !== "AI-Assisted" || trailers[1]?.value !== "true") {
+    return { ok: false, code: "GIT-03-INTEGRATION-TRAILER-MALFORMED" };
+  }
+  const match = INTEGRATION_DISPATCH.exec(trailers[0].value);
+  return match ? { ok: true, intentSha256: match[1] } : { ok: false, code: "GIT-03-INTEGRATION-TRAILER-MALFORMED" };
+}
+
 /**
  * Inspect a finished commit message without depending on argv, files, Git or
  * process state. This is the shared policy seam for PreToolUse inspection and
@@ -128,6 +143,7 @@ export function finishedCommitMessageFindings(message, {
   requireMarker = false,
   requireDispatch = false,
   requireProvenanceWhenSignaled = false,
+  integrationAdmission,
 } = {}) {
   const text = String(message ?? "");
   const provenanceSignaled = PROVENANCE_SIGNAL.test(text);
@@ -160,6 +176,18 @@ export function finishedCommitMessageFindings(message, {
         detail: `the final \`Dispatch: ${dispatches[0].value}\` entry is not an admitted work-package binding`,
       });
     }
+  }
+  const integration = trailers.filter((entry) => entry.key === "Dispatch" && entry.value.startsWith("quality-package-"));
+  if (integration.length > 0) {
+    const parsed = parseIntegrationTrailerBlock(text);
+    const admitted = parsed.ok && integrationAdmission !== null && typeof integrationAdmission === "object"
+      && integrationAdmission.schema === "pipeline.signed-quality-package-integration-evidence.v1"
+      && integrationAdmission.intentSha256 === parsed.intentSha256
+      && integrationAdmission.messageSha256 === messageDigest(text)
+      && ["precommit", "postcommit"].includes(integrationAdmission.phase)
+      && ["QUALITY-PACKAGE-INTEGRATION-PRECOMMIT-VERIFIED", "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED"].includes(integrationAdmission.code);
+    if (!parsed.ok) findings.push({ code: parsed.code, detail: "the integration trailer must be exactly one package intent dispatch followed by one AI-Assisted marker" });
+    else if (!admitted) findings.push({ code: "GIT-03-INTEGRATION-EVIDENCE-REQUIRED", detail: "the exact signed authorization must be independently verified for this message and repository context" });
   }
   return { findings, trailers, provenanceSignaled };
 }

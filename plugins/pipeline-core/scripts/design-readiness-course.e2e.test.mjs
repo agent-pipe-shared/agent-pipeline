@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 // Bounded initial Advisor route, including native runners without a trusted
 // answer channel. No provider calls are made by these synthetic fixtures.
-import test from 'node:test';
+import {registerTestCaseCompletion} from '../lib/test-case-completion.mjs';
+import {openSync as openCompletionDescriptor} from 'node:fs';
 import assert from 'node:assert/strict';
 import {advisorHostFixture} from '../lib/codex-advisor-host.fixture.mjs';
 import {coordinateInitialDesignAdvisory} from '../lib/design-advisory-coordinator-v2.mjs';
@@ -9,6 +10,9 @@ import {createNativeInitialAdvisorExecution} from '../lib/native-initial-advisor
 import {designAdvisorValueSha256} from '../lib/design-advisor-course.mjs';
 import {loadRunnerProfilesV3Registry} from '../lib/runner-profiles-v3.mjs';
 import {createDesignWorkflowPackageApprovalRequest} from '../lib/design-workflow-approval.mjs';
+
+const completionCases=[];
+function test(name,run){completionCases.push({id:'DREC001',name,run});}
 
 test('each native runner has a terminal no-child Advisor route and cannot loop into plan approval', async t => {
   for (const runner of ['claude', 'antigravity']) {
@@ -49,3 +53,9 @@ test('each native runner has a terminal no-child Advisor route and cannot loop i
     assert.equal(approval.ok, false, 'no PO request without disposition and independent final readiness');
   }
 });
+
+const completionFd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined
+ ?openCompletionDescriptor(process.platform==='win32'?'NUL':'/dev/null','w')
+ :Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({cases:completionCases,fd:completionFd,
+ maxBytes:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES??'65536')});

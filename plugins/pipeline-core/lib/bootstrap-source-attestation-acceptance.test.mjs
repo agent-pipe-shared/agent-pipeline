@@ -36,8 +36,8 @@
  * host-path attestation inside `observeCodexPublicCoreIdentity` --
  * PX0-AC-16's cases are written against that, not against the tautology.
  *
- * No real `git` process and no real host binary is started anywhere in this
- * file: every observation, host readback and plugin list is injected.
+ * Disposable governance fixtures initialize real Git without a HEAD. Host
+ * readback, source attestation and plugin lists remain injected.
  */
 
 import assert from "node:assert/strict";
@@ -46,6 +46,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-smoke-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 
 import { observeSelectedCodexPipelinePlugin } from "./codex-host-plugin-list.mjs";
 import { PUBLIC_MARKETPLACE_URL, PUBLIC_SELF_APPLICATION_ORIGINS } from "./public-core-origin-allowlist.mjs";
@@ -191,7 +203,7 @@ test("PX0-AC-09: an unavailable Codex registry fails closed to null instead of f
 
 // ---------------------------------------------------------------- PX0-AC-10
 
-test("PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness compares the loaded plugin identity", () => {
+test("PX0-AC-10: a noGit unenrolled observer is inactive without source attestation", () => {
   const plugin = fixtureRoot();
   const consumer = fixtureRoot({ withGit: false });
   try {
@@ -208,6 +220,27 @@ test("PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness 
       observe: (input) => { observeCalls.push(input); return readyObservation(); },
     });
 
+    assert.equal(result.status, "pipeline-governance-inactive");
+    assert.deepEqual(observeCalls, []);
+  } finally {
+    plugin.dispose();
+    consumer.dispose();
+  }
+});
+
+test("PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness compares the loaded plugin identity", () => {
+  const plugin = fixtureRoot();
+  const consumer = fixtureRoot({ withGit: false });
+  try {
+    enrollFixtureGovernance(consumer.root);
+    assert.notEqual(spawnSync("git", ["rev-parse", "--verify", "HEAD"], { cwd: consumer.root }).status, 0);
+    const observeCalls = [];
+    const result = observePipelineStartPreflight({
+      env: {}, cwd: consumer.root, scriptUrl: plugin.scriptUrl,
+      read: () => JSON.stringify({ version: VERSION }),
+      pluginList: () => JSON.stringify({ installed: [], available: [] }),
+      observe: (input) => { observeCalls.push(input); return readyObservation(); },
+    });
     assert.equal(result.status, "ready", "readiness required a consumer HEAD");
     // The identity that was compared is the LOADED PLUGIN's, twice -- the
     // consumer repository is not an operand of the attestation at all.
@@ -444,6 +477,7 @@ test("PX0-AC-17 (more than one selected plugin): two enabled registrations fail 
 
 test("PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and stays distinct from absence", () => {
   const fixture = fixtureRoot({ withGit: false });
+  enrollFixtureGovernance(fixture.root);
   try {
     const preflight = (installed) => observePipelineStartPreflight({
       env: {},
@@ -451,6 +485,9 @@ test("PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and
       scriptUrl: fixture.scriptUrl,
       read: () => JSON.stringify({ version: VERSION }),
       pluginList: () => JSON.stringify({ installed, available: [] }),
+      // The enrolled physical root is now a self-application Git topology.
+      // Keep source attestation fixed at ready so this case isolates selection.
+      observe: () => readyObservation(),
     });
 
     // Same-class duplicate (two official entries) -- see the comment on the
@@ -460,7 +497,10 @@ test("PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and
     assert.equal(ambiguous.status, "plugin-refresh-required");
     assert.equal(ambiguous.installedVersion, null);
     // Soft, not a hard block: something to do, and a printable confirmation.
-    assert.equal(ambiguous.nextAction.kind, "advisory");
+    assert.equal(ambiguous.nextAction.kind, "command");
+    assert.equal(ambiguous.nextAction.executable, "node");
+    assert.deepEqual(ambiguous.nextAction.argv, [join(fixture.pluginRoot, "scripts", "onboarding-init.mjs"), "--root", fixture.root, "--runner", "codex"]);
+    assert.equal(ambiguous.nextAction.requiresConfirmation, false);
     assert.equal(ambiguous.nextAction.mutation, false);
 
     // Absence is a different outcome from ambiguity -- the two are not conflated.

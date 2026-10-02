@@ -202,6 +202,9 @@ function scopedRegistrationFailureFixture() {
     mkdirSync(dirname(prd), { recursive: true });
     mkdirSync(dirname(windowsAssuranceMatrix), { recursive: true });
     copyFileSync(join(repoRoot, "harness", "scripts", "verify.mjs"), writer);
+    // Close the passive completion-augmentation imports with their real validator.
+    copyFileSync(join(repoRoot, "harness", "scripts", "verify-case-completion-augmentation.mjs"), join(fixtureRoot, "harness", "scripts", "verify-case-completion-augmentation.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-case-completion-receipt.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-case-completion-receipt.mjs"));
     // verify.mjs imports duplicateSuiteIds from this sibling (harness/scripts/); the
     // fixture root must carry it too or the copied verify.mjs fails to even load.
     copyFileSync(

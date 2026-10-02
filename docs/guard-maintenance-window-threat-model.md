@@ -98,7 +98,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
   `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
   `lib/commit-message-policy.mjs`,
-  `lib/critic-route-v3.mjs`,
+  `lib/critic-route-v3.mjs`, `lib/critic-session-model-route.mjs`,
   `lib/critic-skip-decision.mjs`,
   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
   `lib/dispatch-record.mjs`,
@@ -125,7 +125,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
   `lib/successful-spawn.mjs`, `lib/windows-private-state.mjs`,
   `lib/worktree-lifecycle.mjs`,
-  `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`,
+  `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`, `scripts/codex-critic-session-route.mjs`,
   `scripts/continuity-status.mjs`, `scripts/pipeline-state.mjs`,
   `scripts/po-gate-profile-repair.mjs`, `scripts/project-onboarding-v3.mjs`,
   `scripts/settings-allowlist-merge.mjs`,
@@ -428,6 +428,28 @@ completion coverage for all 24 callbacks, with stable IDs COR001–COR024 and a
 bound to the existing builtin Verify row in the inert consumer proposal.
 Protected Verify, writer and guard proposals remain inert until admitted and
 bound to final Source verification.
+
+### Signed-hook and family-authority dependency closure
+
+The actual precommit generator imports the privacy scanner in addition to its
+eight existing dynamic targets. The commit-message generator also imports the
+signed quality verifier. Both tables retain exact call-site counts and the
+scanner still refuses unclassified imports or spawn edges.
+
+The transitive authority closure additionally protects exactly
+`lib/passive-read-policy.mjs`, `lib/intake-material-reference.mjs`,
+`scripts/check-private-identifiers.mjs`, `lib/model-family-authority.mjs`,
+`lib/model-family-execution.mjs`, `lib/model-family-invocation.mjs`,
+`lib/model-family-runtime-host.mjs`, `lib/model-family-route-source.mjs`,
+`lib/model-family-host-store.mjs`, and `lib/model-family-latest-selection.mjs`.
+These modules determine passive-read admission, intake references, privacy
+refusal, verified family assignment authority, sealed invocation selection and
+host storage/readback. The same paths remain protected through both project
+and installed-plugin anchors. A window cannot rewrite a dependency while
+leaving its importing guard or signed authority reader intact.
+
+This source closure does not establish protected-source delivery, independent
+review, native qualification or activation.
 
 ## Threats and controls
 

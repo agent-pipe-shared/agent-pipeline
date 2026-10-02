@@ -3,14 +3,15 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { isAbsolute, join, parse, posix, relative, resolve, sep, win32 } from "node:path";
+import { dirname, isAbsolute, join, parse, posix, relative, resolve, sep, win32 } from "node:path";
+import { fileURLToPath } from "node:url";
 import { canonical, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 
 export const SIGNED_QUALITY_PACKAGE_SCHEMA = "pipeline.signed-quality-package.v1";
 export const QUALITY_PACKAGE_COMMIT_AUTHORIZATION_SCHEMA = "pipeline.signed-quality-package-commit-authorization.v1";
 export const QUALITY_PACKAGE_POLICY_PATH = "project/critical-human-proof.json";
+const FIXTURE_TMP = resolve(dirname(fileURLToPath(import.meta.url)), "../../tmp");
 
 /** Pure lexical contract only; physicalQualityPackageFile still performs all filesystem admission. */
 export function isCanonicalPhysicalQualityPackagePath(path, pathFlavor = process.platform === "win32" ? "win32" : "posix") {
@@ -88,6 +89,17 @@ function changedPathsFromPatch(unifiedDiff) {
   return paths.length > 0 ? paths.sort() : null;
 }
 
+function targetModeFromPatch(root, record, path) {
+  const sections = record.unifiedDiff.split(/(?=^diff --git )/mu);
+  const section = sections.find((part) => part.split("\n").some((line) => line === `+++ b/${path}`));
+  if (!section) return null;
+  const newMode = /^(?:new file mode|new mode) (100644|100755)$/mu.exec(section)?.[1];
+  if (newMode) return newMode;
+  const prior = runGit(root, ["ls-tree", record.baseCommit, "--", path]).trim();
+  const priorMatch = /^(100644|100755) blob [a-f0-9]{40,64}\t/u.exec(prior);
+  return priorMatch?.[1] ?? null;
+}
+
 function validatePackage(record) {
   if (!own(record, ["schema", "baseCommit", "unifiedDiff", "expectedDigests", "intentSha256"]) || record.schema !== SIGNED_QUALITY_PACKAGE_SCHEMA || !OID.test(record.baseCommit) || typeof record.unifiedDiff !== "string" || !SHA256.test(record.intentSha256)) return null;
   if (record.expectedDigests === null || typeof record.expectedDigests !== "object" || Array.isArray(record.expectedDigests)) return null;
@@ -105,7 +117,8 @@ function stagedPackageMatches(root, record, paths) {
     if (staged.length !== paths.length || staged.some((path, index) => path !== paths[index])) return false;
     for (const path of paths) {
       const indexEntry = runGit(root, ["ls-files", "-s", "--", path]).trim();
-      if (!/^100(?:644|755)\s+[0-9a-f]{40,64}\s+0\t/u.test(indexEntry)) return false;
+      const indexMatch = /^(100644|100755)\s+([0-9a-f]{40,64})\s+0\t/u.exec(indexEntry);
+      if (!indexMatch || indexMatch[1] !== targetModeFromPatch(root, record, path)) return false;
       const result = spawnSync("git", ["show", `:${path}`], { cwd: root, encoding: null, maxBuffer: 64 * 1024 * 1024 });
       if (result.error || result.status !== 0 || createHash("sha256").update(result.stdout).digest("hex") !== record.expectedDigests[path]) return false;
     }
@@ -219,6 +232,74 @@ export function verifyQualityPackageCommitAuthorization({ repoRoot } = {}) {
   return fail("QUALITY-PACKAGE-COMMIT-ABSENT");
 }
 
+function readExactAuthorization(root, intentSha256) {
+  if (typeof intentSha256 !== "string" || !SHA256.test(intentSha256)) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  const directory = authorizationDirectory(root);
+  if (!directory) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  const commonDir = resolve(directory, "../../../");
+  if (!directoryHasNoSymlinkAncestors(commonDir)) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  let cursor = commonDir;
+  for (const part of relative(commonDir, directory).split(sep).filter(Boolean)) {
+    cursor = join(cursor, part);
+    try {
+      const ancestor = lstatSync(cursor);
+      if (!ancestor.isDirectory() || ancestor.isSymbolicLink()) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+    } catch (error) {
+      if (error?.code === "ENOENT") return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT");
+      return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+    }
+  }
+  const target = join(directory, `${intentSha256}.json`);
+  let stat;
+  try { stat = lstatSync(target); }
+  catch (error) {
+    return fail(error?.code === "ENOENT" ? "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT" : "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  }
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0 || stat.size === 0 || stat.size > 16 * 1024 * 1024) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  try {
+    const receipt = JSON.parse(readFileSync(target, "utf8"));
+    if (!own(receipt, ["schema", "packageIntent", "proof"]) || receipt.schema !== QUALITY_PACKAGE_COMMIT_AUTHORIZATION_SCHEMA) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+    if (receipt.packageIntent.intentSha256 !== intentSha256) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+    const paths = validatePackage(receipt.packageIntent);
+    if (!paths || paths.includes(QUALITY_PACKAGE_POLICY_PATH)) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+    const trustPolicy = committedTrustPolicy(root, receipt.proof);
+    if (!trustPolicy || !verifyPoApprovalProof({ intent: { sha256: intentSha256 }, proof: receipt.proof, trustPolicy }).verified) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+    return { ok: true, packageIntent: receipt.packageIntent, paths };
+  } catch { return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID"); }
+}
+
+/** Independently rechecks the selected signed authorization against HEAD and the complete staged index. */
+export function verifyQualityPackageIntegrationPreCommit({ repoRoot, intentSha256 } = {}) {
+  const root = typeof repoRoot === "string" ? resolve(repoRoot) : null;
+  if (!root) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  const selected = readExactAuthorization(root, intentSha256);
+  if (!selected.ok) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  if (!stagedPackageMatches(root, selected.packageIntent, selected.paths)) return fail("QUALITY-PACKAGE-INTEGRATION-INDEX-MISMATCH");
+  return { ok: true, code: "QUALITY-PACKAGE-INTEGRATION-PRECOMMIT-VERIFIED", intentSha256 };
+}
+
+/** Binds a committed import to its unique parent, complete changed-path set, exact blobs and modes. */
+export function verifyQualityPackageIntegrationPostCommit({ repoRoot, commitSha, intentSha256 } = {}) {
+  const root = typeof repoRoot === "string" ? resolve(repoRoot) : null;
+  if (!root || typeof commitSha !== "string" || !OID.test(commitSha)) return fail("QUALITY-PACKAGE-INTEGRATION-COMMIT-INVALID");
+  const selected = readExactAuthorization(root, intentSha256);
+  if (!selected.ok) return selected;
+  try {
+    const parents = runGit(root, ["rev-list", "--parents", "-n", "1", commitSha]).trim().split(/\s+/u).slice(1);
+    if (parents.length !== 1 || parents[0] !== selected.packageIntent.baseCommit) return fail("QUALITY-PACKAGE-INTEGRATION-PARENT-MISMATCH");
+    const changed = runGit(root, ["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commitSha]).split("\0").filter(Boolean).sort();
+    if (changed.length !== selected.paths.length || changed.some((path, index) => path !== selected.paths[index])) return fail("QUALITY-PACKAGE-INTEGRATION-PATH-MISMATCH");
+    for (const path of selected.paths) {
+      const treeEntry = runGit(root, ["ls-tree", commitSha, "--", path]).trim();
+      const match = /^(100644|100755) blob ([a-f0-9]{40,64})\t/u.exec(treeEntry);
+      if (!match || match[1] !== targetModeFromPatch(root, selected.packageIntent, path)) return fail("QUALITY-PACKAGE-INTEGRATION-TREE-MISMATCH");
+      const bytes = runGit(root, ["cat-file", "blob", match[2]]);
+      if (digest(bytes) !== selected.packageIntent.expectedDigests[path]) return fail("QUALITY-PACKAGE-INTEGRATION-TREE-MISMATCH");
+    }
+    return { ok: true, code: "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED", intentSha256 };
+  } catch { return fail("QUALITY-PACKAGE-INTEGRATION-COMMIT-INVALID"); }
+}
+
 function verifyResultingFiles(root, paths, expectedDigests) {
   for (const path of paths) {
     const absolute = resolve(root, path); const fromRoot = relative(root, absolute);
@@ -241,7 +322,8 @@ export function applyQualityPackage({ repoRoot, packageIntent, proof, trustPolic
   try {
     const head = runGit(root, ["rev-parse", "HEAD"]).trim();
     if (applyToMain && (head !== packageIntent.baseCommit || runGit(root, ["status", "--porcelain"]) !== "")) return fail("QUALITY-PACKAGE-BASE-DRIFT");
-    worktreeDir = mkdtempSync(join(tmpdir(), "pipeline-quality-package-")); rmSync(worktreeDir, { recursive: true, force: true });
+    mkdirSync(FIXTURE_TMP, { recursive: true });
+    worktreeDir = mkdtempSync(join(FIXTURE_TMP, "pipeline-quality-package-")); rmSync(worktreeDir, { recursive: true, force: true });
     runGit(root, ["worktree", "add", "--detach", worktreeDir, packageIntent.baseCommit]);
     runGit(worktreeDir, ["apply", "--check", "--whitespace=error", "-"], packageIntent.unifiedDiff);
     runGit(worktreeDir, ["apply", "--whitespace=error", "-"], packageIntent.unifiedDiff);

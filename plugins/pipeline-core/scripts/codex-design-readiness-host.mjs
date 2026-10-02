@@ -11,7 +11,11 @@ import {validatePipelineUserV3} from '../lib/runner-profiles-v3.mjs';
 import {parseYaml} from '../lib/yaml-lite.mjs';
 import {createCodexDesignReadinessHostStore} from '../lib/codex-design-readiness-host-store.mjs';
 import {runCodexToolFreeDesignReadiness,verifyCodexToolFreeBindingFromSources} from '../lib/codex-tool-free-design-readiness.mjs';
+import {hostDigest} from '../lib/codex-host-process-journal.mjs';
+import {validateModelFamilyExecutionReceipt} from '../lib/model-family-execution.mjs';
 import {rereadCurrentReadinessAdvisorObservation} from '../lib/codex-readiness-finalization.mjs';
+import {createModelFamilyRuntimeHost} from '../lib/model-family-runtime-host.mjs';
+import {createModelFamilyInvocationEntry} from '../lib/model-family-invocation.mjs';
 
 const NAMES=['input','prd','spec','design','traceability'];
 const OID=/^[a-f0-9]{40}$/,SHA=/^[a-f0-9]{64}$/;
@@ -21,6 +25,85 @@ function unavailable(code){return {status:'unavailable',code,readinessReceipt:nu
 function currentCandidate(root){
   const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',timeout:10000,maxBuffer:524288,stdio:['ignore','pipe','pipe']}).trim();
   return {commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])};
+}
+const FAMILY_PACKET_FIELDS=['runner','sessionId','invocationId','candidateCommit','candidateTree','taskRoute','role','effort','selectedModelId','authoritySha256','discoverySha256','packetBindingSha256'];
+function readinessFamilyPacket(receipt){return Object.freeze(Object.fromEntries(FAMILY_PACKET_FIELDS.map(key=>[key,receipt[key]])));}
+async function runActiveFamilyReadiness({familyEntry,dispatchId,candidate,readCandidate,repoRoot,repoFingerprint,
+  sources,sandboxRuntime,topology,advisorObservationRefs,advisorObservation,dependencies}){
+  const executionHost=dependencies.familyExecutionHost;
+  if(!executionHost||typeof executionHost.recordModelFamilyExecution!=='function'
+    ||typeof executionHost.readExecutionReceipt!=='function')return {code:'MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED',inputDirectory:null};
+  if(typeof familyEntry.prepareCurrentModelFamilyInvocation!=='function')return {code:'MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED',inputDirectory:null};
+  let prepared;
+  try{prepared=await familyEntry.prepareCurrentModelFamilyInvocation({kind:'dispatch',runner:'codex',taskRoute:'duty.readiness',invocationId:dispatchId});}
+  catch{return {code:'MODEL-FAMILY-INVOCATION-UNAVAILABLE',inputDirectory:null};}
+  if(!prepared?.ok||!exact(prepared.value,['handle','receipt']))return {code:prepared?.code??'MODEL-FAMILY-INVOCATION-UNAVAILABLE',inputDirectory:null};
+  const receipt=prepared.value.receipt;
+  if(!receipt||receipt.kind!=='model-family-invocation'||receipt.runner!=='codex'||receipt.taskRoute!=='duty.readiness'
+    ||!receipt.sessionId||receipt.invocationId!==dispatchId||receipt.candidateCommit!==candidate.commit
+    ||receipt.candidateTree!==candidate.tree||typeof receipt.selectedModelId!=='string'||!receipt.selectedModelId
+    ||typeof receipt.effort!=='string'||!receipt.effort||!SHA.test(receipt.authoritySha256??'')
+    ||!SHA.test(receipt.discoverySha256??'')||!SHA.test(receipt.packetBindingSha256??'')
+    ||!Number.isSafeInteger(receipt.storeGeneration)||receipt.storeGeneration<1)return {code:'MODEL-FAMILY-RECEIPT-BINDING',inputDirectory:null};
+  if(!same(readCandidate(),candidate))return {code:'CODEX-READINESS-CANDIDATE-DRIFT',inputDirectory:null};
+  const route={model:receipt.selectedModelId,effort:receipt.effort,sourceSha256:receipt.authoritySha256,candidateCommit:candidate.commit};
+  let store,inputDirectory;
+  try{
+    store=(dependencies.createHostStore??createCodexDesignReadinessHostStore)({gitCommonDir:topology.gitCommonDir,
+      repoFingerprint,trustedExecutablePath:sandboxRuntime.codexPath});
+    inputDirectory=mkdtempSync(join(store.processRoot,'input-'));
+  }catch{return {code:'CODEX-READINESS-HOST-UNAVAILABLE',inputDirectory:null};}
+  const invokeFamily=async request=>{
+    if(!exact(request.readinessSourceContext,['repoRoot','candidate','sources'])
+      ||request.readinessSourceContext.repoRoot!==repoRoot||!same(request.readinessSourceContext.candidate,candidate)
+      ||!same(request.readinessSourceContext.sources,sources)||request.inputContract!=='readiness'
+      ||request.codexPath!==sandboxRuntime.codexPath||request.cwd!==inputDirectory
+      ||request.model!==receipt.selectedModelId||request.effort!==receipt.effort
+      ||typeof request.prompt!=='string'||!request.prompt||!request.outputSchema||typeof request.outputSchema!=='object'
+      ||request.startupTimeoutMs!==45_000||request.turnTimeoutMs!==600_000)return {ok:false,code:'MODEL-FAMILY-NATIVE-REQUEST-REFUSED'};
+    const requestSha256=hostDigest(JSON.stringify({model:request.model,effort:request.effort,
+      prompt:request.prompt,outputSchema:request.outputSchema}));
+    const nativeRequest={schema:'pipeline.codex-design-readiness-native-request.v1',runner:'codex',taskRoute:'duty.readiness',
+      repoRoot,repoFingerprint,dispatchId,sessionId:receipt.sessionId,invocationId:receipt.invocationId,
+      candidate,sources,selectedModelId:receipt.selectedModelId,effort:receipt.effort,
+      inputContract:request.inputContract,codexPath:request.codexPath,cwd:request.cwd,prompt:request.prompt,
+      outputSchema:request.outputSchema,requestSha256,readinessSourceContext:request.readinessSourceContext,
+      readinessAdvisorObservation:request.readinessAdvisorObservation??null,startupTimeoutMs:request.startupTimeoutMs,
+      turnTimeoutMs:request.turnTimeoutMs,managedProcess:request.managedProcess};
+    let binding;
+    try{binding=await familyEntry.bindModelFamilyInvocation({invocation:prepared.value.handle,
+      packet:readinessFamilyPacket(receipt),nativeRequest});}
+    catch{return {ok:false,code:'MODEL-FAMILY-PRELAUNCH-UNAVAILABLE'};}
+    if(!binding?.ok||!binding.value)return {ok:false,code:binding?.code??'MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED'};
+    let launched;
+    try{launched=await familyEntry.launchModelFamilyInvocation({binding:binding.value});}
+    catch{return {ok:false,code:'MODEL-FAMILY-LAUNCH-FAILED'};}
+    if(!launched?.ok||!launched.value||!exact(launched.value,['rawHostResult','report','observed']))
+      return {ok:false,code:launched?.code??'MODEL-FAMILY-LAUNCH-FAILED'};
+    let actual;
+    try{actual=await executionHost.recordModelFamilyExecution({invocationId:receipt.invocationId,
+      rawHostResult:launched.value.rawHostResult});}
+    catch{return {ok:false,code:'MODEL-FAMILY-EXECUTION-IDENTITY-UNAVAILABLE'};}
+    if(!actual?.ok||!actual.value)return {ok:false,code:actual?.code??'MODEL-FAMILY-EXECUTION-IDENTITY-UNAVAILABLE'};
+    let execution;
+    try{execution=executionHost.readExecutionReceipt(actual.value);}catch{return {ok:false,code:'MODEL-FAMILY-EXECUTION-IDENTITY-UNAVAILABLE'};}
+    const proof=execution?.value;
+    if(!execution?.ok||!validateModelFamilyExecutionReceipt(proof).ok
+      ||proof.invocationReceiptSha256!==receipt.receiptSha256||proof.outcome!=='matched'
+      ||proof.actualModelIds.length!==1||proof.actualModelIds[0]!==receipt.selectedModelId
+      ||proof.actualEffort!==receipt.effort)return {ok:false,code:'MODEL-FAMILY-EXECUTION-IDENTITY-MISMATCH'};
+    const observed=launched.value.observed;
+    if(!observed||observed.requestSha256!==requestSha256)return {ok:false,code:'MODEL-FAMILY-NATIVE-REQUEST-REFUSED'};
+    return {ok:true,report:launched.value.report,observed};
+  };
+  let result;
+  try{result=await (dependencies.runToolFreeReadiness??runCodexToolFreeDesignReadiness)({repoRoot,repoFingerprint,
+    dispatchId,candidate,sources,route,codexPath:sandboxRuntime.codexPath,inputDirectory,store,readCandidate,
+    advisorObservationRefs,advisorObservation,invokeHost:invokeFamily});}
+  catch{return {code:'CODEX-READINESS-HOST-FAILED',inputDirectory};}
+  if(result?.status!=='reviewed'||!result.report)return {code:result?.code??'CODEX-READINESS-HOST-UNAVAILABLE',inputDirectory};
+  if(!same(readCandidate(),candidate))return {code:'CODEX-READINESS-READBACK-FAILED',inputDirectory};
+  return {status:'reviewed',result,inputDirectory};
 }
 export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,dispatchId,dispatch,sources,sandboxRuntime,advisorObservationRefs=null,advisorObservation=null},dependencies={}){
   let inputDirectory=null;
@@ -36,6 +119,25 @@ export async function runCodexDesignReadinessHost({repoRoot,repoFingerprint,disp
     const topology=(dependencies.resolveTopology??resolvePoGateRepositoryTopology)(repoRoot);
     if(derivePoGateRepositoryFingerprint({gitCommonDir:topology.gitCommonDir,primaryRoot:topology.primaryRoot})!==repoFingerprint)return unavailable('CODEX-READINESS-REPOSITORY-MISMATCH');
     const candidate={commit:dispatch.candidateCommit,tree:dispatch.candidateTree};
+    const familyEntry=dependencies.familyEntry??(dependencies.createFamilyEntry?.(repoRoot,topology)
+      ??createModelFamilyInvocationEntry({runtimeHost:createModelFamilyRuntimeHost({cwd:repoRoot,resolveCommonDir:()=>topology.gitCommonDir})}));
+    let activation;
+    try{activation=familyEntry.observeActivation();}catch{return unavailable('MODEL-FAMILY-ACTIVATION-UNCERTAIN');}
+    if(!activation?.ok)return unavailable(activation?.code??'MODEL-FAMILY-ACTIVATION-UNCERTAIN');
+    if(activation.status==='active'){
+      if(sandboxRuntime?.schema!=='pipeline.codex-sandbox-runtime.v1'||sandboxRuntime.repoRoot!==repoRoot
+        ||typeof sandboxRuntime.codexPath!=='string'||!isAbsolute(sandboxRuntime.codexPath))return unavailable('CODEX-READINESS-EXECUTABLE-UNAVAILABLE');
+      const active=await runActiveFamilyReadiness({familyEntry,dispatchId,candidate,
+        readCandidate:()=> (dependencies.readCandidate??currentCandidate)(repoRoot),repoRoot,repoFingerprint,sources,
+        sandboxRuntime,topology,advisorObservationRefs,advisorObservation,dependencies});
+      inputDirectory=active.inputDirectory;
+      if(active.status!=='reviewed')return unavailable(active.code??'CODEX-READINESS-HOST-UNAVAILABLE');
+      try{if(inputDirectory)rmSync(inputDirectory,{recursive:true,force:false});inputDirectory=null;}
+      catch(error){if(error?.code!=='ENOENT')return unavailable('CODEX-READINESS-READBACK-FAILED');inputDirectory=null;}
+      return {status:'reviewed',readinessReceipt:active.result.report,
+        assurance:{class:active.result.assurance??'host-observed-tool-free',literal:null}};
+    }
+    if(activation.status!=='inactive')return unavailable('MODEL-FAMILY-ACTIVATION-UNCERTAIN');
     const selected=(dependencies.resolveV3ReadinessRoute??resolveV3DutyRoute)({rootDir:repoRoot,dutyId:'readiness',runner:'codex',candidateCommit:candidate.commit});
     if(!exact(selected,['dutyId','runner','model','effort','state','sourceSha256','candidateCommit'])||selected.dutyId!=='readiness'
       ||selected.runner!=='codex'||selected.state!=='default'||selected.candidateCommit!==candidate.commit

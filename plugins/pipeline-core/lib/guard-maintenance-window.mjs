@@ -171,6 +171,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // V3 authority. A GS-6 window must not be able to change the authority that
   // determines which model the protected health route probes.
   "plugins/pipeline-core/lib/critic-route-v3.mjs",
+  "plugins/pipeline-core/lib/critic-session-model-route.mjs",
   // NVA-B-GMW-CRITIC-DISPOSITION: dispatch-record.mjs is already kernel and
   // delegates the required/skip/evidence decision for every dispatch record to
   // this module. A GS-6 window must not be able to rewrite that decision while
@@ -247,6 +248,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
   "plugins/pipeline-core/lib/yaml-lite.mjs",
   "plugins/pipeline-core/scripts/codex-app-server-health.mjs",
+  "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
   "plugins/pipeline-core/scripts/continuity-status.mjs",
   // Two actual spawn-edge targets (pipeline.gmw-kernel-closure-test-does-not-model-
   // spawn-edges): project-onboarding-v3.mjs's observePoAuthorityRebind/
@@ -656,6 +658,18 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/schemas/pipeline.enrollment-git-removal-barrier.v1.json",
   "schemas/pipeline.enrollment-git-creation.v1.json",
   "plugins/pipeline-core/schemas/pipeline.enrollment-git-creation.v1.json",
+  // Actual signed-hook and family-consent/host import closure (GMWKC01).
+  // These decision dependencies cannot be changed through a maintenance window.
+  "plugins/pipeline-core/lib/passive-read-policy.mjs",
+  "plugins/pipeline-core/lib/intake-material-reference.mjs",
+  "plugins/pipeline-core/scripts/check-private-identifiers.mjs",
+  "plugins/pipeline-core/lib/model-family-authority.mjs",
+  "plugins/pipeline-core/lib/model-family-execution.mjs",
+  "plugins/pipeline-core/lib/model-family-invocation.mjs",
+  "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+  "plugins/pipeline-core/lib/model-family-route-source.mjs",
+  "plugins/pipeline-core/lib/model-family-host-store.mjs",
+  "plugins/pipeline-core/lib/model-family-latest-selection.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

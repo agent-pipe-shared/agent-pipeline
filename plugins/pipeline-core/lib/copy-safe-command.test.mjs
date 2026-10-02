@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
 
 import { boundedOpaqueCopyCommand as libBoundedOpaqueCopyCommand, renderProjectOnboardingAction, variableBoundCopyCommand } from "./project-onboarding-v3.mjs";
 import {
@@ -489,6 +490,15 @@ const TESTPATH_GUARD = fileURLToPath(new URL("../hooks/guard-testpath.mjs", impo
 
 function testpathFixture(mode, prefix) {
   const root = mkdtempSync(join(tmpdir(), prefix));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
   mkdirSync(join(root, ".claude"), { recursive: true });
   writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
     protectedTestPaths: [{
@@ -501,7 +511,6 @@ function testpathFixture(mode, prefix) {
     join(root, "pipeline.user.yaml"),
     `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`,
   );
-  execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
   execFileSync("git", ["add", "-A"], { cwd: root });

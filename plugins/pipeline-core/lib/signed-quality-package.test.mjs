@@ -3,16 +3,18 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { applyQualityPackage, authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA, verifyQualityPackageCommitAuthorization } from "./signed-quality-package.mjs";
+import { applyQualityPackage, authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA, verifyQualityPackageCommitAuthorization, verifyQualityPackageIntegrationPreCommit, verifyQualityPackageIntegrationPostCommit } from "./signed-quality-package.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const git = (root, args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+const FIXTURE_TMP = fileURLToPath(new URL("../../tmp/", import.meta.url));
+mkdirSync(FIXTURE_TMP, { recursive: true });
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "signed-quality-package-"));
+  const root = mkdtempSync(join(FIXTURE_TMP, "signed-quality-package-"));
   git(root, ["init", "-q"]); git(root, ["config", "user.email", "test@example.invalid"]); git(root, ["config", "user.name", "Test"]);
   const keys = generateKeyPairSync("ed25519"); const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
   writeFileSync(join(root, "subject.txt"), "before\n");
@@ -125,7 +127,7 @@ test("commit authorization accepts .github content and staged files above the ch
 
 test("quality package refuses symlinked package outputs and receipt-directory ancestors", () => {
   const item = fixture();
-  const outside = mkdtempSync(join(tmpdir(), "signed-quality-package-outside-"));
+  const outside = mkdtempSync(join(FIXTURE_TMP, "signed-quality-package-outside-"));
   try {
     symlinkSync("subject.txt", join(item.root, "link.txt"));
     git(item.root, ["add", "link.txt"]);
@@ -225,5 +227,67 @@ test("SIGNED-AGENT authorize refuses a planted untracked policy",()=>{
   item.record.baseCommit=git(item.root,["rev-parse","HEAD"]);item.record.intentSha256=qualityPackageIntentSha256(item.record);item.proof=proofFor(item.record,item);
   writeFileSync(join(item.root,"subject.txt"),"after\n");git(item.root,["add","subject.txt"]);
   assert.equal(authorizeQualityPackageCommit({repoRoot:item.root,packageIntent:item.record,proof:item.proof}).ok,false);
+ }finally{rmSync(item.root,{recursive:true,force:true});}
+});
+
+function integrationReady(item) {
+  assert.equal(applyQualityPackage({ repoRoot:item.root, packageIntent:item.record, proof:item.proof, trustPolicy:item.trustPolicy, applyToMain:true }).ok,true);
+  git(item.root,["add","subject.txt"]);
+  assert.equal(authorizeQualityPackageCommit({repoRoot:item.root,packageIntent:item.record,proof:item.proof}).ok,true);
+  return { intentSha256:item.record.intentSha256, commonDir:git(item.root,["rev-parse","--path-format=absolute","--git-common-dir"]) };
+}
+
+test("integration precommit and postcommit verifiers bind the signed package to one exact parent and tree",()=>{
+  const item=fixture();try{
+    const auth=integrationReady(item);
+    assert.equal(verifyQualityPackageIntegrationPreCommit({repoRoot:item.root,intentSha256:auth.intentSha256}).code,"QUALITY-PACKAGE-INTEGRATION-PRECOMMIT-VERIFIED");
+    git(item.root,["commit","-qm","integration"]);
+    const commit=git(item.root,["rev-parse","HEAD"]);
+    assert.equal(verifyQualityPackageIntegrationPostCommit({repoRoot:item.root,commitSha:commit,intentSha256:auth.intentSha256}).code,"QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED");
+  }finally{rmSync(item.root,{recursive:true,force:true});}
+});
+
+for(const kind of ["wrong-intent","forged-proof","missing-authorization","extra-staged","dropped-staged","content-drift","mode-drift","symlink-submodule","postcommit-extra","wrong-parent","merge-parent","unsafe-authorization"]){
+  test("integration verifier rejects "+kind,()=>{
+    const item=fixture();try{
+      const auth=integrationReady(item);
+      const authFile=join(auth.commonDir,"agent-pipeline","signed-quality-packages","commit-authorizations",`${auth.intentSha256}.json`);
+      if(kind==="wrong-intent")assert.equal(verifyQualityPackageIntegrationPreCommit({repoRoot:item.root,intentSha256:"f".repeat(64)}).ok,false);
+      if(kind==="forged-proof")writeFileSync(authFile,JSON.stringify({schema:"pipeline.signed-quality-package-commit-authorization.v1",packageIntent:item.record,proof:{...item.proof,signatureBase64:"AA=="}}),{mode:0o600});
+      if(kind==="missing-authorization")rmSync(authFile);
+      if(kind==="extra-staged"){writeFileSync(join(item.root,"extra.txt"),"extra\n");git(item.root,["add","extra.txt"]);}
+      if(kind==="dropped-staged")git(item.root,["restore","--staged","--source=HEAD","--","subject.txt"]);
+      if(kind==="content-drift"){writeFileSync(join(item.root,"subject.txt"),"drift\n");git(item.root,["add","subject.txt"]);}
+      if(kind==="mode-drift"){git(item.root,["update-index","--chmod=+x","subject.txt"]);}
+      if(kind==="symlink-submodule")git(item.root,["update-index","--add","--cacheinfo","160000,"+"a".repeat(40)+",subject.txt"]);
+      if(kind==="unsafe-authorization"){rmSync(authFile);symlinkSync(join(item.root,"subject.txt"),authFile);}
+      if(["wrong-parent","merge-parent","postcommit-extra"].includes(kind)){
+        if(kind==="postcommit-extra"){writeFileSync(join(item.root,"extra.txt"),"extra\n");git(item.root,["add","extra.txt"]);}
+        let commit;
+        if(kind==="wrong-parent"){
+          git(item.root,["restore","--staged","--source=HEAD","--","subject.txt"]);git(item.root,["commit","--allow-empty","-qm","advance parent"]);git(item.root,["add","subject.txt"]);git(item.root,["commit","-qm","wrong parent"]);commit=git(item.root,["rev-parse","HEAD"]);
+        }else if(kind==="merge-parent"){
+          const base=item.record.baseCommit;const tree=git(item.root,["write-tree"]);const other=git(item.root,["commit-tree",`${base}^{tree}`,"-p",base,"-m","other"]);
+          commit=git(item.root,["commit-tree",tree,"-p",base,"-p",other,"-m","merge"]);
+        }else{git(item.root,["commit","-qm","extra"]);commit=git(item.root,["rev-parse","HEAD"]);}
+        assert.equal(verifyQualityPackageIntegrationPostCommit({repoRoot:item.root,commitSha:commit,intentSha256:auth.intentSha256}).ok,false);
+      } else if(kind!=="wrong-intent")assert.equal(verifyQualityPackageIntegrationPreCommit({repoRoot:item.root,intentSha256:auth.intentSha256}).ok,false);
+    }finally{rmSync(item.root,{recursive:true,force:true});}
+  });
+}
+
+test("postcommit distinguishes an absent selected receipt from present invalid authorization",()=>{
+ const item=fixture();try{
+  const auth=integrationReady(item);git(item.root,["commit","-qm","integration"]);const commit=git(item.root,["rev-parse","HEAD"]);
+  const expected=join(auth.commonDir,"agent-pipeline","signed-quality-packages","commit-authorizations");
+  const authFile=join(expected,`${auth.intentSha256}.json`);
+  rmSync(authFile);
+  assert.equal(verifyQualityPackageIntegrationPostCommit({repoRoot:item.root,commitSha:commit,intentSha256:auth.intentSha256}).code,"QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT");
+  mkdirSync(expected,{recursive:true});writeFileSync(authFile,"{}\n",{mode:0o600});
+  assert.equal(verifyQualityPackageIntegrationPostCommit({repoRoot:item.root,commitSha:commit,intentSha256:auth.intentSha256}).code,"QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  rmSync(authFile);rmSync(join(auth.commonDir,"agent-pipeline"),{recursive:true,force:true});
+  assert.equal(verifyQualityPackageIntegrationPostCommit({repoRoot:item.root,commitSha:commit,intentSha256:auth.intentSha256}).code,"QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT");
+  symlinkSync(item.root,join(auth.commonDir,"agent-pipeline"),"dir");
+  assert.equal(verifyQualityPackageIntegrationPostCommit({repoRoot:item.root,commitSha:commit,intentSha256:auth.intentSha256}).code,"QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
  }finally{rmSync(item.root,{recursive:true,force:true});}
 });

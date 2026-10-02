@@ -19,6 +19,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-el01-tripwire.mjs", import.meta.url));
 
@@ -26,6 +27,18 @@ const ALL_DIRS = [];
 function freshDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `guard-el01-${prefix}-`));
   ALL_DIRS.push(dir);
+  return dir;
+}
+function freshGovernedDir(prefix) {
+  const dir = freshDir(prefix);
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: dir, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error(`git init failed: ${initialized.stderr}`);
+  const scope = createGovernanceScopeController({ hostStateRoot: join(dir, ".git", "fixture-hoststate") });
+  const inactive = scope.observe({ rootDir: dir });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture was not initially inactive");
+  const plan = scope.planDecision({ rootDir: dir, decision: "enroll", by: "EL-01 test fixture" });
+  const active = scope.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
   return dir;
 }
 function writeJson(path, obj) {
@@ -107,7 +120,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-01: BREAK -- refused scenario, spec.md via continuity.authority.spec.path -----
 {
-  const dir = freshDir("refuse-continuity");
+  const dir = freshGovernedDir("refuse-continuity");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -128,7 +141,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-02: BREAK -- refused via planPath-sibling spec.md fallback (no continuity) ----
 {
-  const dir = freshDir("refuse-fallback");
+  const dir = freshGovernedDir("refuse-fallback");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -143,7 +156,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-03: RESTORE -- admitted scenario, a genuinely open matching dispatch record ---
 {
-  const dir = freshDir("admit-open-record");
+  const dir = freshGovernedDir("admit-open-record");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -166,7 +179,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-04: RESTORE -- admitted scenario, open record nested deep in the tree ---------
 {
-  const dir = freshDir("admit-nested-record");
+  const dir = freshGovernedDir("admit-nested-record");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -186,7 +199,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-05: a TERMINAL-outcome record does not admit the write ------------------------
 {
-  const dir = freshDir("refuse-terminal-record");
+  const dir = freshGovernedDir("refuse-terminal-record");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -206,7 +219,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-06: a malformed/incomplete record does not admit the write --------------------
 {
-  const dir = freshDir("refuse-malformed-record");
+  const dir = freshGovernedDir("refuse-malformed-record");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -219,7 +232,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-07: risk class low/absent -- EL-01 exception's own criterion holds, no block --
 {
-  const dir = freshDir("allow-low-risk");
+  const dir = freshGovernedDir("allow-low-risk");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -234,7 +247,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-08: EL-01's own permitted set is exempt regardless of risk/dispatch state -----
 {
-  const dir = freshDir("allow-exempt-paths");
+  const dir = freshGovernedDir("allow-exempt-paths");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",
@@ -269,7 +282,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
   check("TP-09c ALLOW: activeFeature present but its spec.md cannot be found", "Edit", "src/foo.mjs", ALLOW, { projectDir: dir, stderrEmpty: true });
 }
 {
-  const dir = freshDir("warn-invalid-state-json");
+  const dir = freshGovernedDir("warn-invalid-state-json");
   writeJson(join(dir, "project", "pipeline-state.json"), "{not valid json");
   check("TP-09d WARN: state file present but not valid JSON", "Edit", "src/foo.mjs", WARN, {
     projectDir: dir,
@@ -279,7 +292,7 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- TP-10: absolute path outside the project root is allowed unconditionally ---------
 {
-  const dir = freshDir("outside-root");
+  const dir = freshGovernedDir("outside-root");
   writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
     specPath: "specs/phx-example/spec.md",
     planPath: "specs/phx-example/prd_example.md",

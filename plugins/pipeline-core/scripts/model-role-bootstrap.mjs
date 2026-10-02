@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Attended new-session functional-model bootstrap; existing V3 routing stays authoritative until admission. */
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,9 @@ import { admitModelRoleHostBootstrap, prepareModelRoleHostBootstrap } from "../l
 import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
 import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
 import { deriveV3BaselinePolicies } from "../lib/model-role-v3-baseline.mjs";
+import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
+import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
+import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-source.mjs";
 import { resolvePluginManifestVersion } from "./pipeline-start-preflight.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 
@@ -23,6 +27,7 @@ const fail = (code) => ({ ok: false, code, status: "unavailable" });
 /** Optional model-role admission cannot turn an otherwise-ready V3 lifecycle partial. */
 export function modelRoleBootstrapCliResult(result) {
   if (result?.ok) return result;
+  if (result?.fallbackForbidden === true) return result;
   return { ...result, fallback: "legacy-v3", lifecycleImpact: "none" };
 }
 
@@ -137,20 +142,67 @@ function realGitState(rootDir) {
     { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   const common = execFileSync("git", ["rev-parse", "--git-common-dir"],
     { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  if (!OID.test(commit) || common.length === 0) throw new Error("MODEL-ROLE-GIT-STATE");
-  return { candidateCommit: commit, commonDir: realpathSync(resolve(rootDir, common)) };
+  const tree = execFileSync("git", ["rev-parse", "--verify", "HEAD^{tree}"],
+    { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  if (!OID.test(commit) || !OID.test(tree) || common.length === 0) throw new Error("MODEL-ROLE-GIT-STATE");
+  return { candidateCommit: commit, candidateTree: tree, commonDir: realpathSync(resolve(rootDir, common)) };
+}
+
+export async function prepareFamilyBootstrapProjection({ familyInvocationEntry,
+  familyRouteSource = registeredModelFamilyTaskRoutes(), runner, sessionId, candidateCommit, candidateTree,
+  makeInvocationId = randomUUID } = {}) {
+  if (!familyRouteSource?.ok || !Array.isArray(familyRouteSource.taskRoutes)
+    || typeof familyInvocationEntry?.prepareModelFamilyInvocation !== "function") {
+    return { ...fail("MODEL-FAMILY-BOOTSTRAP-SOURCE"), fallbackForbidden: true };
+  }
+  const launchable = familyRouteSource.taskRoutes.filter((route) => route.runner === runner && route.state !== "unavailable");
+  if (launchable.length === 0) return { ...fail("MODEL-FAMILY-BOOTSTRAP-PROJECTION-EMPTY"), fallbackForbidden: true };
+  const receipts = [];
+  for (const route of launchable) {
+    let invocationId;
+    try { invocationId = makeInvocationId(); } catch { return { ...fail("MODEL-FAMILY-INVOCATION-ID-UNAVAILABLE"), fallbackForbidden: true }; }
+    const prepared = await familyInvocationEntry.prepareModelFamilyInvocation({ kind: "bootstrap", runner,
+      taskRoute: route.taskRoute, sessionId, invocationId, candidateCommit, candidateTree });
+    if (!prepared?.ok || !prepared.value?.receipt) return { ...fail(prepared?.code ?? "MODEL-FAMILY-BOOTSTRAP-PREPARE-FAILED"),
+      fallbackForbidden: true, retryable: prepared?.retryable === true };
+    receipts.push(prepared.value.receipt);
+  }
+  return { ok: true, code: "MODEL-FAMILY-BOOTSTRAP-PROJECTION-READY", status: "ready", family: true,
+    runner, sessionId, receipts };
 }
 
 /** The confirmation callback must be a host-owned human event, never a model-supplied JSON flag. */
 export async function runModelRoleBootstrap({ rootDir, runner, env = process.env,
   hostHookSessionId = null, confirm = null,
+  familyInvocationEntry = null,
+  familyRouteSource = registeredModelFamilyTaskRoutes(),
   routeSource = registeredFunctionalTaskRoutes(),
   readApprovedPolicy = readModelRoleApprovedPolicy,
   collectObservations = collectModelRoleHostObservations,
   readGitState = realGitState, makeStore = createModelRoleHostStore,
   now = () => new Date().toISOString() } = {}) {
-  if (typeof rootDir !== "string" || !isAbsolute(rootDir)
-    || !routeSource?.ok) return fail("MODEL-ROLE-BOOTSTRAP-SOURCE");
+  if (typeof rootDir !== "string" || !isAbsolute(rootDir)) return fail("MODEL-ROLE-BOOTSTRAP-SOURCE");
+  familyInvocationEntry ??= createModelFamilyInvocationEntry({
+    runtimeHost: createModelFamilyRuntimeHost({ cwd: rootDir }),
+  });
+  let activation;
+  try { activation = familyInvocationEntry.observeActivation(); }
+  catch { activation = { ok: false, code: "MODEL-FAMILY-ACTIVATION-UNCERTAIN" }; }
+  if (!activation?.ok) return { ...fail(activation?.code ?? "MODEL-FAMILY-ACTIVATION-UNCERTAIN"), fallbackForbidden: true };
+  if (activation.status === "active") {
+    const identity = resolveModelRoleHostSessionIdentity({ runner, env, hostHookSessionId });
+    if (!identity.ok) return { ...fail(identity.code), fallbackForbidden: true };
+    let gitState;
+    try { gitState = readGitState(rootDir); }
+    catch { return { ...fail("MODEL-ROLE-BOOTSTRAP-GIT-UNAVAILABLE"), fallbackForbidden: true }; }
+    if (!OID.test(gitState?.candidateCommit ?? "") || !OID.test(gitState?.candidateTree ?? "")) {
+      return { ...fail("MODEL-ROLE-BOOTSTRAP-GIT-UNAVAILABLE"), fallbackForbidden: true };
+    }
+    return await prepareFamilyBootstrapProjection({ familyInvocationEntry, familyRouteSource, runner,
+      sessionId: identity.sessionId, candidateCommit: gitState.candidateCommit, candidateTree: gitState.candidateTree });
+  }
+  if (activation.status !== "inactive") return { ...fail("MODEL-FAMILY-ACTIVATION-UNCERTAIN"), fallbackForbidden: true };
+  if (!routeSource?.ok) return fail("MODEL-ROLE-BOOTSTRAP-SOURCE");
   const identity = resolveModelRoleHostSessionIdentity({ runner, env, hostHookSessionId });
   if (!identity.ok) return fail(identity.code);
   const runnerSource = functionalTaskRoutesForRunner(routeSource, runner);

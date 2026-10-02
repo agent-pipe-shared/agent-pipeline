@@ -149,6 +149,8 @@ check("WAVR18 detects a tampered authority matrix from the validator fixture roo
  *  plus their local dependencies; copying the real verify-journal.mjs would drag 18 further
  *  modules into the list for a function this fixture proves is never called. */
 const FIXTURE_MODULES = Object.freeze([
+  "harness/scripts/verify-case-completion-augmentation.mjs",
+  "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
   "harness/scripts/check-verify-suite-registration.mjs", // duplicateSuiteIds
   "harness/scripts/manual-check-logic.mjs", // imported by verify.mjs for the manual-check step
   "harness/scripts/self-verify-selection.mjs",

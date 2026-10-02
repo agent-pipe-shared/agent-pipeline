@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "pipeline.model-family-adapter-contract.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "runner", "familyId", "identityRule", "releaseGroupingRule", "versionRule", "variantSelectionRule", "discoveryModes", "selectabilityRule", "effortRule", "compatibilityRule", "executionIdentityRule", "providerEvidenceSha256s"],
+  "properties": {
+    "schema": { "const": "pipeline.model-family-adapter-contract.v1" }, "runner": { "enum": ["codex", "claude", "antigravity"] },
+    "familyId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "identityRule": { "$ref": "#/$defs/rule" }, "releaseGroupingRule": { "$ref": "#/$defs/rule" }, "versionRule": { "$ref": "#/$defs/rule" },
+    "variantSelectionRule": { "$ref": "#/$defs/rule" }, "selectabilityRule": { "$ref": "#/$defs/rule" }, "effortRule": { "$ref": "#/$defs/rule" },
+    "compatibilityRule": { "$ref": "#/$defs/rule" }, "executionIdentityRule": { "$ref": "#/$defs/rule" },
+    "discoveryModes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["complete-catalogue", "verified-latest-alias"] } },
+    "providerEvidenceSha256s": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
+  }, "$defs": {
+    "rule": { "type": "object", "additionalProperties": false, "required": ["id", "version", "sha256"], "properties": {
+      "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "version": { "type": "string", "pattern": "^[1-9][0-9]*$" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } }
+  }
+}

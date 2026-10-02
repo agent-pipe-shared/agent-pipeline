@@ -19,15 +19,18 @@ import { fileURLToPath } from "node:url";
 
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
 import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { writeDesignAdvisoryTransaction, DESIGN_ADVISORY_RECEIPT_DIRECTORY, DESIGN_ADVISORY_TRANSACTION_DIRECTORY } from "../lib/design-advisory-transaction.mjs";
 import { designAdvisoryAdmission } from "../lib/guard-devplan-policy.mjs";
-import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
+import { evaluateLifecycleReadyGuard, isReadOnlyDiagnosticCommand, isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+import { isBoundedSingleRg } from "./guard-command-grammar.mjs";
 
 function writeAdvisorTransaction(dir, { unavailable = false } = {}) {
+  const commonDir = gitCommonDir(dir);
   const args = {
-    repoRoot: dir, gitCommonDir: join(dir, ".git"), featureId: "authority-feature",
+    repoRoot: dir, gitCommonDir: commonDir, featureId: "authority-feature",
     planPath: AUTHORITY_PLAN_PATH, specPath: AUTHORITY_SPEC_PATH,
     receiptId: "advisor-1", nativeAvailable: false,
     disposition: unavailable ? null : { decision: "accept", rationale: "The plan remains bounded." },
@@ -44,9 +47,9 @@ function writeAdvisorTransaction(dir, { unavailable = false } = {}) {
     fallback: unavailable ? { reason: "consult-unavailable", redactedErrorClass: "unavailable" } : { reason: "none", redactedErrorClass: null },
     emittedAtMs: 1,
   };
-  mkdirSync(join(dir, ".git", DESIGN_ADVISORY_RECEIPT_DIRECTORY), { recursive: true });
+  mkdirSync(join(commonDir, DESIGN_ADVISORY_RECEIPT_DIRECTORY), { recursive: true });
   mkdirSync(join(dir, "project"), { recursive: true });
-  writeFileSync(join(dir, ".git", DESIGN_ADVISORY_RECEIPT_DIRECTORY, "advisor-1.json"), JSON.stringify(receipt));
+  writeFileSync(join(commonDir, DESIGN_ADVISORY_RECEIPT_DIRECTORY, "advisor-1.json"), JSON.stringify(receipt));
   return writeDesignAdvisoryTransaction(args);
 }
 
@@ -70,10 +73,48 @@ function verifyAdvisorLanes(dir, allowed, code = null) {
 const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 
 const ALL_DIRS = [];
-function freshDir(prefix) {
-  const dir = mkdtempSync(join(tmpdir(), `guard-devplan-${prefix}-`));
-  ALL_DIRS.push(dir);
+function enrollFixture(dir) {
+  const governance = createGovernanceScopeController({ hostStateRoot: join(dir, "fixture-host-state") });
+  const inactive = governance.observe({ rootDir: dir });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement !== false) throw new Error("fixture was not initially inactive");
+  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || active.requiresEnforcement !== true) throw new Error("fixture enrollment did not become active");
+  if (governance.observe({ rootDir: dir }).state !== "active") throw new Error("fixture enrollment was not observable");
+}
+function freshDir(prefix, { initializeGit = true, enroll = true, separateCommon = false } = {}) {
+  const container = mkdtempSync(join(tmpdir(), `guard-devplan-${prefix}-`));
+  const dir = separateCommon ? join(container, "worktree") : container;
+  ALL_DIRS.push(container);
+  if (separateCommon) {
+    const control = join(container, "private-control");
+    mkdirSync(control, { recursive: true });
+    for (const args of [["init", "--quiet", control], ["-C", control, "config", "user.email", "fixture@example.invalid"], ["-C", control, "config", "user.name", "Fixture"]]) {
+      const result = spawnSync("git", args, { encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stderr);
+    }
+    writeFileSync(join(control, "README.md"), "fixture\n");
+    for (const args of [["-C", control, "add", "README.md"], ["-C", control, "commit", "--quiet", "-m", "fixture"]]) {
+      const result = spawnSync("git", args, { encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stderr);
+    }
+    const worktree = spawnSync("git", ["-C", control, "worktree", "add", "--detach", dir, "HEAD"], { encoding: "utf8" });
+    if (worktree.status !== 0) throw new Error(worktree.stderr);
+  }
+  if (initializeGit) {
+    const found = spawnSync("git", ["-C", dir, "rev-parse", "--git-dir"], { encoding: "utf8" });
+    if (found.status !== 0) {
+      const initialized = spawnSync("git", ["init", "--quiet", dir], { encoding: "utf8" });
+      if (initialized.status !== 0) throw new Error(initialized.stderr);
+    }
+    if (enroll) enrollFixture(dir);
+  }
   return dir;
+}
+function gitCommonDir(dir) {
+  const result = spawnSync("git", ["-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" });
+  if (result.status !== 0) throw new Error(result.stderr);
+  return result.stdout.trim();
 }
 function writeManifest(dir, yamlText) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
@@ -227,15 +268,16 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
 
 // ---- DP06 approval alone stays design-gated; implementation phase admits edits ----------
 {
-  const dir = freshDir("approved");
+  const dir = freshDir("approved", { enroll: false });
+  const initialized = spawnSync("git", ["init", "--quiet", dir], { encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error(initialized.stderr);
+  enrollFixture(dir);
   writeManifest(dir, MANIFEST_BLOCKING);
   writeState(dir, APPROVED_STATE);
   check("DP06 block approved design before explicit implementation phase", "Edit", "src/foo.ts", BLOCK, {
     projectDir: dir,
     stderrIncludes: ["approved", "set-phase"],
   });
-  const initialized = spawnSync("git", ["init", "--quiet", dir], { encoding: "utf8" });
-  if (initialized.status !== 0) throw new Error(initialized.stderr);
   writeAuthorityDocs(dir);
   writeState(dir, v2AuthorityState({ repositoryFingerprint: "7".repeat(64) }));
   writeAdvisorTransaction(dir);
@@ -669,7 +711,11 @@ function governanceGrantIntent({ fingerprint, capturePolicyDigest, decision }) {
 }
 /** Real git-init + governance-ledger fixture backing a genuinely resolvable grant. */
 async function writeGovernanceLedgerGrant(dir, { decisionId, packageId, artifacts }) {
-  spawnSync("git", ["init", "-q", dir]);
+  const existing = spawnSync("git", ["-C", dir, "rev-parse", "--git-dir"], { encoding: "utf8" });
+  if (existing.status !== 0) {
+    const initialized = spawnSync("git", ["init", "-q", dir], { encoding: "utf8" });
+    if (initialized.status !== 0) throw new Error(initialized.stderr);
+  }
   const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: dir });
   const policy = governanceCapturePolicy();
   await mkdir(join(dir, "governance", "events"), { recursive: true });
@@ -776,7 +822,7 @@ function decisionReference({ fingerprint, decisionId, decisionDigest, checkpoint
 // Both real guard lanes read the same repository-private transaction. The ledger
 // fixture above supplies genuine authority, including the unavailable exception.
 for (const variant of ["valid", "separate-common", "missing", "public-only", "malformed", "stale-private", "stale-package", "unavailable-approved", "unavailable-no-final", "unavailable-stale-candidate"]) {
-  const dir = freshDir(`advisor-${variant}`);
+  const dir = freshDir(`advisor-${variant}`, { initializeGit: false, enroll: false, separateCommon: variant === "separate-common" });
   writeManifest(dir, MANIFEST_BLOCKING);
   writeAuthorityDocs(dir);
   const grant = await writeGovernanceLedgerGrant(dir, {
@@ -794,9 +840,8 @@ for (const variant of ["valid", "separate-common", "missing", "public-only", "ma
       decisionDigest: grant.decisionDigest, checkpoint: grant.checkpoint,
     });
   }
-  writeState(dir, state);
   const written = variant === "missing" ? null : writeAdvisorTransaction(dir, { unavailable: variant.startsWith("unavailable-") });
-  const privatePath = written && join(dir, ".git", DESIGN_ADVISORY_TRANSACTION_DIRECTORY, `${written.id}.json`);
+  const privatePath = written && join(gitCommonDir(dir), DESIGN_ADVISORY_TRANSACTION_DIRECTORY, `${written.id}.json`);
   if (variant === "public-only") rmSync(privatePath);
   if (variant === "malformed") writeFileSync(privatePath, "{");
   if (variant === "stale-private") {
@@ -813,9 +858,10 @@ for (const variant of ["valid", "separate-common", "missing", "public-only", "ma
     writeFileSync(publicPath, JSON.stringify(record));
   }
   if (variant === "separate-common") {
-    const moved = spawnSync("git", ["init", "--quiet", "--separate-git-dir", join(dir, "private-control"), dir], { encoding: "utf8" });
-    if (moved.status !== 0) throw new Error(moved.stderr);
+    if (gitCommonDir(dir) === join(dir, ".git")) throw new Error("fixture did not select its separate Git common directory");
   }
+  enrollFixture(dir);
+  writeState(dir, state);
   const allowed = ["valid", "separate-common", "unavailable-approved"].includes(variant);
   const code = {
     missing: "DAA-PUBLIC-UNAVAILABLE", "public-only": "DAA-PRIVATE-UNAVAILABLE",
@@ -901,6 +947,67 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
     projectDir: dir,
     stderrIncludes: ["approved", "set-phase"],
   });
+}
+
+// ---- Cleanup --------------------------------------------------------------------------
+// The writer emits this exact Feature approval argv after its normal PO request
+// preparation. Admission is structural only; the writer still verifies the full
+// signed request and confirmation before committing any approval.
+{
+  const dir = freshDir("feature-approval-command", { initializeGit: false, enroll: false });
+  const requestDir = join(dir, "scratch");
+  mkdirSync(requestDir, { recursive: true });
+  const requestName = `design-workflow-approval-request-${"a".repeat(64)}.json`;
+  writeFileSync(join(requestDir, requestName), "{}\n", { mode: 0o600 });
+  const stateScript = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+  const quote = (value) => JSON.stringify(value);
+  const approve = (args) => isSanctionedLifecycleCommand(
+    [process.execPath, stateScript, ...args].map(quote).join(" "), dir,
+  );
+  const cases = [
+    ["feature approval request producer argv admitted", ["approve-plan", "--by", "PO reviewer", "--design-workflow-approval-request", `scratch/${requestName}`], true],
+    ["legacy approve-plan argv preserved", ["approve-plan", "--by", "PO reviewer"], true],
+    ["bootstrap receipt argv preserved", ["approve-plan", "--bootstrap-acknowledgement-receipt", `scratch/bootstrap-plan-acknowledgement-receipt-${"b".repeat(64)}.json`], true],
+    ["wrong or additional approval option refused", ["approve-plan", "--by", "PO reviewer", "--design-workflow-approval-request", `scratch/${requestName}`, "--authority", "v4"], false],
+    ["request path traversal refused", ["approve-plan", "--by", "PO reviewer", "--design-workflow-approval-request", `scratch/../${requestName}`], false],
+    ["missing request path refused", ["approve-plan", "--by", "PO reviewer", "--design-workflow-approval-request", `scratch/design-workflow-approval-request-${"c".repeat(64)}.json`], false],
+  ];
+  for (const [id, args, expected] of cases) {
+    const actual = approve(args);
+    if (actual === expected) { pass++; console.log(`PASS  ${id}`); }
+    else failures.push(`${id}: ${actual} (expected ${expected})`);
+  }
+  const linkPath = join(requestDir, `design-workflow-approval-request-${"d".repeat(64)}.json`);
+  const outside = join(dir, "outside-request.json");
+  writeFileSync(outside, "{}\n", { mode: 0o600 });
+  symlinkSync(outside, linkPath);
+  const symlinkAllowed = approve(["approve-plan", "--by", "PO reviewer", "--design-workflow-approval-request", `scratch/${linkPath.split(sep).at(-1)}`]);
+  if (!symlinkAllowed) { pass++; console.log("PASS  symlinked feature approval request refused"); }
+  else failures.push("symlinked feature approval request was admitted");
+}
+
+// Filename filters are rg option values, never read-target operands. Pattern
+// files remain genuine reads and are held to the same contained-path policy.
+{
+  const dir = freshDir("rg-filter-grammar", { initializeGit: false, enroll: false });
+  mkdirSync(join(dir, "src"), { recursive: true });
+  writeFileSync(join(dir, "src", "sample.mjs"), "export const value = 1;\n", { mode: 0o600 });
+  writeFileSync(join(dir, "patterns.txt"), "value\n", { mode: 0o600 });
+  const cases = [
+    ["short glob filter is a value, not an out-of-root read", "rg -g '*.mjs' value src", true],
+    ["long glob filter is a value, not an out-of-root read", "rg --glob '*.mjs' value src", true],
+    ["pattern file remains an explicit contained read target", "rg -f patterns.txt src", true],
+    ["outside pattern file is refused", "rg -f ../outside-patterns.txt src", false],
+    ["glob cannot select a hidden path", "rg -g '.*' value src", false],
+    ["unknown rg option remains refused", "rg --pre value src", false],
+  ];
+  for (const [id, command, expected] of cases) {
+    const actual = isReadOnlyDiagnosticCommand(command, dir);
+    if (actual === expected) { pass++; console.log(`PASS  ${id}`); }
+    else failures.push(`${id}: ${actual} (expected ${expected})`);
+  }
+  if (isBoundedSingleRg(["-g", "*.mjs", "value", "src"], dir)) { pass++; console.log("PASS  rg grammar keeps glob operand separate from read roots"); }
+  else failures.push("rg grammar did not admit bounded filename filter");
 }
 
 // ---- Cleanup --------------------------------------------------------------------------

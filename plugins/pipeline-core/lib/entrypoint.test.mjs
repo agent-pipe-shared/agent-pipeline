@@ -27,6 +27,20 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { isDirectInvocation } from "./entrypoint.mjs";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
+
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q", root], { encoding: "utf8" });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
+}
 
 const LIB = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = resolve(LIB, "..");
@@ -59,6 +73,7 @@ function governedFixture() {
   const base = mkdtempSync(join(tmpdir(), "entrypoint-governed-"));
   roots.push(base);
   mkdirSync(join(base, "project"), { recursive: true });
+  enrollFixtureGovernance(base);
   writeFileSync(join(base, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
   writeFileSync(join(base, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   writeFileSync(join(base, "project", "guard-config.json"), '{"protectedTestPaths":[]}\n');

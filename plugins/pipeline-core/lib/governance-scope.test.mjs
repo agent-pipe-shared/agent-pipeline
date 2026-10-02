@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Source target: plugins/pipeline-core/lib/governance-scope.test.mjs
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";

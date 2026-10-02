@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.model-family-approved-policy.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "candidateAtApproval", "subject", "approvalIntent", "proof"],
+  "properties": {
+    "schema": { "const": "pipeline.model-family-approved-policy.v2" },
+    "candidateAtApproval": { "$ref": "#/$defs/candidate" },
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["revision", "predecessorAuthoritySha256", "routeSourceSha256", "assignments", "migration"],
+      "properties": {
+        "revision": { "const": "model-family-v2" },
+        "predecessorAuthoritySha256": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/sha" }] },
+        "routeSourceSha256": { "$ref": "#/$defs/sha" },
+        "assignments": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/assignment" } },
+        "migration": { "anyOf": [{ "type": "null" }, { "$ref": "pipeline.model-family-migration.v1" }] }
+      }
+    },
+    "approvalIntent": { "$ref": "#/$defs/intent" },
+    "proof": { "$ref": "#/$defs/proof" }
+  },
+  "$defs": {
+    "sha": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "candidate": { "type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": {
+      "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" }, "tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" } } },
+    "assignment": { "type": "object", "additionalProperties": false,
+      "required": ["runner", "role", "effort", "taskRoutes", "familyId", "adapterContractSha256", "minimumVersion", "update"],
+      "properties": {
+        "runner": { "enum": ["codex", "claude", "antigravity"] }, "role": { "enum": ["frontier", "worker", "efficient"] },
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] }, "taskRoutes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^(profile|duty)\\.[a-z0-9_.]+$" } },
+        "familyId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" }, "adapterContractSha256": { "$ref": "#/$defs/sha" },
+        "minimumVersion": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } }, "update": { "const": "latest" }
+      } },
+    "intent": { "type": "object", "additionalProperties": false, "required": ["value", "sha256"], "properties": { "value": { "type": "object" }, "sha256": { "$ref": "#/$defs/sha" } } },
+    "proof": { "type": "object", "additionalProperties": false, "required": ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"], "properties": {
+      "schema": { "const": "pipeline.po-approval-proof.v1" }, "intentSha256": { "$ref": "#/$defs/sha" }, "keyReference": { "type": "string", "minLength": 1 }, "publicKey": { "type": "string", "minLength": 1 }, "signatureBase64": { "type": "string", "minLength": 1 } } }
+  }
+}

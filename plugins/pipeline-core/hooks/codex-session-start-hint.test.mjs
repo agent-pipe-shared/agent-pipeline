@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { after as afterTests } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 import { main, sessionStartDecision, sessionStartMessage } from "./codex-session-start-hint.mjs";
 import {
@@ -18,6 +21,15 @@ import {
 import { checkResumeConsumptionAnySession } from "../scripts/check-resume-consumption.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "codex-session-start-hint-"));
+function enrollFixture(dir) {
+  if (!existsSync(join(dir, '.git'))) {
+    const init = spawnSync('git', ['init', '-q'], {cwd:dir, encoding:'utf8', shell:false});
+    assert.equal(init.status, 0, init.stderr);
+  }
+  const controller = createGovernanceScopeController({hostStateRoot:join(dir, '.git', 'fixture-host-state')});
+  const plan = controller.planDecision({rootDir:dir, decision:'enroll', by:'disposable-session-hint-fixture'});
+  assert.equal(controller.applyDecision(plan, {activate:true, planSha256:plan.planSha256}).state, 'active');
+}
 function mainPayload(options) {
   let stdout = "";
   const originalWrite = process.stdout.write;
@@ -29,8 +41,10 @@ function mainPayload(options) {
   }
   return JSON.parse(stdout);
 }
-try {
-  const optional = sessionStartDecision(root);
+let optional, governed;
+const cases = [];
+cases.push({ id: "SSH001", name: "optional workflow remains inert and explains installation", run: () => {
+  optional = sessionStartDecision(root);
   assert.equal(optional.governed, false);
   assert.match(optional.message, /optional project workflow/u);
   assert.match(optional.message, /before any project work/u);
@@ -41,9 +55,13 @@ try {
   assert.doesNotMatch(optional.message, /run pipeline-core:pipeline-start/u);
   assert.equal(sessionStartMessage(root), optional.message);
 
+
+} });
+cases.push({ id: "SSH002", name: "enrolled workflow and current-session transcript guidance", run: () => {
   mkdirSync(join(root, ".claude"));
+  enrollFixture(root);
   writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
-  const governed = sessionStartDecision(root);
+  governed = sessionStartDecision(root);
   assert.equal(governed.governed, true);
   assert.match(governed.message, /Agent Pipeline is active/u);
   assert.match(governed.message, /report the resolved Pipeline version/u);
@@ -66,6 +84,9 @@ try {
   assert.match(governedWithSession.context, /never automatic context injection/u);
   assert.match(governedWithSession.context, /never search \$CODEX_HOME, ~\/\.codex, or any runner session directory directly/u);
 
+
+} });
+cases.push({ id: "SSH003", name: "direct SessionStart payload and native cwd identity", run: () => {
   let stdout = "";
   const originalWrite = process.stdout.write;
   process.stdout.write = (chunk) => { stdout += chunk; return true; };
@@ -92,6 +113,9 @@ try {
     rmSync(fresh, { recursive: true, force: true });
   }
 
+
+} });
+cases.push({ id: "SSH004", name: "pending resume card requires usable session identity", run: () => {
   // NVA-BL-72: an `available` resume-hint card must be surfaced through this SessionStart
   // hook's own `additionalContext` -- its full content (intent/scope/constraints/questions/
   // progress), not merely a passive "a card exists" flag. This is the mandatory-read
@@ -118,6 +142,9 @@ try {
   assert.match(withHint.context, /A guard denial is not by itself a human gate/u);
   assert.equal(withHint.message, governed.message);
 
+
+} });
+cases.push({ id: "SSH005", name: "compact without continuity fails closed", run: () => {
   // NVA-W4-09: on source === "compact", the hint must reuse post-compact-reground.mjs's
   // own PCR-READY/PCR-BLOCKED projection instead of unconditionally instructing a full
   // re-bootstrap. First, no state present -> a fail-closed PCR stop, never the bootstrap text.
@@ -132,10 +159,14 @@ try {
   assert.doesNotMatch(compactStdout, /run pipeline-core:pipeline-start/u);
   assert.match(compactStdout, /PCR-OUTER-INVALID/u);
 
+
+} });
+cases.push({ id: "SSH006", name: "ready compact reground and malformed payload fallback", run: () => {
   // Second, a valid ready continuity state -> the lightweight reground continuation,
   // not the full bootstrap instruction, via the direct hook payload path.
   const compactRoot = mkdtempSync(join(tmpdir(), "codex-session-start-compact-"));
   try {
+    enrollFixture(compactRoot);
     mkdirSync(join(compactRoot, ".claude"), { recursive: true });
     const hex = (ch) => ch.repeat(64);
     const continuityState = {
@@ -185,6 +216,9 @@ try {
     rmSync(compactRoot, { recursive: true, force: true });
   }
 
+
+} });
+cases.push({ id: "SSH007", name: "resume delivery and per-session consumption", run: () => {
   // NVA-R11-RESUMECONSUME: this hook's own resumeHintContextLines() is the real bootstrap
   // consumption step -- Stage 2's other half. A separate, git-initialized root is required
   // here (recordResumeHintConsumption's private-state resolver needs a usable `.git`, which
@@ -195,6 +229,7 @@ try {
     writeFileSync(join(consumptionRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
     const git = spawnSync("git", ["init", "-q"], { cwd: consumptionRoot, encoding: "utf8", shell: false });
     assert.equal(git.status, 0, git.stderr);
+    enrollFixture(consumptionRoot);
 
     const context = {
       intent: "Resume the resume-consumption wiring work.",
@@ -254,6 +289,7 @@ try {
       writeFileSync(join(cliRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
       const cliGit = spawnSync("git", ["init", "-q"], { cwd: cliRoot, encoding: "utf8", shell: false });
       assert.equal(cliGit.status, 0, cliGit.stderr);
+      enrollFixture(cliRoot);
       captureResumeHint({ rootDir: cliRoot, context });
       recordResumeHintCardDigest({ rootDir: cliRoot, card: context });
 
@@ -271,6 +307,9 @@ try {
     rmSync(consumptionRoot, { recursive: true, force: true });
   }
 
+
+} });
+cases.push({ id: "SSH008", name: "verbatim onboarding intake and malformed checkpoint fallback", run: () => {
   // NVA-CF-RESUMEVERBATIM-HOOK: the onboarding intake checkpoint's own verbatim
   // materialInput (the user's own design-input chunks) and answered values must also reach
   // this hook's additionalContext, in addition to the existing distilled-card lines above --
@@ -284,6 +323,7 @@ try {
     writeFileSync(join(verbatimRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
     const verbatimGit = spawnSync("git", ["init", "-q"], { cwd: verbatimRoot, encoding: "utf8", shell: false });
     assert.equal(verbatimGit.status, 0, verbatimGit.stderr);
+    enrollFixture(verbatimRoot);
 
     const verbatimContext = {
       intent: "Resume the resume-hint verbatim surfacing work.",
@@ -354,6 +394,9 @@ try {
     rmSync(verbatimRoot, { recursive: true, force: true });
   }
 
+
+} });
+cases.push({ id: "SSH009", name: "greenfield intake without resume card stays byte exact", run: () => {
   // NVA-062-GREENFIELD-INTAKE-REENTRY: the private intake checkpoint is the
   // lossless authority even before any Resume-Hint card exists. Exercise the
   // direct SessionStart payload path with its session_id.
@@ -363,6 +406,7 @@ try {
     writeFileSync(join(greenfieldRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
     const greenfieldGit = spawnSync("git", ["init", "-q"], { cwd: greenfieldRoot, encoding: "utf8", shell: false });
     assert.equal(greenfieldGit.status, 0, greenfieldGit.stderr);
+    enrollFixture(greenfieldRoot);
     const externalGreenfieldInput = [
       "Vollständige externe Greenfield-Eingabe",
       "",
@@ -387,6 +431,7 @@ try {
   }
 
   console.log("codex-session-start-hint: 49 passed");
-} finally {
-  rmSync(root, { recursive: true, force: true });
-}
+
+} });
+afterTests(() => rmSync(root, { recursive: true, force: true }));
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

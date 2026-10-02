@@ -11,7 +11,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { discoverAgyPath } from "../lib/antigravity-execution-host.mjs";
-import { dispatchAgySession, verifyAgySessionResultReadback } from "../lib/agy-session-dispatch.mjs";
+import { dispatchAgySession, verifyAgySessionResultReadback, dispatchAgyFamilyNativeContext, readAgyFamilyNativeContext, observeAgyFamilyDispatchActivation, prepareAgyFamilyVerifiedReturn } from "../lib/agy-session-dispatch.mjs";
 import { assessAgyHostCommit, captureAgyHostCommitBaseline, observeAgyHostHead } from "../lib/agy-host-commit-admission.mjs";
 import { agyAgentTypeForRole, preflightAgyAuthoredRecord } from "../lib/agy-final-return.mjs";
 import { classifyCriticChangedPaths, CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA,
@@ -22,6 +22,15 @@ import { publishAgyInterruptedRecord, publishAgyUndeliveredRecord } from "./agy-
 
 export const LIVE_REQUEST_SCHEMA = "pipeline.agy-session-live-request.v1";
 export const LIVE_REQUEST_SEAL = "elephant-agy-implementation-dispatch.v1";
+const familyLiveRequests = new WeakMap();
+
+/** Internal same-process seal. No request JSON contains callable authority. */
+export function sealAgyFamilyLiveRequest(request, context) {
+  const checked = readAgyFamilyNativeContext(context);
+  if (!checked.ok || checked.receipt.sessionId !== request?.sessionId || checked.receipt.selectedModelId !== request?.requestedModel
+    || checked.receipt.effort !== request?.effort || checked.receipt.invocationId !== request?.packet?.dispatchId) return { ok: false, code: "AGY-LIVE-FAMILY-CONTEXT" };
+  familyLiveRequests.set(request, { context, wireSha256: digest(request) }); return { ok: true, request };
+}
 
 function exact(value, keys) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -52,6 +61,34 @@ export async function runGoldfishAntigravityLiveHost(request, dependencies = {})
   if (request.seal !== LIVE_REQUEST_SEAL) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-LIVE-REQUEST-UNSEALED", modelCalls: 0, launcherCalls: 0 };
   if (request.consent === null) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-SESSION-CONSENT-REQUIRED", modelCalls: 0, launcherCalls: 0 };
   if (request.consent !== "stored") return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-SESSION-CONSENT-SUPPLIED", modelCalls: 0, launcherCalls: 0 };
+  const familySeal = familyLiveRequests.get(request), familyContext = familySeal?.context;
+  if (familySeal && familySeal.wireSha256 !== digest(request)) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-LIVE-FAMILY-REQUEST-CHANGED", modelCalls: 0, launcherCalls: 0 };
+  const activation = observeAgyFamilyDispatchActivation(request.root);
+  if (familyContext || !activation.ok || activation.status === "active") {
+    if (!activation.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: activation.code, modelCalls: 0, launcherCalls: 0 };
+    if (!familyContext) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-LIVE-FAMILY-CONTEXT-REQUIRED", modelCalls: 0, launcherCalls: 0 };
+    const captured = captureAgyHostCommitBaseline({ root: request.root, candidateCommit: request.packet?.candidate?.commit, resultPath: request.resultPath });
+    if (!captured.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: captured.code, modelCalls: 0, launcherCalls: 0 };
+    const launched = await dispatchAgyFamilyNativeContext({ context: familyContext, inputSha256: request.inputSha256,
+      timeoutMs: request.timeoutMs, nowEpochMs: dependencies.nowEpochMs ?? Date.now(), resultRoot: request.resultRoot });
+    if (launched.code !== "AGY-SESSION-FAMILY-RETURN-CONTRACT-UNQUALIFIED" || !dependencies.familyExecutionPorts) return launched;
+    const verified = await prepareAgyFamilyVerifiedReturn({ context: familyContext, ports: dependencies.familyExecutionPorts,
+      observedAtMs: dependencies.nowEpochMs ?? Date.now(), routePolicySha256: request.routePolicySha256, inputSha256: request.inputSha256 });
+    if (!verified.ok) return { ...launched, code: verified.code, status: "recovery-required" };
+    const admission = assessAgyHostCommit({ baseline: captured.baseline, final: verified.final, allowedPaths: verified.witness.family.consentBinding.allowedPaths });
+    if (!admission.ok) return { ...launched, code: admission.code, status: "recovery-required", result: verified.result };
+    const trigger = { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: true, diff: classifyCriticChangedPaths(admission.paths) };
+    const criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger, appliedRow: evaluateCriticTriggerRow(trigger), reason: "Host-observed Agy implementation requires independent Critic evidence." };
+    const recordPreflight = preflightAgyAuthoredRecord({ taskId: request.packet.dispatchId, agentType: agyAgentTypeForRole(request.packet.role),
+      observedModel: verified.witness.model, effort: request.effort, rulesetSha: request.routePolicySha256,
+      baselineCommit: request.packet.candidate.commit, final: verified.final, criticRequired });
+    if (!recordPreflight.ok) return { ...launched, code: recordPreflight.code, status: "recovery-required", result: verified.result };
+    const pending = { ...launched, status: "final-pending-host-commit", code: "AGY-FAMILY-FINAL-VALIDATED", result: verified.result, final: verified.final,
+      familyReturnHandle: verified.handle, observed: { provider: "google", model: verified.witness.model, effectiveSandbox: "unknown" },
+      commitAdmission: { ...admission, baseline: captured.baseline, final: verified.final, criticRequired, recordPreflight, modelWitness: verified.witness } };
+    const { finalizeAgyFamilyHostObservedReturn } = await import("./agy-host-observed-finalize.mjs");
+    return { ...pending, ...await finalizeAgyFamilyHostObservedReturn({ sealed: request, launched: pending }) };
+  }
   let live;
   try { live = loadLiveSession(request.root, request.sessionId, request.descriptorSha256); } catch { return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: "AGY-SESSION-OWNER-UNAVAILABLE", modelCalls: 0, launcherCalls: 0 }; }
   if (!live.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: live.code, modelCalls: 0, launcherCalls: 0 };

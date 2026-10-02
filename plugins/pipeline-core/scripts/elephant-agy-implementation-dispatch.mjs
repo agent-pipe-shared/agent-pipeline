@@ -16,7 +16,8 @@ import { selectStoredModelRoleDispatch } from "../lib/model-role-host-session.mj
 import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
 import { digest, loadLiveSession, loadStoredConsent, validateConsentRecord, validateDispatchBinding } from "../lib/agy-session-authority.mjs";
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
-import { LIVE_REQUEST_SCHEMA, LIVE_REQUEST_SEAL, runGoldfishAntigravityLiveHost } from "./goldfish-antigravity-live-host.mjs";
+import { LIVE_REQUEST_SCHEMA, LIVE_REQUEST_SEAL, runGoldfishAntigravityLiveHost, sealAgyFamilyLiveRequest } from "./goldfish-antigravity-live-host.mjs";
+import { observeAgyFamilyDispatchActivation, prepareAgyFamilyNativeDispatch } from "../lib/agy-session-dispatch.mjs";
 import { finalizeAgyHostObservedReturn } from "./agy-host-observed-finalize.mjs";
 
 export const ELEPHANT_AGY_IMPLEMENTATION_DISPATCH_SCHEMA = "pipeline.elephant-agy-implementation-dispatch-receipt.v1";
@@ -151,6 +152,33 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
   try { packet = JSON.parse(input.bytes.toString("utf8")); } catch { return empty("AGY-ELEPHANT-REQUEST-JSON"); }
   if (packet?.schema !== ELEPHANT_AGY_IMPLEMENTATION_REQUEST_SCHEMA || packet.transport !== "antigravity" || !IMPLEMENTATION_ROLES.has(packet.role)) return empty("AGY-ELEPHANT-ROLE-FORBIDDEN");
   if (packet.resultDestination?.kind !== "return" || Object.keys(packet.resultDestination).length !== 1) return empty("AGY-ELEPHANT-RESULT-DESTINATION");
+  const activation = observeAgyFamilyDispatchActivation(input.root);
+  if (!activation.ok) return empty(activation.code, "unavailable");
+  if (activation.status === "active") {
+    // Family projects never enter the exact-ID/V3 selection or injected v1
+    // validators. Current identity and selection come from the genuine S5
+    // constructor; its opaque context stays within this process.
+    const preflight = preflightRoleDispatch({ root: input.root, resultRoot: input.root, packet });
+    if (preflight.status !== "prepared") return empty("AGY-ELEPHANT-PREFLIGHT-FAILED", "rejected", { preflight });
+    let stored;
+    try { stored = loadStoredConsent(input.root, sessionId, descriptorSha256); } catch { return empty("AGY-SESSION-CONSENT-UNAVAILABLE", "unavailable"); }
+    if (stored?.record?.schema !== "pipeline.agy-session-consent.v2") return empty("AGY-SESSION-FAMILY-CONSENT-V2-REQUIRED");
+    const scope = stored.record.subject.scope, fallbackPolicy = stored.record.subject.fallbackPolicy;
+    const prepared = await prepareAgyFamilyNativeDispatch({ root: input.root, packet: preflight.packet, sessionId, descriptorSha256, resultPath,
+      consentAuthority: dependencies.familyConsentAuthority, runtimeHost: dependencies.familyRuntimeHost,
+      routeSource: dependencies.familyRouteSource, scope, fallbackPolicy, nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
+    if (!prepared.ok) return empty(prepared.code, "unavailable");
+    const r = prepared.receipt, route = { runner: "antigravity", provider: "google", requestedModel: r.selectedModelId, effort: r.effort,
+      routePolicySha256: digest({ invocationSha256: r.receiptSha256, consentRecordSha256: prepared.consent.consentRecordSha256, candidate: preflight.candidate, packet: preflight.packet, resultPath }) };
+    const inputSha256 = sha256(Buffer.concat([input.bytes, Buffer.from(`\n${JSON.stringify(scope)}\n`, "utf8")]));
+    const sealed = { schema: LIVE_REQUEST_SCHEMA, seal: LIVE_REQUEST_SEAL, root: input.root, resultRoot: input.root, resultPath,
+      packet: preflight.packet, sessionId, descriptorSha256, consent: "stored", requestedModel: route.requestedModel, effort: route.effort,
+      scope, inputSha256, routePolicySha256: route.routePolicySha256, timeoutMs: 300_000 };
+    const bound = sealAgyFamilyLiveRequest(sealed, prepared.context); if (!bound.ok) return empty(bound.code);
+    const launched = await runGoldfishAntigravityLiveHost(bound.request, dependencies);
+    return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record, scope, inputSha256,
+      result: launched, status: launched.status, code: launched.code });
+  }
   const baseRoute = (dependencies.routeAuthority ?? routeAuthority)(dependencies);
   if (!baseRoute) return empty("AGY-ELEPHANT-ROUTE-UNAVAILABLE", "unavailable");
   if (!validRouteAuthority(baseRoute)) return empty("AGY-ELEPHANT-ROUTE-MISMATCH", "unavailable");

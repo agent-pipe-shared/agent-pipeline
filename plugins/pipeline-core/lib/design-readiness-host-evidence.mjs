@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import {designReadinessReportSha256,designReadinessRunnerSelectionSha256} from './design-readiness-hashes.mjs';
 import {createCodexDesignReadinessHostStore} from './codex-design-readiness-host-store.mjs';
 import {verifyCodexToolFreeBindingFromSources} from './codex-tool-free-design-readiness.mjs';

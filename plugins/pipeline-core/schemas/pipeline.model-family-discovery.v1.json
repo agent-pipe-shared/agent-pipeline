@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.model-family-discovery.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "runner",
+    "installationBindingSha256",
+    "accountBindingSha256",
+    "hostProcessBindingSha256",
+    "adapterContractSha256",
+    "mode",
+    "observedAt",
+    "expiresAt",
+    "rawEvidenceSha256",
+    "coverageEvidenceSha256",
+    "compatibilityEvidenceSha256",
+    "records",
+    "latestAliasEvidenceSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.model-family-discovery.v1"
+    },
+    "runner": {
+      "enum": [
+        "codex",
+        "claude",
+        "antigravity"
+      ]
+    },
+    "installationBindingSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "accountBindingSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "hostProcessBindingSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "adapterContractSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "mode": {
+      "enum": [
+        "complete-catalogue",
+        "verified-latest-alias"
+      ]
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "rawEvidenceSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "coverageEvidenceSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "compatibilityEvidenceSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2048,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "releaseId",
+          "familyId",
+          "version",
+          "released",
+          "groupingEvidenceSha256",
+          "variants"
+        ],
+        "properties": {
+          "releaseId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "familyId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "version": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "released": {
+            "type": "boolean"
+          },
+          "groupingEvidenceSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "variants": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "modelId",
+                "canonicalModelId",
+                "aliasEvidenceSha256",
+                "visible",
+                "selectable",
+                "efforts",
+                "capabilityEvidenceSha256",
+                "compatibilityBySlotSha256"
+              ],
+              "properties": {
+                "modelId": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+                },
+                "canonicalModelId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "aliasEvidenceSha256": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "visible": {
+                  "type": "boolean"
+                },
+                "selectable": {
+                  "type": "boolean"
+                },
+                "efforts": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "maxItems": 128,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "capabilityEvidenceSha256": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "compatibilityBySlotSha256": {
+                  "type": "object",
+                  "maxProperties": 512,
+                  "propertyNames": {
+                    "maxLength": 512
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "canonicalModelId": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "aliasEvidenceSha256": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "aliasEvidenceSha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "efforts": {
+                        "type": "array"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "capabilityEvidenceSha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "selectable": {
+                        "const": true
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "visible": {
+                        "const": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "released": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "variants": {
+                  "items": {
+                    "properties": {
+                      "selectable": {
+                        "const": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "latestAliasEvidenceSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "complete-catalogue"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "latestAliasEvidenceSha256": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "latestAliasEvidenceSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -65,6 +65,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { bootstrapBindingStagingAuthoringAdmitted } from "../lib/onboarding-staging-authoring.mjs";
 import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
@@ -90,11 +91,6 @@ import { buildAppendIntent, buildOverrideDecisions, requestDecisionId } from "..
 // mirroring the identical adoption already landed in guard-lifecycle-ready.mjs
 // and guard-testpath.mjs (NVA-W12-COPYSAFE).
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
-import { observeGovernanceScope } from "../lib/governance-scope.mjs";
-import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
-// Repository admission precedes hook input hardening and all governed effects.
-if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
-
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
@@ -524,6 +520,10 @@ export async function appendOverrideConsumedLedgerEvent({ rootDir, pluginRoot, r
 }
 
 if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mjs")) {
+  // Governance stand-down applies only after GS-6 has classified the requested
+  // target. Installed live plugin code remains protected even when this
+  // repository has not enrolled; ordinary gate-strength filenames still pass
+  // through the marker-scoped path below.
   let filePath = "";
   let toolName = "";
   let toolInput = {};
@@ -557,14 +557,13 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
     try { matched = gateStrengthRuleFor(filePath, projectDir); } catch { process.exit(0); }
     if (matched === null) process.exit(0);
 
-    // Only defend a repository the Pipeline actually governs; elsewhere these are
-    // ordinary filenames.
-    const governed = [
-      "pipeline.user.yaml", "project/pipeline.yaml", ".claude/pipeline.yaml",
-      "project/guard-config.json", ".claude/guard-config.json",
-      "project/pipeline.json", ".claude/pipeline.json",
-    ].some((marker) => existsSync(join(resolve(projectDir), marker)));
-    if (!governed) process.exit(0);
+    // Only defend a repository canonically enrolled by Pipeline; legacy marker
+    // filenames alone are ordinary files. This read-only observation happens
+    // after GS-6 has independently classified the target, so an inactive
+    // enrollment can never stand down installed live-plugin protection.
+    let enrollment = null;
+    try { enrollment = observeGovernanceScope({ rootDir: projectDir }); } catch { /* retain the existing refusal on uncertainty */ }
+    if (enrollment?.state === "inactive" && enrollment.requiresEnforcement === false) process.exit(0);
 
     // NVA-GS15-1: GS-15 (project/.onboarding-staging/*) stands down, and only GS-15,
     // for the one narrow Edit/Write a real session performs to author/review the

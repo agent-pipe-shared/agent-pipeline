@@ -40,6 +40,12 @@ function commitFromObservedAdmission(input, dependencies) {
 
 test("AHE01 stages only the admitted child diff, runs normal commit and reads its exact parent/tree/paths", () => fixture(({ root, parent, baseline }) => {
   writeFileSync(join(root, "file.txt"), "after\n");
+  for (const adapterVersion of [0, 3, "2", null]) {
+    assert.equal(commitFromObservedAdmission({ adapterVersion, baseline,
+      final: { outcome: "succeeded", changedPaths: ["file.txt"] }, allowedPaths: ["file.txt"], taskId: "AGY-EXAMPLE-1" }).code, "AGY-HOST-COMMIT-ADAPTER-VERSION");
+    assert.equal(git(root, "rev-parse", "HEAD"), parent);
+    assert.equal(git(root, "diff", "--cached", "--name-only"), "");
+  }
   const result = commitFromObservedAdmission({
     baseline, final: { outcome: "succeeded", changedPaths: ["file.txt"] },
     allowedPaths: ["file.txt"], taskId: "AGY-EXAMPLE-1",

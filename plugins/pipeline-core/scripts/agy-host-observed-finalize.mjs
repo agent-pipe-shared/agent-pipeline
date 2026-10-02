@@ -9,9 +9,10 @@ import { commitAdmittedAgyReturn } from "../lib/agy-host-commit-execution.mjs";
 import { agyAgentTypeForRole, draftAgyAuthoredRecordAfterCommit } from "../lib/agy-final-return.mjs";
 import { agyAuthoredRecordBytes, draftAgyHostObservedReceipt } from "../lib/agy-host-observed-receipt.mjs";
 import { persistAgyHostObservedReceipt } from "../lib/agy-host-observed-store.mjs";
-import { verifyAgySessionResultReadback } from "../lib/agy-session-dispatch.mjs";
+import { verifyAgySessionResultReadback, recheckAgyFamilyVerifiedReturn } from "../lib/agy-session-dispatch.mjs";
 import { digest, loadStoredConsent, validateConsentRecord, validateDispatchBinding } from "../lib/agy-session-authority.mjs";
 import { writeHostObservedAgyDispatchRecord } from "./dispatch-record-write.mjs";
+import { withAgyFamilyLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
 
 const SHA = /^[a-f0-9]{64}$/u;
 function recovery(code, commit = null) {
@@ -27,6 +28,66 @@ function observedCommitAfterException(baseline) {
     const head = result.status === 0 ? result.stdout.trim() : null;
     return /^[a-f0-9]{40,64}$/u.test(head ?? "") && head !== baseline.candidateCommit ? head : null;
   } catch { return null; }
+}
+
+/** V2 admission requires the original private return capability, not witness JSON. */
+export async function finalizeAgyFamilyHostObservedReturn({ sealed, launched } = {}) {
+  const checked = await recheckAgyFamilyVerifiedReturn(launched?.familyReturnHandle);
+  if (!checked.ok) return recovery(checked.code);
+  const { witness, result, final } = checked.value;
+  let packetMatches = false;
+  try { packetMatches = digest(sealed?.packet) === checked.source.packetSha256; } catch { /* malformed sealed packet is a denial */ }
+  if (sealed?.root !== checked.source.root || sealed.resultRoot !== checked.source.root
+    || launched?.commitAdmission?.baseline?.root !== checked.source.root
+    || sealed.resultPath !== witness.resultPath || launched.commitAdmission?.baseline?.resultPath !== witness.resultPath
+    || !packetMatches
+    || launched?.status !== "final-pending-host-commit" || launched.commitAdmission?.code !== "AGY-HOST-COMMIT-ADMITTED"
+    || launched.commitAdmission?.recordPreflight?.code !== "AGY-RECORD-PREFLIGHT-READY"
+    || witness.schema !== "pipeline.agy-host-model-witness.v2"
+    || digest(witness) !== digest(launched.commitAdmission.modelWitness)
+    || witness.dispatchId !== sealed?.packet?.dispatchId || witness.sessionId !== sealed.sessionId
+    || witness.descriptorSha256 !== sealed.descriptorSha256 || witness.candidateCommit !== sealed.packet.candidate.commit
+    || witness.candidateTree !== sealed.packet.candidate.tree || witness.effort !== sealed.effort
+    || witness.family.invocation.selectedModelId !== sealed.requestedModel || witness.inputSha256 !== sealed.inputSha256
+    || witness.routePolicySha256 !== sealed.routePolicySha256 || digest(witness.scope) !== digest(sealed.scope)
+    || digest(result) !== digest(launched.result)) return recovery("AGY-FAMILY-FINALIZE-WITNESS-DRIFT");
+  const readback = verifyAgySessionResultReadback({ resultRoot: sealed.resultRoot, resultPath: sealed.resultPath,
+    receipt: result, dispatchId: witness.dispatchId, candidate: sealed.packet.candidate, sessionId: witness.sessionId,
+    requestedModel: sealed.requestedModel, expectedFinal: final, familyWitness: witness });
+  if (!readback.ok) return recovery("AGY-FAMILY-FINALIZE-RESULT-DRIFT");
+  const admission = launched.commitAdmission;
+  let committed;
+  try {
+    committed = commitAdmittedAgyReturn({ adapterVersion: 2, baseline: admission.baseline,
+      final, allowedPaths: witness.family.consentBinding.allowedPaths,
+      taskId: witness.dispatchId, priorAdmission: admission });
+  } catch { return recovery("AGY-FAMILY-FINALIZE-COMMIT-EXCEPTION", observedCommitAfterException(admission.baseline)); }
+  if (!committed?.ok) return recovery(committed?.code ?? "AGY-FAMILY-FINALIZE-COMMIT-INVALID", committed?.commit ?? observedCommitAfterException(admission.baseline));
+  try {
+    const draft = draftAgyAuthoredRecordAfterCommit({ taskId: witness.dispatchId,
+      agentType: agyAgentTypeForRole(witness.role), observedModel: readback.model,
+      effort: witness.effort, rulesetSha: witness.routePolicySha256,
+      baselineCommit: witness.candidateCommit, candidateTree: witness.candidateTree,
+      resultSha256: witness.resultSha256, resultPath: witness.resultPath, resultBytes: witness.resultBytes,
+      consentSubjectSha256: witness.consentSubjectSha256, consentDecisionId: witness.consentDecisionId,
+      consentRecordSha256: witness.consentRecordSha256, inputSha256: witness.inputSha256,
+      observedAtMs: witness.observedAtMs, scope: witness.scope, sessionId: witness.sessionId,
+      descriptorSha256: witness.descriptorSha256, final, modelWitness: witness,
+      criticRequired: admission.criticRequired, commitReadback: committed });
+    if (!draft.ok) return recovery("AGY-FAMILY-FINALIZE-RECORD-DRAFT", committed.commit);
+    const privateDraft = draftAgyHostObservedReceipt({ modelWitness: witness, commitReadback: committed, record: draft.record });
+    if (!privateDraft.ok) return recovery("AGY-FAMILY-FINALIZE-PRIVATE-DRAFT", committed.commit);
+    const stored = loadStoredConsent(sealed.root, sealed.sessionId, sealed.descriptorSha256);
+    const privateStored = persistAgyHostObservedReceipt({ commonDir: stored.descriptor.repo.commonDir,
+      receipt: privateDraft.receipt, record: draft.record, recordBytes: agyAuthoredRecordBytes(draft.record) });
+    if (!privateStored.ok) return recovery("AGY-FAMILY-FINALIZE-PRIVATE-STORE", committed.commit);
+    const published = await withAgyFamilyLocalReadback({ root: sealed.root, handle: launched.familyReturnHandle,
+      operation: () => writeHostObservedAgyDispatchRecord({ repoRoot: sealed.root,
+        target: `evidence/dispatch-record-${witness.dispatchId}.json`, record: draft.record }) });
+    if (!published?.target) return recovery("AGY-FAMILY-FINALIZE-RECORD-PUBLICATION", committed.commit);
+    return { status: "authored-commit-recorded", code: "AGY-AUTHORED-RECORD-VERIFIED", recoveryCommit: null,
+      record: { target: published.target, sha256: published.sha256, commit: committed.commit, authorship: "host-observed-local" } };
+  } catch (error) { return recovery(`AGY-FAMILY-FINALIZE-POSTCOMMIT-${typeof error?.code === "string" ? error.code : "EXCEPTION"}`, committed.commit); }
 }
 
 export function finalizeAgyHostObservedReturn({ sealed, launched } = {}, dependencies = {}) {

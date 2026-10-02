@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { closeGuardMaintenanceWindow, installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { livePluginRoots } from "./guard-gate-strength.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url));
 
@@ -85,6 +86,12 @@ try {
   execFileSync("git", ["config", "user.name", "Test"], { cwd: GMW_DIR });
   execFileSync("git", ["add", "-A"], { cwd: GMW_DIR });
   execFileSync("git", ["commit", "-q", "-m", "gmw-fixture"], { cwd: GMW_DIR });
+  const governance = createGovernanceScopeController({ hostStateRoot: join(GMW_DIR, ".git", "fixture-hoststate") });
+  const inactive = governance.observe({ rootDir: GMW_DIR });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture governance scope was not initially inactive");
+  const plan = governance.planDecision({ rootDir: GMW_DIR, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture governance enrollment did not activate enforcement");
 
   check("TP09 real armed GMW window scoped to an additive rule lifts the matching Edit", "Edit",
     join(GMW_DIR, "fixtures/gmw-protected.test.mjs"), 0, (() => {

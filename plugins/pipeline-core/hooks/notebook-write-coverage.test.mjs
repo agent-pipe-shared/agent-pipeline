@@ -19,6 +19,17 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-hook-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
@@ -31,6 +42,7 @@ function governedNotReady() {
   const base = mkdtempSync(join(tmpdir(), "notebook-coverage-"));
   roots.push(base);
   writeFileSync(join(base, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\n');
+  enrollFixtureGovernance(base);
   return base;
 }
 
@@ -139,6 +151,7 @@ try {
   check("NB06 guard-gate-strength sees a NotebookEdit target (GS-6)", () => {
     const base = mkdtempSync(join(tmpdir(), "notebook-gs6-"));
     roots.push(base);
+    enrollFixtureGovernance(base);
     const { blocked, stderr } = ask("guard-gate-strength.mjs", "NotebookEdit",
       { notebook_path: join(PLUGIN_ROOT, "hooks", "notes.ipynb") }, base);
     assert.equal(blocked, true, "a notebook inside the live plugin root must be refused");

@@ -81,11 +81,14 @@ check("Critic readiness requires a successful bounded model-start probe", () => 
 });
 
 check("critic-ready resolves the V3-bound candidate model and never probes an unavailable route", () => {
+  const root = mkdtempSync(join(tmpdir(), "codex-ready-route-"));
+  try {
+  assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
   let output = "";
   const calls = [];
-  const exit = run(["--critic-ready", "--root", "/project", "--candidate-commit", "a".repeat(40)], {
+  const exit = run(["--critic-ready", "--root", root, "--candidate-commit", "a".repeat(40)], {
     resolveCriticRoute(input) {
-      assert.deepEqual(input, { rootDir: resolve("/project"), candidateCommit: "a".repeat(40) });
+      assert.deepEqual(input, { rootDir: resolve(root), candidateCommit: "a".repeat(40) });
       return { model: "gpt-6-astra" };
     },
     spawn: (_bin, args) => { calls.push(args); return args[0] === "app-server" ? health() : response(0, JSON.stringify({ schema: "pipeline.codex-app-server-model-probe.v1", status: "ready", code: "CAS-MODEL-READY", detail: null })); },
@@ -94,13 +97,14 @@ check("critic-ready resolves the V3-bound candidate model and never probes an un
   assert.equal(exit, 0);
   assert.equal(calls[1].at(-1), "gpt-6-astra");
   output = ""; calls.length = 0;
-  const unavailable = run(["--critic-ready"], {
+  const unavailable = run(["--critic-ready", "--root", root], {
     resolveCriticRoute() { throw new Error("unavailable"); }, spawn: () => { calls.push(true); return health(); },
     write: (value) => { output += value; }, writeError() {},
   });
   assert.equal(unavailable, 2);
   assert.equal(JSON.parse(output).code, "CAS-MODEL-ROUTE-UNAVAILABLE");
   assert.equal(calls.length, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 check("model probe rejects missing model, relative executable, and returned-model mismatch", () => {

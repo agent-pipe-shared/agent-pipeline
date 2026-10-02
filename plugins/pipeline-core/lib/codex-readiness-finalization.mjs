@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import {validateAdvisoryReceipt} from './advisory-receipt.mjs';
 import {rereadReadinessAdvisorContextV2} from './readiness-advisor-context-v2.mjs';
 import {validateAdvisoryRouteSelection} from './advisory-route-selection.mjs';

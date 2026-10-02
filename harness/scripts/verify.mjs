@@ -253,8 +253,8 @@ const TEST_SUITES = [
   { name: "pipeline-update-channel-tests", file: join(pluginScriptsDir, "pipeline-update-channel.test.mjs") },
   { name: "bootstrap-env-check-tests", file: join(pluginScriptsDir, "bootstrap-env-check.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
-  { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 135 }, (_, index) => `CCH${String(index + 1).padStart(3, "0")}`), maxBytes: 65_536 } },
-  { name: "codex-native-critic-host-tests", file: join(pluginScriptsDir, "codex-native-critic-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `NCH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CCH001", "CCH002", "CCH003", "CCH004", "CCH005", "CCH006", "CCH007", "CCH008", "CCH009", "CCH010", "CCH011", "CCH012", "CCH013", "CCH014", "CCH015", "CCH016", "CCH017", "CCH018", "CCH019", "CCH020", "CCH021", "CCH022", "CCH023", "CCH024", "CCH025", "CCH026", "CCH027", "CCH028", "CCH029", "CCH030", "CCH031", "CCH032", "CCH033", "CCH034", "CCH035", "CCH036", "CCH037", "CCH038", "CCH039", "CCH040", "CCH041", "CCH042", "CCH043", "CCH044", "CCH045", "CCH046", "CCH047", "CCH048", "CCH049", "CCH050", "CCH051", "CCH052", "CCH053", "CCH054", "CCH055", "CCH056", "CCH057", "CCH058", "CCH059", "CCH060", "CCH061", "CCH062", "CCH063", "CCH064", "CCH065", "CCH066", "CCH067", "CCH068", "CCH069", "CCH070", "CCH071", "CCH072", "CCH073", "CCH074", "CCH075", "CCH076", "CCH077", "CCH078", "CCH079", "CCH080", "CCH081", "CCH082", "CCH083", "CCH084", "CCH085", "CCH086", "CCH087", "CCH088", "CCH089", "CCH090", "CCH091", "CCH092", "CCH093", "CCH094", "CCH095", "CCH096", "CCH097", "CCH098", "CCH099", "CCH100", "CCH101", "CCH102", "CCH103", "CCH104", "CCH105", "CCH106", "CCH107", "CCH108", "CCH109", "CCH110", "CCH111", "CCH112", "CCH113", "CCH114", "CCH115", "CCH116", "CCH117", "CCH118", "CCH119", "CCH120", "CCH121", "CCH122", "CCH123", "CCH124", "CCH125", "CCH126", "CCH127", "CCH128", "CCH129", "CCH130", "CCH131", "CCH132", "CCH133", "CCH134", "CCH135", "CCH136", "CCH137"], maxBytes: 65_536 } },
+  { name: "codex-native-critic-host-tests", file: join(pluginScriptsDir, "codex-native-critic-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["NCH01", "NCH02", "NCH03", "NCH04", "NCH05", "NCH06", "NCH07", "NCH08", "NCH09"], maxBytes: 65_536 } },
   { name: "codex-critic-isolation-tests", file: join(pluginScriptsDir, "codex-critic-isolation.test.mjs") },
   { name: "codex-isolated-critic-contract-tests", file: join(pluginScriptsDir, "codex-isolated-critic-contract.test.mjs") },
   { name: "claude-critic-host-tests", file: join(pluginScriptsDir, "critic-claude-host.test.mjs") },
@@ -290,7 +290,7 @@ const TEST_SUITES = [
   { name: "review-economy-tests", file: join(libDir, "review-economy.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-apply-patch-tests", file: join(hooksDir, "guard-apply-patch.test.mjs") },
-  { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") },
+  { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["TPC001", "TPC002", "TPC003", "TPC004", "TPC005", "TPC006", "TPC007", "TPC008", "TPC009", "TPC010", "TPC011", "TPC012", "TPC013", "TPC014", "TPC015", "TPC016", "TPC017", "TPC018"], maxBytes: 65_536 } },
   { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },
   { name: "guard-devplan-tests", file: join(hooksDir, "guard-devplan.test.mjs") },
   { name: "guard-lifecycle-ready-tests", file: join(hooksDir, "guard-lifecycle-ready.test.mjs") },
@@ -299,17 +299,17 @@ const TEST_SUITES = [
   { name: "pipeline-state-revocation-tests", file: join(pluginScriptsDir, "pipeline-state-revocation.test.mjs") },
   { name: "pipeline-state-rebind-runner-tests", file: join(pluginScriptsDir, "pipeline-state-rebind-runner.test.mjs") },
   { name: "codex-pretool-guard-tests", file: join(hooksDir, "codex-pretool-guard.test.mjs") },
-  { name: "codex-session-start-hint-tests", file: join(hooksDir, "codex-session-start-hint.test.mjs") },
+  { name: "codex-session-start-hint-tests", file: join(hooksDir, "codex-session-start-hint.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["SSH001", "SSH002", "SSH003", "SSH004", "SSH005", "SSH006", "SSH007", "SSH008", "SSH009"], maxBytes: 65_536 } },
   { name: "guard-push-tests", file: join(hooksDir, "guard-push.test.mjs") },
-  { name: "guard-push-architecture-tests", file: join(hooksDir, "guard-push-architecture.test.mjs") },
+  { name: "guard-push-architecture-tests", file: join(hooksDir, "guard-push-architecture.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["GPA001"], maxBytes: 65_536 } },
   { name: "guard-push-v2-tests", file: join(hooksDir, "guard-push-v2.test.mjs") },
   { name: "guard-push-attestation-diagnostics-tests", file: join(hooksDir, "guard-push-attestation-diagnostics.test.mjs") },
   { name: "push-destination-policy-tests", file: join(libDir, "push-destination-policy.test.mjs") },
   { name: "architecture-push-currency-tests", file: join(libDir, "architecture-push-currency.test.mjs") },
-  { name: "checkpoint-push-audit-tests", file: join(libDir, "checkpoint-push-audit.test.mjs") },
+  { name: "checkpoint-push-audit-tests", file: join(libDir, "checkpoint-push-audit.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CPA001"], maxBytes: 65_536 } },
   { name: "stop-suggest-tests", file: join(hooksDir, "stop-suggest.test.mjs") },
   { name: "close-coordinator-tests", file: join(pluginScriptsDir, "close-coordinator.test.mjs") },
-  { name: "post-compact-reground-tests", file: join(hooksDir, "post-compact-reground.test.mjs") },
+  { name: "post-compact-reground-tests", file: join(hooksDir, "post-compact-reground.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["PCR001", "PCR002", "PCR003", "PCR004", "PCR005", "PCR006", "PCR007", "PCR008", "PCR009", "PCR010", "PCR011", "PCR012", "PCR013", "PCR014", "PCR015", "PCR016", "PCR017", "PCR018", "PCR019", "PCR020", "PCR021", "PCR022", "PCR023", "PCR024", "PCR025", "PCR026", "PCR027", "PCR028"], maxBytes: 65_536 } },
   { name: "setup-check-tests", file: join(hooksDir, "setup-check.test.mjs") },
   { name: "statusline-context-tests", file: join(pluginScriptsDir, "statusline-context.test.mjs") },
   { name: "yaml-lite-tests", file: join(libDir, "yaml-lite.test.mjs") },
@@ -429,7 +429,7 @@ const TEST_SUITES = [
   // Verify forgot to run -- it is a test that protects nothing, and the gap is invisible
   // precisely because the file exists and passes when run by hand.
   { name: "critical-action-authorization-tests", file: join(libDir, "critical-action-authorization.test.mjs") },
-  { name: "commit-message-policy-tests", file: join(libDir, "commit-message-policy.test.mjs") },
+  { name: "commit-message-policy-tests", file: join(libDir, "commit-message-policy.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CMP001", "CMP002", "CMP003", "CMP004", "CMP005", "CMP006", "CMP007", "CMP008", "CMP009", "CMP010", "CMP011", "CMP012", "CMP013", "CMP014", "CMP015", "CMP016", "CMP017", "CMP018", "CMP019", "CMP020", "CMP021", "CMP022", "CMP023", "CMP024", "CMP025", "CMP026", "CMP027", "CMP028", "CMP029", "CMP030", "CMP031", "CMP032", "CMP033", "CMP034", "CMP035", "CMP036", "CMP037", "CMP038", "CMP039"], maxBytes: 65_536 } },
   { name: "dispatch-budget-core-tests", file: join(libDir, "dispatch-budget-core.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 11 }, (_, index) => `DBC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "dispatch-budget-calibration-tests", file: join(libDir, "dispatch-budget-calibration.test.mjs") },
   { name: "dispatch-policy-tests", file: join(libDir, "dispatch-policy.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 38 }, (_, index) => `DPT${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -498,8 +498,8 @@ const TEST_SUITES = [
   { name: "module-cluster-reachability-tests", file: join(scriptDir, "check-module-cluster-reachability.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "pipeline-state-late-verify-tests", file: join(pluginScriptsDir, "pipeline-state-late-verify.test.mjs") },
-  { name: "dispatch-provenance-tests", file: join(scriptDir, "check-dispatch-provenance.test.mjs") },
-  { name: "guard-git-phoenix-authority-grant-tests", file: join(hooksDir, "guard-git-phoenix-authority-grant.test.mjs") },
+  { name: "dispatch-provenance-tests", file: join(scriptDir, "check-dispatch-provenance.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CDP001", "CDP002", "CDP003", "CDP004", "CDP005", "CDP006", "CDP007", "CDP008", "CDP009", "CDP010", "CDP011", "CDP012", "CDP013", "CDP014", "CDP015", "CDP016", "CDP017", "CDP018", "CDP019", "CDP020", "CDP021", "CDP022", "CDP023", "CDP024", "CDP025", "CDP026", "CDP027", "CDP028", "CDP029", "CDP030", "CDP031", "CDP032", "CDP033", "CDP034", "CDP035", "CDP036"], maxBytes: 65_536 } },
+  { name: "guard-git-phoenix-authority-grant-tests", file: join(hooksDir, "guard-git-phoenix-authority-grant.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["PAG001"], maxBytes: 65_536 } },
   { name: "decision-reference-dual-evaluation-tests", file: join(libDir, "decision-reference-dual-evaluation.test.mjs") },
   { name: "human-authority-grant-tests", file: join(pluginScriptsDir, "human-authority-grant.test.mjs") },
   { name: "po-approval-gate-tests", file: join(pluginScriptsDir, "po-approval-gate.test.mjs") },
@@ -558,7 +558,7 @@ const TEST_SUITES = [
   { name: "governance-recovery-reconciliation-action-tests", file: join(libDir, "governance-recovery-reconciliation-action.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 9 }, (_, index) => `GRRA${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "governance-review-action-tests", file: join(libDir, "governance-review-action.test.mjs") },
   { name: "governance-verification-action-tests", file: join(libDir, "governance-verification-action.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `GVA${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-  { name: "bootstrap-payload-measure-cli-tests", file: join(pluginScriptsDir, "bootstrap-payload-measure.test.mjs") },
+  { name: "bootstrap-payload-measure-cli-tests", file: join(pluginScriptsDir, "bootstrap-payload-measure.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["BPM001", "BPM002", "BPM003", "BPM004", "BPM005"], maxBytes: 65_536 } },
   { name: "local-supervisor-state-tests", file: join(libDir, "local-supervisor-state.test.mjs") },
   { name: "local-supervisor-setup-tests", file: join(pluginScriptsDir, "local-supervisor-setup.test.mjs") },
   { name: "local-worker-supervisor-core-tests", file: join(libDir, "local-worker-supervisor.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 15 }, (_, index) => `LWS${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -672,7 +672,7 @@ const TEST_SUITES = [
   { name: "run-codex-isolation-control-decomposition-tests", file: join(pluginScriptsDir, "run-codex-isolation-control-decomposition.test.mjs") },
   { name: "runner-contracts.schema-tests", file: join(pluginScriptsDir, "runner-contracts.schema.test.mjs") },
   { name: "verify-topology-preflight-tests", file: join(pluginScriptsDir, "verify-topology-preflight.test.mjs") },
-  { name: "worktree-target-binding-tests", file: join(pluginScriptsDir, "worktree-target-binding.test.mjs") },
+  { name: "worktree-target-binding-tests", file: join(pluginScriptsDir, "worktree-target-binding.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["WTB001", "WTB002", "WTB003", "WTB004", "WTB005"], maxBytes: 65_536 } },
   { name: "critic-review-scope-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review", "critic-review-scope.test.mjs") },
   { name: "audit-bundle-core-tests", file: join(libDir, "audit-bundle.test.mjs") },
   { name: "change-control-core-tests", file: join(libDir, "change-control.test.mjs") },
@@ -682,7 +682,7 @@ const TEST_SUITES = [
   { name: "audit-bundle-cli-tests", file: join(pluginScriptsDir, "audit-bundle.test.mjs") },
   { name: "change-control-cli-tests", file: join(pluginScriptsDir, "change-control.test.mjs") },
   { name: "organization-policy-cli-tests", file: join(pluginScriptsDir, "organization-policy.test.mjs") },
-  { name: "publication-state-authority-tests", file: join(scriptDir, "publication-state-authority.test.mjs") },
+  { name: "publication-state-authority-tests", file: join(scriptDir, "publication-state-authority.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["PSA001", "PSA002", "PSA003", "PSA004", "PSA005", "PSA006", "PSA007", "PSA008"], maxBytes: 65_536 } },
   { name: "provenance-release-binding-tests", file: join(libDir, "provenance-release-binding.test.mjs") },
   { name: "publication-authority-tests", file: join(libDir, "publication-authority.test.mjs") },
   { name: "publication-bundle-v2-tests", file: join(libDir, "publication-bundle-v2.test.mjs") },
@@ -713,7 +713,7 @@ const TEST_SUITES = [
   { name: "epic-file-contract-tests", file: join(scriptDir, "check-epic-file-contract.test.mjs") },
   { name: "plan-spec-state-v2-legacy-tests", file: join(repoRoot, "harness", "lib", "plan-spec-state-v2.test.mjs") },
   { name: "recovery-bridge-approval-tests", file: join(scriptDir, "recovery-bridge-approval.test.mjs") },
-  { name: "guard-git-phoenix-tests", file: join(hooksDir, "guard-git-phoenix.test.mjs") },
+  { name: "guard-git-phoenix-tests", file: join(hooksDir, "guard-git-phoenix.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["GGP001"], maxBytes: 65_536 } },
   { name: "afk-activation-tests", file: join(pluginScriptsDir, "afk-activation.test.mjs") },
   { name: "codex-isolated-critic-protected-preimage-tests", file: join(pluginScriptsDir, "codex-isolated-critic-protected-preimage.test.mjs") },
   { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },
@@ -724,7 +724,7 @@ const TEST_SUITES = [
   { name: "guard-el01-tripwire-tests", file: join(hooksDir, "guard-el01-tripwire.test.mjs") },
   { name: "guard-onboarding-consent-lock-tests", file: join(hooksDir, "guard-onboarding-consent-lock.test.mjs") },
   { name: "onboarding-consent-marker-tests", file: join(libDir, "onboarding-consent-marker.test.mjs") },
-  { name: "onboarding-consent-guard-tests", file: join(hooksDir, "onboarding-consent-guard.test.mjs") },
+  { name: "onboarding-consent-guard-tests", file: join(hooksDir, "onboarding-consent-guard.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["ONCG001", "ONCG002", "ONCG003"], maxBytes: 65_536 } },
   { name: "protected-test-paths-tests", file: join(libDir, "protected-test-paths.test.mjs") },
   { name: "rebase-authority-tests", file: join(libDir, "rebase-authority.test.mjs") },
   { name: "onboarding-consent-mark-tests", file: join(pluginScriptsDir, "onboarding-consent-mark.test.mjs") },
@@ -848,7 +848,7 @@ const TEST_SUITES = [
   { name: "bootstrap-trust-recovery-tests", file: join(pluginScriptsDir, "bootstrap-trust-recovery.test.mjs") },
   { name: "intake-material-reference-tests", file: join(libDir, "intake-material-reference.test.mjs") },
   { name: "passive-read-policy-tests", file: join(libDir, "passive-read-policy.test.mjs") },
-  { name: "design-readiness-course-e2e-tests", file: join(pluginScriptsDir, "design-readiness-course.e2e.test.mjs") },
+  { name: "design-readiness-course-e2e-tests", file: join(pluginScriptsDir, "design-readiness-course.e2e.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["DREC001"], maxBytes: 65_536 } },
   { name: "chat-gate-ceremony-tests", file: join(libDir, "chat-gate-ceremony.test.mjs") },
   // NVA-A-060: both suites existed on disk but were never registered here, so the
   // gate reported green while neither ever ran. push-init.test.mjs covers the
@@ -1000,7 +1000,7 @@ if (startedCandidate.status === "dirty") {
       steps.push(declarativeSuitesStep);
     } else {
       const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
-      const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
+      const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file), ...(suite.name === "toolchain-preflight-tests" ? { caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["TCP001", "TCP002", "TCP003", "TCP004", "TCP005", "TCP006", "TCP007", "TCP008", "TCP009", "TCP010", "TCP011", "TCP012", "TCP013", "TCP014", "TCP015", "TCP016", "TCP017", "TCP018", "TCP019", "TCP020", "TCP021", "TCP022", "TCP023", "TCP024", "TCP025", "TCP026", "TCP027", "TCP028", "TCP029", "TCP030", "TCP031", "TCP032", "TCP033"], maxBytes: 65_536 } } : {}) }));
       const phaseSteps = PHASE_STEPS.map((suite, index) => ({ ...suite, dependsOn: index === 0 ? [] : [PHASE_STEPS[index - 1].name] }));
       const registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...phaseSteps];
       // AC-P3/R1.4: report a duplicate registration as a step rather than letting
@@ -1017,6 +1017,18 @@ if (startedCandidate.status === "dirty") {
         try {
           const resolvedSelection = resolveSelfVerifySelection({ repoRoot, candidateCommit: startedCandidate.commit, registeredSuites, invocation });
           verifySelection = resolvedSelection.selection;
+          const verifyCancellation = new AbortController();
+          let parentSignal = null;
+          const onParentSignal = (signalName) => {
+            if (parentSignal !== null) return;
+            parentSignal = signalName;
+            verifyCancellation.abort(signalName);
+          };
+          const onSigint = () => onParentSignal("SIGINT");
+          const onSigterm = () => onParentSignal("SIGTERM");
+          process.once("SIGINT", onSigint);
+          process.once("SIGTERM", onSigterm);
+          try {
           verifyRun = await runVerifyJournal({
             gitCommonDir: gitCommonDirectory(),
             runId,
@@ -1032,7 +1044,14 @@ if (startedCandidate.status === "dirty") {
             },
             allowCrossCandidateReuse: verifySelection.execution === "impacted",
             reuseReceipts: invocation.reuseReceipts,
+            signal: verifyCancellation.signal,
           });
+          } finally {
+            process.removeListener("SIGINT", onSigint);
+            process.removeListener("SIGTERM", onSigterm);
+            if (parentSignal !== null) process.kill(process.pid, parentSignal);
+          }
+          if (verifyRun?.status === "interrupted") await new Promise(() => {});
           steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs, reused }) => ({ name, exitCode, durationMs, reused })));
           execution = verifyRun.execution;
           verifyRunEvidence = createPublicVerifyRunEvidence({

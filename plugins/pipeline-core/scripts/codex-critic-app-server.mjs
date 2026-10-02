@@ -120,6 +120,9 @@ function snapshotRuleset(candidateRoot) {
     [null, "lib/codex-native-critic-policy.mjs"],
     [null, "lib/git-cmd.mjs"],
     [null, "hooks/guard-command-grammar.mjs"],
+    [null, "lib/passive-read-policy.mjs"],
+    [null, "lib/machine-plane.mjs"],
+    [null, "lib/po-key-directory.mjs"],
   ];
   const files = definitions.map(([binding, relativePath]) => {
     const path = physicalRulesetFile(relativePath);

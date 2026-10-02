@@ -9,12 +9,13 @@ import {runIsolatedStructuredHost} from './codex-isolated-structured-host.mjs';
 import {readPhysicalCodexAdvisorConsent} from './codex-advisor-admission.mjs';
 import {advisorExact,readAdvisorInitialInput,buildCodexAdvisorInitialRequest,validateAdvisorInitialCoordinates} from './codex-advisor-request.mjs';
 import {createCodexAdvisorHostStore} from './codex-advisor-host-store.mjs';
+import {validateModelFamilyExecutionReceipt} from './model-family-execution.mjs';
 export {advisorReportSha256,advisorProposalSetSha256,advisorReceiptBytes} from './codex-advisor-request.mjs';
 const capabilities=['requireReady','observeCurrentMetadata','observeRegisteredRoute','admitHostExport'],brands=new WeakMap(),same=(a,b)=>canonicalJson(a)===canonicalJson(b),freeze=v=>{if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;};
 async function bounded(fn,arg,ms){const controller=new AbortController();let timer;try{return await Promise.race([Promise.resolve().then(()=>fn(arg,controller.signal)),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('advisor-admission-timeout'));},ms);})]);}finally{clearTimeout(timer);}}
 export const isCodexAdvisorExecution=value=>brands.has(value);
 export function getCodexAdvisorExecutionAdmission(value){const b=brands.get(value);return b?b.lastAdmission:null;}
-export function createCodexAdvisorExecution({repoRoot,trustedExecutablePath=null,admission=null,inputDirectory=repoRoot,operationTimeoutMs=5000}={}){
+export function createCodexAdvisorExecution({repoRoot,trustedExecutablePath=null,admission=null,inputDirectory=repoRoot,operationTimeoutMs=5000,familyInvocation=null}={}){
  const sealed=advisorExact(admission,capabilities)&&capabilities.every(k=>typeof admission[k]==='function')?Object.freeze(Object.fromEntries(capabilities.map(k=>[k,admission[k]]))):null;
  const state={lastAdmission:null,currentPrepared:null,noChild:null},preparedRequests=new WeakMap(),courseObservations=new WeakMap();
  const courseHostStore=Object.freeze({readForBinding(ref,binding){try{const saved=state.currentPrepared;if(!saved||!advisorExact(binding,['initialContext','courseBinding','dispatch','requestSha256'])||!same(binding.initialContext,saved.initial.initialContext)||!same(binding.courseBinding,saved.initial.courseBinding)||!same(binding.dispatch,saved.initial.dispatch)||binding.requestSha256!==saved.request.requestSha256)return null;const initialBinding={initialContext:saved.initial.initialContext,courseBinding:saved.initial.courseBinding,dispatch:saved.initial.dispatch,profile:saved.initial.profile,route:saved.initial.route},store=createCodexAdvisorHostStore({repoRoot,trustedExecutablePath:trustedExecutablePath??resolveSystemExecutable('codex'),initialBinding}),observation=store.readForBinding(ref);if(!observation)return null;const token=Object.freeze({schema:'pipeline.codex-advisor-course-observation.v1'});courseObservations.set(token,{store,observation});return token;}catch{return null;}},project(token){const saved=courseObservations.get(token),p=saved&&saved.store.project(saved.observation);return p?freeze(Object.fromEntries(['courseBinding','outcome','initialQuestionSha256','initialEvidenceSha256','hostReceipt','advisoryReceipt','requestSha256','recipeSha256','answerSha256','reportCanonicalSha256','proposalSetSha256'].map(k=>[k,p[k]]))):null;}});
@@ -43,8 +44,53 @@ export function createCodexAdvisorExecution({repoRoot,trustedExecutablePath=null
     const context={repoRoot,initialContext:initial.initialContext,dispatch:initial.dispatch,profile:initial.profile,route:initial.route,courseBinding:initial.courseBinding},input=readAdvisorInitialInput(context),request=buildCodexAdvisorInitialRequest({...initial,input});if(!same(request,saved.request))throw Error('advisor-prepared-request-drift');
     const codexPath=trustedExecutablePath??resolveSystemExecutable('codex'),topology=resolvePoGateRepositoryTopology(repoRoot),processRoot=registerCodexHostProcessRoot({gitCommonDir:topology.gitCommonDir,repoFingerprint:initial.initialContext.repoFingerprint,purpose:'advisor'});
     const receiptId='drh_'+randomBytes(16).toString('hex');
-    const result=await runIsolatedStructuredHost({codexPath,cwd:inputDirectory,model:initial.route.model,effort:initial.route.effort,prompt:request.prompt,outputSchema:request.outputSchema,inputContract:'advisor',advisorRecipeSha256:request.recipeSha256,advisorSourceContext:context,inputRecheckTimeoutMs:operationTimeoutMs,
-     managedProcess:{journalParent:processRoot,receiptId,binding:{repoFingerprint:initial.initialContext.repoFingerprint,dispatchId:initial.dispatch.dispatchId,candidateCommit:initial.initialContext.initialCandidate.commit}},
+    const managedProcess={journalParent:processRoot,receiptId,binding:{repoFingerprint:initial.initialContext.repoFingerprint,dispatchId:initial.dispatch.dispatchId,candidateCommit:initial.initialContext.initialCandidate.commit}};
+    let result;
+    if(familyInvocation){
+     const receipt=familyInvocation.receipt,entry=familyInvocation.entry,executionHost=familyInvocation.executionHost;
+     if(!receipt||receipt.taskRoute!=='duty.advisory'||receipt.runner!=='codex'||receipt.sessionId===initial.dispatch.dispatchId
+      ||receipt.invocationId!==initial.dispatch.dispatchId||receipt.candidateCommit!==initial.initialContext.initialCandidate.commit
+      ||receipt.selectedModelId!==initial.route.model||receipt.effort!==initial.route.effort||!entry||!executionHost){
+      return {ok:false,code:'advisor-family-binding-unavailable',outcome:'unavailable',hostReceipt:null,actualHostResult:null};
+     }
+     const advisorBindingSha256=hostDigest({requestSha256:request.requestSha256,recipeSha256:request.recipeSha256,
+      prompt:request.prompt,outputSchema:request.outputSchema,initialContextSha256:hostDigest(initial.initialContext),
+      courseBindingSha256:hostDigest(initial.courseBinding)});
+     const nativeRequest=freeze({schema:'pipeline.codex-design-advisor-native-request.v1',runner:'codex',taskRoute:'duty.advisory',
+      repoRoot,repoFingerprint:initial.initialContext.repoFingerprint,dispatchId:initial.dispatch.dispatchId,
+      sessionId:receipt.sessionId,invocationId:receipt.invocationId,candidate:initial.initialContext.initialCandidate,
+      sources:initial.initialContext.sources,selectedModelId:receipt.selectedModelId,effort:receipt.effort,
+      featureId:initial.initialContext.featureId,profile:initial.profile,reason:initial.reason,route:initial.route,
+      initialContextSha256:hostDigest(initial.initialContext),courseBinding:initial.courseBinding,
+      courseBindingSha256:hostDigest(initial.courseBinding),requestSha256:request.requestSha256,
+      advisorBindingSha256,recipeSha256:request.recipeSha256,
+      prompt:request.prompt,outputSchema:request.outputSchema,inputContract:'advisor',codexPath,cwd:inputDirectory,
+      advisorSourceContext:context,inputRecheckTimeoutMs:operationTimeoutMs,
+      startupTimeoutMs:45_000,turnTimeoutMs:600_000,managedProcess});
+     const packet=Object.freeze(Object.fromEntries(['runner','sessionId','invocationId','candidateCommit','candidateTree','taskRoute',
+      'role','effort','selectedModelId','authoritySha256','discoverySha256','packetBindingSha256'].map(key=>[key,receipt[key]])));
+     const beforeLaunch=await execution.admitInitial(initial);
+     if(beforeLaunch.status!=='admitted')return {ok:false,code:beforeLaunch.code,outcome:beforeLaunch.status==='refused'?'permission-denied':'unavailable',hostReceipt:null,actualHostResult:null};
+     const binding=await entry.bindModelFamilyInvocation({invocation:familyInvocation.handle,packet,nativeRequest});
+     if(!binding?.ok||!binding.value)return {ok:false,code:binding?.code??'MODEL-FAMILY-NATIVE-REQUEST-REFUSED',outcome:'unavailable',hostReceipt:null,actualHostResult:null};
+     const launched=await entry.launchModelFamilyInvocation({binding:binding.value});
+     if(!launched?.ok||!launched.value||!launched.value.rawHostResult||!launched.value.observed
+      ||launched.value.observed.receiptId!==receiptId||launched.value.observed.requestSha256!==request.requestSha256)
+      return {ok:false,code:launched?.code??'MODEL-FAMILY-LAUNCH-FAILED',outcome:'unavailable',hostReceipt:null,actualHostResult:null};
+     const failed=launched.value.observed.finalizedAdvisorFailure?.sha256;
+     if(!failed){
+      if(!launched.value.report)return {ok:false,code:'MODEL-FAMILY-LAUNCH-FAILED',outcome:'unavailable',hostReceipt:null,actualHostResult:null};
+      const executionHandle=await executionHost.recordModelFamilyExecution({invocationId:receipt.invocationId,rawHostResult:launched.value.rawHostResult});
+      if(!executionHandle?.ok||!executionHandle.value)return {ok:false,code:executionHandle?.code??'MODEL-FAMILY-EXECUTION-IDENTITY-UNAVAILABLE',outcome:'unavailable',hostReceipt:null,actualHostResult:null};
+      const observedExecution=executionHost.readExecutionReceipt(executionHandle.value),proof=observedExecution?.value;
+      if(!observedExecution?.ok||!validateModelFamilyExecutionReceipt(proof).ok||proof.invocationReceiptSha256!==receipt.receiptSha256
+       ||proof.outcome!=='matched'||proof.actualModelIds.length!==1||proof.actualModelIds[0]!==receipt.selectedModelId
+       ||(proof.actualEffort!==null&&proof.actualEffort!==receipt.effort))
+       return {ok:false,code:'MODEL-FAMILY-EXECUTION-IDENTITY-MISMATCH',outcome:'unavailable',hostReceipt:null,actualHostResult:null};
+     }
+     result={ok:!failed,code:failed?'advisor-family-host-failed':'advisor-family-launch-complete',report:launched.value.report,observed:launched.value.observed};
+    }else result=await runIsolatedStructuredHost({codexPath,cwd:inputDirectory,model:initial.route.model,effort:initial.route.effort,prompt:request.prompt,outputSchema:request.outputSchema,inputContract:'advisor',advisorRecipeSha256:request.recipeSha256,advisorSourceContext:context,inputRecheckTimeoutMs:operationTimeoutMs,
+     managedProcess,
      beforeTurnInput:async metadata=>{if(metadata.requestSha256!==request.requestSha256||metadata.recipeSha256!==request.recipeSha256)return {decision:'refused'};const recheck=await execution.admitInitial(initial);return {decision:recheck.status==='admitted'?'approved':recheck.status==='refused'?'refused':'unavailable'};}});
     if(!result.ok&&result.observed.finalizedAdvisorFailure&&result.observed.receiptId===receiptId){
      const failedReceipt={id:receiptId,sha256:result.observed.finalizedAdvisorFailure.sha256},initialBinding={initialContext:initial.initialContext,dispatch:initial.dispatch,profile:initial.profile,route:initial.route,courseBinding:initial.courseBinding},store=createCodexAdvisorHostStore({repoRoot,trustedExecutablePath:codexPath,initialBinding}),actualHostResult=store.readForBinding(failedReceipt),projection=actualHostResult&&store.project(actualHostResult),receipt=actualHostResult&&store.receipt(actualHostResult);

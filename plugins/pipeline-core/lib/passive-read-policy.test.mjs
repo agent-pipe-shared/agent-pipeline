@@ -57,6 +57,33 @@ test("recursive additional roots are exact physical boundaries and retain projec
   assert.equal(isAllowedPassiveReadTarget(plugin, context), false, "recursive inventory still excludes keys");
 });
 
+test("mixed exact-file and directory roots keep the transcript exact and memory recursively bounded", (t) => {
+  const fixture = mkdtempSync(join("/var/tmp", "passive-root-interop-"));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const root = join(fixture, "repo"), home = join(fixture, "home");
+  const session = join(fixture, "session"), memory = join(session, "memory");
+  const transcript = join(session, "session.jsonl"), memoryFile = join(memory, "learned.md");
+  const sibling = join(session, "sibling.md"), local = join(root, "local.md");
+  for (const directory of [root, home, session, memory]) mkdirSync(directory);
+  for (const file of [transcript, memoryFile, sibling, local]) writeFileSync(file, "fixture\n");
+  const context = {
+    rootDir: root, homeDir: home, recursive: true,
+    additionalRecursiveRoots: [transcript, memory],
+    machinePlaneRead: () => ({ status: "absent" }),
+    repoKeyDirectory: () => ({ status: "absent" }),
+  };
+  assert.equal(isAllowedPassiveReadTarget("local.md", context), true,
+    "one exact-file boundary must not invalidate an unrelated project read");
+  assert.equal(isAllowedPassiveReadTarget(transcript, context), true,
+    "the approved transcript file is readable exactly");
+  assert.equal(isAllowedPassiveReadTarget(memoryFile, context), true,
+    "a file inside the approved memory directory is readable");
+  assert.equal(isAllowedPassiveReadTarget(sibling, context), false,
+    "the transcript-file boundary cannot admit its directory sibling");
+  assert.equal(isAllowedPassiveReadTarget(`${transcript}/child.md`, context), false,
+    "the transcript-file boundary cannot admit descendants");
+});
+
 test("an external user report remains readable while key material and aliases are excluded", (t) => {
   const fixture = mkdtempSync(join(tmpdir(), "passive-read-policy-"));
   t.after(() => rmSync(fixture, { recursive: true, force: true }));

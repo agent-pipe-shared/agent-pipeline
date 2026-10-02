@@ -44,6 +44,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 import { loadManifestSafe } from "../lib/manifest.mjs";
 import {
@@ -81,6 +82,11 @@ const WORKDIR = mkdtempSync(join(tmpdir(), "stop-suggest-test-"));
 function fixtureDir(name) {
   const dir = join(WORKDIR, name);
   mkdirSync(dir, { recursive: true });
+  const init = spawnSync('git', ['init', '-q'], {cwd:dir, encoding:'utf8', shell:false});
+  if (init.status !== 0) throw Error(init.stderr);
+  const controller = createGovernanceScopeController({hostStateRoot:join(dir, '.git', 'fixture-host-state')});
+  const plan = controller.planDecision({rootDir:dir, decision:'enroll', by:'disposable-stop-hook-fixture'});
+  if (controller.applyDecision(plan, {activate:true, planSha256:plan.planSha256}).state !== 'active') throw Error('fixture enrollment');
   return dir;
 }
 function writeJson(path, obj) {

@@ -69,6 +69,12 @@ function main() {
   try {
     const rootDir = antigravityRepositoryRoot(input);
     if (!rootDir) {
+      // Missing native workspace context is visible only in an already governed
+      // host scope. An optional folder still acquires no bootstrap obligation.
+      if (observeGovernanceScope({ rootDir: process.cwd() }).requiresEnforcement) {
+        reportFailure('AGY-REPOSITORY-CONTEXT-UNAVAILABLE');
+        return;
+      }
       process.stdout.write('{}\n');
       return;
     }

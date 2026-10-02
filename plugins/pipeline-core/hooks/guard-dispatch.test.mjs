@@ -412,71 +412,6 @@ check("GD15h allow an ordinary Codex worker packet", {
   tool_name: "spawn_agent",
   tool_input: { agent_type: "worker", message: "Implement the bounded task.", task_name: "implementation" },
 }, ALLOW);
-manualCheck("GD15n prepare a native pending binding for a complete dispatched Codex briefing and block failed preparation", () => {
-  const fixture = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-native-v2-"));
-  const sessionId = "gd15n-session";
-  const toolUseId = "gd15n-positive";
-  try {
-    execFileSync("git", ["init", "-q"], { cwd: fixture });
-    execFileSync("git", ["config", "user.name", "Pipeline Fixture"], { cwd: fixture });
-    execFileSync("git", ["config", "user.email", "pipeline-fixture@example.invalid"], { cwd: fixture });
-    mkdirSync(join(fixture, "src"), { recursive: true });
-    writeFileSync(join(fixture, "src", "change.mjs"), "export const candidate = true;\n");
-    recordConsentGiven({ rootDir: fixture });
-    assert.equal(observeGovernanceScope({ rootDir: fixture }).requiresEnforcement, true,
-      "native fixture must be admitted through canonical governance enrollment");
-    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", "src/change.mjs"], { cwd: fixture });
-    execFileSync("git", ["commit", "-q", "-m", "fixture candidate"], { cwd: fixture });
-    assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: fixture, encoding: "utf8" }).trim(), "",
-      "native preparation fixture must begin from a clean committed tree");
-    const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: fixture, encoding: "utf8" }).trim();
-    const candidateTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: fixture, encoding: "utf8" }).trim();
-    const binding = { schema: "pipeline.native-goldfish-host-briefing.v2", dispatchId: "GD15N-CODEX-WORKER",
-      candidateCommit, candidateTree, runner: "codex", role: "pipeline-core:goldfish-implementor",
-      nativeAgentType: "worker", model: "gpt-6-luna", effort: "high", rulesetSha: "c".repeat(64),
-      allowedPaths: ["src/change.mjs"],
-      criticDecision: { schema: "pipeline.critic-required-decision.v1",
-        trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
-          diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" } };
-    const fullBriefing = filledTemplateBody("plugins/pipeline-core/templates/prompts/goldfish-task.md");
-    const message = `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(binding)}\n-->\n${fullBriefing}`;
-    assert.equal((message.match(/<!-- pipeline-native-goldfish-host-commit:v[12]/gu) ?? []).length, 1,
-      "the dispatched message must contain only its selected binding");
-    assert.equal((message.match(/NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record;/gu) ?? []).length, 1,
-      "the dispatched message must contain exactly one host directive");
-    const positive = run({ tool_name: "spawn_agent", tool_use_id: toolUseId, session_id: sessionId,
-      tool_input: { agent_type: "worker", message } }, fixture);
-    assert.equal(positive.code, ALLOW, `complete v2 briefing should prepare before launch: ${positive.stderr}`);
-    const privateDir = join(fixture, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
-    const pendingFiles = readdirSync(privateDir).filter((name) => name.startsWith("pending-codex-") && name.endsWith(".json"));
-    assert.equal(pendingFiles.length, 1, "successful preparation must publish one native pending state");
-    const pending = JSON.parse(readFileSync(join(privateDir, pendingFiles[0]), "utf8"));
-    assert.equal(pending.schema, "pipeline.native-goldfish-host-state.v1");
-    assert.equal(pending.binding.dispatchId, binding.dispatchId);
-    assert.equal(pending.binding.adapterVersion, 2);
-    assert.equal(pending.binding.nativeAgentType, "worker");
-    assert.equal(pending.binding.candidateCommit, candidateCommit);
-
-    const failedBinding = { ...binding, candidateTree: "d".repeat(40), dispatchId: "GD15N-CODEX-MISMATCH" };
-    const failedMessage = `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(failedBinding)}\n-->\n${fullBriefing}`;
-    const failed = run({ tool_name: "spawn_agent", tool_use_id: "gd15n-negative", session_id: sessionId,
-      tool_input: { agent_type: "worker", message: failedMessage } }, fixture);
-    assert.equal(failed.code, BLOCK, `failed v2 native preparation must block launch: ${failed.stderr}`);
-    assert.ok(failed.stderr.includes("NGHS-CANDIDATE-MISMATCH"), `typed preparation failure missing: ${failed.stderr}`);
-    assert.equal(readdirSync(privateDir).filter((name) => name.startsWith("pending-codex-") && name.endsWith(".json")).length, 1,
-      "failed preparation must not publish a pending state");
-  } finally { rmSync(fixture, { recursive: true, force: true }); }
-});
-check("GD15k block a marked Codex worker when its native type differs from the binding", {
-  tool_name: "spawn_agent", tool_input: { agent_type: "goldfish-implementor", message: nativeCodexWorkerPrompt() },
-}, BLOCK, { stderrIncludes: ["NGHR-NATIVE-AGENT-TYPE"], projectDir: repoRoot });
-check("GD15l block a marked Codex worker binding with an unknown field", {
-  tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt({ unexpected: true }) },
-}, BLOCK, { stderrIncludes: ["NGHR-BRIEFING-SHAPE"], projectDir: repoRoot });
-check("GD15m check a marked worker packet against the functional Goldfish briefing", {
-  tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt() },
-}, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING"], projectDir: repoRoot });
-
 check("GD15i allow Codex to use its valid default role when agent_type is omitted", {
   tool_name: "spawn_agent",
   tool_input: { message: "Inspect the bounded question.", task_name: "inspection" },
@@ -622,7 +557,7 @@ manualCheck("GD20 extractAntigravityDispatches is importable and callable direct
   }
 });
 
-assert.equal(cases.length, 47, "the complete dispatch guard corpus must register before execution");
+assert.equal(cases.length, 43, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

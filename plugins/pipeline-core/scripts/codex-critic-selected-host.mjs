@@ -32,8 +32,9 @@ import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs"
 import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.mjs";
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
-import { validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
-import { resolveSessionCodexCriticHighRiskRoute } from "./codex-critic-session-route.mjs";
+import { validateSessionCodexCriticRoute as validateCriticHighRiskRoute } from "./codex-critic-session-route.mjs";
+import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, recheckHeldCriticFamilyRoute, launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
+import { observeModelFamilyActivation } from "../lib/model-family-runtime-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 
@@ -219,7 +220,7 @@ function matchesSelectedHostExecution(value, selected) {
  * directly as hostBridge. Treat it as unconfirmed either way -- not fixed
  * here since that file is out of scope for this task.)
  */
-export function selectedCriticInProcessBridge(input, { route, verifyRoute = null, dispatchPreparation = null, prepareRoleDispatch = preflightRoleDispatch, invokeAppServer = invokeCodexCriticAppServer, captureFailureDiagnostic = null } = {}) {
+export function selectedCriticInProcessBridge(input, { route, familyRoute = null, verifyRoute = null, dispatchPreparation = null, prepareRoleDispatch = preflightRoleDispatch, invokeAppServer = invokeCodexCriticAppServer, captureFailureDiagnostic = null } = {}) {
   const boundRoute = validateCriticHighRiskRoute(route);
   const completed = new Map();
   const launch = async (request) => {
@@ -229,7 +230,7 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
     if (request.requested.runner !== boundRoute.runner || request.requested.model !== boundRoute.model) fail("selected Critic generic request drifted from bound route");
     if (typeof verifyRoute === "function") {
       let currentRoute;
-      try { currentRoute = validateCriticHighRiskRoute(verifyRoute()); }
+      try { currentRoute = validateCriticHighRiskRoute(await verifyRoute()); }
       catch { throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE-DRIFT" }); }
       if (!equal(currentRoute, boundRoute)) throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE-DRIFT" });
     }
@@ -256,13 +257,20 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
       profile: structuredClone(request.profile),
       scratch: structuredClone(request.scratch),
     };
-    const result = await invokeAppServer({
+    const nativeRequest = {
       sandboxTransport,
       referencePaths: [...input.referencePaths],
       candidateCommit: input.dispatch.candidateCommit,
       candidateTree: input.dispatch.candidateTree,
       reviewBase: input.reviewBase,
-    });
+    };
+    let result;
+    if (familyRoute) {
+      const observed = await launchHeldCriticFamilyRoute({ route: familyRoute, packet: dispatchPreparation?.packet,
+        nativeRequest: { ...nativeRequest, model: boundRoute.model, effort: boundRoute.effort } });
+      if (!observed.ok) throw new SelectedCriticDispatchPreflightError({ code: observed.code });
+      result = observed.value;
+    } else result = await invokeAppServer(nativeRequest);
     if (result?.status !== "reviewed" || !result.verdict || typeof result.verdict !== "object" || Array.isArray(result.verdict)
       || !validRulesetBindings(result.rulesetBindings)
       || !validRulesetProvenance(result.rulesetProvenance)
@@ -400,12 +408,14 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
   try { input = validateSelectedCriticInput(rawInput); }
   catch { return unavailableResult("selected-critic-role-dispatch-rejected", null, null, "RDP-INPUT"); }
   const routeInput = {
+    ...(transport.authorityDependencies ?? {}),
     rootDir: input.sandboxRuntime.repoRoot,
     candidateCommit: input.dispatch.candidateCommit,
-    ...(transport.authorityDependencies ?? {}),
   };
-  const resolveBoundRoute = () => validateCriticHighRiskRoute(
-    transport.resolveCriticRoute
+  const activation = observeModelFamilyActivation({ cwd: input.sandboxRuntime.repoRoot });
+  if (!activation.ok) return unavailableResult("selected-critic-route-invalid");
+  const resolveBoundRoute = () => (
+    activation.status === "inactive" && transport.resolveCriticRoute
       ? transport.resolveCriticRoute(routeInput)
       : resolveSessionCodexCriticHighRiskRoute({
         rootDir: routeInput.rootDir,
@@ -413,11 +423,14 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
         authorityDependencies: transport.authorityDependencies ?? {},
         env: transport.modelRoleEnvironment ?? process.env,
         select: transport.selectModelRoleForTaskFn,
-      }),
+        familyInvocationEntry: transport.familyInvocationEntry,
+        familyRuntimeHost: transport.familyRuntimeHost,
+        familyExecutionPorts: transport.familyExecutionPorts,
+      })
   );
   let route;
   try {
-    route = resolveBoundRoute();
+    route = await resolveBoundRoute();
   } catch {
     return unavailableResult("selected-critic-route-invalid");
   }
@@ -430,7 +443,8 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
   let capturedFailureDiagnostic = null;
   const selectedHost = selectedCriticInProcessBridge(input, {
     route,
-    verifyRoute: resolveBoundRoute,
+    familyRoute: isHeldCriticFamilyRoute(route) ? route : null,
+    verifyRoute: isHeldCriticFamilyRoute(route) ? () => { const checked = recheckHeldCriticFamilyRoute(route); if (!checked.ok) throw new Error(checked.code); return route; } : resolveBoundRoute,
     dispatchPreparation,
     prepareRoleDispatch: prepare,
     invokeAppServer: transport.invokeCodexCriticAppServer ?? invokeCodexCriticAppServer,

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import { physicalQualityPackageFile, validateQualityPackageCommandArgs } from "../lib/signed-quality-package.mjs";
 import { isPhysicalScratchTarget, isBoundedScratchOnlyWords } from "../lib/physical-scratch-boundary.mjs";
 // SPDX-License-Identifier: SUL-1.0
@@ -2348,7 +2349,7 @@ function isValidPipelineGrepArgs(argv) {
 }
 
 function isValidScopedPipelineGrepSourceArgs(argv, root, extraRoots) {
-  return isSafeExactGrepArgs(argv, root);
+  return isSafeExactGrepArgs(argv, root, extraRoots);
 }
 
 // Shared by every bounded-pipeline SINK ending in `head`: the exact two-token `-n N` shape
@@ -2568,7 +2569,9 @@ function rawReadCandidatePath(value, root) {
 // Cat source operands use the same exact-path policy as direct passive reads.
 function isApprovedCatPipelineReadPath(value, root, extraRoots = []) {
   return typeof value === "string" && !value.startsWith("-")
-    && isAllowedPassiveReadTarget(value, { rootDir: root });
+    && isAllowedPassiveReadTarget(value, {
+      rootDir: root, recursive: true, additionalRecursiveRoots: extraRoots,
+    });
 }
 
 // cat's argv, source side: zero or more CAT_PIPELINE_DISPLAY_FLAGS entries (an optional `--`
@@ -3008,7 +3011,9 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, ex
 /** Passive operands use the shared path policy; executable inputs stay contained. */
 function isApprovedSingleCommandReadArg(arg, root, extraRoots, executableInput = false) {
   if (commandPath(arg, root) === null) return true;
-  if (!executableInput) return isAllowedPassiveReadTarget(arg, { rootDir: root, recursive: true });
+  if (!executableInput) return isAllowedPassiveReadTarget(arg, {
+    rootDir: root, recursive: true, additionalRecursiveRoots: extraRoots,
+  });
   const candidate = rawReadCandidatePath(arg, root);
   return candidate !== null
     && [root, ...extraRoots].some((boundary) => typeof boundary === "string"
@@ -3024,13 +3029,15 @@ function passiveCandidate(raw, root) {
   return isAbsolute(raw) ? raw : join(root, raw);
 }
 
-function isSafeExactPassiveFile(raw, root) {
-  if (typeof raw !== "string" || !raw || !isAllowedPassiveReadTarget(raw, { rootDir: root })) return false;
+function isSafeExactPassiveFile(raw, root, extraRoots = []) {
+  if (typeof raw !== "string" || !raw || !isAllowedPassiveReadTarget(raw, {
+    rootDir: root, recursive: true, additionalRecursiveRoots: extraRoots,
+  })) return false;
   try { return statSync(passiveCandidate(raw, root)).isFile(); }
   catch { return false; }
 }
 
-function isSafeExactGrepArgs(args, root) {
+function isSafeExactGrepArgs(args, root, extraRoots = []) {
   const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename"]);
   let index = 0;
   while (flags.has(args[index])) index += 1;
@@ -3040,22 +3047,28 @@ function isSafeExactGrepArgs(args, root) {
   if (typeof pattern !== "string" || !pattern || (!endedOptions && pattern.startsWith("-"))) return false;
   const paths = args.slice(index);
   return paths.length > 0 && paths.every((path) => !path.startsWith("-")
-    && isSafeExactPassiveFile(path, root));
+    && isSafeExactPassiveFile(path, root, extraRoots));
 }
 
 // Directory enumeration may expose immediate child names only. Checking the
 // physical directory again closes aliases to protected roots and ancestors.
-function isSafeNamesOnlyDirectory(raw, root) {
-  if (!isAllowedPassiveReadTarget(raw, { rootDir: root, directoryListing: true })) return false;
+function isSafeNamesOnlyDirectory(raw, root, extraRoots = []) {
+  if (!isAllowedPassiveReadTarget(raw, {
+    rootDir: root, directoryListing: true,
+    additionalRecursiveRoots: extraRoots,
+  })) return false;
   const candidate = passiveCandidate(raw, root);
   try {
     const physical = realpathSync(candidate);
     return statSync(candidate).isDirectory()
-      && isAllowedPassiveReadTarget(physical, { rootDir: physical, directoryListing: true });
+      && isAllowedPassiveReadTarget(physical, {
+        rootDir: physical, directoryListing: true,
+        additionalRecursiveRoots: extraRoots,
+      });
   } catch { return false; }
 }
 
-function isNamesOnlyLsArgs(args, root) {
+function isNamesOnlyLsArgs(args, root, extraRoots = []) {
   const flags = new Set(["-1", "-a", "-A", "--"]);
   let paths = 0;
   let afterDashDash = false;
@@ -3065,7 +3078,7 @@ function isNamesOnlyLsArgs(args, root) {
       if (!flags.has(arg)) return false;
       continue;
     }
-    if (!isSafeNamesOnlyDirectory(arg, root)) return false;
+    if (!isSafeNamesOnlyDirectory(arg, root, extraRoots)) return false;
     paths += 1;
   }
   return paths > 0;
@@ -3167,8 +3180,8 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
     if (executable === "rg") return isBoundedSingleRg(args, root, extraRoots);
-    if (executable === "grep") return isSafeExactGrepArgs(args, root);
-    if (executable === "ls" && isNamesOnlyLsArgs(args, root)) return true;
+    if (executable === "grep") return isSafeExactGrepArgs(args, root, extraRoots);
+    if (executable === "ls" && isNamesOnlyLsArgs(args, root, extraRoots)) return true;
     if (["head", "tail"].includes(executable)) return isStandaloneHeadTailReadArgs(args, root, extraRoots);
     if (args.some((arg) => arg === "--files-with-matches" && executable === "grep")) return false;
     // The single-command sibling of isOutsideRootBoundedDiagnosticRead's containment check --
@@ -4630,7 +4643,18 @@ function sanctionedPipelineStateArgs(args, root) {
     const bootstrapReceipt = args[1] === "--bootstrap-acknowledgement-receipt"
       && /^scratch\/bootstrap-plan-acknowledgement-receipt-[a-f0-9]{64}\.json$/u.test(args[2] ?? "")
       && args.length === 3;
-    return attributedLegacy || bootstrapReceipt;
+    // The inspection producer's feature-package route carries the exact request
+    // generated by present-plan. This admits only its closed argv shape and a
+    // physically contained request file; pipeline-state.mjs still verifies the
+    // package, PO proof/confirmation, and lifecycle CAS before writing approval.
+    const requestPath = args[4];
+    const featureRequest = args[1] === "--by" && validBy(args[2])
+      && args[3] === "--design-workflow-approval-request"
+      && /^scratch\/design-workflow-approval-request-[a-f0-9]{64}\.json$/u.test(requestPath ?? "")
+      && existsSync(resolve(root, requestPath))
+      && isPhysicalScratchTarget(requestPath, { rootDir: root })
+      && args.length === 5;
+    return attributedLegacy || bootstrapReceipt || featureRequest;
   }
   if (args[0] === "set-phase") {
     const bareTransition = args[1] === "--phase"
@@ -6014,7 +6038,9 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
 
 function containedLiteralReadPath(value, root, dependencies = {}, extraRoots = []) {
   return typeof value === "string" && !/[\0$`*?\[\]{}]/u.test(value)
-    && isAllowedPassiveReadTarget(value, { rootDir: root, recursive: true });
+    && isAllowedPassiveReadTarget(value, {
+      rootDir: root, recursive: true, additionalRecursiveRoots: extraRoots,
+    });
 }
 
 function containedRelativeGlob(value) {
@@ -6028,9 +6054,12 @@ function containedRelativeGlob(value) {
   return /\.(?:md|mjs|js|cjs|ts|tsx|css|html|svg|txt|yaml|yml)$/iu.test(value);
 }
 
-function containedGlobBase(path, root) {
+function containedGlobBase(path, root, extraRoots = []) {
   const candidate = rawReadCandidatePath(path, root);
-  if (candidate === null || !isRealpathedWithinBoundary(candidate, root)) return false;
+  if (candidate === null || !isAllowedPassiveReadTarget(path, {
+    rootDir: root, recursive: true, directoryListing: true,
+    additionalRecursiveRoots: extraRoots,
+  })) return false;
   try { return statSync(candidate).isDirectory(); }
   catch { return false; }
 }
@@ -6042,14 +6071,16 @@ function readToolScopeVerdict(input, root, dependencies) {
   const path = toolName === "Read" ? params.file_path : params.path ?? ".";
   const selector = toolName === "Glob" ? params.pattern : params.glob;
   const targetSafe = (toolName === "Read"
-    ? isAllowedPassiveReadTarget(path, { rootDir: root })
-    : toolName === "Grep" ? isSafeExactPassiveFile(path, root)
+    ? isAllowedPassiveReadTarget(path, { rootDir: root, recursive: true, additionalRecursiveRoots: sessionRoots })
+    : toolName === "Grep" ? isSafeExactPassiveFile(path, root, sessionRoots)
     : containedLiteralReadPath(path, root, dependencies, sessionRoots));
   const selectorSafe = toolName === "Glob"
     ? containedRelativeGlob(selector)
       && (/[?*]/u.test(selector)
-        ? containedGlobBase(path, root)
-        : isAllowedPassiveReadTarget(join(path, selector), { rootDir: root }))
+        ? containedGlobBase(path, root, sessionRoots)
+        : isAllowedPassiveReadTarget(join(path, selector), {
+          rootDir: root, recursive: true, additionalRecursiveRoots: sessionRoots,
+        }))
     : selector === undefined;
   const scoped = targetSafe && selectorSafe;
   if (scoped) return verdict(0);
@@ -6121,7 +6152,7 @@ function powerShellScopeVerdict(input, root, dependencies) {
     else if (readArgv.length === 2 && ["-literalpath", "-path"].includes(readArgv[0].toLowerCase())) target = readArgv[1];
     else return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: unsupported read arguments.\n");
     return (containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
-      || (namesOnly && isSafeNamesOnlyDirectory(target, root)))
+      || (namesOnly && isSafeNamesOnlyDirectory(target, root, sessionReadScopeRoots(input, dependencies))))
       ? verdict(0)
       : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
   }

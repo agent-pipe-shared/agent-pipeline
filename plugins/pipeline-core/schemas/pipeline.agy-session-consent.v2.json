@@ -1,0 +1,19 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"pipeline.agy-session-consent.v2",
+  "type":"object","additionalProperties":false,
+  "required":["schema","status","decisionId","mode","session","runner","provider","familyAuthoritySha256","assignments","roles","allowedPaths","subject","subjectSha256","intent","proof","attribution","approvedAtMs","expiresAtMs"],
+  "properties":{
+    "schema":{"const":"pipeline.agy-session-consent.v2"},"status":{"const":"approved"},"decisionId":{"type":"string","minLength":16,"maxLength":128},"mode":{"enum":["signature","chat"]},
+    "session":{"$ref":"pipeline.agy-session-consent-subject.v2.json#/properties/session"},"runner":{"const":"antigravity"},"provider":{"const":"google"},"familyAuthoritySha256":{"$ref":"pipeline.agy-session-consent-subject.v2.json#/$defs/sha"},
+    "assignments":{"$ref":"pipeline.agy-session-consent-subject.v2.json#/properties/assignments"},"roles":{"$ref":"pipeline.agy-session-consent-subject.v2.json#/properties/roles"},"allowedPaths":{"$ref":"pipeline.agy-session-consent-subject.v2.json#/properties/allowedPaths"},"subject":{"$ref":"pipeline.agy-session-consent-subject.v2.json"},"subjectSha256":{"$ref":"pipeline.agy-session-consent-subject.v2.json#/$defs/sha"},
+    "intent":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/intent"}]},"proof":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/proof"}]},
+    "attribution":{"oneOf":[{"type":"null"},{"type":"object","additionalProperties":false,"required":["mode","decisionReference"],"properties":{"mode":{"const":"chat-attributed-unattested"},"decisionReference":{"type":"string","minLength":1}}}]},
+    "approvedAtMs":{"type":"integer","minimum":0},"expiresAtMs":{"type":"integer","minimum":1}
+  },
+  "allOf":[{"if":{"properties":{"mode":{"const":"signature"}}},"then":{"properties":{"intent":{"type":"object"},"proof":{"type":"object"},"attribution":{"type":"null"}}},"else":{"properties":{"intent":{"type":"null"},"proof":{"type":"null"},"attribution":{"type":"object"}}}}],
+  "$defs":{
+    "sha":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "intent":{"type":"object","additionalProperties":false,"required":["value","sha256"],"properties":{"sha256":{"$ref":"#/$defs/sha"},"value":{"type":"object","additionalProperties":false,"required":["schema","kind","featureId","planSha256","specSha256","candidate","policyRevision","subjectSha256","decision"],"properties":{"schema":{"const":"pipeline.po-approval-intent.v1"},"kind":{"const":"agy-session"},"featureId":{"type":"string","minLength":1},"planSha256":{"$ref":"#/$defs/sha"},"specSha256":{"$ref":"#/$defs/sha"},"candidate":{"type":"object","additionalProperties":false,"required":["commit","tree"],"properties":{"commit":{"type":"string","pattern":"^[a-f0-9]{40}$"},"tree":{"type":"string","pattern":"^[a-f0-9]{40}$"}}},"policyRevision":{"const":"agy-session-family-v2"},"subjectSha256":{"$ref":"#/$defs/sha"},"decision":{"const":"approved"}}}}},
+    "proof":{"type":"object","additionalProperties":false,"required":["schema","intentSha256","keyReference","publicKey","signatureBase64"],"properties":{"schema":{"const":"pipeline.po-approval-proof.v1"},"intentSha256":{"$ref":"#/$defs/sha"},"keyReference":{"type":"string","minLength":1},"publicKey":{"type":"string","minLength":1},"signatureBase64":{"type":"string","minLength":1}}}
+  }
+}

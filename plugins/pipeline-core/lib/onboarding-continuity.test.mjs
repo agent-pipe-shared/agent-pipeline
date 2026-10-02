@@ -3457,17 +3457,25 @@ check("applyOnboardingIntakeConsent: idempotent re-run only fills fields still n
 // an additional optional parameter on applyOnboardingIntakeConsent, reusing
 // applyOnboardingIntakeCapture rather than reimplementing its body.
 
-check("applyOnboardingIntakeConsent: without text, behaviour and returned shape are unchanged", () => {
+check("applyOnboardingIntakeConsent: without text, consent applies without creating a material capture", () => {
   const root = fixture("intake-consent-notext-shape");
   const result = applyOnboardingIntakeConsent({
     rootDir: root, granted: true, language: "en", profile: "feature", activate: true,
   });
-  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema"],
-    "no `capture` field, and no other shape change, when text is omitted");
+  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema", "status"],
+    "the current consent result includes its status and has no `capture` field when text is omitted");
   assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.status, "applied");
   assert.equal(result.mutated, true);
   assert.equal(result.checkpoint.materialInput.length, 0);
   assert.equal(result.checkpoint.transactionState, "collecting");
+  assert.deepEqual(result.checkpoint.values, { gitAuthor: null, language: "en", profile: "feature" });
+  const material = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(material.status, "present", "consent still records its checkpoint");
+  assert.deepEqual(material.chunks, [], "omitting text must not create a material-input entry");
+  assert.equal(existsSync(resolveIntakeCheckpointPaths({ rootDir: root }).evidenceDirectory), false,
+    "omitting text must not create content evidence");
+  assert.equal(result.capture, undefined);
 });
 
 check("applyOnboardingIntakeConsent: text is likewise a true no-op when explicitly undefined", () => {
@@ -3475,8 +3483,15 @@ check("applyOnboardingIntakeConsent: text is likewise a true no-op when explicit
   const result = applyOnboardingIntakeConsent({
     rootDir: root, granted: true, activate: true, text: undefined,
   });
-  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema"]);
+  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema", "status"]);
+  assert.equal(result.status, "applied");
   assert.equal(result.checkpoint.materialInput.length, 0);
+  assert.deepEqual(result.checkpoint.values, { gitAuthor: null, language: null, profile: null });
+  const material = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(material.status, "present");
+  assert.deepEqual(material.chunks, []);
+  assert.equal(existsSync(resolveIntakeCheckpointPaths({ rootDir: root }).evidenceDirectory), false);
+  assert.equal(result.capture, undefined);
 });
 
 check("applyOnboardingIntakeConsent: on a FRESH project (no checkpoint yet), supplying text records consent AND captures that material in one call -- proving consent is recorded before capture runs", () => {

@@ -27,6 +27,17 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-hook-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const PLUGIN = resolve(HOOKS, "..");
@@ -41,12 +52,14 @@ function governedUnbootstrapped() {
   const base = mkdtempSync(join(tmpdir(), "lifecycle-gate-"));
   roots.push(base);
   const git = (...args) => spawnSync("git", args, { cwd: base, encoding: "utf8" });
-  git("init", "-q", "-b", "main");
+  const initialized = git("init", "-q", "-b", "main");
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
   git("config", "user.email", "fixture@example.invalid");
   git("config", "user.name", "Fixture");
   git("commit", "-q", "--allow-empty", "-m", "init");
   mkdirSync(join(base, "project"), { recursive: true });
   writeFileSync(join(base, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  enrollFixtureGovernance(base);
   return base;
 }
 function ungoverned() {

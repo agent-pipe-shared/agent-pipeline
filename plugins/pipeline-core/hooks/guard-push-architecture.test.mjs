@@ -5,7 +5,11 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
+
+const completionCases = [];
+function test(name, run) { completionCases.push({ id: "GPA001", name, run }); }
 
 const guard = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 
@@ -47,3 +51,9 @@ test("stale map blocks strict push and explicit checkpoint persists typed debt",
     assert.equal(records.at(-1).stalenessDebt[0].type, "architecture-map-stale");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

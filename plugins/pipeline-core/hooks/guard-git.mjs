@@ -270,9 +270,10 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { commitMessageFindings, commitTypeFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
+import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { verifyQualityPackageIntegrationPreCommit } from "../lib/signed-quality-package.mjs";
 import {
   LEGACY_GUARD_AUDIT,
   LEGACY_GUARD_CONFIG,
@@ -1001,6 +1002,43 @@ function noteConsumedPhoenixAuthority(reason) {
 //
 // The marker half (`AI-Assisted: true`) is config-gated and defaults to off -- see
 // ../lib/commit-message-policy.mjs for why the two halves are not the same kind of rule.
+function gitInvocationCwd(command) {
+  const tokens = tokenizeArgv(command);
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index] ?? "")) index += 1;
+  if (/^(?:.*[/\\])?env$/i.test(tokens[index] ?? "")) {
+    index += 1;
+    while (tokens[index] !== undefined && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index]) || tokens[index].startsWith("-"))) index += 1;
+  }
+  if (!/^(?:.*[/\\])?git(?:\.exe)?$/i.test(tokens[index] ?? "")) return null;
+  index += 1;
+  let cwd = process.cwd();
+  while (index < tokens.length) {
+    const token = tokens[index];
+    if (token === "-C") {
+      if (tokens[index + 1] === undefined) return null;
+      cwd = resolve(cwd, tokens[index + 1]);
+      index += 2;
+      continue;
+    }
+    if (token.startsWith("-C") && token.length > 2) {
+      cwd = resolve(cwd, token.slice(2));
+      index += 1;
+      continue;
+    }
+    if (token === "-c" || token === "--git-dir" || token === "--work-tree" || token === "--namespace") {
+      if (tokens[index + 1] === undefined) return null;
+      index += 2;
+      continue;
+    }
+    if (token.startsWith("--git-dir=") || token.startsWith("--work-tree=") || token.startsWith("--namespace=")) { index += 1; continue; }
+    if (token.startsWith("-") && token !== "-") { index += 1; continue; }
+    break;
+  }
+  return cwd;
+}
+
+const invokingGitCwd = gitInvocationCwd(cmd);
 let inspection;
 {
   const markerMode = markerPolicyMode(projectConfig);
@@ -1022,7 +1060,8 @@ let inspection;
       // GIT-03-UNREADABLE-MESSAGE-FILE, a blocking finding, precisely because "outside the
       // project" is where an agent's own scratch directory usually lives (2026-08-06 Critic
       // round, F3).
-      const commitCwd = process.cwd();
+      if (invokingGitCwd === null) throw new Error("Git invocation context is unresolved");
+      const commitCwd = invokingGitCwd;
       let commitRoot = resolve(commitCwd);
       const toplevel = spawnSync("git", ["-C", commitCwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", shell: false, timeout: 5000 });
       if (isSuccessfulSpawn(toplevel)) {
@@ -1038,6 +1077,38 @@ let inspection;
     requireMarker: markerMode !== "off",
     requireDispatch: markerMode !== "off",
   });
+  if (inspection.message !== null) {
+    const integration = parseIntegrationTrailerBlock(inspection.message);
+    if (integration.ok) {
+      // Resolve Git's command context, including every leading `-C`, against the
+      // invoking process directory. The process's configured project root may be
+      // the main checkout while this command targets a linked worktree.
+      let repoRoot = null;
+      if (invokingGitCwd !== null) {
+        const rootResult = spawnSync("git", ["-C", invokingGitCwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", shell: false, timeout: 5000 });
+        if (isSuccessfulSpawn(rootResult)) {
+          const value = String(rootResult.stdout ?? "").trim();
+          if (value) repoRoot = resolve(value);
+        }
+      }
+      const verified = repoRoot === null ? null : verifyQualityPackageIntegrationPreCommit({ repoRoot, intentSha256: integration.intentSha256 });
+      const integrationAdmission = verified?.ok === true && verified.code === "QUALITY-PACKAGE-INTEGRATION-PRECOMMIT-VERIFIED"
+        ? {
+          schema: "pipeline.signed-quality-package-integration-evidence.v1",
+          intentSha256: integration.intentSha256,
+          messageSha256: createHash("sha256").update(inspection.message.replace(/\r\n/gu, "\n"), "utf8").digest("hex"),
+          phase: "precommit",
+          code: verified.code,
+        }
+        : null;
+      const finalMessageFindings = finishedCommitMessageFindings(inspection.message, { integrationAdmission }).findings;
+      inspection.findings = inspection.findings.filter((finding) => finding.code !== "GIT-03-INTEGRATION-EVIDENCE-REQUIRED");
+      inspection.findings.push(...finalMessageFindings.filter((finding) => finding.code.startsWith("GIT-03-INTEGRATION-")));
+      if (integrationAdmission === null && !inspection.findings.some((finding) => finding.code === "GIT-03-INTEGRATION-EVIDENCE-REQUIRED")) {
+        inspection.findings.push({ code: "GIT-03-INTEGRATION-EVIDENCE-REQUIRED", detail: "the signed integration authorization could not be verified for this invoking worktree" });
+      }
+    }
+  }
   const conventionCodes = new Set([
     "GIT-03-MARKER-MISSING",
     "GIT-03-MARKER-AMBIGUOUS",

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Actual managed synthetic Node protocol plus focused custody-event boundaries.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +18,7 @@ function fixture(t,scenario){
   const root=mkdtempSync(join(tmpdir(),'codex-host-output-custody-fixture-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
   const cwd=join(root,'input'),common=join(root,'.git');mkdirSync(cwd,{mode:0o700});mkdirSync(common,{mode:0o700});
   const repoFingerprint='a'.repeat(64),receiptId='drh_'+randomBytes(16).toString('hex');
-  const journalParent=registerCodexHostProcessRoot({gitCommonDir:common,repoFingerprint,purpose:'advisor'});
+  const journalParent=registerCodexHostProcessRoot({gitCommonDir:common,repoFingerprint,purpose:'design-readiness'});
   const expected=join(cwd,'expected.json');
   writeFileSync(join(cwd,'app-server'),`
 const {createInterface}=require('node:readline'),{createHash}=require('node:crypto'),{writeFileSync}=require('node:fs');
@@ -52,7 +53,7 @@ else{stdout(frame+'\\n');finish();}
 `);
   return {root,cwd,expected,journalParent,receiptId,args:{codexPath:process.execPath,cwd,model:'synthetic-model',effort:'max',prompt:'Controlled request only.',
     outputSchema:{type:'object',additionalProperties:false,required:['outcome','note'],properties:{outcome:{type:'string',enum:['ok']},note:{type:'string'}}},
-    startupTimeoutMs:3000,turnTimeoutMs:3000,inputContract:'advisor',advisorRecipeSha256:'b'.repeat(64),inputRecheckTimeoutMs:100,beforeTurnInput:()=>({decision:'approved'}),
+    startupTimeoutMs:3000,turnTimeoutMs:3000,inputContract:'readiness',readinessSourceContext:null,
     managedProcess:{journalParent,receiptId,binding:{repoFingerprint,dispatchId:'output-custody',candidateCommit:'c'.repeat(40)}}}};
 }
 for(const scenario of ['valid','split-utf8','invalid-utf8','duplicate-outer','trailing-partial','trailing-full','invalid-report','invalid-stderr','terminal-error'])test('managed output custody: '+scenario,async t=>{

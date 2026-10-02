@@ -6,11 +6,14 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+const cases = [];
+function test(name, run) { cases.push({ id: "GGP001", name, run }); }
 
 import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
 import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
 import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const guard = path.resolve("plugins/pipeline-core/hooks/guard-git.mjs");
 const unavailable = { state: "not-applicable" };
@@ -45,6 +48,14 @@ async function fixture() {
   await writeFile(path.join(root, "fixture.txt"), "fixture\n");
   execFileSync("git", ["-C", root, "add", "fixture.txt"]);
   execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"]);
+  const governance = createGovernanceScopeController({ hostStateRoot: path.join(root, ".git", "fixture-hoststate") });
+  const inactive = governance.observe({ rootDir: root });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = governance.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
   await mkdir(path.join(root, ".claude"), { recursive: true });
   const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   const policy = capturePolicy();
@@ -81,3 +92,5 @@ test("Phoenix Git override requires and single-consumes checkpoint-bound human a
   assert.equal(replay.status, 2);
   assert.match(replay.stderr, /canonical human-governance decision/u);
 });
+
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

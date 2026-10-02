@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "resume-hint.mjs");
@@ -46,6 +47,17 @@ function freshRoot(name) {
   writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.project.v1\n", "utf8");
   execFileSync("git", ["init", "-q"], { cwd: root, stdio: ["ignore", "ignore", "ignore"] });
   return root;
+}
+
+function enrollFixtureGovernance(root) {
+  const scope = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = scope.observe({ rootDir: root });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = scope.planDecision({ rootDir: root, decision: "enroll", by: "resume-hint fixture" });
+  const active = scope.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
 }
 
 const VALID_CARD = {
@@ -192,6 +204,7 @@ test("a materialInput chunk change alters the recorded cardDigest", () => {
 
 test("capture preserves a complete disposable Greenfield fixture in the private intake checkpoint for inspect and the next identified SessionStart", () => {
   const root = freshRoot("greenfield-material-input-e2e");
+  enrollFixtureGovernance(root);
   const cardFile = join(root, "greenfield-card.json");
   const materialInput = [
     "Vollständige externe Greenfield-Eingabe",

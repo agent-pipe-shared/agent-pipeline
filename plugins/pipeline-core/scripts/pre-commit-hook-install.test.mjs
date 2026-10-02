@@ -15,7 +15,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync, unlinkSync, symlinkSync }  from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync, unlinkSync, symlinkSync, statSync }  from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -72,24 +72,57 @@ function freshRepo(prefix, { commitInitial = true, pipelineEnrollment = true } =
   }
   // These original guard fixtures model an explicitly opted-in Pipeline repository.
   // The catalog-only callback selects an ordinary ungoverned repository instead.
-  const governance = createGovernanceScopeController({hostStateRoot: join(dir, "unused-host")});
+  const hostStateRoot = join(dir, "unused-host");
+  const governance = createGovernanceScopeController({hostStateRoot});
+  const commonDir = commonDirOf(dir);
+  const configPath = join(commonDir, "config");
+  const configBefore = readFileSync(configPath);
   const inactive = governance.observe({rootDir: dir});
   assert.equal(inactive.state, "inactive");
   assert.equal(inactive.requiresEnforcement, false);
-  const configBefore = readFileSync(join(dir, ".git", "config"));
+  assert.deepEqual(readFileSync(configPath), configBefore, "inactive observation leaves Git config unchanged");
+  assert.equal(existsSync(hostStateRoot), false, "inactive observation creates no host-store directory");
   if (pipelineEnrollment) {
     const plan = governance.planDecision({rootDir: dir, decision: "enroll", by: "disposable-precommit-fixture"});
     const active = governance.applyDecision(plan, {activate: true, planSha256: plan.planSha256});
     assert.equal(active.state, "active");
     assert.equal(active.requiresEnforcement, true);
+    assert.equal(active.scopeKey, createHash("sha256").update(dir).digest("hex"));
+    assert.deepEqual(active.provenance, {
+      kind: "explicit-local-decision",
+      refs: [{path: "git-common-config", sha256: createHash("sha256").update(readFileSync(configPath)).digest("hex")}],
+    });
+    const configured = spawnSync("git", ["config", "--local", "--get", `agent-pipeline.activation-${active.scopeKey}.record`], {cwd: dir, encoding: "utf8"});
+    assert.equal(configured.status, 0, configured.stderr);
+    assert.equal(JSON.parse(configured.stdout.trim()).state, "active", "Git common config remains the current enrollment authority");
+    const witnessPath = join(hostStateRoot, `${active.scopeKey}.git-proof.json`);
+    assert.equal(existsSync(witnessPath), true, "explicit enrollment records its private diagnostic witness");
+    const witness = JSON.parse(readFileSync(witnessPath, "utf8"));
+    const rootStat = statSync(dir);
+    const commonStat = statSync(commonDir);
+    assert.deepEqual(witness, {
+      schema: "pipeline.governance-positive-proof.v1",
+      root: dir,
+      rootIdentity: {dev: String(rootStat.dev), ino: String(rootStat.ino)},
+      commonPath: commonDir,
+      commonIdentity: {dev: String(commonStat.dev), ino: String(commonStat.ino)},
+      scopeKey: active.scopeKey,
+      by: "disposable-precommit-fixture",
+      decidedAt: witness.decidedAt,
+      planSha256: plan.planSha256,
+    });
+    assert.equal(statSync(witnessPath).mode & 0o777, 0o600, "diagnostic witness remains private");
     assert.equal(governance.observe({rootDir: dir}).state, "active");
   } else {
-    assert.deepEqual(readFileSync(join(dir, ".git", "config")), configBefore, "opted-out fixture keeps its Git config exact");
-    assert.equal(governance.observe({rootDir: dir}).requiresEnforcement, false);
+    assert.deepEqual(readFileSync(configPath), configBefore, "opted-out fixture keeps its Git config exact");
+    const observation = governance.observe({rootDir: dir});
+    assert.equal(observation.state, "inactive");
+    assert.equal(observation.requiresEnforcement, false);
+    assert.deepEqual(readFileSync(configPath), configBefore, "read-only observation keeps opted-out Git config exact");
+    assert.equal(existsSync(hostStateRoot), false, "inactive fixture creates no host-store directory");
   }
   assert.equal(existsSync(join(dir, "project", "pipeline-state.json")), false, "enrollment creates no plan approval or lifecycle State");
   assert.equal(existsSync(join(dir, ".claude", "pipeline-state.json")), false);
-  assert.equal(existsSync(join(dir, "unused-host")), false, "local enrollment never creates host authority");
   return { dir, git };
 }
 

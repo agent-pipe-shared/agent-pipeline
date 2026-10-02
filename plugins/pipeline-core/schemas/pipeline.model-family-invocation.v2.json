@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.model-family-invocation.v2.json",
+  "title": "Immutable model family invocation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "kind", "runner", "sessionId", "invocationId", "candidateCommit", "candidateTree",
+    "taskRoute", "role", "effort", "familyId", "releaseId", "version", "selectedModelId", "canonicalModelId",
+    "groupingEvidenceSha256", "variantSelectionEvidenceSha256", "selection", "authoritySha256", "pinDecisionSha256",
+    "adapterContractSha256", "discoverySha256", "compatibilityEvidenceSha256", "observedAt", "expiresAt",
+    "storeGeneration", "watermarkBefore", "watermarkAfter", "packetBindingSha256", "receiptSha256"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.model-family-invocation.v2" },
+    "kind": { "const": "model-family-invocation" },
+    "runner": { "enum": ["codex", "claude", "antigravity"] },
+    "sessionId": { "$ref": "#/$defs/id" },
+    "invocationId": { "$ref": "#/$defs/id" },
+    "candidateCommit": { "$ref": "#/$defs/objectId" },
+    "candidateTree": { "$ref": "#/$defs/objectId" },
+    "taskRoute": { "type": "string", "pattern": "^(profile|duty)\\.[A-Za-z0-9_.-]{1,120}$" },
+    "role": { "enum": ["frontier", "worker", "efficient"] },
+    "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+    "familyId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "releaseId": { "$ref": "#/$defs/id" },
+    "version": { "$ref": "#/$defs/version" },
+    "selectedModelId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" },
+    "canonicalModelId": { "type": ["string", "null"], "maxLength": 128 },
+    "groupingEvidenceSha256": { "$ref": "#/$defs/sha256" },
+    "variantSelectionEvidenceSha256": { "$ref": "#/$defs/sha256" },
+    "selection": { "enum": ["latest", "explicit-po-pin"] },
+    "authoritySha256": { "$ref": "#/$defs/sha256" },
+    "pinDecisionSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "adapterContractSha256": { "$ref": "#/$defs/sha256" },
+    "discoverySha256": { "$ref": "#/$defs/sha256" },
+    "compatibilityEvidenceSha256": { "$ref": "#/$defs/sha256" },
+    "observedAt": { "$ref": "#/$defs/time" },
+    "expiresAt": { "$ref": "#/$defs/time" },
+    "storeGeneration": { "type": "integer", "minimum": 1 },
+    "watermarkBefore": { "oneOf": [{ "$ref": "#/$defs/version" }, { "type": "null" }] },
+    "watermarkAfter": { "$ref": "#/$defs/version" },
+    "packetBindingSha256": { "$ref": "#/$defs/sha256" },
+    "receiptSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "objectId": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "version": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "integer", "minimum": 0 } },
+    "time": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" }
+  }
+}

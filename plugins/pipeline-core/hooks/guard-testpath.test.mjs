@@ -23,7 +23,8 @@
  * guard-config on the machine can never leak into these cases.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, openSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,8 +34,29 @@ import { closeGuardMaintenanceWindow, installGuardMaintenanceWindow, prepareGuar
 import { createBriefedTestChangeAuthorization } from "../lib/human-guard-override.mjs";
 import { livePluginRoots } from "./guard-gate-strength.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url));
+
+async function* orderedCases() {
+function enrollFixture(dir) {
+  const hostStateRoot = join(dir, "fixture-host-state");
+  const governance = createGovernanceScopeController({ hostStateRoot });
+  const inactive = governance.observe({ rootDir: dir });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
+  assert.equal(governance.observe({ rootDir: dir }).state, "active");
+}
+
+function initAndEnrollFixture(dir) {
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  enrollFixture(dir);
+}
 
 /** Run the guard exactly like Claude Code does: tool-input JSON on stdin. */
 function runGuard(toolName, filePath, projectDir, extraInput = {}, env = {}) {
@@ -49,9 +71,9 @@ function runGuard(toolName, filePath, projectDir, extraInput = {}, env = {}) {
 // Hermetic default project dir. A3 deliberately keeps the plugin baseline active
 // even without project configuration.
 const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-empty-"));
+initAndEnrollFixture(EMPTY_DIR);
 
-let pass = 0;
-const failures = [];
+
 // `stderrMatches` (regex list) is additive alongside the substring channels: some
 // properties are shapes rather than literals -- "a real 64-hex request digest was offered"
 // is not the same claim as "the string --request-sha256 appears somewhere". Existing cases
@@ -70,13 +92,8 @@ function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, std
     if (!pattern.test(stderr)) problems.push(`stderr does not match ${String(pattern)}`);
   }
   if (stderrEmpty && stderr.trim() !== "") problems.push(`stderr not empty: ${stderr.trim().slice(0, 120)}`);
-  if (problems.length === 0) {
-    pass++;
-    console.log(`PASS  ${id}`);
-  } else {
-    failures.push(`${id}: ${problems.join("; ")} — file: ${filePath}`);
-    console.log(`FAIL  ${id} — ${problems.join("; ")}`);
-  }
+  if (problems.length > 0) throw new Error(`${id}: ${problems.join("; ")} — file: ${filePath}`);
+  console.log(`PASS  ${id}`);
 }
 const BLOCK = 2,
   ALLOW = 0,
@@ -96,8 +113,9 @@ writeFileSync(
     ],
   }),
 );
+initAndEnrollFixture(CFG_DIR);
 
-check(
+yield { id: "TPC001", name: "TP01 block  Edit on configured protected test file", run: () => check(
   "TP01 block  Edit on configured protected test file",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs",
@@ -107,52 +125,53 @@ check(
     stderrIncludes: ["TP-1", "guard-git.test.mjs", "GF-04"],
     extraInput: { old_string: "a", new_string: "b" },
   },
-);
-check(
+) };
+yield { id: "TPC002", name: "TP02 block  Edit on a shipped baseline guard hook", run: () => check(
   "TP02 block  Edit on a shipped baseline guard hook",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.mjs",
   BLOCK,
   { projectDir: CFG_DIR, stderrIncludes: ["PB-GUARD-HOOKS"], extraInput: { old_string: "a", new_string: "b" } },
-);
-check(
+) };
+yield { id: "TPC003", name: "TP03 block  Write on configured protected test file (Write tool, not just Edit)", run: () => check(
   "TP03 block  Write on configured protected test file (Write tool, not just Edit)",
   "Write",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs",
   BLOCK,
   { projectDir: CFG_DIR, stderrIncludes: ["TP-1"], extraInput: { content: "// rewritten" } },
-);
-check(
+) };
+yield { id: "TPC004", name: "TP04 block  path with backslashes (Windows) still matches (normalization)", run: () => check(
   "TP04 block  path with backslashes (Windows) still matches (normalization)",
   "Edit",
   "D:\\repo\\plugins\\pipeline-core\\hooks\\guard-git.test.mjs",
   BLOCK,
   { projectDir: CFG_DIR, stderrIncludes: ["TP-1"], extraInput: { old_string: "a", new_string: "b" } },
-);
+) };
 
 // ---- No-config case: immutable plugin baseline remains active ---------------------------
-check(
+yield { id: "TPC005", name: "TP05 block  missing project config still keeps the shipped minimum active", run: () => check(
   "TP05 block  missing project config still keeps the shipped minimum active",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs",
   BLOCK,
   { projectDir: EMPTY_DIR, stderrIncludes: ["PB-CONTRACT-TESTS"], extraInput: { old_string: "a", new_string: "b" } },
-);
+) };
 
 // ---- Broken config: baseline-only, therefore the shipped minimum still blocks -----------
 const BROKEN_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-broken-"));
 mkdirSync(join(BROKEN_DIR, ".claude"), { recursive: true });
 writeFileSync(join(BROKEN_DIR, ".claude", "guard-config.json"), '{ "protectedTestPaths": [ THIS IS NOT JSON');
-check(
+initAndEnrollFixture(BROKEN_DIR);
+yield { id: "TPC006", name: "TP06 block  broken JSON is baseline-only and cannot remove static protection", run: () => check(
   "TP06 block  broken JSON is baseline-only and cannot remove static protection",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs",
   BLOCK,
   { projectDir: BROKEN_DIR, stderrIncludes: ["PB-CONTRACT-TESTS"], extraInput: { old_string: "a", new_string: "b" } },
-);
+) };
 
 // ---- Non-matching tool / empty file_path stays fail-open -------------------------------
-check("TP07 allow  no file_path at all", "Edit", "", ALLOW, { projectDir: CFG_DIR, extraInput: { old_string: "a", new_string: "b" } });
+yield { id: "TPC007", name: "TP07 allow  no file_path at all", run: () => check("TP07 allow  no file_path at all", "Edit", "", ALLOW, { projectDir: CFG_DIR, extraInput: { old_string: "a", new_string: "b" } }) };
 
 // ---- Custom rule id from config ---------------------------------------------------------
 const CFG_ID_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-cfgid-"));
@@ -163,13 +182,14 @@ writeFileSync(
     protectedTestPaths: [{ pattern: "guard-git\\.test\\.mjs$", id: "CUSTOM-01" }],
   }),
 );
-check(
+initAndEnrollFixture(CFG_ID_DIR);
+yield { id: "TPC008", name: "TP08 block  explicit config id is used in the block message", run: () => check(
   "TP08 block  explicit config id is used in the block message",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs",
   BLOCK,
   { projectDir: CFG_ID_DIR, stderrIncludes: ["CUSTOM-01"], extraInput: { old_string: "a", new_string: "b" } },
-);
+) };
 
 // ---- F4 (ADR-0058): a real armed GMW window lifts a matching TP-* rule -----------------
 const GMW_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-gmw-"));
@@ -195,8 +215,9 @@ execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: GMW_DIR
 execFileSync("git", ["config", "user.name", "Test"], { cwd: GMW_DIR });
 execFileSync("git", ["add", "-A"], { cwd: GMW_DIR });
 execFileSync("git", ["commit", "-q", "-m", "gmw-fixture"], { cwd: GMW_DIR });
+enrollFixture(GMW_DIR);
 
-check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit",
+yield { id: "TPC009", name: "TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", run: () => check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs", ALLOW, (() => {
     const livePluginRoot = livePluginRoots()[0];
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
@@ -213,7 +234,7 @@ check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit
       rootDir: GMW_DIR, request, anchors: [{ keyReference: "tp-e2e", publicKeySha256: gmwPublicKeySha256 }], proof, livePluginRoot,
     });
     return { projectDir: GMW_DIR, stderrIncludes: ["pipeline-guard-maintenance-window", "TP-1 lifted"] };
-  })());
+  })()) };
 closeGuardMaintenanceWindow({ rootDir: GMW_DIR });
 
 // ---- selectivity (backlog: 2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels):
@@ -251,8 +272,9 @@ execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: GMW_SEL
 execFileSync("git", ["config", "user.name", "Test"], { cwd: GMW_SEL_DIR });
 execFileSync("git", ["add", "-A"], { cwd: GMW_SEL_DIR });
 execFileSync("git", ["commit", "-q", "-m", "gmw-sel-fixture"], { cwd: GMW_SEL_DIR });
+enrollFixture(GMW_SEL_DIR);
 
-check("TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule", "Edit",
+yield { id: "TPC010", name: "TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule", run: () => check("TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule", "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs", BLOCK, (() => {
     const livePluginRoot = livePluginRoots()[0];
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
@@ -269,7 +291,7 @@ check("TP14 block  a real armed window scoped to TP-1 does NOT lift a different 
       rootDir: GMW_SEL_DIR, request, anchors: [{ keyReference: "tp-sel-e2e", publicKeySha256: gmwSelPublicKeySha256 }], proof, livePluginRoot,
     });
     return { projectDir: GMW_SEL_DIR, stderrIncludes: ["Rule ID: TP-2"], stderrExcludes: ["lifted"] };
-  })());
+  })()) };
 closeGuardMaintenanceWindow({ rootDir: GMW_SEL_DIR });
 
 // ---- ADR-0059 Decision 4: every denial names the mode-appropriate next step -----------
@@ -292,6 +314,7 @@ function gitCommitAll(dir) {
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
   execFileSync("git", ["add", "-A"], { cwd: dir });
   execFileSync("git", ["commit", "-q", "-m", "mode-fixture"], { cwd: dir });
+  enrollFixture(dir);
 }
 const MODE_PATTERN = "src/domain/important\\.test\\.mjs$";
 
@@ -310,7 +333,7 @@ gitCommitAll(MODE_CHAT_DIR);
 // synthetic "D:/repo/..." placeholder, never a path that actually resolves under the project.
 const MODE_CHAT_ABS_FILE = join(MODE_CHAT_DIR, "src/domain/important.test.mjs");
 
-check(
+yield { id: "TPC011", name: "TP10 block  chat mode names its own next step (authorize --activate), not signature's", run: () => check(
   "TP10 block  chat mode names its own next step (authorize --activate), not signature's",
   "Edit",
   MODE_CHAT_ABS_FILE,
@@ -326,7 +349,7 @@ check(
     stderrExcludes: ["authorize-by-signature"],
     extraInput: { old_string: "a", new_string: "b" },
   },
-);
+) };
 
 // A genuinely RELATIVE file_path this time (no absolute prefix at all, same fixture dir) --
 // fixtures must mirror the real contract with absolute paths ALONGSIDE relative ones, and
@@ -339,7 +362,7 @@ check(
 // when the guard is handed a relative rather than an absolute path.
 const MODE_CHAT_REL_FILE = "src/domain/important.test.mjs";
 
-check(
+yield { id: "TPC012", name: "TP11 block  chat mode's own next step still names authorize --activate given a relative path", run: () => check(
   "TP11 block  chat mode's own next step still names authorize --activate given a relative path",
   "Edit",
   MODE_CHAT_REL_FILE,
@@ -355,7 +378,7 @@ check(
     stderrExcludes: ["authorize-by-signature"],
     extraInput: { old_string: "a", new_string: "b" },
   },
-);
+) };
 
 // ---- ADR-0059 Decision 4: a denial with NO route says why, instead of printing nothing --
 // Moved here from lib/human-guard-override.test.mjs, which hosted it only because this suite
@@ -387,7 +410,7 @@ writeFileSync(
 writeFileSync(join(ROUTE_DIR, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
 gitCommitAll(ROUTE_DIR);
 
-check(
+yield { id: "TPC013", name: "TP12 block  a route-less denial (Pipeline source) names the planner status it actually got", run: () => check(
   "TP12 block  a route-less denial (Pipeline source) names the planner status it actually got",
   "Write",
   "plugins/pipeline-core/hooks/probe.test.mjs",
@@ -404,9 +427,9 @@ check(
     stderrExcludes: ["--request-sha256"],
     extraInput: { content: "x\n" },
   },
-);
+) };
 
-check(
+yield { id: "TPC014", name: "TP13 block  the same fixture still offers a real route for an ordinary protected path", run: () => check(
   "TP13 block  the same fixture still offers a real route for an ordinary protected path",
   "Write",
   "harness/scripts/verify.mjs",
@@ -418,11 +441,11 @@ check(
     stderrMatches: [/--request-sha256 [a-f0-9]{64}\b/u],
     extraInput: { content: "x\n" },
   },
-);
+) };
 
 
 // ---- WP-B2-1: Briefed test-change authorization and refusal differentiation --------
-check(
+yield { id: "TPC015", name: "TP15 block  test path refusal clearly states route-available-via-briefed-authorization", run: () => check(
   "TP15 block  test path refusal clearly states route-available-via-briefed-authorization",
   "Edit",
   "plugins/pipeline-core/hooks/guard-git.test.mjs",
@@ -432,9 +455,9 @@ check(
     stderrIncludes: ["route-available-via-briefed-authorization"],
     extraInput: { old_string: "a", new_string: "b" },
   },
-);
+) };
 
-check(
+yield { id: "TPC016", name: "TP16 block  non-test path refusal clearly states no-route-for-this-target", run: () => check(
   "TP16 block  non-test path refusal clearly states no-route-for-this-target",
   "Write",
   "harness/scripts/verify.mjs",
@@ -444,7 +467,7 @@ check(
     stderrIncludes: ["no-route-for-this-target"],
     extraInput: { content: "x\n" },
   },
-);
+) };
 
 const BRIEFED_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-briefed-"));
 mkdirSync(join(BRIEFED_DIR, ".claude"), { recursive: true });
@@ -473,7 +496,7 @@ createBriefedTestChangeAuthorization({
   reason: "briefed test change for TP17",
 });
 
-check(
+yield { id: "TPC017", name: "TP17 allow  briefed test-change authorization admits exact target with matching digest", run: () => check(
   "TP17 allow  briefed test-change authorization admits exact target with matching digest",
   "Edit",
   testTarget,
@@ -483,9 +506,9 @@ check(
     env: { PIPELINE_BRIEFING_DIGEST: matchingDigest },
     extraInput: { old_string: "a", new_string: "b" },
   },
-);
+) };
 
-check(
+yield { id: "TPC018", name: "TP18 block  briefed test-change authorization blocks when presenting mismatching digest", run: () => check(
   "TP18 block  briefed test-change authorization blocks when presenting mismatching digest",
   "Edit",
   testTarget,
@@ -496,9 +519,8 @@ check(
     stderrIncludes: ["route-available-via-briefed-authorization"],
     extraInput: { old_string: "a", new_string: "b" },
   },
-);
+) };
 
-// ---- Summary -----------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, GMW_SEL_DIR, MODE_CHAT_DIR, ROUTE_DIR, BRIEFED_DIR]) {
   try {
     rmSync(dir, { recursive: true, force: true });
@@ -506,11 +528,45 @@ for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, GMW_SEL_
     /* temp cleanup is best-effort */
   }
 }
-const total = pass + failures.length;
-console.log(`\n${pass}/${total} cases passed.`);
-if (failures.length > 0) {
-  console.log("Failures:");
-  for (const f of failures) console.log(`  - ${f}`);
-  process.exit(1);
 }
-process.exit(0);
+
+const iterator = orderedCases();
+const names = [
+  "TP01 block  Edit on configured protected test file",
+  "TP02 block  Edit on a shipped baseline guard hook",
+  "TP03 block  Write on configured protected test file (Write tool, not just Edit)",
+  "TP04 block  path with backslashes (Windows) still matches (normalization)",
+  "TP05 block  missing project config still keeps the shipped minimum active",
+  "TP06 block  broken JSON is baseline-only and cannot remove static protection",
+  "TP07 allow  no file_path at all",
+  "TP08 block  explicit config id is used in the block message",
+  "TP09 real armed GMW window scoped to TP-1 lifts the matching Edit",
+  "TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule",
+  "TP10 block  chat mode names its own next step (authorize --activate), not signature's",
+  "TP11 block  chat mode's own next step still names authorize --activate given a relative path",
+  "TP12 block  a route-less denial (Pipeline source) names the planner status it actually got",
+  "TP13 block  the same fixture still offers a real route for an ordinary protected path",
+  "TP15 block  test path refusal clearly states route-available-via-briefed-authorization",
+  "TP16 block  non-test path refusal clearly states no-route-for-this-target",
+  "TP17 allow  briefed test-change authorization admits exact target with matching digest",
+  "TP18 block  briefed test-change authorization blocks when presenting mismatching digest"
+];
+const cases = names.map((name, index) => {
+  const id = `TPC${String(index + 1).padStart(3, "0")}`;
+  return { id, name, run: async () => {
+    const step = await iterator.next();
+    if (step.done || step.value.id !== id) throw new Error(`case sequence mismatch at ${id}`);
+    let callbackError;
+    try { await step.value.run(); } catch (error) { callbackError = error; }
+    if (index === names.length - 1) {
+      const tail = await iterator.next();
+      if (!tail.done && callbackError === undefined) callbackError = new Error("case generator did not finish after final callback");
+    }
+    if (callbackError !== undefined) throw callbackError;
+  } };
+});
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+const completionMaxBytes = Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536");
+registerTestCaseCompletion({ cases, fd: completionFd, maxBytes: completionMaxBytes });

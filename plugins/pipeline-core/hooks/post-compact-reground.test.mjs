@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { after as afterTests } from "node:test";
+const cases = [];
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -8,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import {
   buildRegroundMessage,
   decideOutput,
@@ -33,11 +37,7 @@ const D = "d".repeat(64);
 const ROOTS = [];
 let passed = 0;
 
-function check(name, fn) {
-  fn();
-  passed += 1;
-  process.stdout.write(`ok ${passed} - ${name}\n`);
-}
+function check(name, fn) { cases.push({ id: `PCR${String(cases.length + 1).padStart(3, "0")}`, name, run: async () => { await fn(); passed += 1; process.stdout.write(`ok ${passed} - ${name}\n`); } }); }
 
 function identity(overrides = {}) {
   return {
@@ -118,6 +118,11 @@ function blocker() {
 function freshRoot(name) {
   const root = mkdtempSync(join(tmpdir(), `post-compact-${name}-`));
   ROOTS.push(root);
+  const init = spawnSync('git', ['init', '-q'], {cwd:root, encoding:'utf8', shell:false});
+  assert.equal(init.status, 0, init.stderr);
+  const controller = createGovernanceScopeController({hostStateRoot:join(root, '.git', 'fixture-host-state')});
+  const plan = controller.planDecision({rootDir:root, decision:'enroll', by:'disposable-compact-hook-fixture'});
+  assert.equal(controller.applyDecision(plan, {activate:true, planSha256:plan.planSha256}).state, 'active');
   mkdirSync(join(root, ".claude"), { recursive: true });
   return root;
 }
@@ -439,5 +444,8 @@ check("real non-compact and malformed-input CLI calls remain silent", () => {
   }
 });
 
+afterTests(() => {
 for (const root of ROOTS) rmSync(root, { recursive: true, force: true });
 process.stdout.write(`${passed} post-compact reground tests passed\n`);
+});
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Actual managed Node protocol fixture; synthetic controls, no provider/model calls.
 import {readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';

@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+import { runBootstrapScratchLifecycle } from "../scripts/pipeline-start-preflight.mjs";
 
 const HOOKS_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +35,9 @@ function freshScratchRepo() {
   const root = mkdtempSync(join(tmpdir(), "staleness-scratchbind-"));
   const init = spawnSync("git", ["init", "--quiet"], { cwd: root, encoding: "utf8" });
   assert.equal(init.status, 0, "fixture repository could not be initialised");
+  const controller = createGovernanceScopeController({hostStateRoot:join(root, '.git', 'fixture-host-state')});
+  const plan = controller.planDecision({rootDir:root, decision:'enroll', by:'disposable-staleness-fixture'});
+  assert.equal(controller.applyDecision(plan, {activate:true, planSha256:plan.planSha256}).state, 'active');
   mkdirSync(join(root, "scratch"), { recursive: true });
   return root;
 }
@@ -88,7 +93,7 @@ for (const [channel, ref] of [
 test("offline/timeout is visible unknown and fail-open without false freshness", async () => {
   const writes = [];
   const execution = await run({
-    projectDir: "/consumer",
+    projectDir: freshScratchRepo(),
     stdout: { write(value) { writes.push(value); } },
     inspect() {
       return availability("unknown", "beta", null, {
@@ -252,9 +257,9 @@ test("NVA-W1-SCRATCHBIND: absent stdin/session_id sweeps but binds nothing, and 
 });
 
 test("NVA-W1-SCRATCHBIND: an unusable root is a typed fault, never a throw (runBootstrapScratchLifecycle's own fail-open contract, unchanged by this wiring)", () => {
-  const result = runScratchLifecycleForSessionStart({
-    projectDir: join(tmpdir(), "staleness-scratchbind-does-not-exist", `${process.pid}`),
-    stdinPayload: { session_id: "nva-w1-unusable-root" },
+  const result = runBootstrapScratchLifecycle({
+    rootDir: join(tmpdir(), "staleness-scratchbind-does-not-exist", `${process.pid}`),
+    env: { PIPELINE_SCRATCH_SESSION_ID: "nva-w1-unusable-root" },
   });
   assert.notEqual(result, null);
   assert.equal(result.binding.status, "unavailable");

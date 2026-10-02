@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "pipeline.model-family-pin-decision.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "subject", "approvalIntent", "proof"],
+  "properties": {
+    "schema": { "const": "pipeline.model-family-pin-decision.v1" },
+    "subject": { "type": "object", "additionalProperties": false,
+      "required": ["decision", "authoritySha256", "runner", "familyId", "taskRoutes", "role", "effort", "modelId", "predecessorDecisionSha256", "revision"],
+      "properties": {
+        "decision": { "enum": ["pin", "unpin"] }, "authoritySha256": { "$ref": "#/$defs/sha" },
+        "runner": { "enum": ["codex", "claude", "antigravity"] }, "familyId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+        "taskRoutes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "role": { "enum": ["frontier", "worker", "efficient"] }, "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+        "modelId": { "type": ["string", "null"], "minLength": 1 }, "predecessorDecisionSha256": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/sha" }] },
+        "revision": { "type": "integer", "minimum": 1 }
+      } },
+    "approvalIntent": { "$ref": "#/$defs/intent" },
+    "proof": { "type": "object", "additionalProperties": false, "required": ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"], "properties": {
+      "schema": { "const": "pipeline.po-approval-proof.v1" }, "intentSha256": { "$ref": "#/$defs/sha" }, "keyReference": { "type": "string", "minLength": 1 }, "publicKey": { "type": "string", "minLength": 1 }, "signatureBase64": { "type": "string", "minLength": 1 } } }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "subject": { "properties": { "decision": { "const": "pin" } } } }, "required": ["subject"] },
+      "then": { "properties": { "subject": { "properties": { "modelId": { "type": "string", "minLength": 1 } } } } }
+    },
+    {
+      "if": { "properties": { "subject": { "properties": { "decision": { "const": "unpin" } } } }, "required": ["subject"] },
+      "then": { "properties": { "subject": { "properties": { "modelId": { "type": "null" }, "predecessorDecisionSha256": { "$ref": "#/$defs/sha" } } } } }
+    }
+  ],
+  "$defs": {
+    "sha": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "intent": { "type": "object", "additionalProperties": false, "required": ["value", "sha256"], "properties": { "value": { "type": "object" }, "sha256": { "$ref": "#/$defs/sha" } } }
+  }
+}

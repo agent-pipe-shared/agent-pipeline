@@ -7,10 +7,12 @@
 import { createHash } from "node:crypto";
 import { canonicalizeJson } from "./governance-event.mjs";
 import { declaredPaths, validateDispatchRecord } from "./dispatch-record.mjs";
-import { agyAgentTypeForRole } from "./agy-final-return.mjs";
+import { agyAgentTypeForRole, validateAgyFamilyReturnBinding } from "./agy-final-return.mjs";
 
 export const AGY_HOST_OBSERVED_RECEIPT_SCHEMA = "pipeline.agy-host-observed-receipt.v1";
 export const AGY_HOST_OBSERVED_TRAILER = "Agy-Host-Observed: v1";
+export const AGY_FAMILY_HOST_OBSERVED_RECEIPT_SCHEMA = "pipeline.agy-host-observed-receipt.v2";
+export const AGY_FAMILY_HOST_OBSERVED_TRAILER = "Agy-Host-Observed: v2";
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -42,9 +44,10 @@ function validScope(scope, subject) {
 }
 
 export function validateAgyHostObservedReceiptShape(receipt, { record = null, recordBytes = null } = {}) {
-  if (!exact(receipt, [...FIELDS, "receiptSha256"])) return false;
+  const family = receipt?.schema === AGY_FAMILY_HOST_OBSERVED_RECEIPT_SCHEMA;
+  if (!exact(receipt, [...FIELDS, "receiptSha256", ...(family ? ["family"] : [])])) return false;
   const { receiptSha256, ...subject } = receipt;
-  if (subject.schema !== AGY_HOST_OBSERVED_RECEIPT_SCHEMA || subject.runner !== "antigravity"
+  if (!(family ? subject.schema === AGY_FAMILY_HOST_OBSERVED_RECEIPT_SCHEMA : subject.schema === AGY_HOST_OBSERVED_RECEIPT_SCHEMA) || subject.runner !== "antigravity"
     || agyAgentTypeForRole(subject.role) === null
     || !ID.test(subject.dispatchId ?? "") || !ID.test(subject.sessionId ?? "")
     || !SHA.test(subject.descriptorSha256 ?? "")
@@ -56,7 +59,7 @@ export function validateAgyHostObservedReceiptShape(receipt, { record = null, re
     || !SHA.test(subject.consentSubjectSha256 ?? "") || !ID.test(subject.consentDecisionId ?? "")
     || !SHA.test(subject.consentRecordSha256 ?? "") || !SHA.test(subject.inputSha256 ?? "")
     || !Number.isSafeInteger(subject.observedAtMs) || subject.observedAtMs < 1
-    || !validScope(subject.scope, subject)
+    || !(family ? validateAgyFamilyReturnBinding(subject.family, subject) : validScope(subject.scope, subject))
     || !SHA.test(subject.resultSha256 ?? "")
     || typeof subject.resultPath !== "string" || subject.resultPath.startsWith("/")
     || subject.resultPath.includes("\\") || subject.resultPath.split("/").some((part) => !part || part === "." || part === "..")
@@ -85,15 +88,16 @@ export function validateAgyHostObservedReceiptShape(receipt, { record = null, re
 }
 
 export function draftAgyHostObservedReceipt({ modelWitness, commitReadback, record } = {}) {
+  const family = modelWitness?.schema === "pipeline.agy-host-model-witness.v2";
   if (!exact(modelWitness, ["schema", "sessionId", "descriptorSha256", "dispatchId",
     "candidateCommit", "candidateTree", "role", "model", "effort", "routePolicySha256", "resultSha256", "resultPath", "resultBytes",
-    "reportSha256", "consentSubjectSha256", "consentDecisionId", "consentRecordSha256", "scope", "inputSha256", "observedAtMs"])
-    || modelWitness.schema !== "pipeline.agy-host-model-witness.v1"
+    "reportSha256", "consentSubjectSha256", "consentDecisionId", "consentRecordSha256", "scope", "inputSha256", "observedAtMs", ...(family ? ["family"] : [])])
+    || !(family ? validateAgyFamilyReturnBinding(modelWitness.family, modelWitness) : modelWitness.schema === "pipeline.agy-host-model-witness.v1")
     || !exact(commitReadback, ["ok", "code", "commit", "parent", "tree", "paths"])
     || commitReadback.ok !== true || commitReadback.code !== "AGY-HOST-COMMIT-READBACK-VERIFIED") {
     return { ok: false, code: "AGY-HOST-RECEIPT-INPUT" };
   }
-  const subject = { schema: AGY_HOST_OBSERVED_RECEIPT_SCHEMA,
+  const subject = { schema: family ? AGY_FAMILY_HOST_OBSERVED_RECEIPT_SCHEMA : AGY_HOST_OBSERVED_RECEIPT_SCHEMA,
     dispatchId: modelWitness.dispatchId, sessionId: modelWitness.sessionId,
     descriptorSha256: modelWitness.descriptorSha256,
     candidateCommit: modelWitness.candidateCommit, candidateTree: modelWitness.candidateTree, runner: "antigravity",
@@ -107,7 +111,7 @@ export function draftAgyHostObservedReceipt({ modelWitness, commitReadback, reco
     resultSha256: modelWitness.resultSha256, resultPath: modelWitness.resultPath,
     resultBytes: modelWitness.resultBytes, reportSha256: modelWitness.reportSha256,
     commit: commitReadback.commit, parent: commitReadback.parent, tree: commitReadback.tree,
-    paths: [...commitReadback.paths].sort(), recordSha256: sha256(agyAuthoredRecordBytes(record)) };
+    paths: [...commitReadback.paths].sort(), recordSha256: sha256(agyAuthoredRecordBytes(record)), ...(family ? { family: structuredClone(modelWitness.family) } : {}) };
   const receipt = { ...subject, receiptSha256: sha256(canonicalizeJson(subject)) };
   return validateAgyHostObservedReceiptShape(receipt, { record, recordBytes: agyAuthoredRecordBytes(record) })
     ? { ok: true, code: "AGY-HOST-RECEIPT-DRAFT-READY", receipt, authority: "unverified-until-private-readback" }

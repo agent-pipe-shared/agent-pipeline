@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.agy-session-consent-subject.v2",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema","repository","session","runner","provider","familyAuthoritySha256","assignments","roles","allowedPaths","scope","fallbackPolicy","expiresAtMs","decisionNonce"],
+  "properties": {
+    "schema": {"const":"pipeline.agy-session-consent-subject.v2"},
+    "repository": {"type":"object","additionalProperties":false,"required":["primaryRoot","commonDir"],"properties":{"primaryRoot":{"type":"string","minLength":1},"commonDir":{"type":"string","minLength":1}}},
+    "session": {"type":"object","additionalProperties":false,"required":["id","descriptorSha256"],"properties":{"id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},"descriptorSha256":{"$ref":"#/$defs/sha"}}},
+    "runner":{"const":"antigravity"},"provider":{"const":"google"},"familyAuthoritySha256":{"$ref":"#/$defs/sha"},
+    "assignments":{"type":"array","minItems":1,"maxItems":256,"uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["taskRoute","role","effort","familyId","adapterContractSha256","assignmentSha256"],"properties":{"taskRoute":{"type":"string","pattern":"^(profile|duty)\\.[a-z0-9_.]+$"},"role":{"enum":["frontier","worker","efficient"]},"effort":{"enum":["low","medium","high","xhigh","max","not-applicable"]},"familyId":{"type":"string","pattern":"^[a-z][a-z0-9-]{0,31}$"},"adapterContractSha256":{"$ref":"#/$defs/sha"},"assignmentSha256":{"$ref":"#/$defs/sha"}}}},
+    "roles":{"type":"array","minItems":1,"maxItems":2,"uniqueItems":true,"items":{"enum":["pipeline-core:goldfish-implementor","pipeline-core:goldfish-mechanic"]}},
+    "allowedPaths":{"type":"array","minItems":1,"maxItems":256,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":1024}},
+    "scope":{"$ref":"#/$defs/restriction"},"fallbackPolicy":{"$ref":"#/$defs/restriction"},"expiresAtMs":{"type":"integer","minimum":1},"decisionNonce":{"type":"string","minLength":16,"maxLength":128,"pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]*$"}
+  },
+  "$defs":{"sha":{"type":"string","pattern":"^[a-f0-9]{64}$"},"restriction":{"anyOf":[{"type":"string","minLength":1,"maxLength":1024},{"type":"integer"},{"type":"boolean"},{"type":"array","minItems":1,"maxItems":256,"items":{"$ref":"#/$defs/restriction"}},{"type":"object","minProperties":1,"additionalProperties":{"$ref":"#/$defs/restriction"}}]}}
+}

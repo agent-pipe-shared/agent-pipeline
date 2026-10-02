@@ -15,8 +15,8 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
@@ -41,6 +41,7 @@ import {
   verifyCommit,
 } from "./dispatch-authorship-verify.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -972,4 +973,126 @@ test("the real git-backed readers work against this repository's own HEAD", () =
   const verdict = verifyCommit("HEAD", deps);
   assert.ok([VERDICT.pass, VERDICT.fail, VERDICT.unverifiable].includes(verdict.verdict));
   assert.equal(typeof verdict.reason, "string");
+});
+
+function signedIntegrationRepo({
+  messageFor = (intent) => `chore: import package\n\nDispatch: quality-package-${intent} (integration)\nAI-Assisted: true\n`,
+  beforeCommit = () => {},
+} = {}) {
+  const root = mkdtempSync(join(SCRATCH, "signed-integration-reader-"));
+  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  git("init", "-q"); git("config", "user.email", "fixture@example.invalid"); git("config", "user.name", "Fixture");
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
+  const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
+  mkdirSync(join(root, "project"));
+  writeFileSync(join(root, "subject.txt"), "before\n");
+  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [],
+    trustAnchors: [{ keyReference: "fixture", publicKeySha256 }],
+  }));
+  git("add", "subject.txt", "project/critical-human-proof.json"); git("commit", "-qm", "base");
+  const record = {
+    schema: SIGNED_QUALITY_PACKAGE_SCHEMA,
+    baseCommit: git("rev-parse", "HEAD"),
+    unifiedDiff: "diff --git a/subject.txt b/subject.txt\nindex df967b9..3e75765 100644\n--- a/subject.txt\n+++ b/subject.txt\n@@ -1 +1 @@\n-before\n+after\n",
+    expectedDigests: { "subject.txt": createHash("sha256").update("after\n").digest("hex") },
+  };
+  record.intentSha256 = qualityPackageIntentSha256(record);
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: record.intentSha256, keyReference: "fixture", publicKey,
+    signatureBase64: sign(null, Buffer.from(record.intentSha256), keys.privateKey).toString("base64"),
+  };
+  writeFileSync(join(root, "subject.txt"), "after\n"); git("add", "subject.txt");
+  assert.equal(authorizeQualityPackageCommit({ repoRoot: root, packageIntent: record, proof }).ok, true);
+  const commonDir = git("rev-parse", "--path-format=absolute", "--git-common-dir");
+  const authorization = join(commonDir, "agent-pipeline", "signed-quality-packages", "commit-authorizations", `${record.intentSha256}.json`);
+  beforeCommit({ root, git, record, authorization });
+  git("commit", "-m", messageFor(record.intentSha256));
+  return { root, git, commitSha: git("rev-parse", "HEAD"), intentSha256: record.intentSha256, authorization, commonDir };
+}
+
+test("signed integration reader verifies the real commit and makes only the limited classification", () => {
+  const item = signedIntegrationRepo();
+  try {
+    const verdict = verifyCommit(item.commitSha, gitDeps({ repoRoot: item.root, evidenceDir: EVIDENCE }));
+    assert.equal(verdict.verdict, VERDICT.pass);
+    assert.equal(verdict.classification, "signed-artifact-integration");
+    assert.equal(verdict.reason, "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED");
+    assert.equal(Object.hasOwn(verdict, "taskId"), false);
+    assert.equal(Object.hasOwn(verdict, "model"), false);
+    assert.equal(Object.hasOwn(verdict, "review"), false);
+  } finally { rmSync(item.root, { recursive: true, force: true }); }
+});
+
+test("signed integration reader maps safely absent authorization to UNVERIFIABLE", () => {
+  const item = signedIntegrationRepo();
+  try {
+    rmSync(item.authorization);
+    const verdict = verifyCommit(item.commitSha, gitDeps({ repoRoot: item.root, evidenceDir: EVIDENCE }));
+    assert.equal(verdict.verdict, VERDICT.unverifiable);
+    assert.equal(verdict.classification, "signed-artifact-integration");
+    assert.equal(verdict.reason, "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT");
+  } finally { rmSync(item.root, { recursive: true, force: true }); }
+});
+
+test("signed integration reader fails forged, wrong-intent and unsafe authorization", () => {
+  for (const kind of ["forged", "wrong-intent", "unsafe"]) {
+    const item = signedIntegrationRepo({ messageFor: (intent) => {
+      const named = kind === "wrong-intent" ? `${"f".repeat(64)}` : intent;
+      return `chore: import package\n\nDispatch: quality-package-${named} (integration)\nAI-Assisted: true\n`;
+    } });
+    try {
+      if (kind === "forged") {
+        const receipt = JSON.parse(readFileSync(item.authorization, "utf8"));
+        receipt.proof.signatureBase64 = Buffer.alloc(64).toString("base64");
+        writeFileSync(item.authorization, JSON.stringify(receipt), { mode: 0o600 });
+      } else if (kind === "wrong-intent") {
+        const wrong = join(dirname(item.authorization), `${"f".repeat(64)}.json`);
+        writeFileSync(wrong, readFileSync(item.authorization), { mode: 0o600 });
+      } else {
+        rmSync(item.authorization);
+        symlinkSync(join(item.root, "subject.txt"), item.authorization);
+      }
+      const verdict = verifyCommit(item.commitSha, gitDeps({ repoRoot: item.root, evidenceDir: EVIDENCE }));
+      assert.equal(verdict.verdict, VERDICT.fail, kind);
+      assert.equal(verdict.classification, "signed-artifact-integration", kind);
+    } finally { rmSync(item.root, { recursive: true, force: true }); }
+  }
+});
+
+test("body-prose integration marker stays outside plugin final-block recognition", () => {
+  const item = signedIntegrationRepo({ messageFor: (intent) => `chore: mention package\n\nBody claim:\nDispatch: quality-package-${intent} (integration)\n\nThis is prose, not a final trailer.\n` });
+  try {
+    const verdict = verifyCommit(item.commitSha, gitDeps({ repoRoot: item.root, evidenceDir: EVIDENCE }));
+    assert.equal(verdict.verdict, VERDICT.unverifiable);
+    assert.equal(verdict.classification, "elephant-direct-undeclared");
+  } finally { rmSync(item.root, { recursive: true, force: true }); }
+});
+
+test("malformed and duplicate integration final blocks fail explicitly", () => {
+  for (const suffix of ["Dispatch: quality-package-abc (integration)\nAI-Assisted: true\n", `Dispatch: quality-package-${"a".repeat(64)} (integration)\nDispatch: quality-package-${"a".repeat(64)} (integration)\nAI-Assisted: true\n`]) {
+    const item = signedIntegrationRepo({ messageFor: () => `chore: import package\n\n${suffix}` });
+    try {
+      const verdict = verifyCommit(item.commitSha, gitDeps({ repoRoot: item.root, evidenceDir: EVIDENCE }));
+      assert.equal(verdict.verdict, VERDICT.fail);
+      assert.equal(verdict.classification, "signed-artifact-integration");
+    } finally { rmSync(item.root, { recursive: true, force: true }); }
+  }
+});
+
+test("signed integration reader fails wrong-parent and postimage path, content or mode drift", () => {
+  for (const kind of ["wrong-parent", "content-drift", "path-drift", "mode-drift"]) {
+    const item = signedIntegrationRepo({ beforeCommit: ({ root, git }) => {
+      if (kind === "wrong-parent") { git("restore", "--staged", "--source=HEAD", "--", "subject.txt"); git("commit", "--allow-empty", "-qm", "advance parent"); git("add", "subject.txt"); }
+      if (kind === "content-drift") { writeFileSync(join(root, "subject.txt"), "drift\n"); git("add", "subject.txt"); }
+      if (kind === "path-drift") { writeFileSync(join(root, "extra.txt"), "extra\n"); git("add", "extra.txt"); }
+      if (kind === "mode-drift") git("update-index", "--chmod=+x", "subject.txt");
+    } });
+    try {
+      const verdict = verifyCommit(item.commitSha, gitDeps({ repoRoot: item.root, evidenceDir: EVIDENCE }));
+      assert.equal(verdict.verdict, VERDICT.fail, kind);
+      assert.equal(verdict.classification, "signed-artifact-integration", kind);
+    } finally { rmSync(item.root, { recursive: true, force: true }); }
+  }
 });

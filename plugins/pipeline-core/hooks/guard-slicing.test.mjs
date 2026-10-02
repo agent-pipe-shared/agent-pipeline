@@ -14,12 +14,23 @@
  * anything that exercises entrypoint behaviour."
  */
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import { spawnSync, execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-hook-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 
 import {
   DISPATCH_TOOL_NAMES,
@@ -50,6 +61,9 @@ const ORCH_TRANSCRIPT = "/fake/session/top.jsonl";
 const SUBAGENT_TRANSCRIPT = "/fake/session/subagents/agent-abc.jsonl";
 const SUBAGENT_META = "/fake/session/subagents/agent-abc.meta.json";
 const COMMON_DIR = "/fake/.git";
+const GOVERNANCE_ROOT = mkdtempSync(join(tmpdir(), "slicing-governance-"));
+enrollFixtureGovernance(GOVERNANCE_ROOT);
+after(() => rmSync(GOVERNANCE_ROOT, { recursive: true, force: true }));
 
 /** An in-memory fs double -- no real disk I/O. Mirrors guard-dispatch-budget.test.mjs's makeStore(). */
 function makeStore(initial = {}) {
@@ -68,7 +82,7 @@ function makeStore(initial = {}) {
 
 function baseOptions(store, overrides = {}) {
   return {
-    rootDir: "/fake/root",
+    rootDir: GOVERNANCE_ROOT,
     resolveGitCommonDirFn: () => COMMON_DIR,
     nowFn: () => "2026-09-06T00:00:00.000Z",
     ...store,
@@ -687,6 +701,7 @@ test("GS18 (subprocess): end-to-end real invocation -- exact stdout bytes and a 
   const repo = mkdtempSync(join(tmpdir(), "guard-slicing-e2e-"));
   try {
     execFileSync("git", ["init", "-q"], { cwd: repo });
+    enrollFixtureGovernance(repo);
     const payload = {
       transcript_path: join(repo, "session.jsonl"),
       session_id: "sess-e2e",
@@ -726,6 +741,7 @@ test("GS18 (subprocess): end-to-end real invocation -- exact stdout bytes and a 
 function initNativeRepo() {
   const repo = mkdtempSync(join(tmpdir(), "native-slicing-"));
   execFileSync("git", ["init", "-q"], { cwd: repo });
+  enrollFixtureGovernance(repo);
   return repo;
 }
 
@@ -912,7 +928,7 @@ test("GS35: oversized or unknown persisted state is discarded before it can alte
     unknown: "must-not-survive", padding: "x".repeat(70_000), seen: [], activeChildren: [], planBatches: [], groups: [],
   });
   const result = observeCodexSlicing(
-    { cwd: "/fixture", session_id: "oversized-state", tool_name: "spawn_agent", tool_use_id: "one", tool_input: {} },
+    { cwd: GOVERNANCE_ROOT, session_id: "oversized-state", tool_name: "spawn_agent", tool_use_id: "one", tool_input: {} },
     "PreToolUse",
     {
       resolveGitCommonDirFn: () => "/fixture/.git",
@@ -931,7 +947,7 @@ test("GS35: oversized or unknown persisted state is discarded before it can alte
 test("GS36: corrupt persisted native state fails open as a fresh bounded session", () => {
   const writes = [];
   const result = observeCodexSlicing(
-    { cwd: "/fixture", session_id: "corrupt-state", tool_name: "spawn_agent", tool_use_id: "one", tool_input: {} },
+    { cwd: GOVERNANCE_ROOT, session_id: "corrupt-state", tool_name: "spawn_agent", tool_use_id: "one", tool_input: {} },
     "PreToolUse",
     {
       resolveGitCommonDirFn: () => "/fixture/.git",

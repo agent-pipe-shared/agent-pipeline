@@ -14,6 +14,7 @@ const codex = functionalTaskRoutesForRunner(source, "codex");
 const sessionId = "session-select-1";
 const base = { rootDir: "/repo", runner: "codex", taskRoute: "duty.implement",
   env: { CODEX_SESSION_ID: sessionId }, routeSource: source,
+  familyInvocationEntry: { observeActivation: () => ({ ok: true, status: "inactive" }) },
   readCommonDir: () => "/repo/.git" };
 
 function admittedStore(runnerSource = codex, heldSessionId = sessionId) {
@@ -203,7 +204,55 @@ test("throwing optional source and stored selection preserve V3 without aborting
     { selector: { kind: "model-id", value: "gpt-6-luna" }, effort: "high" });
 });
 
-assert.equal(cases.length, 7);
+test("active family selection is prepared through the shared entry and carries its immutable receipt", async () => {
+  const calls = [];
+  const familyInvocationEntry = { observeActivation: () => ({ ok: true, status: "active" }),
+    prepareModelFamilyInvocation: (input) => { calls.push(input); return { ok: true, value: {
+      handle: Object.freeze(Object.create(null)), receipt: Object.freeze({ selectedModelId: "gpt-6.1-sol",
+        effort: "high", runner: input.runner, taskRoute: input.taskRoute, sessionId: input.sessionId,
+        invocationId: input.invocationId, receiptSha256: "a".repeat(64) }) } }; } };
+  const selected = await selectModelRoleForTask({ ...base, familyInvocationEntry,
+    readCandidate: () => ({ candidateCommit: "b".repeat(40), candidateTree: "c".repeat(40) }),
+    makeInvocationId: () => "family-dispatch-1", routeSource: { ok: false },
+    readRegistry: () => { throw new Error("family mode must not consult V3"); } });
+  assert.equal(selected.ok, true, selected.code);
+  assert.equal(selected.family, true);
+  assert.equal(selected.modelId, "gpt-6.1-sol");
+  assert.equal(selected.receipt.receiptSha256, "a".repeat(64));
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], { kind: "dispatch", runner: "codex", taskRoute: "duty.implement",
+    sessionId, invocationId: "family-dispatch-1", candidateCommit: "b".repeat(40), candidateTree: "c".repeat(40) });
+});
+
+test("active or uncertain family failures never contain legacy selectors, including identity and source failures", async () => {
+  const uncertain = await selectModelRoleForTask({ ...base,
+    familyInvocationEntry: { observeActivation: () => ({ ok: false, code: "MODEL-FAMILY-STATE-UNCERTAIN" }) },
+    env: {}, routeSource: { ok: false }, readRegistry: () => { throw new Error("must not read V3"); } });
+  assert.equal(uncertain.code, "MODEL-FAMILY-STATE-UNCERTAIN");
+  assert.equal(uncertain.fallbackForbidden, true);
+  assert.equal(Object.hasOwn(uncertain, "v3Route"), false);
+  const activeIdentityFailure = await selectModelRoleForTask({ ...base,
+    familyInvocationEntry: { observeActivation: () => ({ ok: true, status: "active" }) },
+    env: {}, routeSource: { ok: false }, readRegistry: () => { throw new Error("must not read V3"); } });
+  assert.equal(activeIdentityFailure.fallbackForbidden, true);
+  assert.equal(Object.hasOwn(activeIdentityFailure, "v3Route"), false);
+  const activeSourceFailure = await selectModelRoleForTask({ ...base,
+    familyInvocationEntry: { observeActivation: () => ({ ok: true, status: "active" }),
+      prepareModelFamilyInvocation: () => ({ ok: false, code: "MODEL-FAMILY-ROUTE-SOURCE-UNAVAILABLE" }) },
+    readCandidate: () => ({ candidateCommit: "b".repeat(40), candidateTree: "c".repeat(40) }) });
+  assert.equal(activeSourceFailure.code, "MODEL-FAMILY-ROUTE-SOURCE-UNAVAILABLE");
+  assert.equal(Object.hasOwn(activeSourceFailure, "fallback"), false);
+});
+
+test("family selection script-level identity transport failure stays unavailable", async () => {
+  const result = await selectModelRoleForTask({ ...base,
+    familyInvocationEntry: { observeActivation: () => ({ ok: true, status: "active" }) }, env: {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.fallbackForbidden, true);
+  assert.equal(Object.hasOwn(result, "v3Route"), false);
+});
+
+assert.equal(cases.length, 10);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

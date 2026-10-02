@@ -96,6 +96,12 @@ one of these secretly gating on a human decision, it belongs in this
 document and this note should be corrected, not left to imply certainty
 this Goldfish pass did not verify line-by-line for every listed subcommand.
 
+`approve-advisor-exception` is the confirmation-value prefix used by
+`approve-plan` in attended chat mode when the presented design-workflow package
+contains a one-time Advisor-only exception. It is not a separate CLI command or
+additional approval: the same final package decision includes that exception.
+Signature mode binds the exception in the signed complete package instead.
+
 ## Human-terminal template dispositions
 
 This table is the authoritative Slice-1 disposition index consumed by

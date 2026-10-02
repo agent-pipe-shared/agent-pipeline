@@ -5,6 +5,7 @@ import { DISPATCH_RECORD_SCHEMA, OUTCOME_CLASSIFICATION_SCHEMA, declaredPaths,
   validateDurableDispatchReportText } from "./dispatch-record.mjs";
 import { criticDecisionPathFinding } from "./critic-skip-decision.mjs";
 import { canonicalizeJson } from "./governance-event.mjs";
+import { validateInvocationReadback, validateModelFamilyExecutionReceipt } from "./model-family-execution.mjs";
 
 export const AGY_FINAL_RETURN_SCHEMA = "pipeline.agy-final-return.v1";
 const COMMIT = /^[a-f0-9]{40,64}$/u;
@@ -50,12 +51,37 @@ function exact(value, fields) {
     && Object.keys(value).sort().join(",") === [...fields].sort().join(",");
 }
 
+/** Structural draft binding only. Independent private source readback must
+ * still establish original authority, consent and native observation. */
+export function validateAgyFamilyReturnBinding(family, witness) {
+  try {
+    if (!exact(family, ["invocation", "bindings", "provenanceSha256", "consentBinding", "executionReceipt", "nativeRequestSha256", "rawHostResultSha256"])
+      || !validateInvocationReadback({ invocation: family.invocation, bindings: family.bindings, provenanceSha256: family.provenanceSha256 }).ok
+      || !validateModelFamilyExecutionReceipt(family.executionReceipt).ok || !SHA.test(family.nativeRequestSha256) || !SHA.test(family.rawHostResultSha256)) return false;
+    const i = family.invocation, e = family.executionReceipt, c = family.consentBinding;
+    const taskRoute = witness.role === "pipeline-core:goldfish-implementor" ? "duty.implement" : witness.role === "pipeline-core:goldfish-mechanic" ? "duty.mechanic" : null;
+    if (!exact(c, ["schema", "status", "decisionId", "sessionId", "descriptorSha256", "runner", "provider", "familyAuthoritySha256", "assignmentSha256", "role", "allowedPaths", "scope", "fallbackPolicy", "subjectSha256", "consentRecordSha256", "approvedAtMs", "expiresAtMs"])
+      || c.schema !== "pipeline.agy-session-consent-binding.v2" || c.status !== "approved" || c.runner !== "antigravity" || c.provider !== "google"
+      || i.runner !== "antigravity" || i.taskRoute !== taskRoute || i.role !== (taskRoute === "duty.implement" ? "worker" : "efficient")
+      || i.invocationId !== witness.dispatchId || i.sessionId !== witness.sessionId || i.candidateCommit !== witness.candidateCommit || i.candidateTree !== witness.candidateTree
+      || i.effort !== witness.effort || c.sessionId !== witness.sessionId || c.descriptorSha256 !== witness.descriptorSha256 || c.role !== witness.role
+      || c.familyAuthoritySha256 !== i.authoritySha256 || !SHA.test(c.assignmentSha256) || c.subjectSha256 !== witness.consentSubjectSha256
+      || c.decisionId !== witness.consentDecisionId || c.consentRecordSha256 !== witness.consentRecordSha256
+      || !Number.isSafeInteger(c.approvedAtMs) || !Number.isSafeInteger(c.expiresAtMs) || c.approvedAtMs > witness.observedAtMs || c.expiresAtMs <= witness.observedAtMs
+      || canonicalizeJson(c.scope) !== canonicalizeJson(witness.scope) || !Array.isArray(c.allowedPaths)
+      || e.outcome !== "matched" || e.invocationReceiptSha256 !== i.receiptSha256 || e.rawHostResultSha256 !== family.rawHostResultSha256
+      || e.actualModelIds.length !== 1 || e.actualModelIds[0] !== witness.model || ![i.selectedModelId, i.canonicalModelId].includes(witness.model)) return false;
+    return true;
+  } catch { return false; }
+}
+
 function matchesHostModelWitness(witness, input) {
+  const family = witness?.schema === "pipeline.agy-host-model-witness.v2";
   return exact(witness, ["schema", "sessionId", "descriptorSha256", "dispatchId", "candidateCommit", "candidateTree",
     "role", "model", "effort", "routePolicySha256", "resultSha256", "reportSha256",
     "resultPath", "resultBytes", "consentSubjectSha256", "consentDecisionId",
-    "consentRecordSha256", "scope", "inputSha256", "observedAtMs"])
-    && witness.schema === "pipeline.agy-host-model-witness.v1"
+    "consentRecordSha256", "scope", "inputSha256", "observedAtMs", ...(family ? ["family"] : [])])
+    && (family ? validateAgyFamilyReturnBinding(witness.family, witness) : witness.schema === "pipeline.agy-host-model-witness.v1")
     && ID.test(witness.sessionId ?? "") && SHA.test(witness.descriptorSha256 ?? "")
     && witness.sessionId === input.sessionId
     && witness.descriptorSha256 === input.descriptorSha256
@@ -71,8 +97,8 @@ function matchesHostModelWitness(witness, input) {
     && SHA.test(witness.inputSha256 ?? "") && witness.inputSha256 === input.inputSha256
     && Number.isSafeInteger(witness.observedAtMs) && witness.observedAtMs > 0
     && witness.observedAtMs === input.observedAtMs
-    && witness.scope !== null && typeof witness.scope === "object" && !Array.isArray(witness.scope)
-    && input.scope !== null && typeof input.scope === "object" && !Array.isArray(input.scope)
+    && (family || witness.scope !== null && typeof witness.scope === "object" && !Array.isArray(witness.scope))
+    && (family || input.scope !== null && typeof input.scope === "object" && !Array.isArray(input.scope))
     && canonicalizeJson(witness.scope) === canonicalizeJson(input.scope)
     && SHA.test(witness.resultSha256 ?? "")
     && witness.resultSha256 === input.resultSha256

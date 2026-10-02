@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Read the admitted current-session model before a role packet is sealed. */
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +10,8 @@ import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-iden
 import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
 import { selectStoredModelRoleDispatch } from "../lib/model-role-host-session.mjs";
 import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
+import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
+import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
 import { CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE } from "../lib/model-role-route-source.mjs";
 import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 
@@ -29,11 +32,60 @@ function readGitCommonDir(rootDir) {
   return realpathSync(resolve(rootDir, common));
 }
 
+function readGitCandidate(rootDir) {
+  const candidateCommit = execFileSync("git", ["rev-parse", "--verify", "HEAD^{commit}"],
+    { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  const candidateTree = execFileSync("git", ["rev-parse", "--verify", "HEAD^{tree}"],
+    { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  if (!/^[a-f0-9]{40}$/u.test(candidateCommit) || !/^[a-f0-9]{40}$/u.test(candidateTree)) {
+    throw new Error("MODEL-ROLE-GIT-CANDIDATE");
+  }
+  return { candidateCommit, candidateTree };
+}
+
+async function selectFamilyModelRoleForTask({ familyInvocationEntry, runner, taskRoute, identity,
+  candidateCommit, candidateTree, makeInvocationId = randomUUID } = {}) {
+  if (typeof familyInvocationEntry?.prepareModelFamilyInvocation !== "function") {
+    return { ...fail("MODEL-FAMILY-ENTRY-UNAVAILABLE"), fallbackForbidden: true };
+  }
+  let invocationId;
+  try { invocationId = makeInvocationId(); }
+  catch { return { ...fail("MODEL-FAMILY-INVOCATION-ID-UNAVAILABLE"), fallbackForbidden: true }; }
+  const prepared = await familyInvocationEntry.prepareModelFamilyInvocation({ kind: "dispatch", runner, taskRoute,
+    sessionId: identity.sessionId, invocationId, candidateCommit, candidateTree });
+  if (!prepared?.ok || !prepared.value?.receipt) return { ...fail(prepared?.code ?? "MODEL-FAMILY-INVOCATION-UNAVAILABLE"),
+    fallbackForbidden: true, retryable: prepared?.retryable === true };
+  const receipt = prepared.value.receipt;
+  return { ok: true, code: "MODEL-FAMILY-DISPATCH-READY", status: "ready", family: true,
+    runner, taskRoute, sessionId: identity.sessionId, modelId: receipt.selectedModelId,
+    effort: receipt.effort, receipt, invocation: prepared.value.handle };
+}
+
 export function selectModelRoleForTask({ rootDir, runner, taskRoute,
   env = process.env, hostHookSessionId = null,
+  familyInvocationEntry = null,
+  makeInvocationId = randomUUID,
+  readCandidate = readGitCandidate,
   routeSource = undefined, readRegistry = loadRunnerProfilesV3Registry,
   readCommonDir = readGitCommonDir, makeStore = createModelRoleHostStore } = {}) {
   if (typeof rootDir !== "string" || !isAbsolute(rootDir)) return fail("MODEL-ROLE-SELECT-SOURCE");
+  familyInvocationEntry ??= createModelFamilyInvocationEntry({
+    runtimeHost: createModelFamilyRuntimeHost({ cwd: rootDir }),
+  });
+  let activation;
+  try { activation = familyInvocationEntry.observeActivation(); }
+  catch { activation = { ok: false, code: "MODEL-FAMILY-ACTIVATION-UNCERTAIN" }; }
+  if (!activation?.ok) return { ...fail(activation?.code ?? "MODEL-FAMILY-ACTIVATION-UNCERTAIN"), fallbackForbidden: true };
+  if (activation.status === "active") {
+    const identity = resolveModelRoleHostSessionIdentity({ runner, env, hostHookSessionId });
+    if (!identity.ok) return { ...fail(identity.code), fallbackForbidden: true };
+    let candidate;
+    try { candidate = readCandidate(rootDir); }
+    catch { return { ...fail("MODEL-ROLE-SELECT-GIT-UNAVAILABLE"), fallbackForbidden: true }; }
+    return selectFamilyModelRoleForTask({ familyInvocationEntry, runner, taskRoute, identity,
+      ...candidate, makeInvocationId });
+  }
+  if (activation.status !== "inactive") return { ...fail("MODEL-FAMILY-ACTIVATION-UNCERTAIN"), fallbackForbidden: true };
   // Functional model selection is optional. Establish the independently
   // registered V3 route before considering its derived role projection: a
   // damaged projection may not strand an otherwise usable approved route.
@@ -121,18 +173,18 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
       if (!hook.ok) {
         // Native hook identity is required to admit a NEW role receipt, not to
         // keep the already-approved V3 task cell usable for this session.
-        const selected = selectModelRoleForTask({ ...input, hostHookSessionId: null });
+        const selected = await selectModelRoleForTask({ ...input, hostHookSessionId: null });
         process.stdout.write(`${JSON.stringify(selected.ok
           ? { ...selected, diagnostic: hook.code } : selected)}\n`);
         if (!selected.ok) process.exitCode = 2;
       }
       else {
-        const selected = selectModelRoleForTask(input);
+        const selected = await selectModelRoleForTask(input);
         process.stdout.write(`${JSON.stringify(selected)}\n`);
         if (!selected.ok) process.exitCode = 2;
       }
     } else {
-      const selected = selectModelRoleForTask(input);
+      const selected = await selectModelRoleForTask(input);
       process.stdout.write(`${JSON.stringify(selected)}\n`);
       if (!selected.ok) process.exitCode = 2;
     }

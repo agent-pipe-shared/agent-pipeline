@@ -3,10 +3,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 import {
   applyInstall,
@@ -20,12 +21,19 @@ import {
 
 const PLUGIN_LIB_DIR = join(fileURLToPath(new URL("..", import.meta.url)), "lib");
 
+function enrollFixture(dir) {
+  const controller = createGovernanceScopeController({hostStateRoot:join(dir, '.git', 'fixture-host-state')});
+  const plan = controller.planDecision({rootDir:dir, decision:'enroll', by:'disposable-hook-installer-fixture'});
+  assert.equal(controller.applyDecision(plan, {activate:true, planSha256:plan.planSha256}).state, 'active');
+}
+
 function freshRepo(name) {
   const dir = mkdtempSync(join(tmpdir(), `commit-msg-hook-${name}-`));
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 20_000 });
   assert.equal(git("init", "-q", "-b", "main").status, 0);
   assert.equal(git("config", "user.email", "fixture@example.invalid").status, 0);
   assert.equal(git("config", "user.name", "Fixture Human").status, 0);
+  enrollFixture(dir);
   return { dir, git };
 }
 
@@ -234,7 +242,10 @@ test("generated hook fails closed when Git's message file is unreadable", () => 
 
 test("generated hook fails closed when its install-bound policy module is unavailable", () => {
   const { dir, git } = freshRepo("missing-policy");
-  const absentLibDir = join(dir, "absent-plugin-lib");
+  const fixturePlugin = join(dir, '.git', 'missing-policy-plugin');
+  cpSync(join(PLUGIN_LIB_DIR, '..'), fixturePlugin, {recursive:true});
+  const absentLibDir = join(fixturePlugin, 'lib');
+  rmSync(join(absentLibDir, 'commit-message-policy.mjs'));
   const installed = applyInstall({ rootDir: dir, pluginLibDir: absentLibDir });
   assert.equal(installed.status, "installed");
   const result = commitWithMessage(dir, git, "feat: cannot be evaluated\n");

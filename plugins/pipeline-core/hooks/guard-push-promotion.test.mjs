@@ -18,6 +18,18 @@ import { fileURLToPath } from "node:url";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { createReleasePromotionEnvelope, SECURITY_EVIDENCE_DEFAULT_PATH } from "../lib/release-promotion-envelope.mjs";
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+
+function enrollFixtureGovernance(root) {
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
+}
 
 function freshRepo(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-promo-${prefix}-`));
@@ -27,6 +39,7 @@ function freshRepo(prefix) {
     ["config", "user.email", "goldfish@example.invalid"],
     ["config", "user.name", "Goldfish"],
   ]) assert.equal(git(...args).status, 0, `fixture git ${args[0]} failed`);
+  enrollFixtureGovernance(dir);
   writeFileSync(join(dir, "README.md"), "fixture\n");
   assert.equal(git("add", "README.md").status, 0, "fixture git add failed");
   assert.equal(git("commit", "-q", "-m", "init").status, 0, "fixture git commit failed");

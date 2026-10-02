@@ -218,7 +218,9 @@ const DYNAMIC_IMPORT_EDGES = {
   // maintenance-window evaluator so the generated hook can honor non-kernel windows.
   // The sixth through eighth edges bind the signed quality package, then derive
   // the current plan lifecycle and its typed late-verify recovery eligibility.
+  // The ninth edge is the precommit privacy scanner; it is a separate import.
   "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": [
+    "./check-private-identifiers.mjs",
     "../hooks/guard-gate-strength.mjs",
     "../lib/protected-test-paths.mjs",
     "./check-protected-path-integrity.mjs",
@@ -230,6 +232,7 @@ const DYNAMIC_IMPORT_EDGES = {
   ],
   "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
     "../lib/commit-message-policy.mjs",
+    "../lib/signed-quality-package.mjs",
     "../lib/project-authority.mjs",
   ],
 };
@@ -435,6 +438,10 @@ check("GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from
   const globalRoot = mkdtempSync(join(tmpdir(), "gmwkc-global-"));
   const globalPluginRoot = join(globalRoot, "marketplace", "plugins", "pipeline-core");
   mkdirSync(join(globalPluginRoot, "lib"), { recursive: true });
+  for (const suffix of ["lib/passive-read-policy.mjs", "lib/intake-material-reference.mjs", "scripts/check-private-identifiers.mjs", "lib/model-family-authority.mjs", "lib/model-family-execution.mjs", "lib/model-family-invocation.mjs", "lib/model-family-runtime-host.mjs", "lib/model-family-route-source.mjs", "lib/model-family-host-store.mjs", "lib/model-family-latest-selection.mjs"]) {
+    assert.equal(isNeverLiftableKernelPath(join(REPO_ROOT, "plugins", "pipeline-core", suffix), { rootDir: REPO_ROOT }), true, suffix);
+    assert.equal(isNeverLiftableKernelPath(join(globalPluginRoot, suffix), { rootDir: REPO_ROOT, livePluginRoot: globalPluginRoot }), true, suffix);
+  }
   assert.equal(
     isNeverLiftableKernelPath(join(globalPluginRoot, "lib", "entrypoint.mjs"), { rootDir: REPO_ROOT }),
     false,

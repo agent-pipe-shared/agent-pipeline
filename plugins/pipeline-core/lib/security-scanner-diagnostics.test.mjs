@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Prepared G13 test proposal; per-case canonical completion, no envelope.
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";

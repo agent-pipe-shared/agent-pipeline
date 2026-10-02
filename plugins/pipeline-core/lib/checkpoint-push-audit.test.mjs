@@ -4,8 +4,12 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
 import { checkpointAuditRecord, readCheckpointArchitectureDebt, recordCheckpointPushAttempt } from "./checkpoint-push-audit.mjs";
+
+const completionCases = [];
+function test(name, run) { completionCases.push({ id: "CPA001", name, run }); }
 
 test("checkpoint audit persists bound debt and resolves only after descendant map update", () => {
   const dir = mkdtempSync(join(tmpdir(), "checkpoint-debt-"));
@@ -39,3 +43,9 @@ test("checkpoint audit persists bound debt and resolves only after descendant ma
     assert.equal(updated.rawDebt.length, 1);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

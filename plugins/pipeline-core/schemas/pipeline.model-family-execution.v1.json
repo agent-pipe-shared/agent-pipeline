@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.model-family-execution.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "invocationReceiptSha256",
+    "rawHostResultSha256",
+    "actualModelIds",
+    "actualEffort",
+    "hostObservationSha256",
+    "outcome",
+    "receiptSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.model-family-execution.v1"
+    },
+    "invocationReceiptSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "rawHostResultSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actualModelIds": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+      }
+    },
+    "actualEffort": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "not-applicable",
+        null
+      ]
+    },
+    "hostObservationSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outcome": {
+      "enum": [
+        "matched",
+        "mismatch",
+        "identity-unavailable",
+        "execution-failed"
+      ]
+    },
+    "receiptSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "matched"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "actualModelIds": {
+            "minItems": 1,
+            "maxItems": 1
+          }
+        }
+      }
+    }
+  ]
+}

@@ -5,11 +5,27 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-smoke-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES, measureBootstrapBytes } from "../lib/bootstrap-payload-budget.mjs";
 import { buildReceipt } from "./bootstrap-payload-measure.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const completionCases = [
+{ id: "BPM001", name: "Bootstrap byte measurement and rejection bounds", run: () => {
 const coreBytes = readFileSync(join(here, "..", "skills", "pipeline-start", "SKILL.md")).byteLength;
 const envelopeBytes = Buffer.byteLength(JSON.stringify({ schema: "pipeline.bootstrap-happy-path-envelope.v1" }), "utf8");
 const measurement = measureBootstrapBytes(coreBytes + envelopeBytes, { mode: "normal" });
@@ -18,13 +34,17 @@ assert.equal(measurement.exactModelTokens, false);
 assert.equal(measurement.withinBudget, true);
 const overBudget = measureBootstrapBytes(BOOTSTRAP_PAYLOAD_MAX_BYTES + 1, { mode: "normal" });
 assert.equal(overBudget.withinBudget, false);
+} },
 
+{ id: "BPM002", name: "Normal receipt measures both original segments", run: () => {
 const normalReceipt = buildReceipt({ root: join(here, "..") });
 assert.equal(normalReceipt.schema, "pipeline.bootstrap-payload-receipt.v1");
 assert.equal(normalReceipt.segments.length, 2);
 assert.equal(normalReceipt.originalMeasurement.upperBoundUnits,
   normalReceipt.segments.reduce((sum, segment) => sum + segment.utf8Bytes, 0));
+} },
 
+{ id: "BPM003", name: "Enrolled physical bootstrap emits retained-check receipt", run: () => {
 // Deterministic, hermetic default for the origin/content attestation
 // dependency (design: bootstrap-origin-allowlist-and-codex-wsl-freshness.md
 // §A.2/§A.3; fix per Critic finding F5, WP2-WP3-partA-rework-1) -- this
@@ -50,9 +70,11 @@ const readyObservation = () => ({
   },
 });
 
+const normalFixture = mkdtempSync(join(tmpdir(), "normal-bootstrap-fixture-"));
+enrollFixtureGovernance(normalFixture);
 const normalPreflight = observePipelineStartPreflight({
   env: {},
-  cwd: "/tmp/normal-bootstrap-fixture",
+  cwd: normalFixture,
   read: () => JSON.stringify({ version: "0.4.5+test" }),
   pluginList: () => JSON.stringify({
     installed: [{
@@ -75,7 +97,10 @@ assert.deepEqual(normalPreflight.bootstrapPayload.retainedChecks, [
   "lifecycle", "authority", "calibration", "handover", "verify", "continuation", "architecture",
 ]);
 
-const temp = mkdtempSync("/tmp/bootstrap-envelope-");
+rmSync(normalFixture, { recursive: true, force: true });
+} },
+{ id: "BPM004", name: "Oversized machine envelope remains rejected and truncated", run: () => {
+const temp = mkdtempSync(join(tmpdir(), "bootstrap-envelope-"));
 const envelopePath = join(temp, "envelope.json");
 writeFileSync(envelopePath, JSON.stringify({ schema: "pipeline.test-envelope.v1", payload: "x".repeat(50_000) }));
 const overReceipt = buildReceipt({ root: join(here, ".."), envelope: JSON.parse(readFileSync(envelopePath, "utf8")) });
@@ -84,7 +109,9 @@ assert.equal(overReceipt.originalMeasurement.withinBudget, false);
 assert.equal(overReceipt.truncated, true);
 assert.equal(overReceipt.segments[1].name, "machine-readback-envelope");
 rmSync(temp, { recursive: true, force: true });
+} },
 
+{ id: "BPM005", name: "Budget has one owner and every consumer respects exact boundaries", run: () => {
 // ---------------------------------------------------------------------------------------------
 // Single-owner property. This number existed as five copies -- the payload budget itself, this
 // suite's over-budget probe, pipeline-start-preflight's probe, pipeline-start-v3's SKILL.md cap,
@@ -139,3 +166,6 @@ assert.equal(measureBootstrapBytes(BOOTSTRAP_PAYLOAD_MAX_BYTES + 1, { mode: "nor
 const skillBytes = Buffer.byteLength(skillSource, "utf8");
 assert.ok(skillBytes <= BOOTSTRAP_PAYLOAD_MAX_BYTES,
   `SKILL.md is ${skillBytes} bytes, over the ${BOOTSTRAP_PAYLOAD_MAX_BYTES}-byte owner budget`);
+} },
+];
+registerTestCaseCompletion({ cases: completionCases, fd: 3, maxBytes: 65536 });

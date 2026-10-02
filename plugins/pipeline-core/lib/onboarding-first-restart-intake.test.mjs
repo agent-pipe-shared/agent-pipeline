@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Exact proposed first-restart boundary over fixture roots; no native Codex restart.
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";

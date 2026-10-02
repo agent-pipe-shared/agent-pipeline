@@ -93,6 +93,7 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
 // TPSHELL-*: the shell lane of the test-path authority gate. Imported from the library the
 // guard defers to, for the same reason AC-10 states above -- and because the write lane
@@ -7010,6 +7011,85 @@ test("host-provided transcript, memory and sibling paths share passive read beha
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(dirname(transcriptPath), { recursive: true, force: true });
   }
+});
+
+test("PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories agree across read routes under active enrollment", (t) => {
+  const fixture = mkdtempSync(join("/var/tmp", "passive-read-root-interop-"));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const projectDir = join(fixture, "repo"), homeDir = join(fixture, "home");
+  const sessionDir = join(fixture, "session"), memoryDir = join(sessionDir, "memory");
+  const transcriptPath = join(sessionDir, "session.jsonl");
+  const memoryFile = join(memoryDir, "learned.md"), sibling = join(sessionDir, "sibling.md");
+  for (const directory of [projectDir, homeDir, sessionDir, memoryDir]) mkdirSync(directory);
+  for (const file of [transcriptPath, memoryFile, sibling]) writeFileSync(file, "fixture\n");
+  const script = `
+    import assert from "node:assert/strict";
+    import { spawnSync } from "node:child_process";
+    const { createGovernanceScopeController } = await import(process.env.GOVERNANCE_SCOPE_MODULE);
+    const projectDir = process.env.PASSIVE_FIXTURE_PROJECT;
+    const transcriptPath = process.env.PASSIVE_FIXTURE_TRANSCRIPT;
+    const memoryDir = process.env.PASSIVE_FIXTURE_MEMORY;
+    const memoryFile = process.env.PASSIVE_FIXTURE_MEMORY_FILE;
+    const sibling = process.env.PASSIVE_FIXTURE_SIBLING;
+    const initialized = spawnSync("git", ["init", "-q"], { cwd: projectDir, encoding: "utf8" });
+    assert.equal(initialized.status, 0, initialized.stderr);
+    const scope = createGovernanceScopeController();
+    const before = scope.observe({ rootDir: projectDir });
+    assert.equal(before.state, "inactive");
+    assert.equal(before.requiresEnforcement, false);
+    const plan = scope.planDecision({ rootDir: projectDir, decision: "enroll", by: "passive-read-fixture" });
+    const enrolled = scope.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    assert.equal(enrolled.state, "active");
+    assert.equal(enrolled.requiresEnforcement, true);
+    const guard = await import(process.env.LIFECYCLE_GUARD_MODULE);
+    const roots = [transcriptPath, memoryDir];
+    const deps = {
+      projectDir,
+      requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }),
+    };
+    const readTranscript = guard.evaluateLifecycleReadyGuard({
+      tool_name: "Read", tool_input: { file_path: transcriptPath }, transcript_path: transcriptPath,
+    }, deps);
+    assert.equal(readTranscript.exitCode, 0, "Read admits the exact session transcript");
+    const grepMemory = guard.evaluateLifecycleReadyGuard({
+      tool_name: "Grep", tool_input: { path: memoryFile }, transcript_path: transcriptPath,
+    }, deps);
+    assert.equal(grepMemory.exitCode, 0, "Grep admits a file under the current memory directory");
+    const globMemory = guard.evaluateLifecycleReadyGuard({
+      tool_name: "Glob", tool_input: { path: memoryDir, pattern: "*.md" }, transcript_path: transcriptPath,
+    }, deps);
+    assert.equal(globMemory.exitCode, 0, "Glob admits bounded inventory in the current memory directory");
+    const command = (value) => ({ tool_name: "Bash", tool_input: { command: value }, transcript_path: transcriptPath });
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + memoryFile, projectDir, roots), true,
+      "single cat admits the same approved memory file");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + memoryFile + " | head -n 5", projectDir, roots), true,
+      "cat pipeline admits the same approved memory file");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("rg -n fixture " + transcriptPath, projectDir, roots), true,
+      "single recursive-grammar rg admits the exact transcript file");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("rg --files " + memoryDir + " | rg learned", projectDir, roots), true,
+      "rg pipeline admits bounded memory inventory despite the file root");
+    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + sibling), deps).exitCode, 2,
+      "the transcript file does not authorize its directory sibling");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + sibling, projectDir, roots), false,
+      "single-command policy also refuses a session sibling");
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: projectDir,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      HOME: homeDir,
+      CLAUDE_PROJECT_DIR: projectDir,
+      GOVERNANCE_SCOPE_MODULE: new URL("../lib/governance-scope.mjs", import.meta.url).href,
+      LIFECYCLE_GUARD_MODULE: new URL("./guard-lifecycle-ready.mjs", import.meta.url).href,
+      PASSIVE_FIXTURE_PROJECT: projectDir,
+      PASSIVE_FIXTURE_TRANSCRIPT: transcriptPath,
+      PASSIVE_FIXTURE_MEMORY: memoryDir,
+      PASSIVE_FIXTURE_MEMORY_FILE: memoryFile,
+      PASSIVE_FIXTURE_SIBLING: sibling,
+    },
+  });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
 test("runner session paths are ordinary host-visible passive read targets", () => {

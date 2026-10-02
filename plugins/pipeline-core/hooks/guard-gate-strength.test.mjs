@@ -14,10 +14,21 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-hook-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 
 import { GATE_STRENGTH_PATHS, LIVE_PLUGIN_RULE, gateStrengthRuleFor, insideLivePlugin, livePluginRoots } from "./guard-gate-strength.mjs";
 import { GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS } from "./guard-lifecycle-ready.mjs";
@@ -54,6 +65,7 @@ function governed() {
   writeFileSync(join(base, "project", "guard-config.json"), '{"protectedTestPaths":[]}\n');
   writeFileSync(join(base, "project", "critical-human-proof.json"), '{"schema":"pipeline.critical-human-proof-policy.v1","requiredKinds":["push"]}\n');
   writeFileSync(join(base, "README.md"), "# fixture\n");
+  enrollFixtureGovernance(base);
   return base;
 }
 function ask(root, filePath, extraEnv = {}) {
@@ -183,6 +195,39 @@ try {
     const base = mkdtempSync(join(tmpdir(), "gate-strength-live2-"));
     roots.push(base);
     assert.equal(ask(base, join(PLUGIN_ROOT, "hooks", "guard-git.mjs")).blocked, true);
+  });
+
+  check("GST39 inactive repository still blocks an installed live plugin edit and admits an ordinary file", () => {
+    const base = mkdtempSync(join(tmpdir(), "gate-strength-inactive-live-"));
+    roots.push(base);
+    const initialized = spawnSync("git", ["init", "-q"], { cwd: base, encoding: "utf8" });
+    assert.equal(initialized.status, 0, initialized.stderr);
+    const scope = createGovernanceScopeController({ hostStateRoot: join(base, ".git", "fixture-hoststate") });
+    const observed = scope.observe({ rootDir: base });
+    assert.equal(observed.state, "inactive");
+    assert.equal(observed.requiresEnforcement, false);
+    const live = ask(base, join(PLUGIN_ROOT, "hooks", "guard-git.mjs"));
+    assert.equal(live.blocked, true, "inactive enrollment must not stand down installed live plugin protection");
+    assert.match(live.stderr, /Rule ID: GS-6\b/u);
+    const ordinaryPath = join(base, "ordinary.txt");
+    writeFileSync(ordinaryPath, "ordinary fixture\n");
+    assert.equal(ask(base, ordinaryPath).blocked, false, "ordinary files stay admitted in an inactive repository");
+  });
+
+  check("GST40 a legacy marker alone does not enroll an inactive repository for ordinary path-table rules", () => {
+    const base = mkdtempSync(join(tmpdir(), "gate-strength-marker-only-inactive-"));
+    roots.push(base);
+    const initialized = spawnSync("git", ["init", "-q"], { cwd: base, encoding: "utf8" });
+    assert.equal(initialized.status, 0, initialized.stderr);
+    writeFileSync(join(base, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\n');
+    mkdirSync(join(base, "project"), { recursive: true });
+    writeFileSync(join(base, "project", "critical-human-proof.json"), "{}\n");
+    const scope = createGovernanceScopeController({ hostStateRoot: join(base, ".git", "fixture-hoststate") });
+    const observed = scope.observe({ rootDir: base });
+    assert.equal(observed.state, "inactive");
+    assert.equal(observed.requiresEnforcement, false);
+    assert.equal(ask(base, "project/critical-human-proof.json").blocked, false,
+      "the ordinary path rule must stand down despite the legacy pipeline.user.yaml marker");
   });
 
   check("GST11 an over-broad CLAUDE_PLUGIN_ROOT cannot turn this into a blanket refusal", () => {
@@ -328,12 +373,13 @@ try {
   });
 
   check("GST19 a legacy-tier project's guard config is refused through the write lane", () => {
-    // The end-to-end shape of F5: a repository that never migrated, governed only by its
-    // legacy marker, editing the file that names every other guard's protected paths.
+    // The repository is canonically enrolled but still uses the legacy-tier
+    // guard-config path, editing the file that names every other guard's protected paths.
     const root = mkdtempSync(join(tmpdir(), "gate-strength-legacy-"));
     roots.push(root);
     mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({ protectedTestPaths: [] }));
+    enrollFixtureGovernance(root);
     const result = spawnSync(process.execPath, [GUARD], {
       input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: ".claude/guard-config.json" }, cwd: root }),
       encoding: "utf8",
@@ -348,6 +394,7 @@ try {
     const root = mkdtempSync(join(tmpdir(), "gate-strength-gmw-"));
     roots.push(root);
     execFileSync("git", ["init", "-q"], { cwd: root });
+    enrollFixtureGovernance(root);
     execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
     execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
     mkdirSync(join(root, "project"), { recursive: true });
@@ -409,7 +456,21 @@ try {
     execFileSync("git", ["config", "user.name", "Test"], { cwd: base });
     execFileSync("git", ["add", "-A"], { cwd: base });
     execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: base });
+    enrollFixtureGovernance(base);
     return base;
+  }
+
+  function makeUnusableOverrideStore(root) {
+    const agentPipelineDir = join(root, ".git", "agent-pipeline");
+    const overrideStore = join(agentPipelineDir, "human-guard-overrides");
+    const target = join(root, "unusable-override-store-target");
+    mkdirSync(agentPipelineDir, { recursive: true });
+    mkdirSync(target);
+    // HGO requires a physical private directory at the Git common-dir path.
+    // This disposable symlink reaches its typed HGO-STORAGE refusal before any
+    // route record can be created.
+    symlinkSync(target, overrideStore, "dir");
+    return target;
   }
 
   function keyPair() {
@@ -558,13 +619,16 @@ try {
 
   check("GST24 an unusable override store leaves the refusal exactly as it was", () => {
     const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
-    const root = governed(); // no git: the override store has no repository to bind to
+    const root = governedGit();
+    const untouchedTarget = makeUnusableOverrideStore(root);
     const { blocked, stderr } = ask(root, rule.path);
     assert.equal(blocked, true, "a broken override store must not become an authorization");
     assert.match(stderr, new RegExp(`Rule ID: ${rule.id}\\b`, "u"));
     assert.doesNotMatch(stderr, /--request-sha256/u);
     assert.doesNotMatch(stderr, /capability consumed/u);
     assert.doesNotMatch(stderr, /Human override available/u);
+    assert.match(stderr, /planning the route failed with code=HGO-STORAGE/u);
+    assert.deepEqual(readdirSync(untouchedTarget), [], "unusable storage must not receive route records");
   });
 
   check("GST25 a capability bound to a different edit does not admit this one", () => {
@@ -646,17 +710,18 @@ try {
     // those assertions are not repeated here. This is the other half (ADR-0059 Decision 4):
     // the denial now says a route was ATTEMPTED and names the typed code the attempt hit,
     // instead of being byte-identical to a rule that has no override at all -- which for
-    // this guard is a real, adjacent case (GS-6, pinned by GST29). `governed()` has no Git
-    // control path, so the planner throws rather than answering a typed status, exercising
-    // humanGuardRouteUnavailableReason()'s `error` branch.
+    // this guard is a real, adjacent case (GS-6, pinned by GST29). The active Git
+    // fixture's private HGO directory is replaced by a symlink so storage refuses
+    // with its actual typed HGO-STORAGE code before any route record can be written.
     const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
-    const root = governed();
+    const root = governedGit();
+    const untouchedTarget = makeUnusableOverrideStore(root);
     const { blocked, stderr } = ask(root, rule.path);
     assert.equal(blocked, true, "a broken override store must not become an authorization");
     assert.match(stderr, /Rule ID: GS-4\b/u);
     assert.match(
       stderr,
-      /No human override route is offered for this exact edit; the guard attempted to plan one\.\nReason: planning the route failed with code=HGO-GIT\./u,
+      /No human override route is offered for this exact edit; the guard attempted to plan one\.\nReason: planning the route failed with code=HGO-STORAGE\./u,
       `the route-less denial said nothing about why:\n${stderr}`,
     );
     // The reason discloses nothing beyond the typed code: exactly two lines, no path
@@ -665,6 +730,7 @@ try {
     assert.equal(block.split("\n").length, 2, block);
     assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
     assert.ok(!block.includes(root), "the reason leaked the repository root");
+    assert.deepEqual(readdirSync(untouchedTarget), [], "unusable storage must not receive route records");
   });
 
   // ---- LIFTRULES-2: no refusal anywhere in the guard family may advertise hand-editing a

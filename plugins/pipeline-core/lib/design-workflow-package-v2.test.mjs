@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Actual Git + managed Node Advisor and Readiness output. Controls/resolver are
 // explicitly synthetic test capabilities, not operator/provider authority.
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";

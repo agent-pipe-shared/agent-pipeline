@@ -31,6 +31,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 
@@ -41,12 +42,19 @@ function freshRepo(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-v2-${prefix}-`));
   ALL_DIRS.push(dir);
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
-  git("init", "-q", "-b", "main");
+  const initialized = git("init", "-q", "-b", "main");
+  if (initialized.status !== 0) throw new Error(`fixture git init failed: ${initialized.stderr}`);
   git("config", "user.email", "goldfish@example.invalid");
   git("config", "user.name", "Goldfish");
   writeFileSync(join(dir, "README.md"), "fixture\n");
   git("add", "README.md");
   git("commit", "-q", "-m", "init");
+  const governance = createGovernanceScopeController({ hostStateRoot: join(dir, ".git", "fixture-hoststate") });
+  const inactive = governance.observe({ rootDir: dir });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture governance scope was not initially inactive");
+  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture governance enrollment did not activate enforcement");
   const head = git("rev-parse", "HEAD").stdout.trim();
   const tree = git("rev-parse", "HEAD^{tree}").stdout.trim();
   return { dir, head, tree };

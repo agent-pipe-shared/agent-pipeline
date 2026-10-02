@@ -24,6 +24,19 @@ import { afterEach, test } from "node:test";
 import { dirname, join } from "node:path";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+function enrollFixtureGovernance(root) {
+  const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-smoke-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
 import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
@@ -169,6 +182,7 @@ test("markerless external acknowledge apply recovers runner from plan when runne
 
 function generatorSubmitFixture(name, { exempt }) {
   const dir = mkdtempSync(join(tmpdir(), `pipeline-generator-submit-${name}-`)); roots.push(dir);
+  enrollFixtureGovernance(dir);
   const featureId = `generator-${name}`;
   const planPath = `specs/${featureId}/prd_${featureId}.md`;
   const specPath = `specs/${featureId}/spec.md`;
@@ -222,26 +236,38 @@ test("submit-plan honors the exact generator-identical acknowledgement exemption
   const submitted = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
   assert.equal(submitted.status, 0, submitted.err);
   assert.ok(JSON.parse(readFileSync(statePath(f.dir), "utf8")).planSubmission);
+  assert.equal(JSON.parse(readFileSync(statePath(f.dir), "utf8")).planApproved, false);
 });
 
-test("submit-plan still demands PO acknowledgement for modified non-exempt bytes", () => {
+test("submit-plan records modified non-exempt feature bytes without granting approval", () => {
   const f = generatorSubmitFixture("modified", { exempt: false });
-  const before = readFileSync(statePath(f.dir), "utf8");
-  const rejected = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
-  assert.equal(rejected.status, 2);
-  assert.match(rejected.out, /PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING/u);
-  assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
+  const submitted = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
+  assert.equal(submitted.status, 0, submitted.err);
+  const state = JSON.parse(readFileSync(statePath(f.dir), "utf8"));
+  assert.ok(state.planSubmission);
+  assert.equal(state.planApproved, false);
+  assert.equal(state.planApproval ?? null, null);
 });
 
-test("submit-plan rejects an exempt observation whose artifact identity does not match the bound authority", () => {
+test("submit-plan records feature authority independently of an exempt bootstrap observation", () => {
   const f = generatorSubmitFixture("identity-mismatch", { exempt: true });
   const observe = f.deps.observeBootstrapBindAcknowledgement;
   f.deps.observeBootstrapBindAcknowledgement = () => {
     const result = observe();
     return { ...result, prd: { ...result.prd, sha256: h("f") } };
   };
+  const submitted = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
+  assert.equal(submitted.status, 0, submitted.err);
+  const state = JSON.parse(readFileSync(statePath(f.dir), "utf8"));
+  assert.ok(state.planSubmission);
+  assert.equal(state.planApproved, false);
+  assert.equal(state.planApproval ?? null, null);
+});
+
+test("submit-plan mini still refuses missing historical acknowledgement without mutation", () => {
+  const f = generatorSubmitFixture("mini-unacknowledged", { exempt: true });
   const before = readFileSync(statePath(f.dir), "utf8");
-  const rejected = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
+  const rejected = invoke(["submit-plan", "--by", "coordinator", "--profile", "mini"], f.deps);
   assert.equal(rejected.status, 2);
   assert.match(rejected.out, /PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING/u);
   assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
@@ -250,11 +276,15 @@ test("submit-plan rejects an exempt observation whose artifact identity does not
 test("inspect exposes one typed PO approval action after submit and presentation, independent of runner", () => {
   for (const runner of ["claude", "codex", "antigravity"]) {
     const f = generatorSubmitFixture(`approval-${runner}`, { exempt: true });
-    const runnerDeps = { ...f.deps, env: runnerEnv(runner) };
+    const initial = JSON.parse(readFileSync(statePath(f.dir), "utf8"));
+    const authority = f.deps.poGateAuthority({}).value;
+    const pkg = materializeTestDesignWorkflowPackage({ root: f.dir, featureId: initial.activeFeature.id, planPath: authority.planPath, specPath: authority.specPath });
+    const runnerDeps = { ...f.deps, ...pkg.deps, env: runnerEnv(runner), readHumanApprovalMode: () => null };
     // This is runner/action rendering coverage. The separate feature-package
     // suite owns the stronger epic/feature review and signature path.
-    assert.equal(invoke(["submit-plan", "--by", "coordinator", "--profile", "mini"], runnerDeps).status, 0);
-    assert.equal(invoke(["present-plan", "--by", "coordinator"], runnerDeps).status, 0);
+    assert.equal(invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], runnerDeps).status, 0);
+    assert.equal(invoke(["present-plan", "--by", "coordinator", "--design-workflow-package", pkg.packagePath], runnerDeps).status, 0);
+    const presented = JSON.parse(readFileSync(statePath(f.dir), "utf8"));
     const inspected = invoke(["inspect"], runnerDeps);
     assert.equal(inspected.status, 0, inspected.err);
     const action = JSON.parse(inspected.out).nextAction;
@@ -264,6 +294,7 @@ test("inspect exposes one typed PO approval action after submit and presentation
     assert.deepEqual(action.applyAction.argv, [
       new URL("./pipeline-state.mjs", import.meta.url).pathname,
       "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
+      "--design-workflow-approval-request", presented.planPresentation.designWorkflowApprovalRequestPath,
     ]);
     assert.equal(action.applyAction.mutation, true);
     assert.equal(action.applyAction.requiresConfirmation, true);
@@ -271,7 +302,11 @@ test("inspect exposes one typed PO approval action after submit and presentation
     assert.ok(action.applyAction.copyCommand?.posix);
     const approvedArgv = action.applyAction.argv.slice(1).map((value) => value === "<PO_PLAN_APPROVER_NAME>" ? "Runner PO" : value);
     assert.equal(isSanctionedLifecycleCommand(actionCommand({ ...action.applyAction, argv: [action.applyAction.argv[0], ...approvedArgv] }), f.dir), true);
-    assert.equal(invoke(approvedArgv, runnerDeps).status, 0);
+    // The fixture proves the human-only terminal boundary before simulating
+    // an attended terminal; this is synthetic source coverage, not PO authority.
+    assert.equal(invoke(approvedArgv, { ...runnerDeps, isattyFn: () => false }).status, 2);
+    assert.equal(JSON.parse(readFileSync(statePath(f.dir), "utf8")).planApproved, false);
+    assert.equal(invoke(approvedArgv, { ...runnerDeps, isattyFn: () => true, readLineFn: () => "approve-" + presented.planPresentation.designWorkflowPackageSha256.slice(0, 12) }).status, 0);
     assert.equal(JSON.parse(invoke(["inspect"], runnerDeps).out).lifecycle.status, "approved");
   }
 });

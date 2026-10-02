@@ -7,7 +7,7 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildSignatureIntent, configuredConsentMode, consentStoragePath, digest, loadLiveSession, validateConsentRecord } from "../lib/agy-session-authority.mjs";
+import { AGY_FAMILY_SUBJECT_SCHEMA, AGY_FAMILY_CONSENT_SCHEMA, buildSignatureIntent, configuredConsentMode, consentStoragePath, digest, loadLiveSession, validateConsentRecord, validateFamilyConsentSubject } from "../lib/agy-session-authority.mjs";
 import { loadSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 
 const usage = "Usage: agy-session-consent.mjs <prepare|inspect|record|revoke> --root <repo> --session-id <id> [--descriptor-sha256 <sha>] [--record <external-json>]";
@@ -28,9 +28,14 @@ export async function runConsentCommand(argv, deps = {}) {
     const subject = JSON.parse(readFileSync(resolve(args.subject), "utf8"));
     const candidate = JSON.parse(readFileSync(resolve(args.candidate), "utf8"));
     if (digest(subject?.session) !== digest({ id: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256 }) || digest(subject?.repository) !== digest({ primaryRoot: descriptor.repo.primaryRoot, commonDir: descriptor.repo.commonDir })) throw new Error("AGY-CONSENT-SUBJECT-MISMATCH");
+    const family = subject?.schema === AGY_FAMILY_SUBJECT_SCHEMA;
+    if (family) {
+      const checked = validateFamilyConsentSubject(subject, { repository: descriptor.repo, session: { id: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256 }, familyAuthorityInputs: await deps.readFamilyAuthority?.({ root: args.root }) });
+      if (!checked.ok) throw new Error(checked.code);
+    } else if (subject?.schema !== "pipeline.agy-session-consent-subject.v1") throw new Error("AGY-CONSENT-SUBJECT-INVALID");
     const subjectSha256 = digest(subject);
     const mode = configuredConsentMode(args.root).mode;
-    const intent = mode === "signature" ? buildSignatureIntent({ featureId: args.featureId, planSha256: args.planSha256, specSha256: args.specSha256, candidate, subjectSha256 }) : null;
+    const intent = mode === "signature" ? buildSignatureIntent({ featureId: args.featureId, planSha256: args.planSha256, specSha256: args.specSha256, candidate, subjectSha256, ...(family ? { policyRevision: "agy-session-family-v2" } : {}) }) : null;
     return { schema: "pipeline.agy-session-consent-preparation.v1", sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, subject, subjectSha256, mode, ...(intent ? { intent } : {}), status: mode === "signature" ? "awaiting-human-signature" : "awaiting-human-chat-attribution" };
   }
   if (args.command === "inspect") return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { status: "missing", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 };
@@ -39,7 +44,7 @@ export async function runConsentCommand(argv, deps = {}) {
   const record = JSON.parse(readFileSync(resolve(args.record), "utf8"));
   const live = loadLiveSession(args.root, args.sessionId, descriptor.descriptorSha256);
   if (!live.ok) throw new Error(live.code);
-  const checked = validateConsentRecord(record, { root: args.root, repository: descriptor.repo, session: live.session, policy: deps.policy });
+  const checked = validateConsentRecord(record, { root: args.root, repository: descriptor.repo, session: live.session, policy: deps.policy, ...(record.schema === AGY_FAMILY_CONSENT_SCHEMA ? { familyAuthorityInputs: await deps.readFamilyAuthority?.({ root: args.root }) } : {}) });
   if (!checked.ok) throw new Error(checked.code);
   if (existsSync(tombstone)) { let history; try { history = JSON.parse(readFileSync(tombstone, "utf8")); } catch { throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); } if (!Array.isArray(history)) throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); if (history.some((prior) => prior?.decisionId === record.decisionId || prior?.subjectSha256 === record.subjectSha256)) throw new Error("AGY-CONSENT-REAUTH-REQUIRED"); }
   mkdirSync(directory, { recursive: true, mode: 0o700 }); if (lstatSync(directory).isSymbolicLink()) throw new Error("AGY-CONSENT-STORAGE-UNSAFE");

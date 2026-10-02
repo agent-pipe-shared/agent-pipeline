@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const HOOK = fileURLToPath(new URL("./antigravity-start-hint.mjs", import.meta.url));
 const PRETOOL = fileURLToPath(new URL("./antigravity-pretool-guard.mjs", import.meta.url));
@@ -18,6 +19,9 @@ function initializedRoot() {
 }
 
 function markGoverned(root) {
+  const controller = createGovernanceScopeController({hostStateRoot:join(root, '.git', 'fixture-host-state')});
+  const plan = controller.planDecision({rootDir:root, decision:'enroll', by:'disposable-session-hint-fixture'});
+  assert.equal(controller.applyDecision(plan, {activate:true, planSha256:plan.planSha256}).state, 'active');
   mkdirSync(join(root, ".claude"), { recursive: true });
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: fixture\n");
 }

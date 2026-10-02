@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { after as afterTests } from "node:test";
+const cases = [];
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,7 +22,7 @@ import { CAPABILITY_TOOL_ROOTS, evaluateCapabilityCompleteness } from "./toolcha
 import { parseBrowserEvidencePreflightArgs, preflightBrowserEvidence } from "./browser-evidence-preflight.mjs";
 
 let passed = 0;
-function check(name, fn) { fn(); passed += 1; process.stdout.write(`PASS TCP${String(passed).padStart(2, "0")} ${name}\n`); }
+function check(name, fn) { cases.push({ id: `TCP${String(cases.length + 1).padStart(3, "0")}`, name, run: async () => { await fn(); passed += 1; process.stdout.write(`PASS TCP${String(passed).padStart(2, "0")} ${name}\n`); } }); }
 function observed(tool, version, capabilities) {
   return { ok: true, status: "ready", handle: buildHandle(tool, { realPath: `/tools/${tool}`, device: "1", inode: "2", size: 3, mtimeNs: "4", sha256: "a".repeat(64) }, version, capabilities, "2026-07-18T12:00:00.000Z") };
 }
@@ -41,7 +44,7 @@ check("browser evidence preflight distinguishes available local browser capabili
   const result = preflightBrowserEvidence({ rootDir: process.cwd() }, {
     spawnFn: (...args) => {
       calls.push(args);
-      return { status: 0, stdout: JSON.stringify({ state: "ready", executablePath: "/browser/chrome" }) };
+      return { status: 0, stdout: JSON.stringify({ state: "ready" }) };
     },
   });
   assert.equal(result.code, "BEP-BROWSER-E2E-READY");
@@ -61,7 +64,7 @@ check("browser evidence preflight accepts a consumer that provides only the play
     writeFileSync(join(packageDir, "chromium"), "fixture browser", "utf8");
     writeFileSync(
       join(packageDir, "index.js"),
-      'const { join } = require("node:path"); module.exports = { chromium: { executablePath: () => join(__dirname, "chromium") } };',
+      'const { join } = require("node:path"); module.exports = { chromium: { executablePath: () => join(__dirname, "chromium"), launch: async () => ({ close: async () => {} }) } };',
       "utf8",
     );
     const result = preflightBrowserEvidence({ rootDir: repo });
@@ -380,4 +383,7 @@ check("capability-completeness: performs zero filesystem/git mutation (repo stat
   const after = gitStatus();
   assert.equal(after, before);
 });
+afterTests(() => {
 process.stdout.write(`${passed}/33 checks passed.\n`);
+});
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

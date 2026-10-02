@@ -219,7 +219,7 @@ test("awaiting-approval surfaces present-plan as a runnable command when no pres
     PIPELINE_STATE_SCRIPT_PATH, "present-plan", "--by", "Jordan Example",
   ]);
   assert.equal(payload.nextAction.mutation, true);
-  assert.equal(payload.nextAction.requiresConfirmation, true);
+  assert.equal(payload.nextAction.requiresConfirmation, false);
 });
 
 // Same gap, but --by is not derivable: the branch must fall back to
@@ -502,7 +502,7 @@ test("draft next-action becomes a runnable submit-plan command once submitter an
     PIPELINE_STATE_SCRIPT_PATH, "submit-plan", "--by", "Jordan Example", "--profile", "feature",
   ]);
   assert.equal(payload.nextAction.mutation, true);
-  assert.equal(payload.nextAction.requiresConfirmation, true);
+  assert.equal(payload.nextAction.requiresConfirmation, false);
 
   // Runnable in the sense the guided driver requires (onboarding-init.mjs
   // execs any `kind: "command"` action verbatim): `submit-plan` accepts

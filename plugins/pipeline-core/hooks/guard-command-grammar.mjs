@@ -22,17 +22,22 @@ const SEARCH_BOOLEAN = new Set([
 const SEARCH_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "-t", "--type", "-T", "--type-not", "-e", "--regexp",
-  "--max-count", "--max-depth",
+  "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
 ]);
-// Recursive rg must use its default hidden/ignore policy. A glob can force
-// hidden private paths back into scope, so exclude it alongside -u/--hidden.
+// Recursive rg must use its default hidden/ignore policy. Only a basename
+// extension filter is admitted below; path globs and hidden-name selectors
+// stay closed so this operand cannot widen the traversal roots.
 const FILE_BOOLEAN = new Set(["--no-messages"]);
-const FILE_VALUE = new Set(["-t", "--type", "-T", "--type-not", "--max-depth"]);
+const FILE_VALUE = new Set(["-t", "--type", "-T", "--type-not", "--max-depth", "-g", "--glob"]);
 const NUMERIC_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "--max-count", "--max-depth",
 ]);
 const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
+
+function isBoundedFilenameFilter(value) {
+  return typeof value === "string" && /^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
+}
 
 function denied(code = "GUARD-PARSE-UNSUPPORTED") {
   return Object.freeze({
@@ -310,6 +315,16 @@ function approvedReadPath(value, root, additionalRoots = []) {
   return isAllowedPassiveReadTarget(value, { rootDir: root, recursive: true, additionalRecursiveRoots: additionalRoots });
 }
 
+function hasExternalRecursiveGlobTarget(paths, root) {
+  return paths.some((value) => {
+    if (typeof value !== "string") return false;
+    const candidate = isAbsolute(value) ? resolve(value) : resolve(root, value);
+    if (isRealpathedWithinBoundary(candidate, root)) return false;
+    try { return statSync(candidate).isDirectory(); }
+    catch { return false; }
+  });
+}
+
 function validateRg(argv, root, windows, additionalRoots = []) {
   // The policy's recursive inventory intentionally clears this variable.
   // A real rg process inheriting a config could re-enable hidden traversal or
@@ -325,6 +340,9 @@ function validateRg(argv, root, windows, additionalRoots = []) {
   const paths = [];
   let patternCount = 0;
   let regexpProvided = false;
+  let patternFileProvided = false;
+  const patternFiles = [];
+  let globProvided = false;
   let afterDashDash = false;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -342,16 +360,31 @@ function validateRg(argv, root, windows, additionalRoots = []) {
         if (typeof value !== "string" || value === "" || value.startsWith("-")) return false;
         if (NUMERIC_VALUE.has(arg) && !canonicalInteger(value, 500)) return false;
         if (["-e", "--regexp"].includes(arg)) regexpProvided = true;
+        if (["-g", "--glob"].includes(arg)) {
+          if (globProvided || !isBoundedFilenameFilter(value)) return false;
+          globProvided = true;
+        }
+        if (["-f", "--file"].includes(arg)) {
+          if (patternFileProvided) return false;
+          patternFileProvided = true;
+          patternFiles.push(value);
+        }
         index += 1;
       }
       continue;
     }
-    if (filesMode || regexpProvided || patternCount === 1) paths.push(arg);
+    if (filesMode || regexpProvided || patternFileProvided || patternCount === 1) paths.push(arg);
     else patternCount += 1;
   }
-  if ((!filesMode && !regexpProvided && patternCount !== 1)
-    || (!filesMode && regexpProvided && patternCount !== 0)) return false;
-  return (paths.length > 0 ? paths : ["."])
+  if ((!filesMode && !regexpProvided && !patternFileProvided && patternCount !== 1)
+    || (!filesMode && (regexpProvided || patternFileProvided) && patternCount !== 0)) return false;
+  // Filename filters change which files a recursive search visits. They are
+  // admitted for project searches, where the inventory is already bounded by
+  // the project, but cannot be combined with an external approved directory:
+  // that would make the directory boundary selective and could hide unsafe
+  // entries from the policy's whole-tree check.
+  if (globProvided && hasExternalRecursiveGlobTarget(paths, root)) return false;
+  return [...(paths.length > 0 ? paths : ["." ]), ...patternFiles]
     .every((path) => approvedReadPath(path, root, additionalRoots))
     && (windows ? true : true);
 }

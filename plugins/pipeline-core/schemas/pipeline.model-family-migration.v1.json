@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "pipeline.model-family-migration.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "historicBundleByteSha256", "historicApprovalIntentSha256", "historicRouteSourceSha256", "targetRouteSourceSha256", "familyProjectionSha256", "adapterContractSha256s", "preservedFloorsSha256"],
+  "properties": {
+    "schema": { "const": "pipeline.model-family-migration.v1" },
+    "historicBundleByteSha256": { "$ref": "#/$defs/sha" }, "historicApprovalIntentSha256": { "$ref": "#/$defs/sha" },
+    "historicRouteSourceSha256": { "$ref": "#/$defs/sha" }, "targetRouteSourceSha256": { "$ref": "#/$defs/sha" },
+    "familyProjectionSha256": { "$ref": "#/$defs/sha" }, "adapterContractSha256s": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sha" } },
+    "preservedFloorsSha256": { "$ref": "#/$defs/sha" }
+  }, "$defs": { "sha": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
+}

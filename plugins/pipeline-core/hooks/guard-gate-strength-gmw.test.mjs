@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { livePluginRoots } from "./guard-gate-strength.mjs";
 import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const GUARD = join(HOOKS, "guard-gate-strength.mjs");
@@ -76,6 +77,14 @@ try {
     }));
     execFileSync("git", ["add", "-A"], { cwd: root });
     execFileSync("git", ["commit", "-q", "-m", "gmw-fixture"], { cwd: root });
+    const governance = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+    const inactive = governance.observe({ rootDir: root });
+    assert.equal(inactive.state, "inactive");
+    assert.equal(inactive.requiresEnforcement, false);
+    const plan = governance.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+    const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    assert.equal(active.state, "active");
+    assert.equal(active.requiresEnforcement, true);
     const livePluginRoot = livePluginRoots()[0];
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "GST20",

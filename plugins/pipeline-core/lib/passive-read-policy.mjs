@@ -148,23 +148,38 @@ export function isAllowedPassiveReadTarget(raw, {
           && (within(identity, protectedRoot) || within(identity, physicalRoot)))) return false;
     }
   }
-  // Caller-owned resolved directory boundaries extend only recursive inventory.
-  // Keep rootDir unchanged: relative operands and the repository key pointer
-  // always belong to the original project. Reject ambiguous/missing boundaries.
+  // Caller-owned resolved roots extend only bounded read operations. Directory
+  // roots may contain recursive inventory; file roots match one exact file and
+  // never admit siblings or descendants. Keep rootDir unchanged: relative
+  // operands and the repository key pointer always belong to the original project.
+  // Reject ambiguous, missing, aliased, and credential-containing boundaries.
   const recursiveRoots = [];
-  if (recursive) {
+  if (recursive || directoryListing) {
     for (const boundary of additionalRecursiveRoots) {
       if (typeof boundary !== "string" || !isAbsolute(boundary)
         || resolve(boundary) !== boundary || /[\0$`*?\[\]{}]/u.test(boundary)) return false;
+      let observed;
       try {
-        if (realpath(boundary) !== boundary || !stat(boundary).isDirectory()) return false;
+        if (realpath(boundary) !== boundary) return false;
+        observed = stat(boundary);
       } catch { return false; }
-      recursiveRoots.push(boundary);
+      if (!observed.isDirectory() && !observed.isFile()) return false;
+      if (observed.isDirectory()) {
+        for (const protectedRoot of protectedRoots) {
+          let physicalRoot = protectedRoot;
+          try { physicalRoot = realpath(protectedRoot); }
+          catch (error) { if (error?.code !== "ENOENT") return false; }
+          if (within(boundary, protectedRoot) || within(boundary, physicalRoot)) return false;
+        }
+      }
+      recursiveRoots.push({ path: boundary, directory: observed.isDirectory() });
     }
   }
   const inProject = within(rootDir, lexical) && within(rootDir, physical);
-  const inAdditional = recursive && recursiveRoots.some((boundary) =>
-    within(boundary, lexical) && within(boundary, physical));
+  const inAdditional = (recursive || directoryListing) && recursiveRoots.some(({ path, directory }) =>
+    directory
+      ? within(path, lexical) && within(path, physical)
+      : lexical === path && physical === path);
   if (!inProject && inAdditional && raw.split(/[\\/]/u).includes("..")) return false;
   if (!inProject && !inAdditional) {
     if (!identities.every((identity) => userVisibleHostPath(identity, homeDir))) return false;
@@ -175,10 +190,11 @@ export function isAllowedPassiveReadTarget(raw, {
       if (directoryListing && !observed.isFile() && !observed.isDirectory()) return false;
     } catch { return false; }
   }
-  if (recursive) {
+  if (recursive || (directoryListing && inAdditional)) {
     let observed;
     try { observed = stat(candidate); }
     catch { return false; }
+    if (directoryListing && inAdditional && !observed.isFile() && !observed.isDirectory()) return false;
     if (observed.isDirectory() && !safeRecursiveTree(candidate, protectedRoots, realpath, stat)) return false;
   }
   return true;

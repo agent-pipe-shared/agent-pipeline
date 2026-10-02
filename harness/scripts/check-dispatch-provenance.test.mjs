@@ -11,9 +11,13 @@
  * checker per the dispatching briefing); run directly with `node --test` or
  * plain `node`.
  */
+import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
+import { after as afterTests } from "node:test";
+const cases = [];
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,13 +32,14 @@ import {
   summaryLine,
   touchesTrackedSource,
 } from "./check-dispatch-provenance.mjs";
+import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../../plugins/pipeline-core/lib/signed-quality-package.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const checkerPath = join(here, "check-dispatch-provenance.mjs");
 const repoRoot = resolve(here, "..", "..");
 
 let passed = 0;
-function check(name, fn) { fn(); passed += 1; process.stdout.write(`ok ${passed} - ${name}\n`); }
+function check(name, fn) { cases.push({ id: `CDP${String(cases.length + 1).padStart(3, "0")}`, name, run: async () => { await fn(); passed += 1; process.stdout.write(`ok ${passed} - ${name}\n`); } }); }
 
 // --------------------------------------------------------------- git fixture
 
@@ -480,4 +485,118 @@ check("CLI: a real repo stage-0 precedent commit is recognized as exempt (regres
   assert.match(result.stdout, /Dispatch provenance: range/);
 });
 
+function signedIntegrationFixture({ messageFor = (intent) => `chore: import package\n\nDispatch: quality-package-${intent} (integration)\nAI-Assisted: true\n`, beforeCommit = () => {} } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "dispatch-signed-integration-test-"));
+  initRepo(root);
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
+  const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
+  mkdirSync(join(root, "project"));
+  writeFile(root, "subject.txt", "before\n");
+  writeFile(root, "project/critical-human-proof.json", JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [],
+    trustAnchors: [{ keyReference: "fixture", publicKeySha256 }],
+  }));
+  git(root, "add", "subject.txt", "project/critical-human-proof.json"); git(root, "commit", "-qm", "base");
+  const record = {
+    schema: SIGNED_QUALITY_PACKAGE_SCHEMA,
+    baseCommit: git(root, "rev-parse", "HEAD").trim(),
+    unifiedDiff: "diff --git a/subject.txt b/subject.txt\nindex df967b9..3e75765 100644\n--- a/subject.txt\n+++ b/subject.txt\n@@ -1 +1 @@\n-before\n+after\n",
+    expectedDigests: { "subject.txt": createHash("sha256").update("after\n").digest("hex") },
+  };
+  record.intentSha256 = qualityPackageIntentSha256(record);
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: record.intentSha256, keyReference: "fixture", publicKey,
+    signatureBase64: sign(null, Buffer.from(record.intentSha256), keys.privateKey).toString("base64"),
+  };
+  writeFile(root, "subject.txt", "after\n"); git(root, "add", "subject.txt");
+  assert.equal(authorizeQualityPackageCommit({ repoRoot: root, packageIntent: record, proof }).ok, true);
+  const commonDir = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").trim();
+  const authorization = join(commonDir, "agent-pipeline", "signed-quality-packages", "commit-authorizations", `${record.intentSha256}.json`);
+  beforeCommit({ root, git: (...args) => git(root, ...args), record, authorization });
+  git(root, "commit", "-m", messageFor(record.intentSha256));
+  return { root, base: record.baseCommit, candidate: git(root, "rev-parse", "HEAD").trim(), intentSha256: record.intentSha256, authorization };
+}
+
+check("signed integration range admits only the exact verified import and leaves legacy counters intact", () => {
+  const item = signedIntegrationFixture();
+  try {
+    const result = checkDispatchProvenance({ root: item.root, base: item.base, candidate: item.candidate });
+    assert.equal(result.ok, true, result.findings.join("\n"));
+    assert.equal(result.coverage.commitsTouchingSource, 1);
+    assert.equal(result.coverage.commitsExempt, 0);
+    assert.equal(result.coverage.commitsSignedArtifactIntegration, 1);
+    assert.deepEqual(result.signedArtifactIntegrations, [{ sha: item.candidate, verdict: "PASS", classification: "signed-artifact-integration", reason: "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED" }]);
+    assert.deepEqual(result.recordShapeFindings, []);
+    assert.equal(Object.hasOwn(result.signedArtifactIntegrations[0], "model"), false);
+    assert.equal(Object.hasOwn(result.signedArtifactIntegrations[0], "review"), false);
+    assert.equal(Object.hasOwn(result.signedArtifactIntegrations[0], "taskId"), false);
+  } finally { cleanup(item.root); }
+});
+
+check("safe missing authorization is UNVERIFIABLE; forged and unsafe authorization FAIL", () => {
+  for (const kind of ["missing", "forged", "unsafe"]) {
+    const item = signedIntegrationFixture();
+    try {
+      if (kind === "missing") rmSync(item.authorization);
+      if (kind === "forged") {
+        const receipt = JSON.parse(readFileSync(item.authorization, "utf8"));
+        receipt.proof.signatureBase64 = Buffer.alloc(64).toString("base64");
+        writeFileSync(item.authorization, JSON.stringify(receipt), { mode: 0o600 });
+      }
+      if (kind === "unsafe") { rmSync(item.authorization); symlinkSync(join(item.root, "subject.txt"), item.authorization); }
+      const result = checkDispatchProvenance({ root: item.root, base: item.base, candidate: item.candidate });
+      assert.equal(result.signedArtifactIntegrations[0].verdict, kind === "missing" ? "UNVERIFIABLE" : "FAIL");
+      assert.equal(result.ok, false);
+      assert.equal(result.coverage.commitsTouchingSource, 1);
+    } finally { cleanup(item.root); }
+  }
+});
+
+check("wrong intent, parent and exact-tree drift fail integration admission", () => {
+  for (const kind of ["wrong-intent", "wrong-parent", "content-drift", "path-drift", "mode-drift"]) {
+    const item = signedIntegrationFixture({
+      messageFor: (intent) => {
+        const named = kind === "wrong-intent" ? "f".repeat(64) : intent;
+        return `chore: import package\n\nDispatch: quality-package-${named} (integration)\nAI-Assisted: true\n`;
+      },
+      beforeCommit: ({ root, git }) => {
+        if (kind === "wrong-parent") { git("restore", "--staged", "--source=HEAD", "--", "subject.txt"); git("commit", "--allow-empty", "-qm", "advance parent"); git("add", "subject.txt"); }
+        if (kind === "content-drift") { writeFile(root, "subject.txt", "drift\n"); git("add", "subject.txt"); }
+        if (kind === "path-drift") { writeFile(root, "extra.txt", "extra\n"); git("add", "extra.txt"); }
+        if (kind === "mode-drift") git("update-index", "--chmod=+x", "subject.txt");
+      },
+    });
+    try {
+      if (kind === "wrong-intent") writeFileSync(join(dirname(item.authorization), `${"f".repeat(64)}.json`), readFileSync(item.authorization), { mode: 0o600 });
+      const result = checkDispatchProvenance({ root: item.root, base: item.base, candidate: item.candidate });
+      assert.equal(result.ok, false, kind);
+      assert.equal(result.signedArtifactIntegrations[0].verdict, "FAIL", kind);
+    } finally { cleanup(item.root); }
+  }
+});
+
+check("malformed and duplicate final integration trailers fail while body prose keeps legacy parsing", () => {
+  for (const messageFor of [
+    () => `chore: malformed\n\nDispatch: quality-package-abc (integration)\nAI-Assisted: true\n`,
+    (intent) => `chore: duplicate\n\nDispatch: quality-package-${intent} (integration)\nDispatch: quality-package-${intent} (integration)\nAI-Assisted: true\n`,
+  ]) {
+    const item = signedIntegrationFixture({ messageFor });
+    try {
+      const result = checkDispatchProvenance({ root: item.root, base: item.base, candidate: item.candidate });
+      assert.equal(result.signedArtifactIntegrations[0].verdict, "FAIL");
+      assert.equal(result.coverage.commitsExempt, 0);
+    } finally { cleanup(item.root); }
+  }
+  const body = signedIntegrationFixture({ messageFor: (intent) => `chore: body marker\n\nDispatch: quality-package-${intent} (integration)\n\nThis is body prose.\n` });
+  try {
+    const result = checkDispatchProvenance({ root: body.root, base: body.base, candidate: body.candidate });
+    assert.equal(result.signedArtifactIntegrations.length, 0);
+    assert.ok(result.findings.some((finding) => finding.includes("reason=malformed-trailer")));
+  } finally { cleanup(body.root); }
+});
+
+afterTests(() => {
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
+});
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

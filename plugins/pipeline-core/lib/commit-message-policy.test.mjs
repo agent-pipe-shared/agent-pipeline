@@ -6,6 +6,9 @@
  * `Co-Authored-By: <provider>` and a session URL, 53 of them reached a public remote before
  * a human noticed by reading. CMP1 is that exact message.
  */
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { after as afterTests } from "node:test";
+const cases = [];
 import assert from "node:assert/strict";
 
 import {
@@ -16,10 +19,12 @@ import {
   GIT01_COMMIT_TYPES,
   markerPolicyMode,
   parseCommitTrailerBlock,
+  parseIntegrationTrailerBlock,
 } from "./commit-message-policy.mjs";
+import { createHash } from "node:crypto";
 
 let checks = 0;
-const check = (label, fn) => { fn(); checks += 1; process.stdout.write(`ok ${label}\n`); };
+const check = (label, fn) => { cases.push({ id: `CMP${String(cases.length + 1).padStart(3, "0")}`, name: label, run: async () => { await fn(); checks += 1; process.stdout.write(`ok ${label}\n`); } }); };
 const codes = (result) => result.findings.map((f) => f.code).sort();
 
 const CLEAN = "feat(x): do a thing\n\nWhy it matters.\n\nAI-Assisted: true\n";
@@ -295,4 +300,25 @@ check("CMT11 the range entry point on an empty or non-array input is empty, not 
   assert.deepEqual(commitTypeFindingsForRange(null), []);
 });
 
+check("integration trailer parser admits only the exact two-line package binding",()=>{
+  const message="chore: integrate reviewed package\n\nDispatch: quality-package-"+"a".repeat(64)+" (integration)\nAI-Assisted: true\n";
+  assert.deepEqual(parseIntegrationTrailerBlock(message),{ok:true,intentSha256:"a".repeat(64)});
+  assert.equal(codes(finishedCommitMessageFindings(message)).includes("GIT-03-INTEGRATION-EVIDENCE-REQUIRED"),true);
+  const admitted={schema:"pipeline.signed-quality-package-integration-evidence.v1",intentSha256:"a".repeat(64),messageSha256:createHash("sha256").update(message.replace(/\r\n/gu,"\n")).digest("hex"),phase:"precommit",code:"QUALITY-PACKAGE-INTEGRATION-PRECOMMIT-VERIFIED"};
+  assert.deepEqual(finishedCommitMessageFindings(message,{integrationAdmission:admitted}).findings,[]);
+});
+
+check("integration trailer parser rejects malformed, duplicate and extended blocks",()=>{
+  const id="quality-package-"+"b".repeat(64)+" (integration)";
+  for(const message of [
+    `chore: x\n\nDispatch: ${id}\n`,
+    `chore: x\n\nDispatch: ${id}\nAI-Assisted: true\nAI-Assisted: true\n`,
+    `chore: x\n\nDispatch: ${id}\nAI-Assisted: true\nReview: required\n`,
+    `chore: x\n\nDispatch: quality-package-ABC (integration)\nAI-Assisted: true\n`,
+  ])assert.equal(parseIntegrationTrailerBlock(message).ok,false);
+});
+
+afterTests(() => {
 process.stdout.write(`\n${checks}/${checks} commit-message policy checks passed\n`);
+});
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

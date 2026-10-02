@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Source proposal integration tests; actual S1 observation, no scope callback.
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";

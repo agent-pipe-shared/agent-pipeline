@@ -172,7 +172,7 @@ function validateDispatch(value) {
 }
 function validateRouteShape(value) {
   exactKeys(value, ["dutyId", "runner", "model", "effort", "sourceSha256", "candidateCommit"], "native Critic route");
-  if (value.dutyId !== "critic_high_risk" || value.runner !== "codex" || typeof value.model !== "string" || value.model.length === 0
+  if (!["critic_high_risk", "critic_normal"].includes(value.dutyId) || value.runner !== "codex" || typeof value.model !== "string" || value.model.length === 0
     || typeof value.effort !== "string" || value.effort.length === 0 || !COMMIT_SHA.test(value.candidateCommit)) fail("native Critic route is invalid");
   digest(value.sourceSha256, "route authority digest");
   return clone(value);

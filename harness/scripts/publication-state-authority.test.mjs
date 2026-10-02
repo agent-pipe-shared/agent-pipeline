@@ -3,6 +3,9 @@
 /* Integration proof for Batman decision 7A. Most cases drive the sanctioned
  * State writer directly; one closed fixture runs the fixed executor against a
  * disposable local bare remote and verifies exact reconciliation. */
+import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
+import { after as afterTests } from "node:test";
+const cases = [];
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -20,6 +23,7 @@ import {
   publicationRemoteFingerprint,
   publicationRepositoryFingerprint,
 } from "../../plugins/pipeline-core/scripts/publication-executor.mjs";
+import { createGovernanceScopeController } from "../../plugins/pipeline-core/lib/governance-scope.mjs";
 
 const oid = (character, length = 40) => character.repeat(length);
 const sha = (value) => createHash("sha256").update(value).digest("hex");
@@ -35,9 +39,20 @@ const prepareInput = (transactionId) => ({
 });
 
 const root = mkdtempSync(join(tmpdir(), "publication-state-authority-"));
+const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+assert.equal(initialized.status, 0, initialized.stderr);
+const scope = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+const initialScope = scope.observe({ rootDir: root });
+assert.equal(initialScope.state, "inactive");
+assert.equal(initialScope.requiresEnforcement, false);
+const enrollmentPlan = scope.planDecision({ rootDir: root, decision: "enroll", by: "publication fixture" });
+const enrolledScope = scope.applyDecision(enrollmentPlan,
+  { activate: true, planSha256: enrollmentPlan.planSha256 });
+assert.equal(enrolledScope.state, "active");
+assert.equal(enrolledScope.requiresEnforcement, true);
 const deps = { dir: root, gitCommonDir: () => ({ ok: true, path: root }), now: () => "2026-07-18T20:00:00.000Z" };
 let count = 0;
-function check(name, fn) { fn(); count++; }
+function check(name, fn) { cases.push({ id: `PSA${String(cases.length + 1).padStart(3, "0")}`, name, run: async () => { await fn(); count++; } }); }
 function state() { return JSON.parse(readFileSync(statePath(root), "utf8")); }
 function writeRequest(value) { writeFileSync(join(root, "request.json"), `${JSON.stringify(value)}\n`, { mode: 0o600 }); }
 function invoke(sub, request, overrides = {}) {
@@ -65,8 +80,9 @@ check("State writer persists only a redacted prepared reference", () => {
   assert.equal(JSON.stringify(publication).includes("remoteFingerprint"), false);
   assert.deepEqual(publication.authorizedPushes, []);
 });
-let reference = state().publication.channels.private;
+let reference;
 check("State writer records a candidate-bound single authorization", () => {
+  reference = state().publication.channels.private;
   assert.equal(invoke("publication-approve", request(first, 0, reference.publicationStateSha256, {
     approvalId: "po-1", attribution: "PO", approvedAt: 1_000, expiresAt: 901_000,
   })), 0);
@@ -80,7 +96,6 @@ check("State writer records a candidate-bound single authorization", () => {
 });
 
 check("Push Guard rejects raw Git even for the State-Writer's exact legacy projection tuple", () => {
-  assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
   const guard = (pushCommand) => spawnSync(process.execPath, [guardPath], {
     cwd: root,
     input: JSON.stringify({ tool_name: "Bash", tool_input: { command: pushCommand } }),
@@ -248,5 +263,8 @@ check("fixed executor publishes to a disposable remote and consumed authority re
   }
 });
 
+afterTests(() => {
 rmSync(root, { recursive: true, force: true });
 console.log(`publication-state-authority: ${count} tests passed`);
+});
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

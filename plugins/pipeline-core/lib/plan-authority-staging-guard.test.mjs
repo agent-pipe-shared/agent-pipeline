@@ -21,6 +21,8 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
 
 import {
   INTAKE_STAGING_DIRNAME,
@@ -45,7 +47,18 @@ function sha256Hex(content) {
 }
 
 function tempProjectDir(prefix = "a4-staging-guard-") {
-  return mkdtempSync(join(tmpdir(), prefix));
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  const initialized = spawnSync("git", ["init", "-q", root], { encoding: "utf8" });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  assert.equal(inactive.state, "inactive");
+  assert.equal(inactive.requiresEnforcement, false);
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  assert.equal(active.state, "active");
+  assert.equal(active.requiresEnforcement, true);
+  return root;
 }
 
 function capturedStderr(fn) {

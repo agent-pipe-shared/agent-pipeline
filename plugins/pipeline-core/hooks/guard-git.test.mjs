@@ -40,6 +40,21 @@ import { fileURLToPath } from "node:url";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+
+const enrolledFixtureRoots = new Set();
+function enrollFixtureGovernance(root) {
+  if (enrolledFixtureRoots.has(root)) return;
+  const initialized = spawnSync("git", ["init", "-q", root], { encoding: "utf8" });
+  if (initialized.status !== 0) throw new Error(`fixture Git initialization failed: ${initialized.stderr}`);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture governance was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+  enrolledFixtureRoots.add(root);
+}
 
 const GUARD = fileURLToPath(new URL("./guard-git.mjs", import.meta.url));
 
@@ -52,6 +67,7 @@ const GUARD = fileURLToPath(new URL("./guard-git.mjs", import.meta.url));
  * session-level arming deliberately (AC-1 env-fallback path).
  */
 function runGuard(command, projectDir, envOverride = {}) {
+  enrollFixtureGovernance(projectDir);
   const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
   const res = spawnSync(process.execPath, [GUARD], {
     input: JSON.stringify({ tool_input: { command } }),
@@ -907,6 +923,8 @@ function gitRepoFixture(prefix) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
   SIGNED_ROOTS.push(root);
   gitIn(root)("init", "--quiet");
+  // Enroll before signed fixtures write legacy lifecycle/history records.
+  enrollFixtureGovernance(root);
   return root;
 }
 function commitFile(root, name, body) {

@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.model-family-acceptance.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "candidateCommit",
+    "candidateTree",
+    "designSpecSha256",
+    "familyAuthoritySha256",
+    "sourceResult",
+    "installedResults",
+    "independentReviewSha256s"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.model-family-acceptance.v1"
+    },
+    "candidateCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "candidateTree": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "designSpecSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "familyAuthoritySha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sourceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "contracts",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "contracts": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "runner",
+              "adapterContractSha256",
+              "testEvidenceSha256",
+              "sourceEvidenceSha256",
+              "providerQualification"
+            ],
+            "properties": {
+              "runner": {
+                "enum": [
+                  "codex",
+                  "claude",
+                  "antigravity"
+                ]
+              },
+              "adapterContractSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "testEvidenceSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "sourceEvidenceSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "providerQualification": {
+                "enum": [
+                  "qualified",
+                  "unqualified"
+                ]
+              }
+            }
+          },
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "runner": {
+                    "const": "codex"
+                  }
+                },
+                "required": [
+                  "runner"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "runner": {
+                    "const": "claude"
+                  }
+                },
+                "required": [
+                  "runner"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "runner": {
+                    "const": "antigravity"
+                  }
+                },
+                "required": [
+                  "runner"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        },
+        "evidenceSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "installedResults": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "runner",
+          "status",
+          "evidenceSha256",
+          "reasonCode"
+        ],
+        "properties": {
+          "runner": {
+            "enum": [
+              "codex",
+              "claude",
+              "antigravity"
+            ]
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed",
+              "not-installed",
+              "unqualified"
+            ]
+          },
+          "evidenceSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reasonCode": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_-]{0,95}$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "runner": {
+                "const": "codex"
+              }
+            },
+            "required": [
+              "runner"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "runner": {
+                "const": "claude"
+              }
+            },
+            "required": [
+              "runner"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "runner": {
+                "const": "antigravity"
+              }
+            },
+            "required": [
+              "runner"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "independentReviewSha256s": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    }
+  }
+}

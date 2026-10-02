@@ -119,6 +119,8 @@ import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation } from 
 import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
 import { verifyCriticDispositionAddendumForRecord } from "./check-critic-skip-coverage.mjs";
 import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
+import { parseIntegrationTrailerBlock } from "../lib/commit-message-policy.mjs";
+import { verifyQualityPackageIntegrationPostCommit } from "../lib/signed-quality-package.mjs";
 import {
   DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
   declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
@@ -317,6 +319,24 @@ export function verifyCommit(sha, deps) {
     message = readCommitMessage(sha);
   } catch (error) {
     return result(sha, VERDICT.unverifiable, "commit-unreadable", `commit could not be read: ${error.message}`);
+  }
+
+  const finalBlock = parseTrailerBlock(message);
+  const integrationAttempt = finalBlock.some((entry) => entry.key.toLowerCase() === "dispatch"
+    && (/^quality-package-/iu.test(entry.value) || /\(integration\)/iu.test(entry.value)));
+  if (integrationAttempt) {
+    const parsed = parseIntegrationTrailerBlock(message);
+    if (!parsed.ok) return result(sha, VERDICT.fail, "signed-artifact-integration", parsed.code);
+    const verified = verifyQualityPackageIntegrationPostCommit({
+      repoRoot: deps.repoRoot,
+      commitSha: sha,
+      intentSha256: parsed.intentSha256,
+    });
+    if (verified.code === "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT") {
+      return result(sha, VERDICT.unverifiable, "signed-artifact-integration", verified.code);
+    }
+    if (!verified.ok) return result(sha, VERDICT.fail, "signed-artifact-integration", verified.code);
+    return result(sha, VERDICT.pass, "signed-artifact-integration", verified.code);
   }
 
   const dispatch = parseDispatchTrailer(message);
@@ -776,6 +796,7 @@ export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = join(repoRoot, "ev
   const exactRecordBytes = (taskId, record) => evidenceDir === join(repoRoot, "evidence")
     ? readExactRecordBytes(evidenceDir, taskId, nativeAuthoredRecordBytes(record)) : null;
   return {
+    repoRoot,
     readCommitMessage: (sha) => git(["show", "-s", "--format=%B", `${sha}^{commit}`]),
     readChangedPaths: (sha) =>
       git(["show", "--no-renames", "--name-only", "--format=", `${sha}^{commit}`])

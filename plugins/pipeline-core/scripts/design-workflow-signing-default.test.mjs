@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Synthetic non-Codex authority fixture; NOT managed Codex/provider evidence.
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
