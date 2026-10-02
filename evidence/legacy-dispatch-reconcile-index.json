@@ -240,6 +240,16 @@
         "path": "evidence/legacy-dispatch-reconcile-evidence.json",
         "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
       }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-ALF-SCANNER-PREP.json",
+      "recordSha256": "fcdebdfcd937daf28292ca4be3965fd3133aa7fe500975ab9c3317147da88487",
+      "terminalKind": "stopped-without-commit",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/alf-scanner-prep-terminal-reconciliation.json",
+        "sha256": "036f627c942cd3f79f18b9cb30cdf479a118f11ba72f9a52a096a9c86b06d645"
+      }
     }
   ]
 }

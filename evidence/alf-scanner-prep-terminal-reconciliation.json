@@ -1,0 +1,18 @@
+{
+  "schema": "pipeline.legacy-dispatch-terminal-evidence.v1",
+  "taskId": "ALF-SCANNER-PREP",
+  "record": {
+    "path": "evidence/dispatch-record-ALF-SCANNER-PREP.json",
+    "sha256": "fcdebdfcd937daf28292ca4be3965fd3133aa7fe500975ab9c3317147da88487"
+  },
+  "incident": {
+    "path": "specs/sprint-alfred-epic/evidence/scanner-preparation-scope-incident-2026-09-18.md",
+    "sha256": "c883abe582ffeb8356cac72b028bb881bd59f7338699b47aa3f6348d67ea6953"
+  },
+  "terminalKind": "stopped-without-commit",
+  "outcome": "interrupted",
+  "authoredCommits": [],
+  "independentReview": "not-produced",
+  "qualification": "none",
+  "observedDisposition": "The recorded unauthorized append was interrupted and exactly rolled back; the historical record and incident remain unchanged."
+}
