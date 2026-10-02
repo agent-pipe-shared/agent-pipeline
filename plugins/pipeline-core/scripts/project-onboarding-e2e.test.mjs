@@ -311,6 +311,39 @@ function actionArgs(result) {
   return result.nextAction.argv.slice(1);
 }
 
+function advanceTypedOnboardingInput(path, result) {
+  let current = result;
+  const allowed = new Set(["text", "projectDescription", "gitAuthorName", "gitAuthorEmail", "language", "profile", "humanApprovalMode", "advisorExportConsent"]);
+  const answers = new Map([
+    ["<PO_INTAKE_GIT_AUTHOR_NAME>", "Onboarding E2E PO"],
+    ["<PO_INTAKE_GIT_AUTHOR_EMAIL>", "onboarding-e2e@example.invalid"],
+    ["<PO_INTAKE_LANGUAGE>", "en"], ["<PO_INTAKE_PROFILE>", "feature"],
+    ["<PO_GIT_AUTHOR_NAME>", "Onboarding E2E PO"],
+    ["<PO_GIT_AUTHOR_EMAIL>", "onboarding-e2e@example.invalid"],
+    ["<signature|chat>", "signature"], ["<approved|declined>", "declined"], ["<de|en>", "en"],
+  ]);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const action = current.json?.nextAction;
+    if (action?.kind !== "collect-input") return current;
+    const names = action.inputs?.map((input) => input.name) ?? (action.input ? [action.input.name] : []);
+    assert.ok(names.length > 0 && names.every((name) => allowed.has(name)), `unhandled published input names: ${names.join(",")}`);
+    assert.equal(action.applyAction?.kind, "command");
+    assert.equal(action.applyAction.argv[0], onboarding);
+    if (names.includes("projectDescription") || names.includes("text")) {
+      mkdirSync(join(path, "scratch"), { recursive: true });
+      writeFileSync(join(path, "scratch", "onboarding-intake.txt"),
+        "Build a small local project from this original fixture request.\nKeep the result self-contained and locally verifiable.\n");
+    }
+    if (names.includes("projectDescription")) assert.equal(action.applyAction.argv.includes("--granted"), true, "the disposable fixture explicitly chooses local intake consent");
+    const argv = action.applyAction.argv.map((value) => answers.get(value) ?? value);
+    const applied = run(onboarding, argv.slice(1), path);
+    assert.equal(applied.status, 0, applied.stdout);
+    current = run(onboarding, ["inspect", "--root", path, "--runner", "codex"], path);
+  }
+  assert.notEqual(current.json?.nextAction?.kind, "collect-input", "the bounded fixture answer sequence must reach the next non-input step");
+  return current;
+}
+
 function explicitRunnerActionArgs(result, runner) {
   const args = actionArgs(result);
   const index = args.indexOf("--runner");
@@ -350,7 +383,8 @@ function completeRuntimeReadback(path, now = 50_000) {
 }
 function makeReady(path) {
   const portable = run(onboarding, ["plan", "--root", path], path);
-  assert.equal(run(onboarding, actionArgs(portable.json), path).json.status, "runtime-initialization-required");
+  const seeded = run(onboarding, actionArgs(portable.json), path);
+  assert.equal(advanceTypedOnboardingInput(path, seeded).json.status, "runtime-initialization-required");
   const runtime = run(onboarding, ["plan-runtime", "--root", path], path);
   assert.equal(run(onboarding, actionArgs(runtime.json), path).json.status, "restart-required");
   completeRuntimeReadback(path);
@@ -401,7 +435,8 @@ test("fresh and existing roots advance through portable seed and runtime initial
       assert.equal(plan.json.status, isExisting ? "adoption-required" : "portable-seed-required");
       const applied = run(onboarding, actionArgs(plan.json), path);
       assert.equal(applied.status, 0);
-      assert.equal(applied.json.status, "runtime-initialization-required");
+      const afterCapture = advanceTypedOnboardingInput(path, applied);
+      assert.equal(afterCapture.json.status, "runtime-initialization-required");
       const runtimePlan = run(onboarding, ["plan-runtime", "--root", path], path);
       assert.equal(runtimePlan.status, 0, runtimePlan.stdout);
       const initialized = run(onboarding, actionArgs(runtimePlan.json), path);
@@ -635,11 +670,13 @@ test("an existing linked Git worktree is adopted without replacing its .git poin
     git(["commit", "-q", "-m", "base"], source);
     git(["worktree", "add", "-q", "-b", "linked-onboarding", linked], source);
     const gitPointer = readFileSync(join(linked, ".git"), "utf8");
-    const plan = run(onboarding, ["plan", "--root", linked], linked);
-    assert.equal(plan.status, 0, plan.stdout);
-    assert.equal(plan.json.status, "adoption-required");
+    const rawPlan = run(onboarding, ["plan", "--root", linked], linked);
+    assert.equal(rawPlan.status, 0, rawPlan.stdout);
+    assert.equal(rawPlan.json.status, "adoption-required");
+    const plan = advanceTypedOnboardingInput(linked, rawPlan);
     const applied = run(onboarding, actionArgs(plan.json), linked);
     assert.equal(applied.status, 0);
+    advanceTypedOnboardingInput(linked, applied);
     assert.equal(readFileSync(join(linked, ".git"), "utf8"), gitPointer);
     assert.equal(readFileSync(join(linked, "README.md"), "utf8"), "worktree project\n");
     const runtimePlan = run(onboarding, ["plan-runtime", "--root", linked], linked);
@@ -810,11 +847,12 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
       const initialAsk = first.pendingAsks[0];
       assert.equal(initialAsk.applyAction?.kind, "command");
-      assert.deepEqual(initialAsk.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
+      assert.deepEqual(initialAsk.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
       const initial = invokeAction(initialAsk.applyAction, new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
         ["<signature|chat>", "signature"],
+        ["<approved|declined>", "declined"],
         ["<de|en>", "en"],
       ]), path, env);
       assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
@@ -826,6 +864,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(heldInitialAnswers.gitAuthorName, "Greenfield E2E PO");
       assert.equal(heldInitialAnswers.gitAuthorEmail, "greenfield-e2e@example.invalid");
       assert.equal(heldInitialAnswers.language, "en");
+      assert.equal(heldInitialAnswers.advisorExportConsent, "declined");
       assert.equal(fixtureGitConfig.has(`${path}\u0000user.name`), false);
       assert.equal(fixtureGitConfig.has(`${path}\u0000user.email`), false);
       const readback = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);

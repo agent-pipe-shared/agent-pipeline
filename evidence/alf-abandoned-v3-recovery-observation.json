@@ -1,0 +1,32 @@
+{
+  "schema": "pipeline.abandoned-v3-dispatch-recovery-observation.v1",
+  "observedAt": "2026-10-02T09:20:03Z",
+  "baseHead": "39ba386b30dcf5cf6901b9e7242d94463a196859",
+  "records": [
+    {
+      "taskId": "ALF-ADOPTION-PROOF",
+      "recordPath": "evidence/dispatch-record-ALF-ADOPTION-PROOF.json",
+      "recordSha256": "1ad2ca5cd4f394af1d558c7d05ff04ec03ffee46b9dfbe5f14bf350706913057",
+      "schema": "pipeline.dispatch-record.v3",
+      "outcome": "in-progress",
+      "candidateCommit": null,
+      "commits": []
+    },
+    {
+      "taskId": "ALF-RECOVERY-PLAN",
+      "recordPath": "evidence/dispatch-record-ALF-RECOVERY-PLAN.json",
+      "recordSha256": "bc9ce4824d67dacbff5d7252459418c4a8f1c0c1b37dd29606afaf2ed04ad6bb",
+      "schema": "pipeline.dispatch-record.v3",
+      "outcome": "in-progress",
+      "candidateCommit": "92e2500e554d5d099a1763425f2c6179da54def7",
+      "commits": []
+    }
+  ],
+  "coordinatorQueue": {
+    "observedAt": "2026-10-02T09:20:03Z",
+    "dispatchesFound": false,
+    "taskIds": ["ALF-ADOPTION-PROOF", "ALF-RECOVERY-PLAN"],
+    "scope": "current coordinator queue snapshot only"
+  },
+  "scope": "administrative-retirement-only; no worker-terminal, delivery, completion, or Critic-pass claim"
+}

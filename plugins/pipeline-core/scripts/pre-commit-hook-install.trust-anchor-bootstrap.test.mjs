@@ -19,6 +19,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,6 +42,9 @@ function freshRepo(prefix) {
   git("init", "-q", "-b", "main");
   git("config", "user.email", "goldfish@example.invalid");
   git("config", "user.name", "Goldfish");
+  const plan = planGovernanceScopeDecision({ rootDir: dir, decision: "enroll", by: "Trust-anchor bootstrap fixture" });
+  assert.equal(applyGovernanceScopeDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+  assert.equal(observeGovernanceScope({ rootDir: dir }).requiresEnforcement, true);
   return { dir, git };
 }
 

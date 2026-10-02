@@ -6,11 +6,12 @@ import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {registerTestCaseCompletion} from '../../plugins/pipeline-core/lib/test-case-completion.mjs';
-import {parseVerifyCaseCompletion} from '../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs';
+import {parseVerifyCaseCompletion,verifyCaseCompletionPolicySha256} from '../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs';
 import {AUGMENTATION_SCHEMA,AUGMENTATION_PATH,validateVerifyCaseCompletionAugmentations,applyVerifyCaseCompletionAugmentations,loadAndApplyVerifyCaseCompletionAugmentations} from './verify-case-completion-augmentation.mjs';
 const policy=()=>({schema:'pipeline.verify-case-completion-policy.v1',caseIds:['actual-one','actual-two'],maxBytes:4096});
+const policySha256=value=>verifyCaseCompletionPolicySha256(value);
 const suites=()=>[{name:'existing',file:'plugins/pipeline-core/lib/existing.test.mjs',invariantPinned:'original invariant',nonOverlapNote:'original coverage',durationMs:123},{name:'unaffected',file:'plugins/pipeline-core/lib/unaffected.test.mjs'}];
-const table=()=>({schema:AUGMENTATION_SCHEMA,augmentations:[{name:'existing',file:suites()[0].file,caseCompletion:policy()}]});
+const table=(caseCompletion=policy())=>({schema:AUGMENTATION_SCHEMA,augmentations:[{name:'existing',file:suites()[0].file,caseCompletion}]});
 function write(root,path,body){mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),body);}
 function fixture(t){const root=mkdtempSync(join(tmpdir(),'completion-augmentation-'));t.after(()=>rmSync(root,{recursive:true,force:true}));return root;}
 function git(root,args){const r=spawnSync('git',args,{cwd:root,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);return r.stdout.trim();}
@@ -72,6 +73,41 @@ check('VAC012','candidate symlink/tree and unbound refs cannot borrow a regular 
   assert.equal(loadAndApplyVerifyCaseCompletionAugmentations({rootDir:root,candidate:alias,suites:suites()}).code,'AUG-READ');assert.equal(loadAndApplyVerifyCaseCompletionAugmentations({rootDir:root,candidate:'HEAD',suites:suites()}).code,'AUG-READ');
   rmSync(join(root,AUGMENTATION_PATH));mkdirSync(join(root,AUGMENTATION_PATH));write(root,AUGMENTATION_PATH+'/nested','controlled');const tree=commit(root);rmSync(join(root,AUGMENTATION_PATH),{recursive:true});write(root,AUGMENTATION_PATH,JSON.stringify(table()));assert.equal(loadAndApplyVerifyCaseCompletionAugmentations({rootDir:root,candidate:tree,suites:suites()}).code,'AUG-READ');
 });
-assert.equal(cases.length,12);
+check('VAC013','exact previous-policy binding permits a strict ordered case-ID superset without mutating source rows',()=>{
+  const original=suites();original[0].caseCompletion=policy();const before=JSON.stringify(original);
+  const next={...policy(),caseIds:[...policy().caseIds,'actual-three']};const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(policy());
+  const result=applyVerifyCaseCompletionAugmentations(original,data);assert.equal(result.ok,true);assert.equal(JSON.stringify(original),before);
+  assert.deepEqual(result.suites[0].caseCompletion,next);assert.deepEqual(result.suites[0].invariantPinned,original[0].invariantPinned);assert.equal(result.suites[1],original[1]);
+});
+check('VAC014','removing IDs, adding no new ID, or reducing maxBytes refuses a bound replacement',()=>{
+  const previous=policy();
+  const proposals=[
+    {caseIds:['actual-one'],maxBytes:4096},
+    {caseIds:['actual-one','actual-two'],maxBytes:4096},
+    {caseIds:['actual-two','actual-one','actual-three'],maxBytes:4096},
+    {caseIds:['actual-one','actual-two','actual-three'],maxBytes:2048},
+  ];
+  for(const proposal of proposals){
+    const rows=suites();rows[0].caseCompletion=previous;
+    const data=table({schema:previous.schema,...proposal});data.augmentations[0].previousPolicySha256=policySha256(previous);
+    assert.equal(applyVerifyCaseCompletionAugmentations(rows,data).code,'AUG-NON-MONOTONE');
+  }
+});
+check('VAC015','wrong previous-policy preimage digest refuses an otherwise monotone extension',()=>{
+  const rows=suites();rows[0].caseCompletion=policy();const data=table({...policy(),caseIds:[...policy().caseIds,'actual-three']});
+  data.augmentations[0].previousPolicySha256='0'.repeat(64);assert.equal(applyVerifyCaseCompletionAugmentations(rows,data).code,'AUG-PREIMAGE');
+});
+check('VAC016','existing-policy shadowing remains a conflict without exact binding and binding cannot target an absent policy',()=>{
+  const withPolicy=suites();withPolicy[0].caseCompletion=policy();assert.equal(applyVerifyCaseCompletionAugmentations(withPolicy,table()).code,'AUG-CONFLICT');
+  const absent=table({...policy(),caseIds:[...policy().caseIds,'actual-three']});absent.augmentations[0].previousPolicySha256=policySha256(policy());
+  assert.equal(applyVerifyCaseCompletionAugmentations(suites(),absent).code,'AUG-PREIMAGE');
+});
+check('VAC017','ordered superset may interleave new IDs while retaining every old ID in order',()=>{
+  const previous={schema:'pipeline.verify-case-completion-policy.v1',caseIds:['old-one','old-three'],maxBytes:4096};
+  const next={schema:'pipeline.verify-case-completion-policy.v1',caseIds:['old-one','old-two','old-three'],maxBytes:4096};
+  const rows=suites();rows[0].caseCompletion=previous;const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(previous);
+  assert.equal(applyVerifyCaseCompletionAugmentations(rows,data).ok,true);
+});
+assert.equal(cases.length,17);
 const fd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined?openSync(process.platform==='win32'?'NUL':'/dev/null','w'):Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({cases,fd,maxBytes:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES??'65536')});

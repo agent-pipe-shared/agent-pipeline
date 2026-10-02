@@ -28,7 +28,7 @@ function commit(root, file, contents, message) {
 /** A throwaway repository with an independent Nova branch, so the real Git primitives this
  * check spawns (for-each-ref, merge-base --is-ancestor, cat-file -e) run against real objects,
  * not a hand-built receipt. */
-function buildRepo() {
+function buildRepo({ includeCyborg = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "epic-ac02-"));
   git(root, ["init", "--quiet"]);
   git(root, ["symbolic-ref", "HEAD", "refs/heads/main"]);
@@ -38,7 +38,14 @@ function buildRepo() {
   commit(root, "README.md", "base\n", "base");
   const mainTip = git(root, ["rev-parse", "HEAD"]);
 
+  let cyborgTip = null;
+  if (includeCyborg) {
+    git(root, ["checkout", "--quiet", "-b", "feat/sprint-cyborg-codex-v046"]);
+    cyborgTip = commit(root, "cyborg-only.txt", "cyborg work\n", "cyborg-only work");
+    git(root, ["checkout", "--quiet", "main"]);
+  }
   git(root, ["checkout", "--quiet", "-b", "feat/sprint-nova-codex-v046"]);
+  if (includeCyborg) git(root, ["merge", "--no-ff", "--quiet", "-m", "nova consumes cyborg", "feat/sprint-cyborg-codex-v046"]);
   const novaTip = commit(root, "nova-only.txt", "nova work\n", "nova-only work");
 
   git(root, ["checkout", "--quiet", "main"]);
@@ -46,19 +53,21 @@ function buildRepo() {
   const boundCommit = git(root, ["rev-parse", "HEAD"]);
   const boundTree = git(root, ["rev-parse", "HEAD^{tree}"]);
 
-  return { root, mainTip, novaTip, boundCommit, boundTree };
+  return { root, mainTip, novaTip, cyborgTip, boundCommit, boundTree };
 }
 
-function writeManifest(root, candidate) {
+function writeManifest(root, candidate, id = "test-epic") {
   const manifest = {
     schema: "pipeline.feature-package.v1",
-    feature: { id: "test-epic", rigor: 2 },
+    feature: { id, rigor: 2 },
     state: "verifying",
     artifacts: [],
     candidate,
     supersedes: null,
   };
-  writeFileSync(join(root, "specs", "test-epic", "lifecycle.json"), JSON.stringify(manifest));
+  const manifestDir = join(root, "specs", id);
+  mkdirSync(manifestDir, { recursive: true });
+  writeFileSync(join(manifestDir, "lifecycle.json"), JSON.stringify(manifest));
 }
 
 function writeReleaseState(root, { commit: releasedCommit, tree: releasedTree }) {
@@ -122,6 +131,35 @@ check("permits a candidate commit with no sibling-Epic ancestry at all", () => {
     const result = checkEpicAc02Publication(repo.root);
     assert.equal(result.ok, true);
     assert.equal(result.results[0].receipt.code, "PSI-PUB-NO-SIBLING-CONSUMPTION");
+  } finally { rmSync(repo.root, { recursive: true, force: true }); }
+});
+
+check("does not classify Nova's own unpublished branch as sibling consumption", () => {
+  const repo = buildRepo();
+  try {
+    writeReleaseState(repo.root, { commit: repo.mainTip, tree: git(repo.root, ["rev-parse", `${repo.mainTip}^{tree}`]) });
+    writeManifest(repo.root, { commit: repo.novaTip, tree: git(repo.root, ["rev-parse", `${repo.novaTip}^{tree}`]) }, "sprint-nova-epic");
+    const result = checkEpicAc02Publication(repo.root);
+    assert.equal(result.ok, true);
+    assert.equal(result.failed.length, 0);
+    assert.equal(result.results[0].receipt.status, "verification-permitted");
+    assert.equal(result.results[0].receipt.code, "PSI-PUB-NO-SIBLING-CONSUMPTION");
+    assert.deepEqual(result.results[0].receipt.publishedConsumptions, []);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); }
+});
+
+check("still rejects Nova when its candidate consumes an unpublished Cyborg branch", () => {
+  const repo = buildRepo({ includeCyborg: true });
+  try {
+    writeReleaseState(repo.root, { commit: repo.mainTip, tree: git(repo.root, ["rev-parse", `${repo.mainTip}^{tree}`]) });
+    writeManifest(repo.root, { commit: repo.boundCommit, tree: repo.boundTree }, "sprint-nova-epic");
+    const result = checkEpicAc02Publication(repo.root);
+    assert.equal(result.ok, false);
+    assert.equal(result.failed.length, 1);
+    assert.equal(result.failed[0].receipt.code, "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT");
+    assert.deepEqual(result.failed[0].receipt.findings, [{
+      code: "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT", epic: "cyborg", commit: repo.cyborgTip,
+    }]);
   } finally { rmSync(repo.root, { recursive: true, force: true }); }
 });
 

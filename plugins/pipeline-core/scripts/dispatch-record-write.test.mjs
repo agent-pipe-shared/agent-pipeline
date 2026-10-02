@@ -321,6 +321,29 @@ function undeliveredFixture() {
   return { root, value, addendum, criticPath };
 }
 
+function deliveredV3AddendumFixture(overrides = {}) {
+  const value = record({ taskId: "V3-DELIVERED-ADDENDUM", outcome: "completed",
+    candidateCommit: "b".repeat(40), commits: ["a".repeat(40), "b".repeat(40)],
+    criticSkip: undefined, ...overrides });
+  delete value.criticSkip;
+  value.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA,
+    rigorLevel: 2, riskClass: "low", riskFlag: true,
+    diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T4" };
+  const root = fixture(value);
+  const recordPath = `evidence/dispatch-record-${value.taskId}.json`;
+  const receipt = writeDispatchRecordObject({ repoRoot: root, target: recordPath, record: value });
+  const criticPath = `evidence/critic-${value.taskId}.md`;
+  const criticBytes = Buffer.from("Independent Critic reviewed the delivered v3 dispatch.\n");
+  writeFileSync(join(root, criticPath), criticBytes);
+  const addendum = { schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath, recordSha256: receipt.sha256,
+    taskId: value.taskId, candidateCommit: value.candidateCommit, reviewCandidateCommit: "e".repeat(40),
+    criticPacketId: "d".repeat(32), criticReceiptSha256: "c".repeat(64),
+    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: value.taskId,
+      candidateCommit: value.candidateCommit, path: criticPath,
+      sha256: createHash("sha256").update(criticBytes).digest("hex") } };
+  return { root, value, addendum, recordPath };
+}
+
 check("Critic addendum writer publishes exclusively and coverage reads the exact record bytes", () => {
   const { root, value, addendum } = undeliveredFixture();
   try {
@@ -378,7 +401,35 @@ check("public writer cannot publish authored Claude/Codex v4 without the private
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 17, "the complete dispatch-record writer corpus must be registered before execution begins");
+check("Critic addendum writer accepts a terminal delivered v3 record with candidateCommit last", () => {
+  const { root, value, addendum } = deliveredV3AddendumFixture();
+  try {
+    const receipt = writeCriticDispositionAddendumObject({ repoRoot: root, addendum });
+    assert.equal(receipt.recordSha256, addendum.recordSha256);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, receipt.target), "utf8")), addendum);
+    assert.equal(receipt.candidateCommit, value.candidateCommit);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Critic addendum writer refuses v3 in-progress and zero-commit sources", () => {
+  const inProgress = deliveredV3AddendumFixture({ taskId: "V3-ADDENDUM-IN-PROGRESS",
+    outcome: "in-progress", commits: [] });
+  try {
+    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: inProgress.root, addendum: inProgress.addendum }), /delivered Critic-required/u);
+    assert.equal(existsSync(join(inProgress.root, criticDispositionAddendumPath(inProgress.value.taskId))), false);
+  } finally { rmSync(inProgress.root, { recursive: true, force: true }); }
+  const zeroCommit = deliveredV3AddendumFixture({ taskId: "V3-ADDENDUM-ZERO-COMMIT" });
+  try {
+    const malformed = { ...zeroCommit.value, commits: [] };
+    const malformedBytes = Buffer.from(`${JSON.stringify(malformed, null, 2)}\n`);
+    writeFileSync(join(zeroCommit.root, zeroCommit.recordPath), malformedBytes);
+    zeroCommit.addendum.recordSha256 = createHash("sha256").update(malformedBytes).digest("hex");
+    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: zeroCommit.root, addendum: zeroCommit.addendum }), /candidateCommit as the final commits entry/u);
+    assert.equal(existsSync(join(zeroCommit.root, criticDispositionAddendumPath(zeroCommit.value.taskId))), false);
+  } finally { rmSync(zeroCommit.root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 19, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

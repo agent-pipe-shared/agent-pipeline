@@ -122,7 +122,7 @@ function readyLifecycleFixture(mode = "chat") {
   // Build the shared lifecycle through its explicit chat-only fixture route.
   // Individual guard cases select the policy under test after this fixture is
   // ready, so this helper does not duplicate the detached-proof E2E ceremony.
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat", "--language", "en"], { cwd: root, env, encoding: "utf8", shell: false });
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat", "--advisor-export-consent", "declined", "--language", "en"], { cwd: root, env, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -289,7 +289,7 @@ check("Antigravity pretool guard allows read-only tools immediately", () => {
 });
 
 check("Antigravity pretool guard rejects invalid JSON", () => {
-  const root = fixture();
+  const root = readyLifecycleFixture();
   const res = decision(run("not-json", root));
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /not valid JSON/);
@@ -297,15 +297,7 @@ check("Antigravity pretool guard rejects invalid JSON", () => {
 });
 
 check("Antigravity pretool guard blocks chained commands (&&, ;, pipes)", () => {
-  const root = fixture();
-  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
-    project: "test", verify: "node verify.mjs",
-  }));
-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
-    schema: "pipeline.state.v0",
-    planApproved: true,
-    activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" },
-  }));
+  const root = readyLifecycleFixture();
 
   const res = decision(run({
     toolCall: {

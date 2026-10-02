@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
-import { parseVerifyCaseCompletion } from "../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs";
+import { parseVerifyCaseCompletion, verifyCaseCompletionPolicySha256 } from "../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs";
 
 import {
   DEFAULT_REGISTRY,
@@ -596,9 +596,9 @@ check("VCR27", "supplementary policy admits required completion without mutating
 check("VCR28", "unknown, duplicate, malformed and conflicting supplementary policies fail the canonical gate", () => {
   for (const mutate of [d=>d.augmentations[0].name="unknown",d=>d.augmentations[0].file="../outside.test.mjs",d=>d.augmentations.push(structuredClone(d.augmentations[0])),d=>d.extra=true]) {
     const f = declarativeFixture(); delete f.suite.caseCompletion; saveDeclarative(f); const data = supplementary(f); mutate(data);
-    write(f.root, AUGMENTATION_FILE, JSON.stringify(data)); hasFinding(f, "DECLARATIVE-AUGMENTATION");
+    write(f.root, AUGMENTATION_FILE, JSON.stringify(data)); hasFinding(f, "VERIFY-AUGMENTATION");
   }
-  const f = declarativeFixture(); write(f.root, AUGMENTATION_FILE, JSON.stringify(supplementary(f))); hasFinding(f, "DECLARATIVE-AUGMENTATION AUG-CONFLICT");
+  const f = declarativeFixture(); write(f.root, AUGMENTATION_FILE, JSON.stringify(supplementary(f))); hasFinding(f, "VERIFY-AUGMENTATION AUG-CONFLICT");
 });
 check("VCR29", "candidate-bound supplementary JSON cannot borrow worktree policy or hide required historical absence", () => {
   const f = declarativeFixture(); delete f.suite.caseCompletion; saveDeclarative(f); const base = initializeCandidate(f);
@@ -607,15 +607,39 @@ check("VCR29", "candidate-bound supplementary JSON cannot borrow worktree policy
   hasFinding(f, "REQUIRED-VERIFY-POLICY declarative-required", { base, candidate: base });
   git(f.root, ["add", "."]); git(f.root, ["commit", "-qm", "supplementary required policy"]); const candidate = git(f.root, ["rev-parse", "HEAD"]);
   write(f.root, AUGMENTATION_FILE, "{broken"); const bound = checkVerifyCaseCompletion({ root: f.root, base, candidate });
-  assert.equal(bound.ok, true, bound.findings.join("\n")); hasFinding(f, "DECLARATIVE-AUGMENTATION AUG-READ");
+  assert.equal(bound.ok, true, bound.findings.join("\n")); hasFinding(f, "VERIFY-AUGMENTATION AUG-READ");
 });
 check("VCR30", "published supplementary policy cannot be ignored when no matching declarative rows exist", () => {
   const f = fixture(); write(f.root, AUGMENTATION_FILE, JSON.stringify({ schema: "pipeline.verify-case-completion-augmentations.v1", augmentations: [
     { name: "unconsumed", file: "plugins/pipeline-core/lib/required.test.mjs", caseCompletion: declarativePolicy() }] }));
-  hasFinding(f, "DECLARATIVE-AUGMENTATION AUG-TARGET");
+  hasFinding(f, "VERIFY-AUGMENTATION AUG-TARGET");
 });
 
-assert.equal(cases.length, 30, "the complete Verify case-completion registry corpus must be registered before execution begins");
+check("VCR31", "strict declarative monotone extension passes the full exact prior policy object to the augmentation loader", () => {
+  const f = declarativeFixture();
+  const previous = declarativePolicy();
+  const next = { ...previous, caseIds: ["case-one", "case-two"] };
+  write(f.root, AUGMENTATION_FILE, JSON.stringify({ schema: "pipeline.verify-case-completion-augmentations.v1", augmentations: [
+    { name: f.suite.name, file: f.suite.file, previousPolicySha256: verifyCaseCompletionPolicySha256(previous), caseCompletion: next },
+  ] }));
+  const result = checkVerifyCaseCompletion({ root: f.root });
+  assert.equal(result.ok, true, result.findings.join("\n"));
+  assert.equal(result.registeredCount, 5); assert.equal(result.registryCount, 5);
+  assert.deepEqual(JSON.parse(readFileSync(join(f.root, DECLARATIVE), "utf8")).suites[0].caseCompletion, previous,
+    "augmentation uses candidate reader data without rewriting the declarative preimage");
+});
+
+check("VCR32", "static boolean case-presence markers cannot authorize a monotone policy extension", () => {
+  const f = fixture();
+  const previous = declarativePolicy();
+  const next = { ...previous, caseIds: ["case-one", "case-two"] };
+  write(f.root, AUGMENTATION_FILE, JSON.stringify({ schema: "pipeline.verify-case-completion-augmentations.v1", augmentations: [
+    { name: "required", file: "plugins/pipeline-core/lib/required.test.mjs", previousPolicySha256: verifyCaseCompletionPolicySha256(previous), caseCompletion: next },
+  ] }));
+  hasFinding(f, "VERIFY-AUGMENTATION AUG-PREIMAGE");
+});
+
+assert.equal(cases.length, 32, "the complete Verify case-completion registry corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

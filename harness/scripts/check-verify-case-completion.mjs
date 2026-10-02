@@ -342,18 +342,17 @@ function parseDeclarativeRegistrations(reader, findings, root, candidate) {
   // obtained through the selected physical/Git-candidate reader. Never run Verify.
   const validation = validateDeclarativeVerifySuites(data);
   if (!validation.ok) { findings.push(`DECLARATIVE-SCHEMA ${validation.error}`); return []; }
-  const augmented = loadAndApplyVerifyCaseCompletionAugmentations({ rootDir: root, candidate, suites: data.suites });
-  if (!augmented.ok) { findings.push(`DECLARATIVE-AUGMENTATION ${augmented.code} ${augmented.error}`); return []; }
   const entries = [];
-  for (const suite of augmented.suites) {
+  for (const suite of data.suites) {
     if (!safeRepoPath(suite.file) || !suite.file.endsWith(".mjs")) {
       findings.push(`DECLARATIVE-PATH ${suite.name} has unsafe or malformed ${JSON.stringify(suite.file)}`); continue;
     }
     if (suite.caseCompletion !== undefined && !validateVerifyCaseCompletionPolicy(suite.caseCompletion)) {
       findings.push(`DECLARATIVE-POLICY ${suite.name} has invalid completion policy`);
     }
+    const policyValid = validateVerifyCaseCompletionPolicy(suite.caseCompletion);
     entries.push({ name: suite.name, path: suite.file, arrayName: "DECLARATIVE_VERIFY_SUITES",
-      caseCompletion: validateVerifyCaseCompletionPolicy(suite.caseCompletion) });
+      caseCompletion: policyValid, caseCompletionPolicy: policyValid ? suite.caseCompletion : null });
   }
   return entries;
 }
@@ -511,7 +510,20 @@ export function checkVerifyCaseCompletion({
   try { verifySource = reader.read(toPosix(verifyPath)); } catch (error) { findings.push(`VERIFY-READ ${error.message}`); }
   if (registrySource === undefined || schemaSource === undefined || verifySource === undefined) return { ok: false, findings, registeredCount: 0, vulnerableCount: 0, registryCount: 0 };
 
-  const registrations = [...parseVerifyRegistrations(verifySource, findings), ...parseDeclarativeRegistrations(reader, findings, root, candidateOid)]
+  const staticRegistrations = parseVerifyRegistrations(verifySource, findings);
+  const declarativeRegistrations = parseDeclarativeRegistrations(reader, findings);
+  const augmentationInputs = [...staticRegistrations, ...declarativeRegistrations].map((entry) => ({
+    name: entry.name,
+    file: entry.path,
+    ...(entry.arrayName === "DECLARATIVE_VERIFY_SUITES"
+      ? (entry.caseCompletion ? { caseCompletion: entry.caseCompletionPolicy } : {})
+      : (entry.caseCompletion ? { caseCompletion: true } : {})),
+  }));
+  const augmentedRegistrations = loadAndApplyVerifyCaseCompletionAugmentations({ rootDir: root, candidate: candidateOid, suites: augmentationInputs });
+  if (!augmentedRegistrations.ok) findings.push(`VERIFY-AUGMENTATION ${augmentedRegistrations.code} ${augmentedRegistrations.error}`);
+  const policyNames = new Set(augmentedRegistrations.ok ? augmentedRegistrations.suites.filter((entry) => entry.caseCompletion).map((entry) => entry.name) : []);
+  const registrations = [...staticRegistrations, ...declarativeRegistrations]
+    .map((entry) => ({ ...entry, caseCompletion: policyNames.has(entry.name) }))
     .filter((entry) => entry.path.endsWith(".test.mjs"));
   const schema = parseValidationSchema(schemaSource, findings);
   const registry = parseRegistry(registrySource, schema, reader, findings);

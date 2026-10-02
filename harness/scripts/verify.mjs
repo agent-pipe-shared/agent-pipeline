@@ -267,9 +267,9 @@ const TEST_SUITES = [
   { name: "main-session-route-tests", file: join(libDir, "main-session-route.test.mjs") },
   { name: "model-role-session-tests", file: join(libDir, "model-role-session.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 39 }, (_, index) => `MRS${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "model-role-dispatch-tests", file: join(libDir, "model-role-dispatch.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 3 }, (_, index) => `MRD${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-  { name: "model-role-dispatch-select-tests", file: join(pluginScriptsDir, "model-role-dispatch-select.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["MDS01", "MDS02", "MDS03", "MDS04", "MDS05", "MDS06", "MDS07"], maxBytes: 65_536 } },
+  { name: "model-role-dispatch-select-tests", file: join(pluginScriptsDir, "model-role-dispatch-select.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["MDS01", "MDS02", "MDS03", "MDS04", "MDS05", "MDS06", "MDS07", "MDS08", "MDS09", "MDS10"], maxBytes: 65_536 } },
   { name: "model-role-approved-policy-tests", file: join(libDir, "model-role-approved-policy.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 5 }, (_, index) => `MRP${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-  { name: "model-role-bootstrap-tests", file: join(pluginScriptsDir, "model-role-bootstrap.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 16 }, (_, index) => `MRB${String(index + 1).padStart(2, "0")}`), maxBytes: 131_072 } },
+  { name: "model-role-bootstrap-tests", file: join(pluginScriptsDir, "model-role-bootstrap.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 19 }, (_, index) => `MRB${String(index + 1).padStart(2, "0")}`), maxBytes: 131_072 } },
   { name: "model-role-host-observations-tests", file: join(libDir, "model-role-host-observations.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 7 }, (_, index) => `MRO${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "model-role-host-identity-tests", file: join(libDir, "model-role-host-identity.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 3 }, (_, index) => `MRI${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "model-role-host-session-tests", file: join(libDir, "model-role-host-session.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 4 }, (_, index) => `MRH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -319,7 +319,7 @@ const TEST_SUITES = [
   { name: "runner-profile-migration-v2-tests", file: join(libDir, "runner-profile-migration-v2.test.mjs") },
   { name: "runner-profiles-v3-tests", file: join(libDir, "runner-profiles-v3.test.mjs") },
   { name: "runtime-projection-v3-tests", file: join(libDir, "runtime-projection-v3.test.mjs") },
-  { name: "runner-profile-migration-v3-tests", file: join(libDir, "runner-profile-migration-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 54 }, (_, index) => `RPM${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "runner-profile-migration-v3-tests", file: join(libDir, "runner-profile-migration-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 56 }, (_, index) => `RPM${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "project-onboarding-v3-tests", file: join(libDir, "project-onboarding-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["POV-00ddbc796e449f17", "POV-01ee71f24ad67847", "POV-0276da1cde1564c2", "POV-02912c387210350a", "POV-0373d32f758e8d31", "POV-04032a9983c9fe4a", "POV-04e6debab7d9a4be", "POV-055eafcff81b4dda", "POV-0715659135c026ec", "POV-07da0944b1ec0b4f", "POV-083a78a2f3946112", "POV-0a141e159c01479b", "POV-0b661179261503d9", "POV-0bb33608193d0b98", "POV-0e6ddd160ede7621", "POV-107ff4bc450f915d", "POV-10f53050fa82bf9a", "POV-135b7d1c7e591883", "POV-185af79f7d57db60", "POV-1920850a60927347", "POV-1936d59b5229accd", "POV-1985a2667aaa448d", "POV-1993715936636004", "POV-19b8d135db3ea311", "POV-1bc3c1178af90243", "POV-1bfb0a42d218c5cf", "POV-1c65985138083f00", "POV-1d5f3d0abc2a287e", "POV-1fd81ac84c6d02c5", "POV-20a3806d9e40d456", "POV-20ab90fb3038caaf", "POV-20d7cc958baf563a", "POV-2122e04615a2a64c", "POV-2192591f669166e1", "POV-21db7c1b992e9c90", "POV-227afe4e773338a8", "POV-236fff164061d288", "POV-23b0b044ffc59d2e", "POV-2480d183b7d56199", "POV-25efe9be5c4012b9", "POV-26420bf85a7d4fc5", "POV-26a1dcd3f0584b6a", "POV-272dc682918eb418", "POV-274390584d8de067", "POV-2775339dd0f57625", "POV-27d398facc5fee7f", "POV-2a90d7b2376554f8", "POV-2c857f07be4d6f2b", "POV-2f1698bde7c199dd", "POV-2f32a4164bd5122a", "POV-31a467df40d91682", "POV-327106f4fb615499", "POV-331992dad7988cf6", "POV-35e8c78d54ee4321", "POV-36eb348cf28c5158", "POV-37e46d6edf6bf272", "POV-388da32fad62ad9c", "POV-39c338e79243591d", "POV-39dff492daff6a96", "POV-3b1d68d331feee57", "POV-3b5e8d9cac28d3c1", "POV-3e71bffbb1014642", "POV-40031932c7d8be71", "POV-40aa964462eeba1d", "POV-40df3488697a411d", "POV-4130c4ce7167bd02", "POV-420b1e3b0d9c44a6", "POV-42887e4088661553", "POV-42dd4f3d224029cc", "POV-437a6ff66e05f1e0", "POV-460a76837e7b5ec0", "POV-465c717cde41215f", "POV-496312c00ceefb08", "POV-4aef2c78ffbc85a9", "POV-4c55c2f7de51781c", "POV-4dc69d8296d0df85", "POV-4e74c13b2543e050", "POV-4e8f0cbb5bac9cd1", "POV-4ea3045119660272", "POV-4f50f1b7e1d6bf0e", "POV-51e8335012ea9e8c", "POV-53268324b257a6f9", "POV-55c5de9e1f917d14", "POV-5786f961395b4d14", "POV-59771443076a7e6f", "POV-59e8dca80e532033", "POV-5ad747f219cca159", "POV-5c3343a07429c542", "POV-5e9a1b911133e313", "POV-610806ff5f007007", "POV-618f937930e9476f", "POV-61efa600e0f4b8d4", "POV-64a98eb9c326189d", "POV-64fcac60ee4626fa", "POV-66e49da101f15ade", "POV-68560f1c9516707f", "POV-693de860360f354d", "POV-6b31952e1741596c", "POV-6bc13949b2b629e3", "POV-6dcfdc87a1602815", "POV-6edec87c2101a040", "POV-6f1560272250337d", "POV-72603af2fccea9c9", "POV-7373b000a289a43c", "POV-74508137addc92c8", "POV-746a0936efae16d2", "POV-74a0efd0bbb3aa6c", "POV-74e8aa112d26f055", "POV-750a22b103cbd861", "POV-753466dc869f6ee5", "POV-77f707b8547e50a5", "POV-785de9cd0d3d9bd7", "POV-787734883cd0ec98", "POV-79cf7aa27d4d6b6e", "POV-7af7a985ae76440c", "POV-7c48d18e69827af7", "POV-7cf6b3882bc5174b", "POV-7e14b5d37548d7d7", "POV-81b42c7101b78049", "POV-81ececc626bbbf3a", "POV-846df0423c7f95eb", "POV-875092a78e50a194", "POV-881eb0bacd823364", "POV-8c3467e290e07c55", "POV-8ca8f5fdd2a0a77d", "POV-8d3cbe84bd17ce5c", "POV-8d4dcf31f411b761", "POV-942c4ec49421949b", "POV-97a918937f9e098d", "POV-9a0f4a638e4c9c9a", "POV-9a3d108daa8941ec", "POV-9a79d587ee12a898", "POV-9b276f2255197696", "POV-9ef63a6f5a2e1064", "POV-9f3c2272d6bcaa9b", "POV-a1b4e0eaf478a708", "POV-a2b2cf71bfa9a02b", "POV-a4d45fdfb2521d93", "POV-a59cef7de0904395", "POV-a79a3836be6e951d", "POV-a90c7844592b6f26", "POV-ac9bb43fea5d43d5", "POV-ad5a1c5426775a32", "POV-ad675b3ae5319535", "POV-ae3963a33e9df5ad", "POV-b039c9431f677416", "POV-b0b71e067d2c084e", "POV-b0d2179eb68bb6ad", "POV-b25c62308a31b3fe", "POV-b47ad8994c4f308c", "POV-b4965efe00ba3fb9", "POV-b7e0593579d4dbe9", "POV-b8f4cb642d646067", "POV-ba8863a0ac82adbe", "POV-bc426c016d0302a8", "POV-bcea98ff28388145", "POV-bdac72aca0ec56ec", "POV-bdfd72d46b09668d", "POV-c40f6a54a3065b3d", "POV-c6bb046e9ce1e375", "POV-ca4c6a07de50be54", "POV-cb076d6a3c92ced1", "POV-cc168d91c7bd5c5d", "POV-cc229033b370d574", "POV-ccbe2c297d490d7b", "POV-cff5c8cd6982470e", "POV-d05cdcb0d2b2217b", "POV-d1a15155eb153871", "POV-d1f08fbcf7f4cad0", "POV-d308d8473a11c9ed", "POV-d563f040762882e5", "POV-d5778f82678f8fcc", "POV-d7250b2b95e730fa", "POV-d85a6fea3e10b5e7", "POV-d8eb6777746d881c", "POV-d998ddbfe1c3b412", "POV-d9b8a46a728c8800", "POV-dc481f4808ca173c", "POV-dc813e6f97dbfa35", "POV-dd5a32f014d6f6ad", "POV-dd635fa29ad729e9", "POV-dffae61eec0c7881", "POV-e1cf2fd3e8682c5a", "POV-e26dbbe8e7bf8062", "POV-e3b1deb6f648b10d", "POV-e3eaffaa27941341", "POV-e51e66f758c096b3", "POV-e534ee76e0ede4ce", "POV-e67d403f0a1de295", "POV-e68ae592fbfeb492", "POV-e7c3b37e6e29c20c", "POV-e8b019f7f76b281a", "POV-e8c9af39808c1133", "POV-ebc68a0a2fce3057", "POV-ebebd3c77f67c772", "POV-ebf73112679cb62f", "POV-ebfe7ed51688a952", "POV-ec30cc79fa6df70b", "POV-ec3b6c2b31b38111", "POV-ef1eb4827109991c", "POV-ef59d4494680d112", "POV-ef98e543a3684587", "POV-f0f2f735f2910b87", "POV-f2cfb72587803df2", "POV-f37e711f591b74ff", "POV-f452dd1e7c4436f9", "POV-f5900571b26c339b", "POV-f5b7719b5ea3a938", "POV-f60f94ad91f95677", "POV-f8ffc2fbd9030218", "POV-f96a801753a9e357", "POV-fa4b7e199dde24a1", "POV-fc4d55a6719443b5", "POV-fc4ed152ab2d5f3b", "POV-fd0099aa72e63783", "POV-fe2dfb26586ebb38"], maxBytes: 65536 } },
   { name: "onboarding-first-restart-intake-tests", file: join(libDir, "onboarding-first-restart-intake.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC17C001","RC17C002","RC17C003","RC17C004","RC17C005","RC17C006","RC17C007"],maxBytes:65536} },
   { name: "project-onboarding-ready-gate-tests", file: join(libDir, "project-onboarding-ready-gate.test.mjs") },
@@ -392,7 +392,7 @@ const TEST_SUITES = [
   { name: "codex-tool-free-design-readiness-tests", file: join(libDir, "codex-tool-free-design-readiness.test.mjs") },
   { name: "codex-host-output-custody-tests", file: join(libDir, "codex-host-output-custody.test.mjs") },
   { name: "design-readiness-runner-host-store-tests", file: join(libDir, "design-readiness-runner-host-store.test.mjs") },
-  { name: "pipeline-start-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "pipeline-start", "pipeline-start-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 7 }, (_, index) => `PSV${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "pipeline-start-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "pipeline-start", "pipeline-start-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `PSV${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "pipeline-start-preflight-tests", file: join(pluginScriptsDir, "pipeline-start-preflight.test.mjs") },
   { name: "runner-usage-v1-tests", file: join(libDir, "runner-usage-v1.test.mjs") },
   { name: "p3b-runner-conformance-tests", file: join(libDir, "p3b-runner-conformance.test.mjs") },
@@ -592,7 +592,7 @@ const TEST_SUITES = [
   { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
   { name: "test-case-completion-tests", file: join(libDir, "test-case-completion.test.mjs") },
   { name: "verify-case-completion-receipt-tests", file: join(libDir, "verify-case-completion-receipt.test.mjs") },
-  { name: "verify-case-completion-registry-tests", file: join(scriptDir, "check-verify-case-completion.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 30 }, (_, index) => `VCR${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "verify-case-completion-registry-tests", file: join(scriptDir, "check-verify-case-completion.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 32 }, (_, index) => `VCR${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "verify-case-completion-check", file: join(scriptDir, "check-verify-case-completion.mjs") },
   { name: "afk-assumption-mode-tests", file: join(libDir, "afk-assumption-mode.test.mjs") },
   { name: "afk-capability-worker-tests", file: join(libDir, "afk-capability-worker.test.mjs") },
@@ -789,7 +789,7 @@ const TEST_SUITES = [
   { name: "check-suite-registration-tests", file: join(pluginScriptsDir, "check-suite-registration.test.mjs") },
   { name: "check-vendored-template-sync-tests", file: join(pluginScriptsDir, "check-vendored-template-sync.test.mjs") },
   { name: "dispatch-authorship-verify-tests", file: join(pluginScriptsDir, "dispatch-authorship-verify.test.mjs") },
-  { name: "dispatch-record-write-tests", file: join(pluginScriptsDir, "dispatch-record-write.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 17 }, (_, index) => `DRW${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "dispatch-record-write-tests", file: join(pluginScriptsDir, "dispatch-record-write.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 19 }, (_, index) => `DRW${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "execution-plane-launch-tests", file: join(pluginScriptsDir, "execution-plane-launch.test.mjs") },
   { name: "installed-plugin-attestation-host-tests", file: join(pluginScriptsDir, "installed-plugin-attestation-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 9 }, (_, index) => `IPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "nova-a8-benchmark-runner-tests", file: join(pluginScriptsDir, "nova-a8-benchmark-runner.test.mjs") },
@@ -909,8 +909,11 @@ const TEST_SUITES = [
 ];
 const declarativeSuitesPath = join(repoRoot, "harness", "verify-suites.json");
 const declarativeSuitesResult = loadDeclarativeVerifySuites(declarativeSuitesPath);
+const augmentationRegistrationSources = declarativeSuitesResult.ok
+  ? [...declarativeSuitesResult.suites, ...WINDOWS_ASSURANCE_VERIFY_SUITES]
+  : [];
 const augmentedDeclarativeSuitesResult = declarativeSuitesResult.ok
-  ? loadAndApplyVerifyCaseCompletionAugmentations({ rootDir: repoRoot, suites: declarativeSuitesResult.suites })
+  ? loadAndApplyVerifyCaseCompletionAugmentations({ rootDir: repoRoot, suites: augmentationRegistrationSources })
   : declarativeSuitesResult;
 let declarativeSuitesStep = null;
 if (!augmentedDeclarativeSuitesResult.ok) {
@@ -918,10 +921,9 @@ if (!augmentedDeclarativeSuitesResult.ok) {
   declarativeSuitesStep = { name: "declarative-verify-suites-registration", exitCode: 1 };
 } else if (declarativeSuitesResult.exists) {
   for (const suite of augmentedDeclarativeSuitesResult.suites) {
+    if (!declarativeSuitesResult.suites.some((declared) => declared.name === suite.name)) continue;
     const entry = { name: suite.name, file: join(repoRoot, suite.file) };
-    if (suite.caseCompletion) {
-      entry.caseCompletion = suite.caseCompletion;
-    }
+    if (suite.caseCompletion) entry.caseCompletion = suite.caseCompletion;
     TEST_SUITES.push(entry);
   }
 }
@@ -1000,7 +1002,10 @@ if (startedCandidate.status === "dirty") {
       steps.push(declarativeSuitesStep);
     } else {
       const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
-      const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file), ...(suite.name === "toolchain-preflight-tests" ? { caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["TCP001", "TCP002", "TCP003", "TCP004", "TCP005", "TCP006", "TCP007", "TCP008", "TCP009", "TCP010", "TCP011", "TCP012", "TCP013", "TCP014", "TCP015", "TCP016", "TCP017", "TCP018", "TCP019", "TCP020", "TCP021", "TCP022", "TCP023", "TCP024", "TCP025", "TCP026", "TCP027", "TCP028", "TCP029", "TCP030", "TCP031", "TCP032", "TCP033"], maxBytes: 65_536 } } : {}) }));
+      const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => {
+        const registered = augmentedDeclarativeSuitesResult.suites.find((entry) => entry.name === suite.name && entry.file === suite.file);
+        return { name: suite.name, file: join(repoRoot, suite.file), ...(registered?.caseCompletion ? { caseCompletion: registered.caseCompletion } : {}) };
+      });
       const phaseSteps = PHASE_STEPS.map((suite, index) => ({ ...suite, dependsOn: index === 0 ? [] : [PHASE_STEPS[index - 1].name] }));
       const registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...phaseSteps];
       // AC-P3/R1.4: report a duplicate registration as a step rather than letting

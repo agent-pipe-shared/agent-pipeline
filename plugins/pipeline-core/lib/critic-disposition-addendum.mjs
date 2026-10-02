@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
-/** Immutable review resolution for an exclusive, Critic-required v4 record. */
+/** Immutable review resolution for a Critic-required authored v3/v4 record. */
 import { createHash } from "node:crypto";
 import { CRITIC_EVIDENCE_SCHEMA } from "./critic-skip-decision.mjs";
-import { DISPATCH_RECORD_SCHEMA, isSafeTaskId, normalizeDispatchRecordPath } from "./dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, isNoDeliveryOutcome, isSafeTaskId, isTerminalOutcome, normalizeDispatchRecordPath } from "./dispatch-record.mjs";
 
 export const CRITIC_DISPOSITION_ADDENDUM_SCHEMA = "pipeline.critic-disposition-addendum.v1";
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -46,14 +46,18 @@ export function validateCriticDispositionAddendum(addendum, { recordPath, record
   const authored = record?.outcomeClassification?.kind === "authored-commit"
     && Array.isArray(record.commits) && record.commits.length === 1
     && record.commits[0] === addendum.candidateCommit;
+  const authoredV3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
+    && isTerminalOutcome(record.outcome) && !isNoDeliveryOutcome(record.outcome)
+    && Array.isArray(record.commits) && record.commits.length > 0
+    && record.commits.at(-1) === addendum.candidateCommit;
   if (recordPath !== `evidence/dispatch-record-${addendum.taskId}.json`
     || addendum.recordPath !== recordPath
     || !(recordBytes instanceof Uint8Array)
     || createHash("sha256").update(recordBytes).digest("hex") !== addendum.recordSha256
-    || record?.schema !== DISPATCH_RECORD_SCHEMA
+    || (record?.schema !== DISPATCH_RECORD_SCHEMA && !authoredV3)
     || record.taskId !== addendum.taskId
     || record.candidateCommit !== addendum.candidateCommit
     || !Object.hasOwn(record, "criticRequired")
-    || (!undelivered && !interrupted && !authored)) throw new TypeError("critic addendum does not bind an immutable Critic-required v4 record");
+    || (!undelivered && !interrupted && !authored && !authoredV3)) throw new TypeError("critic addendum does not bind an immutable Critic-required authored v3/v4 record");
   return addendum;
 }

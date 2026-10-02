@@ -8,9 +8,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, verifyCriticDispositionAddendumForRecord, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+import { DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, verifyCriticDispositionAddendumForRecord, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
-import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 
 const SHA = "a".repeat(40);
 const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
@@ -47,11 +47,11 @@ const criticReceiptSha256 = "c".repeat(64);
 const criticPacketId = "d".repeat(32);
 const reviewCandidateCommit = "e".repeat(40);
 const recordBlobOid = "b".repeat(40);
-const boundReview = (recordBytes) => ({
+const boundReview = (recordBytes, taskId = "UNDELIVERED") => ({
   gitRead: (args) => args[1] === "--git-common-dir" ? ".git" : recordBlobOid,
   readGitBlob: () => Buffer.from(recordBytes),
-  readBoundCriticReceipt: () => ({ packet: { request: { taskId: "UNDELIVERED" },
-    references: [{ kind: "evidence", path: "evidence/dispatch-record-UNDELIVERED.json", candidateBlobOid: recordBlobOid }] },
+  readBoundCriticReceipt: () => ({ packet: { request: { taskId },
+    references: [{ kind: "evidence", path: `evidence/dispatch-record-${taskId}.json`, candidateBlobOid: recordBlobOid }] },
   critic: { reviewPass: true, candidate: { commit: reviewCandidateCommit } }, criticReceiptSha256 }),
 });
 function reconcileIndex(entry) { return json({ schema: LEGACY_RECONCILE_SCHEMA, entries: [entry] }); }
@@ -77,6 +77,34 @@ function addendum(taskId, recordBytes, criticBytes) {
     criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: SHA,
       path: `evidence/critic-${taskId}.md`, sha256: sha256(criticBytes) },
   };
+}
+
+function abandonedRecoveryFiles() {
+  const recordRows = [
+    v3("ALF-ADOPTION-PROOF", { candidateCommit: null, criticRequired: required() }),
+    v3("ALF-RECOVERY-PLAN", { criticRequired: required() }),
+  ];
+  const paths = recordRows.map((record) => `evidence/dispatch-record-${record.taskId}.json`);
+  const bytes = recordRows.map(json);
+  const observation = json({ schema: "pipeline.abandoned-v3-dispatch-recovery-observation.v1",
+    observedAt: "2026-10-02T09:20:03Z", baseHead: SHA,
+    records: recordRows.map((record, index) => ({ taskId: record.taskId, recordPath: paths[index],
+      recordSha256: sha256(bytes[index]), schema: record.schema, outcome: record.outcome,
+      candidateCommit: record.candidateCommit, commits: record.commits })),
+    coordinatorQueue: { observedAt: "2026-10-02T09:20:03Z", dispatchesFound: false,
+      taskIds: recordRows.map((record) => record.taskId), scope: "current coordinator queue snapshot only" },
+    scope: "administrative-retirement-only; no worker-terminal, delivery, completion, or Critic-pass claim" });
+  const entries = recordRows.map((record, index) => ({ taskId: record.taskId, recordPath: paths[index],
+    recordSha256: sha256(bytes[index]), recordSchema: record.schema, outcome: record.outcome,
+    candidateCommit: record.candidateCommit, commits: record.commits, disposition: "abandoned-no-delivery",
+    observationPath: "evidence/alf-abandoned-v3-recovery-observation.json", observationSha256: sha256(observation) }));
+  const index = json({ schema: "pipeline.abandoned-v3-dispatch-recovery-index.v1", entries });
+  return Object.fromEntries([
+    ["evidence/dispatch-record-ALF-ADOPTION-PROOF.json", bytes[0]],
+    ["evidence/dispatch-record-ALF-RECOVERY-PLAN.json", bytes[1]],
+    ["evidence/alf-abandoned-v3-recovery-observation.json", observation],
+    [DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, index],
+  ]);
 }
 
 test("immutable v4 undelivered record is covered by an exact byte-bound Critic addendum", () => {
@@ -125,6 +153,31 @@ test("immutable authored Agy v4 record can be resolved by the same independently
     json({ ...authored, commits: [] }));
   assert.match(evaluate(root, ["src.txt"], boundReview(recordBytes)).readFindings.join("\n"),
     /authored-commit terminal record requires candidateCommit/u);
+});
+
+test("immutable authored v3 record can be resolved by a consumed task-bound Critic receipt", () => {
+  const taskId = "LEGACY-AUTHORED";
+  const authored = v3(taskId, { candidateCommit: SHA, outcome: "completed", resultSha256: sha256("Done."),
+    commits: [SHA], report: { text: "Done.", changedFiles: ["src.txt"] }, criticRequired: required() });
+  const recordBytes = json(authored);
+  const criticBytes = "Independent Critic review of authored v3 delivery.\n";
+  const root = fixture({ [`evidence/dispatch-record-${taskId}.json`]: recordBytes,
+    [`evidence/critic-${taskId}.md`]: criticBytes,
+    [criticDispositionAddendumPath(taskId)]: json(addendum(taskId, recordBytes, criticBytes)) });
+  const reviewed = evaluate(root, ["src.txt"], boundReview(recordBytes, taskId));
+  assert.equal(reviewed.ok, true, reviewed.readFindings.join("\n"));
+  assert.equal(reviewed.requiredRecordCount, 0);
+  assert.equal(reviewed.criticEvidenceRecordCount, 1);
+
+  for (const stale of [
+    v3(taskId, { criticRequired: required() }),
+    v3(taskId, { outcome: "completed", candidateCommit: SHA, resultSha256: sha256("No delivery."), commits: [],
+      report: { text: "No delivery.", changedFiles: [] }, criticRequired: required() }),
+  ]) {
+    assert.throws(() => validateCriticDispositionAddendum(addendum(taskId, recordBytes, criticBytes), {
+      recordPath: `evidence/dispatch-record-${taskId}.json`, recordBytes, record: stale,
+    }), /authored v3\/v4/u);
+  }
 });
 
 test("interrupted Agy v4 remains pending until exact independent Critic review", () => {
@@ -368,25 +421,131 @@ test("review admission permits exactly its current pending target while retainin
   assert.equal(admitted.ok, true);
   assert.equal(admitted.admittedCount, 1);
   assert.equal(admitted.coveredRecordCount, 1);
+  assert.equal(admitted.targetRecordCandidateCommit, SHA);
+  assert.equal(admitted.candidateCommit, SHA);
+  assert.equal(admitted.admittedByDescendant, false);
 });
 
-test("review admission rejects candidate drift, a second pending record, and malformed corpus evidence", () => {
+test("review admission allows a second structurally valid pending record but keeps coverage blocked", () => {
   const root = fixture({
     "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
     "evidence/dispatch-record-OTHER.json": json(v4("OTHER", { criticRequired: required() })),
   });
   const extraPending = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
-  assert.equal(extraPending.ok, false);
-  assert.match(extraPending.readFindings.join("\n"), /only the exact review target may remain pending/u);
+  assert.equal(extraPending.ok, true, extraPending.readFindings.join("\n"));
+  assert.equal(extraPending.admittedCount, 1);
+  assert.equal(extraPending.pendingRecordCount, 1);
+  assert.deepEqual(extraPending.pendingRecordPaths, ["evidence/dispatch-record-OTHER.json"]);
+  const coverage = evaluate(root);
+  assert.equal(coverage.ok, false);
+  assert.equal(coverage.requiredRecordCount, 2);
+
+  writeFileSync(join(root, "evidence", "dispatch-critic-addendum-OTHER.json"), "{}\n");
+  const malformedAddendum = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(malformedAddendum.ok, false);
+  assert.match(malformedAddendum.readFindings.join("\n"), /invalid critic addendum/u);
 
   const drifted = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: "b".repeat(40), readChangedPaths: () => [] });
   assert.equal(drifted.ok, false);
   assert.match(drifted.readFindings.join("\n"), /found 0/u);
+});
 
+test("review admission follows the exact authored record candidate to its descendant review candidate", () => {
+  const root = fixture({ "src/change.txt": "source change\n" });
+  const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+  const git = (...args) => execFileSync("git", args, { cwd: root, env: cleanEnv, encoding: "utf8" }).trim();
+  git("init", "-q");
+  git("add", "src/change.txt");
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "authored source");
+  const sourceCandidate = git("rev-parse", "HEAD");
+  const recordPath = "evidence/dispatch-record-ANCESTOR-TARGET.json";
+  const record = v3("ANCESTOR-TARGET", { outcome: "completed", candidateCommit: sourceCandidate,
+    resultSha256: sha256("Completed delivery."), commits: [sourceCandidate],
+    report: { text: "Completed delivery.", changedFiles: ["src/change.txt"] }, criticRequired: required() });
+  writeFileSync(join(root, recordPath), json(record));
+  git("add", recordPath);
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "persist dispatch record");
+  const reviewCandidate = git("rev-parse", "HEAD");
+  const admitted = evaluateReviewAdmission({ root, taskId: record.taskId,
+    candidateCommit: reviewCandidate, readChangedPaths: () => [] });
+  assert.equal(admitted.ok, true, admitted.readFindings.join("\n"));
+  assert.equal(admitted.admittedByDescendant, true);
+  assert.equal(admitted.targetRecordCandidateCommit, sourceCandidate);
+  assert.equal(admitted.candidateCommit, reviewCandidate);
+
+  const tree = git("rev-parse", `${reviewCandidate}^{tree}`);
+  const unrelated = git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+    "commit-tree", tree, "-m", "unrelated root");
+  const stale = evaluateReviewAdmission({ root, taskId: record.taskId,
+    candidateCommit: unrelated, readChangedPaths: () => [] });
+  assert.equal(stale.ok, false);
+  assert.match(stale.readFindings.join("\n"), /not a descendant/u);
+  const wrongTask = evaluateReviewAdmission({ root, taskId: "OTHER-TASK",
+    candidateCommit: reviewCandidate, readChangedPaths: () => [] });
+  assert.equal(wrongTask.ok, false);
+});
+
+test("review admission still rejects malformed corpus evidence while another record is pending", () => {
+  const root = fixture({
+    "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
+    "evidence/dispatch-record-OTHER.json": json(v4("OTHER", { criticRequired: required() })),
+  });
   writeFileSync(join(root, "evidence", "dispatch-record-BROKEN.json"), "{");
   const malformed = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
   assert.equal(malformed.ok, false);
   assert.match(malformed.readFindings.join("\n"), /could not be read as valid JSON/u);
+});
+
+test("signed recovery index retires exactly two source-bound zero-commit v3 rows without covering authored reviews", () => {
+  const files = abandonedRecoveryFiles();
+  const authored = v4("AUTHORED", { outcome: "completed", resultSha256: sha256("Complete."), commits: [SHA],
+    report: { text: "Complete.", changedFiles: [] },
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    criticRequired: required() });
+  files["evidence/dispatch-record-TARGET.json"] = json(v4("TARGET", { criticRequired: required() }));
+  files["evidence/dispatch-record-AUTHORED.json"] = json(authored);
+  const root = fixture(files);
+  const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+  const git = (...args) => execFileSync("git", args, { cwd: root, env: cleanEnv, encoding: "utf8" }).trim();
+  const intentSha256 = "f".repeat(64);
+  git("init", "-q");
+  git("add", "evidence");
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm",
+    `signed-package fixture\n\nDispatch: quality-package-${intentSha256} (integration)\nAI-Assisted: true`);
+  const ownerCommit = git("rev-parse", "HEAD");
+  const noProof = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [],
+    verifyQualityPackageIntegrationPostCommit: () => ({ ok: false, code: "missing-proof" }) });
+  assert.equal(noProof.ok, false);
+  assert.match(noProof.readFindings.join("\n"), /signed quality-package post-commit verification failed/u);
+
+  const proof = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [],
+    verifyQualityPackageIntegrationPostCommit: (input) => {
+      assert.deepEqual(input, { repoRoot: root, commitSha: ownerCommit, intentSha256 });
+      return { ok: true, code: "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED" };
+    } });
+  assert.equal(proof.ok, true, proof.readFindings.join("\n"));
+  assert.equal(proof.administrativelyRetiredRecordCount, 2);
+  assert.equal(proof.pendingRecordCount, 1);
+  assert.deepEqual(proof.pendingRecordPaths, ["evidence/dispatch-record-AUTHORED.json"]);
+  const coverage = evaluate(root, [], { verifyQualityPackageIntegrationPostCommit: () => ({
+    ok: true, code: "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED" }) });
+  assert.equal(coverage.ok, false);
+  assert.equal(coverage.administrativelyRetiredRecordCount, 2);
+  assert.equal(coverage.requiredRecordCount, 2, "the review target and authored pending record still require coverage");
+
+  const adoptionPath = join(root, "evidence/dispatch-record-ALF-ADOPTION-PROOF.json");
+  const adoptionBytes = files["evidence/dispatch-record-ALF-ADOPTION-PROOF.json"];
+  writeFileSync(adoptionPath, "{\n");
+  const malformedSource = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA,
+    verifyQualityPackageIntegrationPostCommit: () => ({ ok: true, code: "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED" }) });
+  assert.equal(malformedSource.ok, false);
+  assert.match(malformedSource.readFindings.join("\n"), /recordSha256 does not match the current record|could not be read as valid JSON/u);
+  writeFileSync(adoptionPath, adoptionBytes);
+  writeFileSync(adoptionPath, json(v4("ALF-ADOPTION-PROOF", { criticRequired: required() })));
+  const v4Substitution = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA,
+    verifyQualityPackageIntegrationPostCommit: () => ({ ok: true, code: "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED" }) });
+  assert.equal(v4Substitution.ok, false);
+  assert.match(v4Substitution.readFindings.join("\n"), /recordSha256 does not match the current record|current source row is not the exact in-progress zero-commit v3/u);
 });
 
 test("v4 pending, skipped and evidenced records remain actual coverage consumers, while malformed v4 fails closed", () => {

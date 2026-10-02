@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 
 const hook = join(dirname(fileURLToPath(import.meta.url)), "antigravity-pretool-guard.mjs");
 const prepareScript = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "antigravity-native-dispatch-prepare.mjs");
@@ -27,6 +28,9 @@ function fixture() {
   git(root, "config", "user.email", "fixture@example.invalid");
   git(root, "add", "input.txt");
   git(root, "commit", "-q", "-m", "fixture");
+  const enrollment = planGovernanceScopeDecision({ rootDir: root, decision: "enroll", by: "Antigravity native fixture" });
+  assert.equal(applyGovernanceScopeDecision(enrollment, { activate: true, planSha256: enrollment.planSha256 }).state, "active");
+  assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true);
   const nativeSubagents = [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "input.txt\nmodel: gemini-3.7\nruleset-sha: local" }];
   const packets = [{
     schema: ROLE_DISPATCH_REQUEST_SCHEMA,

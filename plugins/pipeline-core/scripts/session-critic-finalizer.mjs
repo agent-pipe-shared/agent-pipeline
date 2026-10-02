@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   GOVERNANCE_REVIEW_SOURCE_SCHEMA,
@@ -157,7 +158,7 @@ function readBoundedJson(root, path, code) {
 }
 function validateCliRequest(value) {
   if (!exact(value, REQUEST_KEYS) || value.schema !== SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA
-    || !SAFE_ID.test(value.taskId ?? "") || !SAFE_ID.test(value.projectId ?? "")
+    || !isSafeTaskId(value.taskId) || !SAFE_ID.test(value.projectId ?? "")
     || !SAFE_ID.test(value.sessionId ?? "") || !PACKET_ID.test(value.packetId ?? "")
     || !["T0", "T1", "T2", "T3"].includes(value.trigger)
     || !exact(value.route, ROUTE_KEYS) || !exact(value.review, REVIEW_KEYS)
@@ -188,10 +189,12 @@ function candidateFor(preflight) {
     tree: preflight.candidate.tree,
   };
 }
-function referencesFor(preflight) {
+function referencesFor(preflight, taskId) {
+  if (!isSafeTaskId(taskId)) fail("SCF-TASK");
   return [
     { kind: "spec", path: preflight.spec.path },
     ...preflight.guardrails.map(({ path }) => ({ kind: "guardrail", path })),
+    { kind: "evidence", path: `evidence/dispatch-record-${taskId}.json` },
   ].filter((entry, index, all) => all.findIndex((candidate) => candidate.kind === entry.kind && candidate.path === entry.path) === index);
 }
 function courseDigestsFor(preflight) {
@@ -255,7 +258,7 @@ export function admitSessionCriticReview(options, deps = {}) {
     rulesetOid: preflight.dispatch.reviewerInput.rulesetSha,
     trigger: options.trigger ?? "T1",
     route,
-    references: referencesFor(preflight),
+    references: referencesFor(preflight, options.taskId),
     evidencePaths: options.preflightInput.evidencePaths,
     sessionBinding: {
       schema: SESSION_PACKET_BINDING_SCHEMA,
@@ -368,7 +371,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     admitted = (deps.inspectClaimedSessionAdmissionFn ?? inspectClaimedSessionAdmission)({ controlRoot, packetId }, deps.packetDependencies);
   } catch { fail("SCF-PRELAUNCH-ADMISSION"); }
   const packet = admitted.packet;
-  const expectedReferences = referencesFor(preflight).sort((left, right) => {
+  const expectedReferences = referencesFor(preflight, options.taskId).sort((left, right) => {
     const a = `${left.kind}:${left.path}`;
     const b = `${right.kind}:${right.path}`;
     return a < b ? -1 : a > b ? 1 : 0;

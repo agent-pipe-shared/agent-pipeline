@@ -36,6 +36,18 @@ import {
 const TEST_VERSION = "0.9.0+prepush-observe-test";
 const manifest = JSON.stringify({ version: TEST_VERSION });
 const pluginList = () => () => JSON.stringify({ installed: [], available: [] });
+const activeGovernanceScope = ({ rootDir }) => ({
+  schema: "pipeline.governance-scope.v1",
+  state: "active",
+  root: rootDir,
+  scopeKey: "a".repeat(64),
+  repositoryKind: "git",
+  provenance: { kind: "isolated-unit-capability", refs: [] },
+  diagnostics: [],
+  requiresEnforcement: true,
+  hintAllowed: false,
+});
+
 
 // Mirrors pipeline-start-preflight-antigravity-hard-enforcement.test.mjs's own
 // `noSelfApplicationGitScriptUrl`: a synthetic scriptUrl under `root` so
@@ -125,8 +137,10 @@ test("installed-and-current: a repo where this installer's own hook is present a
 
 test("installed-but-stale: an intact hook from plugin library A advises the exact update for library B, then becomes current", () => {
   withFreshRepo("stale-plugin-library", (dir) => {
-    const oldLib = "/pipeline-cache/a/lib";
-    const currentLib = "/pipeline-cache/b/lib";
+    const oldLib = join(dir, "pipeline-cache", "a", "lib");
+    const currentLib = join(dir, "pipeline-cache", "b", "lib");
+    mkdirSync(oldLib, { recursive: true });
+    mkdirSync(currentLib, { recursive: true });
     const install = applyInstall({ rootDir: dir, pluginLibDir: oldLib });
     assert.equal(install.status, "installed");
     const hookBefore = readFileSync(install.hookPath, "utf8");
@@ -287,7 +301,7 @@ test("wired: the ready path is unchanged when the hook is installed-and-current"
   withFreshRepo("wired-ready", (dir) => {
     const install = applyInstall({ rootDir: dir });
     assert.equal(install.status, "installed");
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: {},
       pluginList: pluginList(),
       read: () => manifest,
@@ -309,7 +323,7 @@ test("wired: the ready path is unchanged when the hook is installed-and-current"
 // still fully present and correct.
 test("wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command", () => {
   withFreshRepo("wired-absent", (dir) => {
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: {},
       pluginList: pluginList(),
       read: () => manifest,
@@ -328,7 +342,7 @@ test("wired: a declined repository is ready, and the result still shows the decl
   withFreshRepo("wired-declined", (dir) => {
     const decline = applyDecline({ rootDir: dir });
     assert.equal(decline.status, "declined");
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: {},
       pluginList: pluginList(),
       read: () => manifest,
@@ -352,7 +366,7 @@ test("wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVI
     ).trim();
     mkdirSync(join(hookPath, ".."), { recursive: true });
     writeFileSync(hookPath, "#!/bin/sh\necho a human already had this\n");
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: {},
       pluginList: pluginList(),
       read: () => manifest,
@@ -367,7 +381,7 @@ test("wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVI
 
 test("wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged", () => {
   const cwd = "/projects/current";
-  const result = observePipelineStartPreflight({
+  const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
     env: {},
     pluginList: pluginList(),
     read: () => manifest,
@@ -385,7 +399,7 @@ test("wired: a repository-unresolved cwd (this file's own pre-existing test fixt
 // NVA-PREPUSHVISIBLE-1: deliberately inverted, same reasoning as the two tests above.
 test("wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either", () => {
   withFreshRepo("wired-claude", (dir) => {
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: { CLAUDECODE: "1" },
       pluginList: pluginList(),
       read: () => manifest,
@@ -401,7 +415,7 @@ test("wired: a Claude-runner session observes the same hook state as any other r
 test("wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value", () => {
   const calls = [];
   const dir = "/some/repo/root";
-  const result = observePipelineStartPreflight({
+  const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
     env: {},
     pluginList: pluginList(),
     read: () => manifest,
@@ -484,7 +498,7 @@ test("wired: an unseen push never gates readiness or the exit code, and is still
     writeHookLog(dir, [
       { schema: "pipeline.pre-push-hook-log.v1", at: new Date().toISOString(), verdict: "allowed", commit: "0".repeat(40).replace(/0$/, "1"), localRef: "refs/heads/other", remoteRef: "refs/heads/other" },
     ]);
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: {},
       pluginList: pluginList(),
       read: () => manifest,
@@ -506,7 +520,7 @@ test("wired: a seen push (in the log) never gates readiness either, status/exit 
     writeHookLog(dir, [
       { schema: "pipeline.pre-push-hook-log.v1", at: new Date().toISOString(), verdict: "allowed", commit: head, localRef: "refs/heads/main", remoteRef: "refs/heads/main" },
     ]);
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: {},
       pluginList: pluginList(),
       read: () => manifest,
@@ -522,7 +536,7 @@ test("wired: a seen push (in the log) never gates readiness either, status/exit 
 test("wired: an injected observeUnseenPushToRemoteFn is honored, proving the call site actually forwards cwd rather than a hardcoded value", () => {
   const calls = [];
   const dir = "/some/repo/root";
-  const result = observePipelineStartPreflight({
+  const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
     env: {},
     pluginList: pluginList(),
     read: () => manifest,

@@ -5,7 +5,7 @@ import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstat
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { normalizeDispatchRecordPath, validateDispatchRecord } from "../lib/dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
@@ -286,7 +286,9 @@ export function writeCriticDispositionAddendumObject({ repoRoot, addendum }, dep
   let record;
   try { record = parseStrictJson(recordBytes); }
   catch (error) { fail("record-json", `dispatch record is not strict JSON: ${error.message}`); }
-  validateDispatchRecord(record);
+  if (record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA) validatePreviousDispatchRecord(record);
+  else if (record?.schema === DISPATCH_RECORD_SCHEMA) validateDispatchRecord(record);
+  else fail("record-schema", "critic addendum source record schema must be v3 or v4");
   validateCriticDispositionAddendum(addendum, { recordPath: addendum.recordPath, recordBytes, record });
   const evidenceBytes = readPhysicalRequest(root, addendum.criticEvidence.path, dependencies);
   if (createHash("sha256").update(evidenceBytes).digest("hex") !== addendum.criticEvidence.sha256) fail("critic-evidence", "critic evidence digest mismatch");

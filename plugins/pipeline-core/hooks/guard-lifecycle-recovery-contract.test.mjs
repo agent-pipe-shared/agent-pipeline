@@ -32,11 +32,13 @@
 // prevent.
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
 import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
+import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gate.mjs";
 import {
   inspectProjectOnboardingV3,
@@ -53,6 +55,14 @@ import {
 } from "../lib/project-onboarding-v3.test.mjs";
 
 function bash(command) { return { tool_name: "Bash", tool_input: { command } }; }
+function activeRoot() {
+  const path = root();
+  execFileSync("git", ["init", "--quiet"], { cwd: path });
+  const plan = planGovernanceScopeDecision({ rootDir: path, decision: "enroll", by: "Lifecycle recovery fixture" });
+  assert.equal(applyGovernanceScopeDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+  assert.equal(observeGovernanceScope({ rootDir: path }).requiresEnforcement, true);
+  return path;
+}
 function deny() {
   throw new ProjectOnboardingReadyError("PORG-NOT-READY", "raw lifecycle message", {
     intent: "session",
@@ -107,7 +117,7 @@ test("every offered PO-authority-rebind-planner nextAction is admitted by the re
 });
 
 test("NVA-B8: only the fresh, complete published action crosses the executable boundary", () => {
-  const path = root();
+  const path = activeRoot();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const action = {

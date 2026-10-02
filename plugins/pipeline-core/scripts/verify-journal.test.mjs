@@ -1097,6 +1097,37 @@ test("AGY-VERIFYTUNER-2: an exclusiveSuites member runs alone -- nothing else is
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("security-scan uses the default exclusive phase so sibling fixtures cannot race its cleanliness snapshot", async () => {
+  const f = twoSuiteFixture(["security-scan", "concurrent-peer"]);
+  let securityScanRunning = false;
+  let peerInFlight = 0;
+  let anyOverlap = false;
+  const spawn = delayedSpawn({
+    delayMs: 25,
+    onStart: (file) => {
+      if (file === f.files[0]) {
+        securityScanRunning = true;
+        if (peerInFlight > 0) anyOverlap = true;
+        return;
+      }
+      peerInFlight += 1;
+      if (securityScanRunning) anyOverlap = true;
+    },
+    onSettle: (file) => { if (file === f.files[0]) securityScanRunning = false; else peerInFlight -= 1; },
+  });
+  try {
+    const result = await runVerifyJournal({
+      gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites,
+      policyInputs: { harness: "test" }, runId: "verify-security-snapshot-exclusive",
+      registerRun, spawn, concurrency: 4,
+    });
+    assert.equal(anyOverlap, false, "security-scan must complete before any sibling suite starts, so transient fixture writes cannot change its cleanliness observation");
+    assert.deepEqual(result.steps.map((step) => step.name), ["security-scan", "concurrent-peer"]);
+    assert.equal(result.steps.every((step) => step.exitCode === 0), true);
+    assert.equal(result.terminal.status, "passed");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking", async () => {
   const f = twoSuiteFixture(["excl-dep", "pool-dep"]);
   const suites = [

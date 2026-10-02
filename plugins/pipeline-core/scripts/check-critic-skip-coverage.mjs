@@ -10,9 +10,11 @@ import { fileURLToPath } from "node:url";
 import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { readBoundConsumedCriticReceipt } from "../lib/critic-verify-lifecycle.mjs";
-import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isNoDeliveryOutcome, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
+import { parseIntegrationTrailerBlock } from "../lib/commit-message-policy.mjs";
+import { verifyQualityPackageIntegrationPostCommit } from "../lib/signed-quality-package.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -21,6 +23,10 @@ const DISPATCH_RECORD_PATTERN = /^dispatch-record-.+\.json$/u;
 const CRITIC_ADDENDUM_PATTERN = /^dispatch-critic-addendum-.+\.json$/u;
 export const LEGACY_RECONCILE_SCHEMA = "pipeline.legacy-dispatch-reconcile-index.v1";
 export const DEFAULT_LEGACY_RECONCILE_INDEX_PATH = "evidence/legacy-dispatch-reconcile-index.json";
+export const ABANDONED_V3_RECOVERY_INDEX_SCHEMA = "pipeline.abandoned-v3-dispatch-recovery-index.v1";
+export const DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH = "evidence/abandoned-v3-dispatch-recovery-index.json";
+const ABANDONED_V3_TASKS = ["ALF-ADOPTION-PROOF", "ALF-RECOVERY-PLAN"];
+const ABANDONED_V3_OBSERVATION_SCHEMA = "pipeline.abandoned-v3-dispatch-recovery-observation.v1";
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 function physicalRegularFile(root, path, label) {
@@ -53,6 +59,138 @@ function digestMatches(bytes, expected, label) {
   if (typeof expected !== "string" || !SHA256.test(expected)) return `${label}: sha256 must be a lowercase SHA-256 digest`;
   const actual = createHash("sha256").update(bytes).digest("hex");
   return actual === expected ? null : `${label}: SHA-256 digest mismatch`;
+}
+
+function readGit(root, args, options = {}) {
+  const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+  return (options.gitRead ?? ((gitArgs) => execFileSync("git", gitArgs, {
+    cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024, env: gitEnv,
+  }).trim()))(args);
+}
+
+/**
+ * Retire only the two source-bound stale v3 rows after a canonical signed
+ * package committed the exact index. The index cannot authorize itself: its
+ * owning commit must be an ancestor, its current bytes/mode must match that
+ * commit, and the commit's canonical integration trailer must verify against
+ * the signed package receipt.
+ */
+export function readAbandonedV3RecoveryIndex(root, options = {}) {
+  const indexPath = options.abandonedV3RecoveryIndexPath ?? DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH;
+  const entriesByPath = new Map();
+  const absolute = resolve(root, indexPath);
+  if (!existsSync(absolute)) return { findings: [], entriesByPath, indexPresent: false };
+  const findings = [];
+  let indexBytes;
+  try {
+    const file = physicalRegularFile(root, indexPath, "abandoned v3 recovery index");
+    if (file.finding) throw new Error(file.finding);
+    indexBytes = file.bytes;
+  } catch (error) { return { findings: [`${indexPath}: ${error.message}`], entriesByPath, indexPresent: true }; }
+  let index;
+  try { index = parseStrictJson(indexBytes); }
+  catch (error) { return { findings: [`${indexPath}: malformed recovery index (${error.message})`], entriesByPath, indexPresent: true }; }
+  try {
+    exactObject(index, ["schema", "entries"], "abandoned v3 recovery index");
+    if (index.schema !== ABANDONED_V3_RECOVERY_INDEX_SCHEMA) throw new Error(`schema must be ${ABANDONED_V3_RECOVERY_INDEX_SCHEMA}`);
+    if (!Array.isArray(index.entries) || index.entries.length !== ABANDONED_V3_TASKS.length) throw new Error("entries must contain exactly the two bounded historical task IDs");
+    const observedPaths = new Set();
+    for (const [position, entry] of index.entries.entries()) {
+      const label = `${indexPath}: entries[${position}]`;
+      exactObject(entry, ["taskId", "recordPath", "recordSha256", "recordSchema", "outcome", "candidateCommit", "commits", "disposition", "observationPath", "observationSha256"], label);
+      const expectedTaskId = ABANDONED_V3_TASKS[position];
+      if (entry.taskId !== expectedTaskId) throw new Error(`${label}.taskId must be ${expectedTaskId} in canonical order`);
+      const expectedRecordPath = `evidence/dispatch-record-${expectedTaskId}.json`;
+      if (entry.recordPath !== expectedRecordPath || entry.recordSchema !== PREVIOUS_DISPATCH_RECORD_SCHEMA
+        || entry.outcome !== "in-progress" || !Array.isArray(entry.commits) || entry.commits.length !== 0
+        || entry.disposition !== "abandoned-no-delivery") throw new Error(`${label} is outside the closed zero-commit v3 retirement scope`);
+      if (entry.candidateCommit !== null && (typeof entry.candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(entry.candidateCommit))) throw new Error(`${label}.candidateCommit is invalid`);
+      if ((entry.taskId === "ALF-ADOPTION-PROOF") !== (entry.candidateCommit === null)) throw new Error(`${label}.candidateCommit does not match the exact observed historical row`);
+      if (!SHA256.test(entry.recordSha256 ?? "") || !SHA256.test(entry.observationSha256 ?? "")) throw new Error(`${label} digest is invalid`);
+      normalizeDispatchRecordPath(entry.observationPath, `${label}.observationPath`);
+      if (!/^evidence\/alf-abandoned-v3-recovery-observation\.json$/u.test(entry.observationPath)) throw new Error(`${label}.observationPath is outside the fixed observation path`);
+      if (observedPaths.has(entry.recordPath)) throw new Error(`${label}.recordPath duplicates an earlier entry`);
+      observedPaths.add(entry.recordPath);
+      const observationFile = physicalRegularFile(root, entry.observationPath, `${label}.observationPath`);
+      if (observationFile.finding) throw new Error(observationFile.finding);
+      if (digestMatches(observationFile.bytes, entry.observationSha256, `${label}.observationSha256`)) throw new Error(`${label}.observationSha256 does not match the observation`);
+      const observation = parseStrictJson(observationFile.bytes);
+      exactObject(observation, ["schema", "observedAt", "baseHead", "records", "coordinatorQueue", "scope"], `${label}.observation`);
+      exactObject(observation.coordinatorQueue, ["observedAt", "dispatchesFound", "taskIds", "scope"], `${label}.observation.coordinatorQueue`);
+      if (observation.schema !== ABANDONED_V3_OBSERVATION_SCHEMA || !/^[a-f0-9]{40}$/u.test(observation.baseHead ?? "")
+        || !Array.isArray(observation.records) || observation.records.length !== ABANDONED_V3_TASKS.length
+        || observation.coordinatorQueue?.dispatchesFound !== false
+        || JSON.stringify(observation.coordinatorQueue.taskIds) !== JSON.stringify(ABANDONED_V3_TASKS)
+        || observation.coordinatorQueue.scope !== "current coordinator queue snapshot only"
+        || observation.scope !== "administrative-retirement-only; no worker-terminal, delivery, completion, or Critic-pass claim") throw new Error(`${label}.observation is not a closed current administrative observation`);
+      const observedRecord = observation.records[position];
+      exactObject(observedRecord, ["taskId", "recordPath", "recordSha256", "schema", "outcome", "candidateCommit", "commits"], `${label}.observation record`);
+      if (observedRecord.taskId !== entry.taskId || observedRecord.recordPath !== entry.recordPath
+        || observedRecord.recordSha256 !== entry.recordSha256 || observedRecord.schema !== entry.recordSchema
+        || observedRecord.outcome !== entry.outcome || observedRecord.candidateCommit !== entry.candidateCommit
+        || JSON.stringify(observedRecord.commits) !== JSON.stringify(entry.commits)) throw new Error(`${label} does not match the durable observation`);
+      const recordFile = physicalRegularFile(root, entry.recordPath, `${label}.recordPath`);
+      if (recordFile.finding) throw new Error(recordFile.finding);
+      if (digestMatches(recordFile.bytes, entry.recordSha256, `${label}.recordSha256`)) throw new Error(`${label}.recordSha256 does not match the current record`);
+      const currentRecord = parseStrictJson(recordFile.bytes);
+      if (currentRecord?.schema !== PREVIOUS_DISPATCH_RECORD_SCHEMA || currentRecord?.taskId !== entry.taskId
+        || currentRecord?.outcome !== "in-progress" || currentRecord?.candidateCommit !== entry.candidateCommit
+        || !Array.isArray(currentRecord?.commits) || currentRecord.commits.length !== 0) throw new Error(`${label} current source row is not the exact in-progress zero-commit v3 record`);
+      // These two exact SHA-bound historical rows are administratively retired
+      // even if their v3 payload contains the known invalid candidate/appliedRow
+      // fields. The signed index is the narrow correction boundary; no other
+      // malformed record can use this branch.
+    }
+    const owner = readGit(root, ["log", "-1", "--format=%H", "--", indexPath], options);
+    if (!/^[a-f0-9]{40}$/u.test(owner)) throw new Error("index has no unique owning commit");
+    readGit(root, ["merge-base", "--is-ancestor", owner, "HEAD"], options);
+    const treeEntry = readGit(root, ["ls-tree", owner, "--", indexPath], options);
+    const treeMatch = /^(100644|100755) blob ([a-f0-9]{40,64})\t/u.exec(treeEntry);
+    const info = lstatSync(absolute);
+    const physicalMode = (info.mode & 0o111) ? "100755" : "100644";
+    if (!treeMatch || treeMatch[1] !== physicalMode) throw new Error("current index mode differs from its owning commit");
+    const committedBytes = (options.readGitBlob ?? ((oid) => execFileSync("git", ["cat-file", "blob", oid], { cwd: root, maxBuffer: 2 * 1024 * 1024 })))(treeMatch[2]);
+    if (!Buffer.from(committedBytes).equals(indexBytes)) throw new Error("current index bytes differ from its owning commit");
+    const message = readGit(root, ["show", "-s", "--format=%B", owner], options);
+    const trailer = parseIntegrationTrailerBlock(message);
+    if (!trailer.ok) throw new Error("index owner lacks one canonical signed-package integration trailer");
+    const verify = options.verifyQualityPackageIntegrationPostCommit ?? verifyQualityPackageIntegrationPostCommit;
+    const proof = verify({ repoRoot: root, commitSha: owner, intentSha256: trailer.intentSha256 });
+    if (!proof?.ok || proof.code !== "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED") throw new Error("signed quality-package post-commit verification failed");
+    for (const entry of index.entries) entriesByPath.set(entry.recordPath, entry);
+  } catch (error) { findings.push(`${indexPath}: invalid or unauthorized abandoned-v3 recovery index (${error.message})`); }
+  return { findings, entriesByPath, indexPresent: true };
+}
+
+function abandonedV3RecordFinding(entry, retirement) {
+  if (!retirement) return null;
+  if (entry.path !== retirement.recordPath || entry.sha256 !== retirement.recordSha256
+    || entry.record?.schema !== PREVIOUS_DISPATCH_RECORD_SCHEMA
+    || entry.record?.outcome !== "in-progress" || entry.record?.candidateCommit !== retirement.candidateCommit
+    || !Array.isArray(entry.record?.commits) || entry.record.commits.length !== 0
+    || entry.record?.taskId !== retirement.taskId) return `${entry.path}: recovery index no longer matches this exact in-progress v3 record`;
+  return null;
+}
+
+function terminalAuthoredDelivery(record) {
+  const delivered = isTerminalOutcome(record?.outcome) && !isNoDeliveryOutcome(record?.outcome)
+    && Array.isArray(record?.commits) && record.commits.length > 0
+    && record.commits.at(-1) === record.candidateCommit;
+  if (record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA) return delivered;
+  return record?.schema === DISPATCH_RECORD_SCHEMA
+    && record?.outcomeClassification?.kind === "authored-commit" && delivered;
+}
+
+function verifyCandidateDescendsFromRecord(root, recordCandidate, reviewCandidate, options = {}) {
+  const gitRead = options.gitRead ?? ((args) => execFileSync("git", args, {
+    cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024,
+    env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key))),
+  }).trim());
+  try { gitRead(["merge-base", "--is-ancestor", recordCandidate, reviewCandidate]); return { ok: true }; }
+  catch (error) {
+    if (error?.status === 1) return { ok: false, notDescendant: true };
+    return { ok: false, finding: `candidate ancestry could not be verified (${error.code ?? error.status ?? "git-readback"})` };
+  }
 }
 
 /**
@@ -257,8 +395,9 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   const readChangedPaths = options.readChangedPaths ?? ((record) => readCommitChangedPaths(root, record.commits));
   const scan = walkDispatchRecords(root);
   const reconciliations = readLegacyDispatchReconcileIndex(root, options);
+  const abandoned = readAbandonedV3RecoveryIndex(root, options);
   const addenda = readCriticDispositionAddenda(root);
-  const findings = [...scan.findings, ...reconciliations.findings, ...addenda.findings];
+  const findings = [...scan.findings, ...reconciliations.findings, ...abandoned.findings, ...addenda.findings];
   const usedAddenda = new Set();
   let applicableRecordCount = 0;
   let legacyRecordCount = 0;
@@ -266,8 +405,15 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   let requiredRecordCount = 0;
   let criticEvidenceRecordCount = 0;
   let reconciledLegacyRecordCount = 0;
+  let administrativelyRetiredRecordCount = 0;
   for (const entry of scan.records) {
     const { path, record } = entry;
+    const retirement = abandoned.entriesByPath.get(path);
+    if (retirement) {
+      const retirementFinding = abandonedV3RecordFinding(entry, retirement);
+      if (retirementFinding) findings.push(retirementFinding);
+      else { administrativelyRetiredRecordCount += 1; continue; }
+    }
     const reconciliation = reconciliations.entriesByPath.get(path);
     if (reconciliation) {
       if (record?.schema === DISPATCH_RECORD_SCHEMA) {
@@ -298,7 +444,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     const disposition = criticDisposition(record);
     const addendum = addenda.entriesByPath.get(path);
     if (addendum && disposition !== "required") {
-      findings.push(`${addendum.path}: critic addendum is only valid for a required v4 record`);
+      findings.push(`${addendum.path}: critic addendum is only valid for a required dispatch record`);
       usedAddenda.add(path);
     }
     if (disposition === "skipped") {
@@ -361,15 +507,16 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     requiredRecordCount,
     skipRecordCount,
     reconciledLegacyRecordCount,
+    administrativelyRetiredRecordCount,
     readFindings: findings,
   };
 }
 
 /**
  * Admit exactly one current dispatch record to independent review without
- * treating the pending Critic disposition as completion. This is deliberately
- * separate from coverage: every other v3/v4 record still has to be skipped or
- * evidenced, and malformed or stale corpus entries remain blocking.
+ * treating any pending Critic disposition as completion. Coverage remains a
+ * separate gate: other valid required records are reported as pending, while
+ * malformed or stale corpus entries remain blocking.
  */
 export function evaluateReviewAdmission(options = {}) {
   const root = options.root ?? DEFAULT_ROOT;
@@ -378,17 +525,29 @@ export function evaluateReviewAdmission(options = {}) {
   const readChangedPaths = options.readChangedPaths ?? ((record) => readCommitChangedPaths(root, record.commits));
   const scan = walkDispatchRecords(root);
   const reconciliations = readLegacyDispatchReconcileIndex(root, options);
+  const abandoned = readAbandonedV3RecoveryIndex(root, options);
   const addenda = readCriticDispositionAddenda(root);
-  const findings = [...scan.findings, ...reconciliations.findings, ...addenda.findings];
+  const findings = [...scan.findings, ...reconciliations.findings, ...abandoned.findings, ...addenda.findings];
   const usedAddenda = new Set();
   let admittedCount = 0;
   let applicableRecordCount = 0;
   let coveredRecordCount = 0;
+  let pendingRecordCount = 0;
+  let administrativelyRetiredRecordCount = 0;
+  const pendingRecordPaths = [];
+  let targetRecordCandidateCommit = null;
+  let admittedByDescendant = false;
   if (typeof taskId !== "string" || taskId.trim() === "") findings.push("review admission taskId is required");
   if (typeof candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(candidateCommit)) findings.push("review admission candidateCommit must be a full lowercase Git SHA");
 
   for (const entry of scan.records) {
     const { path, record } = entry;
+    const retirement = abandoned.entriesByPath.get(path);
+    if (retirement) {
+      const retirementFinding = abandonedV3RecordFinding(entry, retirement);
+      if (retirementFinding) findings.push(retirementFinding);
+      else { administrativelyRetiredRecordCount += 1; continue; }
+    }
     const reconciliation = reconciliations.entriesByPath.get(path);
     if (reconciliation) {
       if (record?.schema === DISPATCH_RECORD_SCHEMA) {
@@ -417,7 +576,7 @@ export function evaluateReviewAdmission(options = {}) {
     const disposition = criticDisposition(record);
     const addendum = addenda.entriesByPath.get(path);
     if (addendum && disposition !== "required") {
-      findings.push(`${addendum.path}: critic addendum is only valid for a required v4 record`);
+      findings.push(`${addendum.path}: critic addendum is only valid for a required dispatch record`);
       usedAddenda.add(path);
     }
     if (disposition === "required") {
@@ -427,9 +586,20 @@ export function evaluateReviewAdmission(options = {}) {
         if (addendumFinding) findings.push(addendumFinding);
         else coveredRecordCount += 1;
       } else if (record.taskId === taskId && record.candidateCommit === candidateCommit) {
+        targetRecordCandidateCommit = record.candidateCommit;
         admittedCount += 1;
+      } else if (record.taskId === taskId && terminalAuthoredDelivery(record)) {
+        targetRecordCandidateCommit = record.candidateCommit;
+        const ancestry = verifyCandidateDescendsFromRecord(root, record.candidateCommit, candidateCommit, options);
+        if (ancestry.ok) { admittedCount += 1; admittedByDescendant = true; }
+        else if (ancestry.finding) findings.push(`${path}: ${ancestry.finding}`);
+        else findings.push(`${path}: requested review candidate is not a descendant of the record's original candidateCommit`);
+      } else if (record.taskId === taskId) {
+        targetRecordCandidateCommit = record.candidateCommit;
+        findings.push(`${path}: candidate mismatch is not an exact match or a delivered authored record ancestor`);
       } else {
-        findings.push(`${path}: Critic is required by ${record.criticRequired.appliedRow}; only the exact review target may remain pending`);
+        pendingRecordCount += 1;
+        pendingRecordPaths.push(path);
       }
       continue;
     }
@@ -450,9 +620,11 @@ export function evaluateReviewAdmission(options = {}) {
     findings.push(`${path}: requires exactly one Critic disposition`);
   }
   for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
-  if (admittedCount !== 1) findings.push(`review admission requires exactly one pending record for ${taskId}@${candidateCommit}; found ${admittedCount}`);
-  const ok = findings.length === 0 && admittedCount === 1 && coveredRecordCount + admittedCount === applicableRecordCount;
-  return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount, readFindings: findings };
+  if (admittedCount !== 1) findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}`);
+  const ok = findings.length === 0 && admittedCount === 1;
+  return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount,
+    pendingRecordCount, pendingRecordPaths, administrativelyRetiredRecordCount, targetRecordCandidateCommit,
+    admittedByDescendant, readFindings: findings };
 }
 
 function runCli() {

@@ -35,15 +35,26 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
+import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const GUARD = fileURLToPath(new URL("./guard-dispatch-budget.mjs", import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
-const FAKE_ROOT = "/fake/root";
+const SCRATCH_ROOT = join(REPO_ROOT, "scratch");
+function activeGovernanceRoot(prefix) {
+  const root = mkdtempSync(join(SCRATCH_ROOT, `guard-budget-active-${prefix}-`));
+  execFileSync("git", ["init", "--quiet"], { cwd: root });
+  const plan = planGovernanceScopeDecision({ rootDir: root, decision: "enroll", by: "Dispatch budget fixture" });
+  assert.equal(applyGovernanceScopeDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+  assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true);
+  return root;
+}
+const FAKE_ROOT = activeGovernanceRoot("guard");
+const ENV_ROOT = activeGovernanceRoot("env");
 const SUBAGENT_TRANSCRIPT = "/fake/session/subagents/agent-abc123.jsonl";
 const META_PATH = "/fake/session/subagents/agent-abc123.meta.json";
 const ORCHESTRATOR_TRANSCRIPT = "/fake/session/top-level.jsonl";
@@ -147,9 +158,9 @@ const RUNNER_SOURCE = [
   "console.log('RESULT: ' + JSON.stringify({ results, commonDirCalls }));",
 ].join("\n");
 
-const SCRATCH_ROOT = join(REPO_ROOT, "scratch");
+
 mkdirSync(SCRATCH_ROOT, { recursive: true });
-const runnerDir = mkdtempSync(join(SCRATCH_ROOT, "guard-dispatch-budget-runner-"));
+const runnerDir = activeGovernanceRoot("runner");
 const RUNNER_PATH = join(runnerDir, "runner.mjs");
 writeFileSync(RUNNER_PATH, RUNNER_SOURCE);
 const PARALLEL_COUNTER_RUNNER_PATH = join(runnerDir, "parallel-counter-runner.mjs");
@@ -167,7 +178,7 @@ writeFileSync(PARALLEL_COUNTER_RUNNER_PATH, [
   "}",
   "console.log(JSON.stringify({ exitCode: result.exitCode, stderr: result.stderr }));",
 ].join("\n"));
-process.on("exit", () => { try { rmSync(runnerDir, { recursive: true, force: true }); } catch { /* best effort */ } });
+process.on("exit", () => { for (const root of [runnerDir, FAKE_ROOT, ENV_ROOT]) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } } });
 
 /** Spawns the runner against the REAL guard module and returns its parsed RESULT payload. Fails loudly (never silently) if the child does not print the success marker -- see the file-top NOTE for why. */
 function run(scenario, spawnOverrides = {}) {
@@ -444,15 +455,15 @@ test("evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded 
 test("evaluateDispatchBudgetGuard: rootDir precedence -- assert the actual resolveGitCommonDirFn argument in all three precedence cases", () => {
   const withRootDir = run(
     { rootDir: FAKE_ROOT, files: seedSubagentFiles(), steps: [{ op: "guard", input: readInputObj({}) }] },
-    { env: { ...process.env, CLAUDE_PROJECT_DIR: "/env/root" } },
+    { env: { ...process.env, CLAUDE_PROJECT_DIR: ENV_ROOT }, cwd: runnerDir },
   );
   assert.deepEqual(withRootDir.commonDirCalls, [FAKE_ROOT], "options.rootDir must win over CLAUDE_PROJECT_DIR and process.cwd()");
 
   const envOnly = run(
     { rootDirAbsent: true, files: seedSubagentFiles(), steps: [{ op: "guard", input: readInputObj({}) }] },
-    { env: { ...process.env, CLAUDE_PROJECT_DIR: "/env/root" } },
+    { env: { ...process.env, CLAUDE_PROJECT_DIR: ENV_ROOT }, cwd: runnerDir },
   );
-  assert.deepEqual(envOnly.commonDirCalls, ["/env/root"], "CLAUDE_PROJECT_DIR must win over process.cwd() when no options.rootDir override is given");
+  assert.deepEqual(envOnly.commonDirCalls, [ENV_ROOT], "CLAUDE_PROJECT_DIR must win over process.cwd() when no options.rootDir override is given");
 
   const { CLAUDE_PROJECT_DIR: _drop, ...envWithoutVar } = process.env;
   const cwdFallback = run(

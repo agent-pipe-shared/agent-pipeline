@@ -21,6 +21,7 @@ import {
   writeLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+import { observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
 
 const cases = [];
 function check(name, run) {
@@ -96,7 +97,7 @@ check("post-install readback is runner-neutral and writes path-free receipts tha
       ? { registryInstalledPluginRoot: repo.installedPluginRoot }
       : { registrySourcePluginRoot: repo.sourcePluginRoot }),
     protectedPaths: repo.protectedPaths,
-  }, { receiptDirectory: repo.receiptDirectory });
+  }, { receiptDirectory: repo.receiptDirectory, observe: (observation) => observePublicCoreIdentity(observation) });
   assert.equal(bootstrap.status, "verified", JSON.stringify(bootstrap));
  }
 });
@@ -390,6 +391,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   };
   const agyInspect = (registries = agyRegistry) => observePipelineStartPreflight({
     env: { ANTIGRAVITY_AGENT: "1" }, pluginList: () => JSON.stringify({}),
+    observeGovernanceScopeFn: ({ rootDir }) => ({ schema: "pipeline.governance-scope.v1", state: "active", root: rootDir, scopeKey: "a".repeat(64), repositoryKind: "git", provenance: { kind: "isolated-unit-capability", refs: [] }, diagnostics: [], requiresEnforcement: true, hintAllowed: false }),
     scriptUrl: pathToFileURL(join(agyRepo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
     cwd: agyRepo.base, read: agyManifestRead,
     antigravityPluginRegistries: registries,

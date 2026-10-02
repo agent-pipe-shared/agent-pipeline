@@ -31,6 +31,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest } from "../lib/manifest.mjs";
+import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { deriveCriticExportView, validateCriticExportAuthorization } from "../lib/critic-export-policy.mjs";
@@ -436,7 +437,7 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const requiredControl = join(commonDir, "agent-pipeline", "critic-packets");
     const controlRoot = assertRealPrivateDir(resolve(options.controlRoot), "control root");
     if (controlRoot !== requiredControl) fail("CPP-CONTROL", "controlRoot is not the canonical Git common-dir packet root.");
-    if (!PACKET_ID.test(options.packetId) || !SAFE_ID.test(options.taskId) || !SAFE_ID.test(options.projectId)) fail("CPP-ARGUMENT", "Unsafe packet/task/project ID.");
+    if (!PACKET_ID.test(options.packetId) || !isSafeTaskId(options.taskId) || !SAFE_ID.test(options.projectId)) fail("CPP-ARGUMENT", "Unsafe packet/task/project ID.");
     const route = normalizeRoute(options.route);
     const sessionBinding = options.sessionBinding === undefined ? undefined : normalizeSessionBinding(options.sessionBinding, route);
     const objectFormat = gitText(repoRoot, ["rev-parse", "--show-object-format"]);
@@ -452,7 +453,20 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     } else {
       const parents = gitText(repoRoot, ["rev-list", "--parents", "-n", "1", candidate]).split(/\s+/u);
       const emptyTree = String(git(repoRoot, ["hash-object", "-t", "tree", "--stdin"], { input: "" }).stdout).trim();
-      if (baseType !== "tree" || parents.length !== 1 || base !== emptyTree) fail("CPP-REF", "Base ref is neither an ancestor commit nor the empty tree of a root candidate.");
+      let exactRootSourceDescendant = false;
+      if (baseType === "tree" && base === emptyTree && parents.length !== 1
+        && reviewAdmission.admittedByDescendant === true
+        && typeof reviewAdmission.targetRecordCandidateCommit === "string"
+        && OID.test(reviewAdmission.targetRecordCandidateCommit)) {
+        const sourceCandidate = reviewAdmission.targetRecordCandidateCommit;
+        const sourceParents = gitText(repoRoot, ["rev-list", "--parents", "-n", "1", sourceCandidate]).split(/\s+/u);
+        const sourceIsRootCommit = gitText(repoRoot, ["cat-file", "-t", sourceCandidate]) === "commit" && sourceParents.length === 1;
+        const sourceIsAncestor = git(repoRoot, ["merge-base", "--is-ancestor", sourceCandidate, candidate], { allowNonzero: true }).status === 0;
+        exactRootSourceDescendant = sourceIsRootCommit && sourceIsAncestor;
+      }
+      if (baseType !== "tree" || base !== emptyTree || (parents.length !== 1 && !exactRootSourceDescendant)) {
+        fail("CPP-REF", "Base ref is neither an ancestor commit nor the empty tree of a root candidate or its exact admitted root-source descendant.");
+      }
     }
     const candidateTree = assertOid(gitText(repoRoot, ["rev-parse", `${candidate}^{tree}`]), objectFormat, "candidate tree");
     let diagnostics;

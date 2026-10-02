@@ -121,6 +121,18 @@ function withTempRoot(run) {
   }
 }
 
+const activeGovernanceScope = ({ rootDir }) => ({
+  schema: "pipeline.governance-scope.v1",
+  state: "active",
+  root: rootDir,
+  scopeKey: "a".repeat(64),
+  repositoryKind: "git",
+  provenance: { kind: "isolated-unit-capability", refs: [] },
+  diagnostics: [],
+  requiresEnforcement: true,
+  hintAllowed: false,
+});
+
 // `version` defaults to TEST_VERSION (the "currently installed" build in
 // every fixture below) so pre-existing tests that only care about freshness
 // keep writing a version-matching lock without having to say so themselves.
@@ -307,7 +319,7 @@ test("the Antigravity runner surfaces the observation field end to end, wired th
   withTempRoot((root) => {
     const now = Date.now();
     writeLock(root, "live", now - 1000);
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: { ANTIGRAVITY_AGENT: "1" },
       pluginList: pluginList(),
       read: () => manifest,
@@ -325,7 +337,7 @@ test("the Antigravity runner surfaces the observation field end to end, wired th
 
 test("the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exists, and status is fail-closed, not ready", () => {
   withTempRoot((root) => {
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: { AI_AGENT: "antigravity" },
       pluginList: pluginList(),
       read: () => manifest,
@@ -346,7 +358,7 @@ test("the Antigravity runner surfaces not-observed for a stale prior-session loc
   withTempRoot((root) => {
     const now = Date.now();
     writeLock(root, "yesterday", now - ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS - 60_000);
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: { ANTIGRAVITY_AGENT: "1" },
       pluginList: pluginList(),
       read: () => manifest,
@@ -366,7 +378,7 @@ test("the Antigravity runner surfaces not-observed for a fresh lock bound to an 
     // upgraded: fresh in time, but bound to a version that is no longer the
     // one actually loaded (`manifest` above reports TEST_VERSION).
     writeLock(root, "stale-build", now - 1000, "0.4.4+test");
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: { ANTIGRAVITY_AGENT: "1" },
       pluginList: pluginList(),
       read: () => manifest,
@@ -388,7 +400,7 @@ test("wiring passes the preflight's own resolved version as currentVersion, not 
     // currentVersion, this would spuriously flip to observed regardless of
     // the actual manifest content.
     writeLock(root, "abc", now - 1000, "9.9.9+not-the-installed-version");
-    const result = observePipelineStartPreflight({
+    const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: { ANTIGRAVITY_AGENT: "1" },
       pluginList: pluginList(),
       read: () => manifest, // reports TEST_VERSION
@@ -407,7 +419,7 @@ test("wiring passes the preflight's own resolved version as currentVersion, not 
 // the field's absence.
 test("a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready", () => {
   const spy = () => { throw new Error("must not be invoked for the Claude runner"); };
-  const result = observePipelineStartPreflight({
+  const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
     env: { CLAUDECODE: "1" },
     pluginList: pluginList(),
     read: () => JSON.stringify({ version: TEST_VERSION }),
@@ -420,7 +432,7 @@ test("a Claude session never invokes the Antigravity detector, carries no such f
 
 test("a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready", () => {
   const spy = () => { throw new Error("must not be invoked for the Codex runner"); };
-  const result = observePipelineStartPreflight({
+  const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
     env: {},
     pluginList: pluginList(),
     read: () => manifest,
@@ -443,7 +455,7 @@ test("a Codex session never invokes the Antigravity detector, carries no such fi
 test("Codex preflight output keys and status are unchanged by this addition (byte-identical surface)", () => {
   const spy = () => { throw new Error("must not be invoked for the Codex runner"); };
   const cwd = "/projects/current";
-  const result = observePipelineStartPreflight({
+  const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
     env: {},
     pluginList: pluginList(),
     read: () => manifest,

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -32,7 +34,7 @@ function commit(root, message) {
   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
   return git(root, ["rev-parse", "HEAD"]);
 }
-function fixture({ rootCandidate = false, targetedExitCode = 0 } = {}) {
+function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-"));
   git(root, ["init", "-q"]);
   mkdirSync(join(root, ".claude"));
@@ -40,58 +42,22 @@ function fixture({ rootCandidate = false, targetedExitCode = 0 } = {}) {
   mkdirSync(join(root, "evidence"));
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   writeFileSync(join(root, "specs", "spec.md"), "# Spec\n");
-  let base;
-  if (rootCandidate) {
-    const candidate = commit(root, "root candidate");
-    base = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
-    const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
-    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
-    writeFileSync(join(root, "evidence", "dispatch-record-nova-b-lnd5.json"), JSON.stringify({
-      schema: "pipeline.dispatch-record.v3",
-      taskId: "nova-b-lnd5",
-      agentType: "default",
-      model: "gpt-5.6-luna",
-      effort: "medium",
-      rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
-      dispatcher: "elephant",
-      outcome: "completed",
-      commits: [candidate],
-      candidateCommit: candidate,
-      resultSha256: "a".repeat(64),
-      log: [],
-      report: { text: "done", changedFiles: ["specs/spec.md"] },
-      criticRequired: {
-        schema: "pipeline.critic-required-decision.v1",
-        trigger: {
-          schema: "pipeline.critic-trigger-input.v1",
-          rigorLevel: 2,
-          riskClass: "high",
-          riskFlag: true,
-          diff: { mechanical: false, architecture: false, guardrails: true, security: false },
-        },
-        appliedRow: "T1",
-      },
-    }, null, 2));
-    return { root, base, candidate, tree };
-  }
-  base = commit(root, "base");
-  writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nCandidate.\n");
-  const candidate = commit(root, "candidate");
-  const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
-  // Deliberately untracked: the normal session preflight admits this local,
-  // candidate-bound machine evidence without fabricating a candidate blob.
-  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
-  writeFileSync(join(root, "evidence", "dispatch-record-nova-b-lnd5.json"), JSON.stringify({
+  const emptyTree = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
+  const base = rootCandidate ? emptyTree : commit(root, "base");
+  if (!rootCandidate) writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nSource candidate.\n");
+  const historicalCandidate = commit(root, rootCandidate ? "root source candidate" : "source candidate");
+  const recordPath = `evidence/dispatch-record-${taskId}.json`;
+  const record = {
     schema: "pipeline.dispatch-record.v3",
-    taskId: "nova-b-lnd5",
+    taskId,
     agentType: "default",
     model: "gpt-5.6-luna",
     effort: "medium",
     rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
     dispatcher: "elephant",
     outcome: "completed",
-    commits: [candidate],
-    candidateCommit: candidate,
+    commits: [historicalCandidate],
+    candidateCommit: historicalCandidate,
     resultSha256: "a".repeat(64),
     log: [],
     report: { text: "done", changedFiles: ["specs/spec.md"] },
@@ -106,8 +72,15 @@ function fixture({ rootCandidate = false, targetedExitCode = 0 } = {}) {
       },
       appliedRow: "T1",
     },
-  }, null, 2));
-  return { root, base, candidate, tree };
+  };
+  const recordBytes = `${JSON.stringify(record, null, 2)}\n`;
+  writeFileSync(join(root, recordPath), recordBytes);
+  const recordCommit = commit(root, "persist authored dispatch record");
+  writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nDescendant candidate.\n");
+  const candidate = commit(root, "descendant candidate");
+  const tree = git(root, ["rev-parse", `${candidate}^{tree}`]);
+  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
+  return { root, base, historicalCandidate, recordCommit, candidate, tree, taskId, recordPath, recordBytes };
 }
 function verdict(overrides = {}) {
   return {
@@ -131,7 +104,7 @@ function options(fx, overrides = {}) {
       evidencePaths: ["evidence/verify.json"],
       priorCriticEvidencePath: null,
     },
-    taskId: "nova-b-lnd5",
+    taskId: fx.taskId,
     projectId: "pipeline",
     sessionId: "session-lnd5-1",
     packetId: "1".repeat(32),
@@ -156,7 +129,7 @@ function cleanup(fx) { rmSync(fx.root, { recursive: true, force: true }); }
 function cliRequest(fx, overrides = {}) {
   return {
     schema: SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA,
-    taskId: "nova-b-lnd5",
+    taskId: fx.taskId,
     projectId: "pipeline",
     sessionId: "session-cli-1",
     packetId: "6".repeat(32),
@@ -176,6 +149,49 @@ function cliRequest(fx, overrides = {}) {
   };
 }
 
+test("task record reference binds uppercase delivered-v3 bytes in an immutable descendant candidate", () => {
+  const fx = fixture({ taskId: "ALF-HISTORICAL-01" });
+  try {
+    assert.equal(isSafeTaskId(fx.taskId), true);
+    const request = options(fx, { packetId: "8".repeat(32) });
+    admitSessionCriticReview(request);
+    const controlRoot = join(fx.root, git(fx.root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
+    const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
+    assert.equal(readback.packet.candidate.commit, fx.candidate);
+    assert.notEqual(readback.packet.candidate.commit, fx.historicalCandidate);
+    const reference = readback.packet.references.find(({ path }) => path === fx.recordPath);
+    assert.deepEqual(reference?.kind, "evidence");
+    assert.equal(reference.candidateBlobOid, git(fx.root, ["rev-parse", `${fx.candidate}:${fx.recordPath}`]));
+    const exactRecordBytes = readFileSync(join(fx.root, fx.recordPath));
+    assert.equal(createHash("sha256").update(fx.recordBytes).digest("hex"), createHash("sha256").update(exactRecordBytes).digest("hex"));
+    assert.equal(JSON.parse(exactRecordBytes).candidateCommit, fx.historicalCandidate);
+    assert.deepEqual(request.preflightInput.evidencePaths, ["evidence/verify.json"]);
+  } finally { cleanup(fx); }
+});
+
+test("uppercase task ID is safe and wrong or traversal IDs cannot select a different record", () => {
+  assert.equal(isSafeTaskId("ALF-HISTORICAL-01"), true);
+  assert.equal(isSafeTaskId("../ALF-HISTORICAL-01"), false);
+  const fx = fixture({ taskId: "ALF-HISTORICAL-01" });
+  try {
+    const wrong = options(fx, { taskId: "ALF-WRONG-02", packetId: "9".repeat(32) });
+    assert.throws(() => admitSessionCriticReview(wrong), (error) => error.code === "CPP-REVIEW-ADMISSION");
+    const unsafe = options(fx, { taskId: "../ALF-HISTORICAL-01", packetId: "a".repeat(32) });
+    assert.throws(() => admitSessionCriticReview(unsafe),
+      (error) => error instanceof SessionCriticFinalizerError && error.code === "SCF-TASK");
+  } finally { cleanup(fx); }
+});
+
+test("empty-tree packet base rejects a non-root authored candidate", () => {
+  const fx = fixture();
+  try {
+    const emptyTree = git(fx.root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
+    const request = options(fx, { packetId: "c".repeat(32) });
+    request.preflightInput = { ...request.preflightInput, base: emptyTree };
+    assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CPP-REF");
+  } finally { cleanup(fx); }
+});
+
 test("prelaunch admission creates one claimed, digest-bound packet before the verdict exists", () => {
   const fx = fixture();
   try {
@@ -189,6 +205,9 @@ test("prelaunch admission creates one claimed, digest-bound packet before the ve
     const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
     assert.equal(readback.admission.sessionId, request.sessionId);
     assert.equal(readback.packet.candidate.commit, fx.candidate);
+    const recordReference = readback.packet.references.find(({ path }) => path === fx.recordPath);
+    assert.equal(recordReference?.kind, "evidence");
+    assert.equal(recordReference.candidateBlobOid, git(fx.root, ["rev-parse", `${fx.candidate}:${fx.recordPath}`]));
     assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CPP-OVERWRITE");
   } finally { cleanup(fx); }
 });
@@ -393,18 +412,38 @@ test("review action construction cannot occur before identical consume readback"
   } finally { cleanup(fx); }
 });
 
-test("findings emit REVIEW_FINDINGS and a root candidate keeps its real empty-tree range", () => {
+test("findings emit REVIEW_FINDINGS and a root-authored record keeps its real empty-tree range", () => {
   const fx = fixture({ rootCandidate: true });
   try {
     const finding = { gap: "missing edge", risk: "failure", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
-    const result = finalizeSessionCriticReview(preadmitted(fx, {
+    assert.equal(fx.base, git(fx.root, ["hash-object", "-t", "tree", "--stdin"], { input: "" }));
+    const request = preadmitted(fx, {
       packetId: "4".repeat(32),
       verdict: verdict({ findings: [finding], pass: false }),
       eventOutPath: "evidence/review-action.json",
-    }));
+    });
+    const controlRoot = join(fx.root, git(fx.root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
+    const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
+    const recordReference = readback.packet.references.find(({ path }) => path === fx.recordPath);
+    assert.equal(recordReference?.kind, "evidence");
+    assert.equal(recordReference.candidateBlobOid, git(fx.root, ["rev-parse", `${fx.candidate}:${fx.recordPath}`]));
+    const result = finalizeSessionCriticReview(request);
     assert.equal(result.event.reasonCode, "REVIEW_FINDINGS");
     assert.equal(result.receipt.reviewRange.base, fx.base);
     assert.equal(result.receipt.candidate.commit, fx.candidate);
+  } finally { cleanup(fx); }
+});
+
+test("dispatch record drift after admission blocks finalization", () => {
+  const fx = fixture({ taskId: "ALF-HISTORICAL-01" });
+  try {
+    const request = preadmitted(fx, { packetId: "b".repeat(32) });
+    writeFileSync(join(fx.root, fx.recordPath), "{\n  \"schema\": \"pipeline.dispatch-record.v3\"\n}\n");
+    const driftCandidate = commit(fx.root, "dispatch record drift");
+    writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root: fx.root, candidate: driftCandidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", "console.log('record drift candidate')"], logPath: "evidence/targeted.log" }))}\n`);
+    const driftedRequest = { ...request, preflightInput: { ...request.preflightInput, candidate: driftCandidate } };
+    assert.throws(() => finalizeSessionCriticReview(driftedRequest),
+      (error) => error instanceof SessionCriticFinalizerError && error.code === "SCF-PRELAUNCH-BINDING");
   } finally { cleanup(fx); }
 });
 
@@ -417,7 +456,7 @@ test("receipt validation is closed and refuses provider metadata", () => {
 });
 
 test("closed CLI admits before verdict and finalizes only that durable packet", () => {
-  const fx = fixture();
+  const fx = fixture({ taskId: "ALF-CLI-HISTORY-01" });
   try {
     writeFileSync(join(fx.root, "evidence", "finalize-request.json"), `${JSON.stringify(cliRequest(fx))}\n`);
     const admission = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", "evidence/finalize-request.json"]);

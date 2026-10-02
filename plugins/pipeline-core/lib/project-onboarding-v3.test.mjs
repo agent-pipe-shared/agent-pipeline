@@ -2914,8 +2914,11 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
     assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input");
     assert.equal(applied.result.pushApprovalSetupAction.mutation, false);
     assert.equal(applied.result.pushApprovalSetupAction.input.name, "humanApprovalMode");
-    assert.deepEqual(Object.keys(applied.result.nextAction.pendingAsks[0].reviewedDefaults).sort(), ["gitIdentity", "humanApproval", "language", "runner"],
+    assert.deepEqual(Object.keys(applied.result.nextAction.pendingAsks[0].reviewedDefaults).sort(), ["advisorExportConsent", "gitIdentity", "humanApproval", "language", "runner"],
       "the bundled initial review publishes one typed defaults envelope");
+    assert.deepEqual(applied.result.nextAction.pendingAsks[0].reviewedDefaults.advisorExportConsent, {
+      value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true,
+    }, "the synthetic fixture preserves the explicit no-export choice for human confirmation");
     assert.deepEqual(applied.result.nextAction.pendingAsks[0].reviewedDefaults.language, {
       value: "en", source: "fresh-project-default", requiresConfirmation: true,
     });
@@ -7448,7 +7451,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
     assert.equal(postSeed.nextAction.kind, "command");
     assert.deepEqual(postSeed.nextAction.pendingAsks[0].inputs.map((input) => input.name),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
     const kickoff = completeKickoff(
       path,
       "Build one small HTML game from the supplied design",

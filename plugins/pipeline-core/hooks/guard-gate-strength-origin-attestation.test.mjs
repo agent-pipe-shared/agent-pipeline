@@ -79,7 +79,7 @@ const SUBJECTS = SUBJECT_IDS.map((id) => {
   return rule;
 });
 
-/** Same shape as the main suite's `governed()`: the fixture markers, not the fixture contents, are what the guard reads. */
+/** Same shape as the main suite's `governed()`: canonical enrollment activates enforcement for this disposable checkout. */
 function governed() {
   const base = mkdtempSync(join(tmpdir(), "gate-strength-origin-"));
   roots.push(base);
@@ -195,6 +195,11 @@ try {
     // governed fixture with no ready bootstrap has its own separate reasons to refuse.
     const root = governed();
     for (const rule of SUBJECTS) {
+      // GST33 targets must physically exist inside the disposable governed root; otherwise
+      // the read classifier cannot distinguish a genuine subject read from an absent path.
+      const fixtureTarget = join(root, rule.path);
+      mkdirSync(dirname(fixtureTarget), { recursive: true });
+      writeFileSync(fixtureTarget, "export const fixtureSubject = true;\n");
       for (const command of [
         `cat ${rule.path}`,
         `rg PUBLIC_SELF_APPLICATION_ORIGINS ${rule.path}`,
@@ -290,13 +295,11 @@ try {
     }
   });
 
-  check("GST37 the two lanes disagree about which checkouts are governed, in both directions", () => {
-    // Residual 4 of §I.1.3, likewise pinned as OPEN. The write lane tests five inline markers,
-    // the shell lane its own eleven-entry GOVERNANCE_MARKERS, and neither list contains the
-    // other. Recorded here because the divergence is what makes "GS-8/GS-9 protect this module"
-    // a per-lane claim: a checkout carrying only a guard config is Edit-refused but freely
-    // touched from the shell, and a checkout carrying only .claude/settings.json -- which is
-    // essentially every Claude Code project -- is the exact reverse.
+  check("GST37 legacy marker-only roots stand down in both lanes while canonical enrollment governs both", () => {
+    // Legacy filenames alone no longer establish governance. Both guards consult the canonical
+    // governance-scope enrollment authority before applying GS-8/GS-9 to a consumer checkout.
+    // Pin both old marker-only shapes as inactive in both lanes, then contrast a disposable
+    // Git root enrolled through the public controller API.
     const writeLaneOnly = mkdtempSync(join(tmpdir(), "gate-strength-origin-wlane-"));
     roots.push(writeLaneOnly);
     mkdirSync(join(writeLaneOnly, "project"), { recursive: true });
@@ -309,16 +312,27 @@ try {
 
     for (const rule of SUBJECTS) {
       const writeOnly = ask(writeLaneOnly, rule.path);
-      assert.equal(writeOnly.blocked, true, `${rule.id}: a write-lane marker did not govern the write lane`);
-      assert.match(writeOnly.stderr, new RegExp(`Rule ID: ${rule.id}\\b`, "u"));
-      assert.doesNotMatch(shell(writeLaneOnly, `touch ${rule.path}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
-        `${rule.id}: the shell lane claimed a checkout carrying only a write-lane marker`);
+      assert.equal(writeOnly.blocked, false, `${rule.id}: a legacy write-lane marker alone activated governance`);
+      assert.equal(writeOnly.stderr, "", `${rule.id}: inactive write lane emitted a refusal`);
+      const shellForWriteMarker = shell(writeLaneOnly, `touch ${rule.path}`);
+      assert.equal(shellForWriteMarker.blocked, false, `${rule.id}: a legacy write-lane marker alone activated the shell lane`);
+      assert.doesNotMatch(shellForWriteMarker.stderr, /GUARD-GATE-STRENGTH-SHELL/u);
 
-      assert.equal(ask(shellLaneOnly, rule.path).blocked, false,
-        `${rule.id}: the write lane claimed a checkout carrying only a shell-lane marker`);
+      const writeForShellMarker = ask(shellLaneOnly, rule.path);
+      assert.equal(writeForShellMarker.blocked, false, `${rule.id}: a legacy shell-lane marker alone activated the write lane`);
+      assert.equal(writeForShellMarker.stderr, "");
       const shellOnly = shell(shellLaneOnly, `touch ${rule.path}`);
-      assert.equal(shellOnly.blocked, true, `${rule.id}: a shell-lane marker did not govern the shell lane`);
-      assert.match(shellOnly.stderr, /GUARD-GATE-STRENGTH-SHELL/u);
+      assert.equal(shellOnly.blocked, false, `${rule.id}: a legacy shell-lane marker alone activated the shell lane`);
+      assert.doesNotMatch(shellOnly.stderr, /GUARD-GATE-STRENGTH-SHELL/u);
+    }
+    const enrolled = governed();
+    for (const rule of SUBJECTS) {
+      const write = ask(enrolled, rule.path);
+      assert.equal(write.blocked, true, `${rule.id}: canonical enrollment did not govern the write lane`);
+      assert.match(write.stderr, new RegExp(`Rule ID: ${rule.id}\\b`, "u"));
+      const command = shell(enrolled, `touch ${rule.path}`);
+      assert.equal(command.blocked, true, `${rule.id}: canonical enrollment did not govern the shell lane`);
+      assert.match(command.stderr, /GUARD-GATE-STRENGTH-SHELL/u);
     }
   });
 

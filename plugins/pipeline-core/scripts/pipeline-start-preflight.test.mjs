@@ -1489,7 +1489,7 @@ test("preflight calls observe self-referentially with the loaded plugin root on 
   assert.equal(result.status, "ready");
 });
 
-test("an unattested origin keeps plugin refresh required and returns the controlled onboarding action", () => {
+test("an unattested origin keeps plugin refresh required and returns a non-executable advisory", () => {
   const result = preflight({
     env: {},
     pluginList: pluginList(),
@@ -1501,7 +1501,7 @@ test("an unattested origin keeps plugin refresh required and returns the control
   });
   assert.equal(result.status, "plugin-refresh-required");
   assert.equal(pipelineStartPreflightExitCode(result), 0);
-  assertGuidedOnboardingAction(result, process.cwd(), "codex");
+  assertRefreshAdvisory(result);
 });
 
 test("the second reviewed origin (SSH form) also attests as ready", () => {
@@ -1517,7 +1517,7 @@ test("the second reviewed origin (SSH form) also attests as ready", () => {
   assert.equal(result.status, "ready");
 });
 
-test("a rejected observation keeps plugin refresh required and returns the controlled onboarding action", () => {
+test("a rejected observation keeps plugin refresh required and returns a non-executable advisory", () => {
   const result = preflight({
     env: {},
     pluginList: pluginList(),
@@ -1526,7 +1526,7 @@ test("a rejected observation keeps plugin refresh required and returns the contr
   });
   assert.equal(result.status, "plugin-refresh-required");
   assert.equal(pipelineStartPreflightExitCode(result), 0);
-  assertGuidedOnboardingAction(result, process.cwd(), "codex");
+  assertRefreshAdvisory(result);
 });
 
 test("a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation", () => {
@@ -1680,7 +1680,7 @@ test("F4(b): runner codex reaches the real observeCodexPublicCoreIdentity defaul
     // outcome, on the identical fixture, is the proof that the codex-only
     // default branch (not observePublicCoreIdentity) was genuinely reached.
     assert.equal(result.status, "plugin-refresh-required");
-    assertGuidedOnboardingAction(result, process.cwd(), "codex");
+    assertRefreshAdvisory(result);
     assert.equal(pipelineStartPreflightExitCode(result), 0);
   } finally {
     rmSync(fixture.gitRoot, { recursive: true, force: true });

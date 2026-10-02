@@ -588,6 +588,7 @@ const JOURNAL_STUB_TRIPWIRE = "PHX-FIXTURE-JOURNAL-STUB-CALLED";
  *  module read as an unexplained failure. */
 const FIXTURE_MODULES = Object.freeze([
   "harness/scripts/check-verify-suite-registration.mjs",
+  "harness/scripts/verify-case-completion-augmentation.mjs",
   "harness/scripts/manual-check-logic.mjs", // imported by verify.mjs for the manual-check step
   "harness/scripts/self-verify-selection.mjs",
   "harness/scripts/verify-evidence-writer.mjs",

@@ -766,6 +766,11 @@ const EXCLUSIVE_SUITES = Object.freeze(new Set([
   // complete installed plugin tree before and after its nested checks. Any sibling
   // suite that probes a source file in place can otherwise manufacture VEP-DRIFT.
   "verify-evidence-producer-tests",
+  // The security suite verifies candidate working-tree cleanliness around all four adapters.
+  // A concurrent suite can create and later remove a fixture inside the checkout, making every
+  // adapter observe a dirty tree even when Verify itself starts and ends clean. Run this composite
+  // security check alone; its required capabilities and scanner policy remain unchanged.
+  "security-scan",
 ]));
 
 // A minimal counting semaphore bounding how many suites may have a child process in flight at

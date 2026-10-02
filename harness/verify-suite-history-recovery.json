@@ -1,0 +1,15 @@
+{
+  "schema": "pipeline.verify-suite-history-recovery.v1",
+  "entries": [
+    {
+      "schema": "pipeline.verify-suite-history-recovery-entry.v1",
+      "integrationCommit": "b7c660282e168051455fab83c37c7261a83cc71d",
+      "integrationParent": "140f19ec12d1ad46bbbe2fc9cd5a754608e1179a",
+      "integrationIntentSha256": "60f2ab4a75cd64357f30530cd282ccca4b011a90316459d9c37f6a5457bc2f8f",
+      "parentRegistryBlobOid": "fb8606582581af9dd8f6d82e83ae85d314b50545",
+      "defectRegistryBlobOid": "942405a8e797bb370171983c590dd114d8456313",
+      "priorSuiteCount": 87,
+      "appendedSuiteCount": 21
+    }
+  ]
+}

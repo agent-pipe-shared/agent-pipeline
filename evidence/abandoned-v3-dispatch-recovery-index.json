@@ -1,0 +1,29 @@
+{
+  "schema": "pipeline.abandoned-v3-dispatch-recovery-index.v1",
+  "entries": [
+    {
+      "taskId": "ALF-ADOPTION-PROOF",
+      "recordPath": "evidence/dispatch-record-ALF-ADOPTION-PROOF.json",
+      "recordSha256": "1ad2ca5cd4f394af1d558c7d05ff04ec03ffee46b9dfbe5f14bf350706913057",
+      "recordSchema": "pipeline.dispatch-record.v3",
+      "outcome": "in-progress",
+      "candidateCommit": null,
+      "commits": [],
+      "disposition": "abandoned-no-delivery",
+      "observationPath": "evidence/alf-abandoned-v3-recovery-observation.json",
+      "observationSha256": "3f8d4467c788f8d7571161355384dc35dcc24c14e7f100b83cbfa3ddfa91141f"
+    },
+    {
+      "taskId": "ALF-RECOVERY-PLAN",
+      "recordPath": "evidence/dispatch-record-ALF-RECOVERY-PLAN.json",
+      "recordSha256": "bc9ce4824d67dacbff5d7252459418c4a8f1c0c1b37dd29606afaf2ed04ad6bb",
+      "recordSchema": "pipeline.dispatch-record.v3",
+      "outcome": "in-progress",
+      "candidateCommit": "92e2500e554d5d099a1763425f2c6179da54def7",
+      "commits": [],
+      "disposition": "abandoned-no-delivery",
+      "observationPath": "evidence/alf-abandoned-v3-recovery-observation.json",
+      "observationSha256": "3f8d4467c788f8d7571161355384dc35dcc24c14e7f100b83cbfa3ddfa91141f"
+    }
+  ]
+}
