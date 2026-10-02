@@ -1120,7 +1120,8 @@ function runCli() {
 
   if (json) {
     console.log(JSON.stringify(result, null, 2));
-    process.exit(result.overallStatus === OUTCOME_PASS || result.overallStatus === OUTCOME_EXCEPTED ? 0 : 1);
+    process.exitCode = result.overallStatus === OUTCOME_PASS || result.overallStatus === OUTCOME_EXCEPTED ? 0 : 1;
+    return;
   }
 
   if (check) {
@@ -1131,10 +1132,12 @@ function runCli() {
           console.error(`  - [${outcome.propertyId}] ${outcome.details}`);
         }
       }
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     console.log(`Architecture fitness check PASSED: all property classes evaluated (${result.summary.passCount} pass, ${result.summary.exceptedCount} excepted).`);
-    process.exit(0);
+    process.exitCode = 0;
+    return;
   }
 
   console.log(`Architecture Fitness Evaluation (${mode}): ${result.overallStatus}`);
