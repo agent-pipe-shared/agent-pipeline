@@ -46,6 +46,8 @@ const shardIndex = Number.parseInt(process.env.PIPELINE_CODEX_PRETOOL_TEST_SHARD
 const shardCount = 3;
 const totalChecks = 37;
 const shardResults = [];
+const readyLifecycleEnvByRoot = new Map();
+const readyLifecycleExternalParents = new Set();
 if (Number.isInteger(shardIndex) && (shardIndex < 0 || shardIndex >= shardCount)) {
   throw new Error(`PIPELINE_CODEX_PRETOOL_TEST_SHARD must be between 0 and ${shardCount - 1}`);
 }
@@ -155,7 +157,7 @@ function lifecycleCommand(root, ...args) {
     // become input for the nested lifecycle CLI: Node reserves these values
     // for its own fork bootstrap and they are not part of that CLI's contract.
     env: {
-      ...process.env,
+      ...(readyLifecycleEnvByRoot.get(root) ?? process.env),
       NODE_CHANNEL_FD: undefined,
       NODE_UNIQUE_ID: undefined,
     },
@@ -171,10 +173,34 @@ function followLifecycleAction(root, result, name) {
   return lifecycleCommand(root, ...result.nextAction.argv.slice(1));
 }
 
-function executeFixtureAction(root, action, replacements) {
-  const result = spawnSync(action.executable, action.argv.map((value) => replacements[value] ?? value), { cwd: root, encoding: "utf8", shell: false });
+function executeFixtureAction(root, action, replacements, env = process.env) {
+  const result = spawnSync(action.executable, action.argv.map((value) => replacements[value] ?? value), { cwd: root, env, encoding: "utf8", shell: false });
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
   return JSON.parse(result.stdout);
+}
+
+function refreshReadyFixtureVendorCopy(root) {
+  const inspection = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  assert.equal(inspection.status, "migration-required", JSON.stringify(inspection));
+  assert.ok(inspection.diagnostics.some((entry) => entry.code === "project_authority_vendor_sync_required"));
+  writeFileSync(join(root, ".gitignore"), "/plugins/pipeline-core/\n");
+  const env = readyLifecycleEnvByRoot.get(root);
+  const plan = executeFixtureAction(root, inspection.nextAction, {}, env);
+  assert.equal(plan.status, "ready", JSON.stringify(plan));
+  assert.equal(plan.nextAction?.argv?.[1], "vendor-sync");
+  const applied = executeFixtureAction(root, plan.nextAction, {}, env);
+  assert.equal(applied.status, "applied", JSON.stringify(applied));
+  let ready = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  if (ready.status === "migration-required"
+    && ready.diagnostics.some((entry) => entry.code === "project_authority_remote_adoption_required")) {
+    const adoptionPlan = executeFixtureAction(root, ready.nextAction, {}, env);
+    assert.equal(adoptionPlan.status, "ready", JSON.stringify(adoptionPlan));
+    assert.equal(adoptionPlan.nextAction?.argv?.[1], "apply");
+    const adoptionApplied = executeFixtureAction(root, adoptionPlan.nextAction, {}, env);
+    assert.equal(adoptionApplied.status, "applied", JSON.stringify(adoptionApplied));
+    ready = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  }
+  assert.equal(ready.status, "ready", JSON.stringify(ready));
 }
 
 function createReadyLifecycleFixture(mode = "chat") {
@@ -182,6 +208,16 @@ function createReadyLifecycleFixture(mode = "chat") {
   // real CLI creates authority/checkpoint state; the real readback consumer
   // verifies its ticket and digests before the native adapter probes it.
   const root = mkdtempSync(join(tmpdir(), "codex-ready-hgo-"));
+  const home = mkdtempSync(join(tmpdir(), "codex-ready-hgo-home-"));
+  readyLifecycleExternalParents.add(home);
+  const fixtureEnv = {
+    ...process.env,
+    PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home,
+    HOME: home,
+    USERPROFILE: home,
+  };
+  delete fixtureEnv.PIPELINE_PO_APPROVAL_DIRECTORY;
+  readyLifecycleEnvByRoot.set(root, fixtureEnv);
   const portable = followLifecycleAction(root, lifecycleCommand(root, "plan", "--root", root, "--runner", "codex"), "apply-portable-seed");
   // The lifecycle setup itself uses the explicit legacy chat fixture route;
   // the HGO test below changes the final policy only after the project is
@@ -189,18 +225,58 @@ function createReadyLifecycleFixture(mode = "chat") {
   // fail-closed to signature, which keeps this fixture focused on HGO's two policy
   // continuations instead of duplicating the full detached-proof ceremony
   // covered by project-onboarding-e2e.test.mjs.
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "codex", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat", "--language", "en", "--advisor-export-consent", "declined"], { cwd: root, encoding: "utf8", shell: false });
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "codex", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat", "--language", "en", "--advisor-export-consent", "declined"], { cwd: root, env: fixtureEnv, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /push_approval: "chat"/u);
   assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_approval: "chat"/u);
   for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
-    const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+    const git = spawnSync("git", args, { cwd: root, env: fixtureEnv, encoding: "utf8", shell: false });
     assert.equal(git.status, 0, git.stderr);
   }
-  const barrier = readRestartBarrier({ rootDir: root }); const issued = issueLaunchTicket({ rootDir: root, barrierSha256: barrier.rawSha256 });
-  consumeRuntimeReadback({ rootDir: root, ticketId: issued.ticketId, token: issued.token, receipt: { schema: "pipeline.codex-project-runtime-readback.v1", barrierSha256: barrier.rawSha256, repositoryFingerprint: barrier.barrier.repositoryFingerprint, sourceSha256: barrier.barrier.sourceSha256, runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256, readerGenerationSha256: sha256("test-hgo-readback"), effectiveConfigSha256: sha256("test-hgo-config"), validatedAgentsSha256: sha256("test-hgo-agents"), ticketId: issued.ticketId, observedAtEpochMs: Date.now() } });
-  const collect = (result, values, material = null) => { const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return lifecycleCommand(root, ...argv.slice(1)); };
-  collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "feature" }, "HGO test fixture material.\n");
+  const collect = (result, values, material = null) => {
+    assert.equal(result.nextAction?.kind, "collect-input", JSON.stringify(result));
+    const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value);
+    const index = argv.indexOf("--text-file");
+    if (material !== null && index >= 0) {
+      const path = join(root, argv[index + 1]);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, material);
+    }
+    return lifecycleCommand(root, ...argv.slice(1));
+  };
+  let runtimeInspection = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  assert.equal(runtimeInspection.status, "intake-required", JSON.stringify(runtimeInspection));
+  assert.equal(runtimeInspection.runtime.firstRestartIntake.status, "capture-required");
+  assert.ok(runtimeInspection.diagnostics.some((entry) => entry.code === "first_restart_material_capture_required"));
+  assert.deepEqual(runtimeInspection.nextAction.inputs.map((input) => input.name), ["language", "profile", "projectDescription"]);
+  assert.equal(runtimeInspection.nextAction.applyAction.argv.includes("--granted"), true,
+    "the test fixture explicitly grants local intake consent through the returned action");
+  const captured = collect(runtimeInspection, {
+    "<PO_INTAKE_LANGUAGE>": "en",
+    "<PO_INTAKE_PROFILE>": "feature",
+  }, "HGO test fixture material.\n");
+  assert.equal(captured.status, "applied", JSON.stringify(captured));
+  runtimeInspection = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  assert.equal(runtimeInspection.runtime.firstRestartIntake.status, "captured", JSON.stringify(runtimeInspection));
+  assert.doesNotMatch(JSON.stringify(runtimeInspection.diagnostics), /first_restart_material_capture_required/u);
+  const runtimeOperation = runtimeInspection.status === "runtime-initialization-required"
+    ? "runtime"
+    : runtimeInspection.status === "runtime-attestation-required"
+      ? "readback"
+      : null;
+  assert.ok(runtimeOperation !== null, JSON.stringify(runtimeInspection));
+  const planCommand = runtimeOperation === "runtime" ? "plan-runtime" : "plan-readback";
+  const applyCommand = runtimeOperation === "runtime" ? "initialize-runtime" : "apply-readback";
+  const runtimePlan = followLifecycleAction(root, runtimeInspection, planCommand);
+  const runtimeApplied = followLifecycleAction(root, runtimePlan, applyCommand);
+  assert.equal(runtimeApplied.status, "restart-required", JSON.stringify(runtimeApplied));
+  const barrier = readRestartBarrier({ rootDir: root });
+  assert.equal(barrier.status, "present", JSON.stringify(barrier));
+  assert.equal(barrier.barrier.state, "restart-required");
+  assert.match(barrier.rawSha256, /^[a-f0-9]{64}$/u);
+  const issued = issueLaunchTicket({ rootDir: root, barrierSha256: barrier.rawSha256 });
+  const consumed = consumeRuntimeReadback({ rootDir: root, ticketId: issued.ticketId, token: issued.token, receipt: { schema: "pipeline.codex-project-runtime-readback.v1", barrierSha256: barrier.rawSha256, repositoryFingerprint: barrier.barrier.repositoryFingerprint, sourceSha256: barrier.barrier.sourceSha256, runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256, readerGenerationSha256: sha256("test-hgo-readback"), effectiveConfigSha256: sha256("test-hgo-config"), validatedAgentsSha256: sha256("test-hgo-agents"), ticketId: issued.ticketId, observedAtEpochMs: Date.now() } });
+  assert.equal(consumed.barrier.state, "cleared");
   collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "HGO fixture." }]) });
   const generated = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "intake-generate-plan");
   lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "codex");
@@ -282,6 +358,7 @@ const readyLifecycleCloneParents = new Set();
 process.once("exit", () => {
   for (const parent of readyLifecycleCloneParents) rmSync(parent, { recursive: true, force: true });
   for (const template of readyLifecycleTemplates.values()) rmSync(template, { recursive: true, force: true });
+  for (const parent of readyLifecycleExternalParents) rmSync(parent, { recursive: true, force: true });
 });
 
 function readyLifecycleFixture(mode = "chat") {
@@ -293,6 +370,7 @@ function readyLifecycleFixture(mode = "chat") {
   const parent = mkdtempSync(join(tmpdir(), "codex-ready-clone-"));
   const root = join(parent, "project");
   cpSync(template, root, { recursive: true, dereference: false });
+  readyLifecycleEnvByRoot.set(root, readyLifecycleEnvByRoot.get(template));
   readyLifecycleCloneParents.add(parent);
   return root;
 }
@@ -312,7 +390,7 @@ function run(input, root = fixture(), {
   try {
     return spawnSync(process.execPath, [adapter], {
       cwd: hookCwd,
-      env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
+      env: { ...(readyLifecycleEnvByRoot.get(root) ?? process.env), CLAUDE_PROJECT_DIR: claudeProjectDir },
       encoding: "utf8",
       stdio: [inputFd, "pipe", "pipe"],
       timeout: 8_000,
@@ -482,6 +560,7 @@ check("Bash, apply_patch, Edit and Write each reach their intended guard family"
   writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
     protectedTestPaths: [{ id: "NATIVE-TEST", pattern: "locked\\.test\\.mjs$", reason: "locked fixture" }],
   }));
+  refreshReadyFixtureVendorCopy(root);
 
   const bash = decision(run({ tool_name: "Bash", tool_input: { command: "git reset --hard" } }, root));
   assert.equal(bash.permissionDecision, "deny");

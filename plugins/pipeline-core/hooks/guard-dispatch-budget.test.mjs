@@ -166,12 +166,12 @@ writeFileSync(RUNNER_PATH, RUNNER_SOURCE);
 const PARALLEL_COUNTER_RUNNER_PATH = join(runnerDir, "parallel-counter-runner.mjs");
 writeFileSync(PARALLEL_COUNTER_RUNNER_PATH, [
   "const [, , guardPath, configB64] = process.argv;",
-  "const { commonDir, counterPath } = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8'));",
+  "const { commonDir, counterPath, rootDir } = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8'));",
   "const { evaluateDispatchBudgetGuard } = await import(guardPath);",
   "const input = { agent_id: 'parallel-agent', agent_type: 'pipeline-core:goldfish-implementor', transcript_path: '/unused.jsonl', tool_name: 'Read', tool_input: { file_path: '/x' } };",
   "let result;",
   "for (let attempt = 0; attempt < 1000; attempt += 1) {",
-  "  result = evaluateDispatchBudgetGuard(input, { rootDir: '/unused', resolveGitCommonDirFn: () => commonDir, resolveMaxTurnsFn: () => 50 });",
+  "  result = evaluateDispatchBudgetGuard(input, { rootDir, resolveGitCommonDirFn: () => commonDir, resolveMaxTurnsFn: () => 50 });",
   "  if (result.exitCode === 0) break;",
   "  if (!result.stderr.includes('counter-lock-busy') && !result.stderr.includes('counter-lock-recovery-busy')) break;",
   "  await new Promise((resolve) => setTimeout(resolve, 2));",
@@ -671,7 +671,7 @@ test("concurrent authenticated child calls serialize counter RMW without lost in
     workingCap: 35,
     count: 0,
   }, null, 2)}\n`);
-  const config = Buffer.from(JSON.stringify({ commonDir, counterPath }), "utf8").toString("base64");
+  const config = Buffer.from(JSON.stringify({ commonDir, counterPath, rootDir: FAKE_ROOT }), "utf8").toString("base64");
   const invoke = () => new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [PARALLEL_COUNTER_RUNNER_PATH, GUARD, config], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
@@ -926,14 +926,14 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): concurrent real-file
   const runner = join(fixture, "concurrent-runner.mjs");
   const input = measuredOrchestratorPayload({ agent_id: null, agent_type: "pipeline-core:goldfish-deep", session_id: "same-session" });
   writeFileSync(runner, [
-    "const [guardPath, commonDir, inputB64] = process.argv.slice(2);",
+    "const [guardPath, commonDir, rootDir, inputB64] = process.argv.slice(2);",
     "const mod = await import(guardPath);",
-    "const result = mod.evaluateDispatchBudgetGuard(JSON.parse(Buffer.from(inputB64, 'base64url').toString('utf8')), { rootDir: '/', resolveGitCommonDirFn: () => commonDir });",
+    "const result = mod.evaluateDispatchBudgetGuard(JSON.parse(Buffer.from(inputB64, 'base64url').toString('utf8')), { rootDir, resolveGitCommonDirFn: () => commonDir });",
     "process.exit(result.exitCode);",
   ].join("\n"));
   try {
     await Promise.all(Array.from({ length: 8 }, () => new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, [runner, GUARD, commonDir, Buffer.from(JSON.stringify(input)).toString("base64url")]);
+      const child = spawn(process.execPath, [runner, GUARD, commonDir, FAKE_ROOT, Buffer.from(JSON.stringify(input)).toString("base64url")]);
       child.on("error", reject);
       child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`child exited ${code}`)));
     })));

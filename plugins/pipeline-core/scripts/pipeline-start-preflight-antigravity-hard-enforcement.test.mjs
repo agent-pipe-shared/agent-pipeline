@@ -98,12 +98,23 @@ function noSelfApplicationGitScriptUrl(root) {
   return pathToFileURL(join(root, "scripts", "pipeline-start-preflight.mjs")).href;
 }
 
-// An exact Antigravity registry root is a direct local-development source.
-// Keep its registry binding hermetically ready so these cases measure only the
-// hard-enforcement observation named by the suite.
+// A hermetic current Antigravity topology for the preflight wiring cases.
+// These cases measure how the hard-enforcement observation affects readiness,
+// not the independent physical topology reader's registry/file validation.
 function readyAntigravityInstallation(root) {
   return {
     antigravityPluginRegistries: () => [JSON.stringify({ entries: [{ path: root }] })],
+    observeAntigravityLoadedTopologyFn: ({ loadedPluginRoot }) => ({
+      schema: "pipeline.antigravity-loaded-topology.v1",
+      status: "current",
+      sourcePluginRoot: root,
+      loadedPluginRoot,
+      loadedKind: "direct",
+      sourceContentSha256: "d".repeat(64),
+      loadedContentSha256: "d".repeat(64),
+      managedContentMismatch: false,
+      executingGuardAssurance: "not-established-by-topology",
+    }),
   };
 }
 

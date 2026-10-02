@@ -440,7 +440,7 @@ test("dispatch record drift after admission blocks finalization", () => {
     const request = preadmitted(fx, { packetId: "b".repeat(32) });
     writeFileSync(join(fx.root, fx.recordPath), "{\n  \"schema\": \"pipeline.dispatch-record.v3\"\n}\n");
     const driftCandidate = commit(fx.root, "dispatch record drift");
-    writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root: fx.root, candidate: driftCandidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", "console.log('record drift candidate')"], logPath: "evidence/targeted.log" }))}\n`);
+    writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root: fx.root, candidate: driftCandidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", "console.log('record drift candidate')"], logPath: "evidence/record-drift-targeted.log" }))}\n`);
     const driftedRequest = { ...request, preflightInput: { ...request.preflightInput, candidate: driftCandidate } };
     assert.throws(() => finalizeSessionCriticReview(driftedRequest),
       (error) => error instanceof SessionCriticFinalizerError && error.code === "SCF-PRELAUNCH-BINDING");

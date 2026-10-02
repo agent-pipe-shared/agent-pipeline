@@ -125,7 +125,9 @@ test("candidate must restore original order and preserve b7 addition order witho
 
 test("missing restoration and an unrelated historical commit are not accepted", () => {
   assert.equal(evaluate({ candidateBytes: registry(defectRows) }).code, "VSA-RECOVERY-CANDIDATE-MISMATCH");
-  assert.equal(evaluate({ candidateBytes: registry([...prior.slice(1), ...additions]) }).code, "VSA-RECOVERY-CANDIDATE-MISMATCH");
+  const sameShapeWrongRestoration = [{ name: "unrelated", file: "unrelated.test.mjs" }, ...prior.slice(1), ...additions];
+  assert.equal(sameShapeWrongRestoration.length, prior.length + additions.length);
+  assert.equal(evaluate({ candidateBytes: registry(sameShapeWrongRestoration) }).code, "VSA-RECOVERY-CANDIDATE-MISMATCH");
   assert.equal(evaluate({ integrationCommit: "f".repeat(40) }).code, "VSA-RECOVERY-AUTHORIZATION");
 });
 

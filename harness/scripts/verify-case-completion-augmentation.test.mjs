@@ -75,7 +75,7 @@ check('VAC012','candidate symlink/tree and unbound refs cannot borrow a regular 
 });
 check('VAC013','exact previous-policy binding permits a strict ordered case-ID superset without mutating source rows',()=>{
   const original=suites();original[0].caseCompletion=policy();const before=JSON.stringify(original);
-  const next={...policy(),caseIds:[...policy().caseIds,'actual-three']};const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(policy());
+  const next={...policy(),caseIds:[...policy().caseIds,'actual-z']};const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(policy());
   const result=applyVerifyCaseCompletionAugmentations(original,data);assert.equal(result.ok,true);assert.equal(JSON.stringify(original),before);
   assert.deepEqual(result.suites[0].caseCompletion,next);assert.deepEqual(result.suites[0].invariantPinned,original[0].invariantPinned);assert.equal(result.suites[1],original[1]);
 });
@@ -84,8 +84,8 @@ check('VAC014','removing IDs, adding no new ID, or reducing maxBytes refuses a b
   const proposals=[
     {caseIds:['actual-one'],maxBytes:4096},
     {caseIds:['actual-one','actual-two'],maxBytes:4096},
-    {caseIds:['actual-two','actual-one','actual-three'],maxBytes:4096},
-    {caseIds:['actual-one','actual-two','actual-three'],maxBytes:2048},
+    {caseIds:['actual-one','actual-z'],maxBytes:4096},
+    {caseIds:['actual-one','actual-two','actual-z'],maxBytes:2048},
   ];
   for(const proposal of proposals){
     const rows=suites();rows[0].caseCompletion=previous;
@@ -94,17 +94,17 @@ check('VAC014','removing IDs, adding no new ID, or reducing maxBytes refuses a b
   }
 });
 check('VAC015','wrong previous-policy preimage digest refuses an otherwise monotone extension',()=>{
-  const rows=suites();rows[0].caseCompletion=policy();const data=table({...policy(),caseIds:[...policy().caseIds,'actual-three']});
+  const rows=suites();rows[0].caseCompletion=policy();const data=table({...policy(),caseIds:[...policy().caseIds,'actual-z']});
   data.augmentations[0].previousPolicySha256='0'.repeat(64);assert.equal(applyVerifyCaseCompletionAugmentations(rows,data).code,'AUG-PREIMAGE');
 });
 check('VAC016','existing-policy shadowing remains a conflict without exact binding and binding cannot target an absent policy',()=>{
   const withPolicy=suites();withPolicy[0].caseCompletion=policy();assert.equal(applyVerifyCaseCompletionAugmentations(withPolicy,table()).code,'AUG-CONFLICT');
-  const absent=table({...policy(),caseIds:[...policy().caseIds,'actual-three']});absent.augmentations[0].previousPolicySha256=policySha256(policy());
+  const absent=table({...policy(),caseIds:[...policy().caseIds,'actual-z']});absent.augmentations[0].previousPolicySha256=policySha256(policy());
   assert.equal(applyVerifyCaseCompletionAugmentations(suites(),absent).code,'AUG-PREIMAGE');
 });
 check('VAC017','ordered superset may interleave new IDs while retaining every old ID in order',()=>{
   const previous={schema:'pipeline.verify-case-completion-policy.v1',caseIds:['old-one','old-three'],maxBytes:4096};
-  const next={schema:'pipeline.verify-case-completion-policy.v1',caseIds:['old-one','old-two','old-three'],maxBytes:4096};
+  const next={schema:'pipeline.verify-case-completion-policy.v1',caseIds:['old-one','old-one-a','old-three'],maxBytes:4096};
   const rows=suites();rows[0].caseCompletion=previous;const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(previous);
   assert.equal(applyVerifyCaseCompletionAugmentations(rows,data).ok,true);
 });

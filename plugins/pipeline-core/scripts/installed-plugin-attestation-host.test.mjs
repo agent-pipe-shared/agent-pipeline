@@ -15,13 +15,16 @@ import {
   installedPluginAttestationSetupCommand,
   readInstalledPluginAttestationSetup,
   readExternalInstalledPluginReceipt,
+  resolveAntigravityRegistryInstalledRoot,
   verifyLocalDevelopmentInstalledPluginReceipt,
   writeClaudeRegistryInstalledPluginReceipt,
   writeCodexRegistryInstalledPluginReceipt,
   writeLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+import { observeAntigravityLoadedTopologyWithWiring } from "../lib/antigravity-topology-refresh-host.mjs";
 import { observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { planGovernanceScopeDecision, applyGovernanceScopeDecision } from "../lib/governance-scope.mjs";
 
 const cases = [];
 function check(name, run) {
@@ -36,7 +39,11 @@ function fixture(provider = "codex") {
   const base = mkdtempSync(join(tmpdir(), "ipa-host-"));
   const sourceRoot = join(base, "source");
   const sourcePluginRoot = join(sourceRoot, "plugins", "pipeline-core");
-  const installedPluginRoot = join(base, "installed", "pipeline-core", "1.2.3-test.1");
+  const antigravityConfigRoot = join(base, "antigravity-config");
+  const antigravityWorkspaceRoot = join(base, "antigravity-workspace");
+  const installedPluginRoot = provider === "antigravity"
+    ? join(antigravityConfigRoot, "config", "plugins", "agent-pipeline-core")
+    : join(base, "installed", "pipeline-core", "1.2.3-test.1");
   const receiptDirectory = join(base, "host", "receipts");
   const manifest = `${JSON.stringify({
     name: "pipeline-core", version: "1.2.3-test.1", description: "fixture",
@@ -65,12 +72,17 @@ function fixture(provider = "codex") {
   git(sourceRoot, ["remote", "add", "origin", "https://example.test/owner/plugin.git"]);
   git(sourceRoot, ["add", "."]);
   git(sourceRoot, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"]);
+  if (provider === "antigravity") {
+    mkdirSync(join(antigravityWorkspaceRoot, ".agents"), { recursive: true });
+    writeFileSync(join(antigravityWorkspaceRoot, ".agents", "plugins.json"), `${JSON.stringify({ entries: [{ path: sourcePluginRoot }] })}\n`);
+    writeFileSync(join(antigravityConfigRoot, "config", "import_manifest.json"), `${JSON.stringify({ imports: [{ name: "agent-pipeline-core", source: sourcePluginRoot }] })}\n`);
+  }
   const protectedPaths = INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[provider];
   const input = {
     provider, plugin: { name: "pipeline-core", version: "1.2.3-test.1" },
     sourcePluginRoot, installedPluginRoot, protectedPaths,
   };
-  return { base, sourcePluginRoot, installedPluginRoot, receiptDirectory, protectedPaths, input, cleanup: () => rmSync(base, { recursive: true, force: true }) };
+  return { base, sourceRoot, sourcePluginRoot, installedPluginRoot, receiptDirectory, protectedPaths, input, antigravityConfigRoot, antigravityWorkspaceRoot, cleanup: () => rmSync(base, { recursive: true, force: true }) };
 }
 
 check("post-install readback is runner-neutral and writes path-free receipts that the core verifies", (t) => {
@@ -97,7 +109,14 @@ check("post-install readback is runner-neutral and writes path-free receipts tha
       ? { registryInstalledPluginRoot: repo.installedPluginRoot }
       : { registrySourcePluginRoot: repo.sourcePluginRoot }),
     protectedPaths: repo.protectedPaths,
-  }, { receiptDirectory: repo.receiptDirectory, observe: (observation) => observePublicCoreIdentity(observation) });
+  }, {
+    receiptDirectory: repo.receiptDirectory,
+    observe: (observation) => observePublicCoreIdentity(observation),
+    ...(provider === "antigravity" ? {
+      antigravityConfigRoot: repo.antigravityConfigRoot,
+      antigravityWorkspaceRoot: repo.antigravityWorkspaceRoot,
+    } : {}),
+  });
   assert.equal(bootstrap.status, "verified", JSON.stringify(bootstrap));
  }
 });
@@ -245,6 +264,8 @@ check("unsupported provider and unsorted or escaping protected paths are refused
 
 check("an exact Codex local registry/cache binding needs no receipt and a divergent cache stays closed", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
+  const activation = planGovernanceScopeDecision({ rootDir: repo.sourceRoot, decision: "enroll", by: "Installed plugin preflight fixture" });
+  assert.equal(applyGovernanceScopeDecision(activation, { activate: true, planSha256: activation.planSha256 }).state, "active");
   const marketplaceRoot = join(repo.base, "marketplace");
   const marketplacePluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
   cpSync(repo.sourcePluginRoot, marketplacePluginRoot, { recursive: true });
@@ -256,7 +277,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   }], available: [] });
   const scriptUrl = pathToFileURL(join(repo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href;
   const inspect = (verifyLocalInstalledPluginReceiptFn) => observePipelineStartPreflight({
-    env: {}, pluginList, scriptUrl, cwd: repo.base,
+    env: {}, pluginList, scriptUrl, cwd: repo.sourceRoot,
     read: () => JSON.stringify({ version: "1.2.3-test.1" }),
     verifyLocalInstalledPluginReceiptFn,
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
@@ -277,6 +298,8 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   assert.ok(divergent.installedPluginAttestation.reasonCodes.includes("IPA-HOST-LOCATOR-UNAVAILABLE"));
 
   const claudeRepo = fixture("claude"); t.after(claudeRepo.cleanup);
+  const claudeActivation = planGovernanceScopeDecision({ rootDir: claudeRepo.sourceRoot, decision: "enroll", by: "Installed plugin preflight fixture" });
+  assert.equal(applyGovernanceScopeDecision(claudeActivation, { activate: true, planSha256: claudeActivation.planSha256 }).state, "active");
   // NVA-B8-10: Claude may load directly from the one registered directory
   // marketplace. That is not a source-to-copy installation: the registry's
   // physical marketplace plugin root and the loaded plugin root are the same
@@ -294,7 +317,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   const claudeDirect = observePipelineStartPreflight({
     env: { CLAUDECODE: "1" }, pluginList: claudeDirectList, knownMarketplaces: claudeDirectMarketplaces,
     scriptUrl: pathToFileURL(join(claudeDirectPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
-    cwd: claudeRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    cwd: claudeRepo.sourceRoot, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
     verifyLocalInstalledPluginReceiptFn: () => { throw new Error("direct directory must not consume a receipt"); },
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
     observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
@@ -310,7 +333,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
     }]),
     knownMarketplaces: claudeDirectMarketplaces,
     scriptUrl: pathToFileURL(join(claudeDirectPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
-    cwd: claudeRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    cwd: claudeRepo.sourceRoot, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
     verifyLocalInstalledPluginReceiptFn: () => { throw new Error("direct directory must not consume a receipt"); },
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
     observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
@@ -332,7 +355,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
     }]),
     knownMarketplaces: claudeDirectMarketplaces,
     scriptUrl: pathToFileURL(join(claudeDirectPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
-    cwd: claudeRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    cwd: claudeRepo.sourceRoot, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
     verifyLocalInstalledPluginReceiptFn: () => { throw new Error("direct directory must not consume a receipt"); },
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
     observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
@@ -354,7 +377,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   const claudeInspect = () => observePipelineStartPreflight({
     env: { CLAUDECODE: "1" }, pluginList: claudeList, knownMarketplaces,
     scriptUrl: pathToFileURL(join(claudeRepo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
-    cwd: claudeRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    cwd: claudeRepo.sourceRoot, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
     verifyLocalInstalledPluginReceiptFn: (input) => verifyLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: claudeRepo.receiptDirectory }),
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
     observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
@@ -378,7 +401,11 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   assert.equal(claudeInspect().status, "ready");
 
   const agyRepo = fixture("antigravity"); t.after(agyRepo.cleanup);
-  const agyRegistry = () => [JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }] })];
+  const agyWorkspaceRegistryPath = join(agyRepo.antigravityWorkspaceRoot, ".agents", "plugins.json");
+  const agyGlobalRegistryPath = join(agyRepo.antigravityConfigRoot, "config", "plugins.json");
+  const agyImportManifestPath = join(agyRepo.antigravityConfigRoot, "config", "import_manifest.json");
+  writeFileSync(agyWorkspaceRegistryPath, `${JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }] })}\n`);
+  writeFileSync(agyImportManifestPath, `${JSON.stringify({ imports: [{ name: "agent-pipeline-core", source: agyRepo.installedPluginRoot }] })}\n`);
   const agyManifestRead = (path) => {
     const value = String(path);
     if (value.endsWith("/plugin.json") && !value.includes("/.codex-plugin/")) {
@@ -389,12 +416,12 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
     }
     throw new Error(`unexpected Antigravity manifest path: ${path}`);
   };
-  const agyInspect = (registries = agyRegistry) => observePipelineStartPreflight({
+  const agyInspect = (observeTopology) => observePipelineStartPreflight({
     env: { ANTIGRAVITY_AGENT: "1" }, pluginList: () => JSON.stringify({}),
     observeGovernanceScopeFn: ({ rootDir }) => ({ schema: "pipeline.governance-scope.v1", state: "active", root: rootDir, scopeKey: "a".repeat(64), repositoryKind: "git", provenance: { kind: "isolated-unit-capability", refs: [] }, diagnostics: [], requiresEnforcement: true, hintAllowed: false }),
     scriptUrl: pathToFileURL(join(agyRepo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
-    cwd: agyRepo.base, read: agyManifestRead,
-    antigravityPluginRegistries: registries,
+    cwd: agyRepo.antigravityWorkspaceRoot, antigravityConfigRoot: agyRepo.antigravityConfigRoot, read: agyManifestRead,
+    ...(observeTopology ? { observeAntigravityLoadedTopologyFn: observeTopology } : {}),
     verifyLocalInstalledPluginReceiptFn: (input) => verifyLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: agyRepo.receiptDirectory }),
     observeAntigravityHardEnforcementFn: () => ({ observed: true }),
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
@@ -405,12 +432,43 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   assert.equal(agyDirect.status, "ready", JSON.stringify(agyDirect));
   assert.equal(agyDirect.installedPluginAttestation.status, "not-required");
   assert.notEqual(agyDirect.nextAction?.kind, "host-postinstall", "an exact Antigravity registry root needs no host receipt repair");
-  for (const registries of [
-    () => [],
-    () => [JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }, { path: agyRepo.installedPluginRoot }] })],
-    () => [JSON.stringify({ entries: [{ path: join(agyRepo.base, "other") }] })],
-  ]) {
-    const refused = agyInspect(registries);
+
+  // The installed copy is deliberately not the same root as the isolated
+  // topology observed below. The real topology observer therefore returns a
+  // current registration for a different gitless loaded root; preflight must
+  // refuse to bind that registration to the installed copy without proposing
+  // a writer. The three registry variants are also exercised against the real
+  // physical root resolver below.
+  const topologyPluginRoot = join(agyRepo.base, "topology", "direct-plugin");
+  const topologyConfigRoot = join(agyRepo.base, "topology-config");
+  const topologyWorkspaceRoot = join(agyRepo.base, "topology-workspace");
+  mkdirSync(join(agyRepo.base, "topology"), { recursive: true });
+  cpSync(agyRepo.installedPluginRoot, topologyPluginRoot, { recursive: true });
+  mkdirSync(topologyConfigRoot, { recursive: true });
+  mkdirSync(join(topologyWorkspaceRoot, ".agents"), { recursive: true });
+  writeFileSync(join(topologyWorkspaceRoot, ".agents", "plugins.json"), `${JSON.stringify({ entries: [{ path: topologyPluginRoot }] })}\n`);
+  const observeOtherCurrentTopology = () => observeAntigravityLoadedTopologyWithWiring({
+    loadedPluginRoot: topologyPluginRoot,
+    configRoot: topologyConfigRoot,
+    workspaceRoot: topologyWorkspaceRoot,
+  });
+  const registryCases = [
+    { name: "no physical registry", entries: [] },
+    { name: "conflicting duplicate roots", entries: [agyRepo.installedPluginRoot, agyRepo.sourcePluginRoot] },
+    { name: "unavailable external root", entries: [join(agyRepo.base, "other")] },
+  ];
+  for (const registryCase of registryCases) {
+    rmSync(agyWorkspaceRegistryPath, { force: true });
+    rmSync(agyGlobalRegistryPath, { force: true });
+    if (registryCase.entries.length > 0) {
+      writeFileSync(agyGlobalRegistryPath, `${JSON.stringify({ entries: registryCase.entries.map((path) => ({ path })) })}\n`);
+    }
+    assert.equal(resolveAntigravityRegistryInstalledRoot({
+      installedPluginRoot: agyRepo.installedPluginRoot,
+      configRoot: agyRepo.antigravityConfigRoot,
+      workspaceRoot: agyRepo.antigravityWorkspaceRoot,
+    }), null, `${registryCase.name} must not resolve a registered install root`);
+    const refused = agyInspect(observeOtherCurrentTopology);
     assert.equal(refused.status, "plugin-attestation-required", JSON.stringify(refused));
     assert.equal(refused.nextAction, null);
     assert.equal(refused.installedPluginAttestation.reasonCodes[0], "IPA-HOST-REGISTRY-BINDING-UNAVAILABLE");

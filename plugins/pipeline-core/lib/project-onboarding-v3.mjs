@@ -5518,9 +5518,7 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
 
 function initialAnswersReceipt(root, fs, repositoryCapability = "local") {
   try {
-    const path = repositoryCapability === "host-managed"
-      ? resolveInitialAnswersState(root, "host-managed").receipt
-      : safePath(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH, fs);
+    const path = resolveInitialAnswersState(root, repositoryCapability).receipt;
     if (!fs.existsSync(path)) return null;
     const stat = fs.lstatSync(path);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return null;

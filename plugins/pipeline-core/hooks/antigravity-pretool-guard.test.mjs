@@ -5,9 +5,11 @@ import assert from "node:assert/strict";
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdtempSync,
   mkdirSync,
   openSync,
+  realpathSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -19,6 +21,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 import { normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
+import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
 import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
@@ -30,12 +33,74 @@ const startHint = join(hookDir, "antigravity-start-hint.mjs");
 const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
 
-function fixture() {
+function unregisteredFixture() {
   const root = mkdtempSync(join(tmpdir(), "agy-pretool-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
   mkdirSync(join(root, "project"), { recursive: true });
   writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
     project: "test", verify: "node verify.mjs",
+  }));
+  return root;
+}
+
+// The first-run hint must be tested in a non-Git path outside any ancestor
+// checkout. On some hosts os.tmpdir() itself is beneath an unrelated .git
+// control directory, which governance correctly classifies as unavailable
+// rather than as an optional inactive folder.
+function uninitializedTempRoot() {
+  const candidates = [...new Set([
+    tmpdir(),
+    ...(process.platform === "win32" ? [] : ["/var/tmp", "/dev/shm"]),
+  ])];
+  for (const candidate of candidates) {
+    try {
+      const base = realpathSync(candidate);
+      let containsGitAncestor = false;
+      for (let ancestor = base; ; ancestor = dirname(ancestor)) {
+        try {
+          lstatSync(join(ancestor, ".git"));
+          containsGitAncestor = true;
+          break;
+        } catch (error) {
+          if (error.code !== "ENOENT") { containsGitAncestor = true; break; }
+        }
+        const parent = dirname(ancestor);
+        if (parent === ancestor) break;
+      }
+      if (containsGitAncestor) continue;
+      return mkdtempSync(join(base, "agy-start-hint-fresh-"));
+    } catch {
+      // Try the next host-provided temporary parent; never fall back to a
+      // workspace whose scope cannot be observed as safely inactive.
+    }
+  }
+  throw new Error("No writable temporary parent is free of ancestor Git control paths");
+}
+
+// Most guard cases must actually enroll their temporary project. A lone
+// calibration JSON is not governance authority; the exact consent marker is
+// the smallest recognized positive enrollment for these incomplete fixtures.
+function fixture() {
+  const root = unregisteredFixture();
+  mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-10-02T00:00:00.000Z",
+  }));
+  return root;
+}
+
+// The Cwd-selection cases need a workspace that is governed but has not
+// completed onboarding. A legacy calibration file alone is not an enrollment
+// authority, so use the canonical incomplete-consent marker for that state.
+function unreadyGovernedFixture() {
+  const root = unregisteredFixture();
+  mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-10-02T00:00:00.000Z",
   }));
   return root;
 }
@@ -47,7 +112,7 @@ function nativeFixture() {
     ["init", "-q"],
     ["config", "user.name", "Fixture"],
     ["config", "user.email", "fixture@example.invalid"],
-    ["add", ".claude/pipeline.json", "input.txt"],
+    ["add", ".claude/pipeline.json", ".agent-pipeline/onboarding-consent.json", "input.txt"],
     ["commit", "-q", "-m", "fixture"],
   ]) execFileSync("git", args, { cwd: root, encoding: "utf8" });
   return root;
@@ -277,7 +342,7 @@ check("normalizeAntigravityToolInput: identifies read-only tools", () => {
 
 // 2. Direct Guard Decisions
 check("Antigravity pretool guard allows read-only tools immediately", () => {
-  const root = fixture();
+  const root = unregisteredFixture();
   const res = decision(run({
     toolCall: {
       name: "view_file",
@@ -317,7 +382,7 @@ check("Antigravity pretool guard blocks chained commands (&&, ;, pipes)", () => 
 const cwdReadyRoot = readyLifecycleFixture();
 check("Antigravity run_command uses its absolute Cwd instead of the first workspace", () => {
   const readyRoot = cwdReadyRoot;
-  const unreadyRoot = fixture();
+  const unreadyRoot = unreadyGovernedFixture();
   try {
     const res = decision(run({
       workspacePaths: [readyRoot, unreadyRoot],
@@ -335,7 +400,7 @@ check("Antigravity run_command uses its absolute Cwd instead of the first worksp
 
 check("Antigravity run_command resolves a relative Cwd from the adapter working directory", () => {
   const readyRoot = cwdReadyRoot;
-  const unreadyRoot = fixture();
+  const unreadyRoot = unreadyGovernedFixture();
   try {
     const res = decision(run({
       workspacePaths: [readyRoot, unreadyRoot],
@@ -353,26 +418,58 @@ check("Antigravity run_command resolves a relative Cwd from the adapter working 
 
 check("Antigravity run_command falls back to workspacePaths when Cwd is missing", () => {
   const readyRoot = cwdReadyRoot;
-  const unreadyRoot = fixture();
+  const unreadyRoot = unreadyGovernedFixture();
+  const inactiveRoot = unregisteredFixture();
   try {
     const res = decision(run({
       workspacePaths: [readyRoot, unreadyRoot],
       toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
     }, readyRoot, { hookCwd: unreadyRoot }));
     assert.equal(res.decision, "allow");
+
+    const admission = (runner, input) => nativeHookGovernanceAdmission({ runner, rawInput: JSON.stringify(input) });
+    assert.equal(admission("antigravity", {
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: 42 } },
+    }).requiresEnforcement, true);
+    assert.equal(admission("antigravity", {
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: inactiveRoot } },
+    }).requiresEnforcement, false);
+    assert.equal(admission("antigravity", {
+      workspacePaths: [readyRoot],
+      toolCall: { name: "write_to_file", args: { TargetFile: "file.txt", CodeContent: "x", Cwd: inactiveRoot } },
+    }).requiresEnforcement, true);
+    assert.equal(admission("antigravity", {
+      workspacePaths: { 0: inactiveRoot },
+      cwd: readyRoot,
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
+    }).requiresEnforcement, true);
+    assert.equal(admission("antigravity", {
+      workspacePaths: [inactiveRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
+    }).requiresEnforcement, false);
+    assert.equal(admission("codex", {
+      cwd: inactiveRoot,
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: readyRoot } },
+    }).requiresEnforcement, false);
   } finally {
+    rmSync(inactiveRoot, { recursive: true, force: true });
     rmSync(unreadyRoot, { recursive: true, force: true });
   }
 });
 
 check("Antigravity run_command fails closed for a malformed explicit Cwd", () => {
   const readyRoot = cwdReadyRoot;
-  const res = decision(run({
-    workspacePaths: [readyRoot],
-    toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: 42 } },
-  }, readyRoot));
-  assert.equal(res.decision, "deny");
-  assert.match(res.reason, /project root is unavailable/);
+  for (const Cwd of [42, "", null]) {
+    const res = decision(run({
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd } },
+    }, readyRoot));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /project root is unavailable/);
+  }
 });
 
 check("Antigravity run_command admits a relative passive read outside the selected project root", () => {
@@ -1054,7 +1151,7 @@ check("Antigravity pretool guard allows running a node script file, not inline c
 });
 
 check("Antigravity start hint never creates .git before Git initialization", () => {
-  const root = mkdtempSync(join(tmpdir(), "agy-start-hint-fresh-"));
+  const root = uninitializedTempRoot();
   try {
     const input = JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: "fresh" });
     const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000 });

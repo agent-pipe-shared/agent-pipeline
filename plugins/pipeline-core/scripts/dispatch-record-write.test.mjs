@@ -328,7 +328,7 @@ function deliveredV3AddendumFixture(overrides = {}) {
   delete value.criticSkip;
   value.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA,
     rigorLevel: 2, riskClass: "low", riskFlag: true,
-    diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T4" };
+    diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" };
   const root = fixture(value);
   const recordPath = `evidence/dispatch-record-${value.taskId}.json`;
   const receipt = writeDispatchRecordObject({ repoRoot: root, target: recordPath, record: value });
@@ -415,7 +415,8 @@ check("Critic addendum writer refuses v3 in-progress and zero-commit sources", (
   const inProgress = deliveredV3AddendumFixture({ taskId: "V3-ADDENDUM-IN-PROGRESS",
     outcome: "in-progress", commits: [] });
   try {
-    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: inProgress.root, addendum: inProgress.addendum }), /delivered Critic-required/u);
+    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: inProgress.root, addendum: inProgress.addendum }),
+      (error) => error instanceof TypeError && error.message === "critic addendum does not bind an immutable Critic-required authored v3/v4 record");
     assert.equal(existsSync(join(inProgress.root, criticDispositionAddendumPath(inProgress.value.taskId))), false);
   } finally { rmSync(inProgress.root, { recursive: true, force: true }); }
   const zeroCommit = deliveredV3AddendumFixture({ taskId: "V3-ADDENDUM-ZERO-COMMIT" });

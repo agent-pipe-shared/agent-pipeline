@@ -4572,7 +4572,7 @@ function initialContinuity({ featureId, prdPath, prdSha256, specPath, specSha256
  * (backlog: kickoff-apply-action-drops-the-runner-the-plan-was-made-for;
  * ADR-0051, ADR-0057 R1).
  */
-function planBoundApplyAction(onboardingScript, commandArgv, optionArgv, runner, planSha256, schema) {
+function planBoundApplyAction(onboardingScript, commandArgv, optionArgv, runner, planSha256, schema, statuses = ["ready"]) {
   if (typeof runner !== "string" || runner.length === 0) {
     fail("APPLY-ACTION-RUNNER-REQUIRED", "a plan-bound apply action cannot be constructed without the runner its plan was produced under");
   }
@@ -4593,7 +4593,7 @@ function planBoundApplyAction(onboardingScript, commandArgv, optionArgv, runner,
     requiresConfirmation: true,
     expected: {
       schema,
-      statuses: ["ready"],
+      statuses,
     },
   };
 }
@@ -4961,6 +4961,7 @@ function promotionApplyAction(onboardingScript, root, profile, featureId, planPa
       runner,
       planSha256,
       KICKOFF_PROMOTION_APPLY_SCHEMA,
+      ["applied"],
     );
   }
   return planBoundApplyAction(

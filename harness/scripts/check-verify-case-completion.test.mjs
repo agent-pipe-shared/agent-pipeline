@@ -106,14 +106,31 @@ function git(root, args) {
 check("VCR01", "the repository registry covers all arrays and pins the observed required-descriptor counts", () => {
   const result = checkVerifyCaseCompletion({ root: REPO_ROOT });
   assert.equal(result.ok, true, result.findings.join("\n"));
-  assert.equal(result.vulnerableCount, 241);
-  assert.equal(result.registryCount, 246);
+  assert.equal(result.vulnerableCount, 266);
+  assert.equal(result.registryCount, 273);
 });
 
 check("VCR02", "the closed classifier distinguishes vulnerable and separately registered cases", () => {
   assert.equal(classifyVulnerableSuite(LEGACY)?.classification, "throwing-check-wrapper");
   assert.equal(classifyVulnerableSuite(TOP_LEVEL)?.classification, "top-level-assertions");
   assert.equal(classifyVulnerableSuite(REQUIRED), null);
+  const regexFixture = fixture();
+  try {
+    const requiredWithRegexBrace = REQUIRED.replace(
+      "registerTestCaseCompletion({",
+      'assert.match("POST_COMPACT_REGROUND {", /^POST_COMPACT_REGROUND \\{/);\nregisterTestCaseCompletion({',
+    );
+    write(regexFixture.root, "plugins/pipeline-core/lib/required.test.mjs", requiredWithRegexBrace);
+    const result = checkVerifyCaseCompletion({ root: regexFixture.root });
+    assert.equal(result.ok, true, result.findings.join("\n"));
+    assert.equal(
+      result.findings.some((finding) => finding.includes("REQUIRED-PROTOCOL required")),
+      false,
+      "a regex brace before a genuine top-level registration must not hide its protocol",
+    );
+  } finally {
+    rmSync(regexFixture.root, { recursive: true, force: true });
+  }
   const mixed = `import { test as roundLTest } from "node:test";
 import assert from "node:assert/strict";
 roundLTest("native one", () => assert.equal(1, 1));

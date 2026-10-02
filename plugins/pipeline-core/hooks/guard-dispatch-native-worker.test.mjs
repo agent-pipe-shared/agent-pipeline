@@ -183,4 +183,5 @@ assert.equal(cases.length, 4, "the native-worker dispatch regression corpus must
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
-registerTestCaseCompletion({ cases: cases.map((entry, index) => ({ ...entry, id: `GDW${String(index + 1).padStart(2, "0")}` })), fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDW${String(index + 1).padStart(2, "0")}` }));
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

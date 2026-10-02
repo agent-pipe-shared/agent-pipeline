@@ -6,7 +6,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   chmodSync, closeSync, copyFileSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
-  openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
+  openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
@@ -385,18 +385,50 @@ async function runShards(recorder) {
 // of fixture setup or hand-typing a result shape (the exact anti-pattern
 // backlog item 2026-08-08-the-guard-refuses-the-recovery-the-inspection-
 // prescribes.md's AC-8 calls out).
-export function root() { return mkdtempSync(join(tmpdir(), "project onboarding v3 matrix with spaces-")); }
-function spacedRoot() { return mkdtempSync(join(tmpdir(), "project onboarding v3 with spaces-")); }
+function temporaryBase() {
+  for (const candidate of [...new Set([tmpdir(), process.env.TMPDIR, process.env.TMP, process.env.TEMP, "/var/tmp", "/dev/shm"].filter(Boolean))]) {
+    let cursor;
+    try { cursor = realpathSync(candidate); if (!lstatSync(cursor).isDirectory()) continue; }
+    catch { continue; }
+    let clean = true;
+    while (true) {
+      try { lstatSync(join(cursor, ".git")); clean = false; break; }
+      catch (error) { if (error?.code !== "ENOENT") { clean = false; break; } }
+      const parent = dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+    if (clean) return realpathSync(candidate);
+  }
+  throw new Error("no writable temporary parent without an existing Git control is available for V3 fixtures");
+}
+export function root() { return mkdtempSync(join(temporaryBase(), "project onboarding v3 matrix with spaces-")); }
+function spacedRoot() { return mkdtempSync(join(temporaryBase(), "project onboarding v3 with spaces-")); }
 export function dispose(path) { rmSync(path, { recursive: true, force: true }); }
 export function fakeGit(command, args, options = {}) {
   if (command !== "git") return { status: 1, stderr: "unexpected program" };
-  if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-  if (args[0] === "rev-parse" && args[1] === "--path-format=absolute" && args[2] === "--git-common-dir") return { status: 0, stdout: `${join(options.cwd, ".git")}\n`, stderr: "" };
-  if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
-  if (args[0] === "init" && args[1] === "--initial-branch=main") {
+  let gitArgs = [...args];
+  const fixedGitConfig = [
+    "-c", "core.hooksPath=/dev/null",
+    "-c", "commit.gpgSign=false",
+    "-c", "tag.gpgSign=false",
+    "-c", "core.fsmonitor=false",
+    "-c", "credential.helper=",
+  ];
+  if (gitArgs[0] === "-c") {
+    if (gitArgs.length < fixedGitConfig.length
+      || fixedGitConfig.some((value, index) => gitArgs[index] !== value)) {
+      return { status: 1, stderr: "unexpected git arguments" };
+    }
+    gitArgs = gitArgs.slice(fixedGitConfig.length);
+  }
+  if (gitArgs[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+  if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--path-format=absolute" && gitArgs[2] === "--git-common-dir") return { status: 0, stdout: `${join(options.cwd, ".git")}\n`, stderr: "" };
+  if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
+  if (gitArgs[0] === "init" && gitArgs[1] === "--initial-branch=main") {
     // Successful fixture initialization must satisfy the canonical physical
     // Git owner; failure-specific test adapters still override this branch.
-    return spawnSync("git", args, { ...options, encoding: "utf8", shell: false,
+    return spawnSync("git", gitArgs, { ...options, encoding: "utf8", shell: false,
       env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" } });
   }
   return { status: 1, stderr: "unexpected git arguments" };
@@ -2444,7 +2476,8 @@ test("a runner without a native runtime readback publishes no barrier and procee
     // ADR-0057 decision 2a's own test: the runtime targets really were written,
     // with no Codex executable resolvable anywhere on this machine.
     assert.equal(existsSync(join(path, ".claude", "settings.json")), true);
-    assert.equal(existsSync(join(path, ".codex", "config.toml")), true);
+    assert.equal(existsSync(join(path, ".codex", "config.toml")), false,
+      "a Claude-only seed does not create a Codex runtime target");
     assert.equal(existsSync(observingDeps.codexExecutable), false);
   } finally { dispose(path); }
 });
@@ -5406,6 +5439,16 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     };
 
     commit("seeded consumer");
+    // The fresh seed carries only a design-pending map. Add a real bounded
+    // concept through the existing fixture helper so the intended push and
+    // security evidence refusals are reachable after the genesis commit.
+    mkdirSync(join(path, "docs"), { recursive: true });
+    writeFileSync(join(path, "docs", "architecture-fixture-plan.md"), "Bounded architecture fixture plan.\n");
+    materializeArchitectureDesignFixture({
+      rootDir: path,
+      planPath: "docs/architecture-fixture-plan.md",
+      decisionRef: "PUSHSEED-2-ARCHITECTURE-FIXTURE",
+    });
     const refused = attemptPush();
     assert.equal(refused.status, 2, `the seeded gate must refuse an unapproved push: ${refused.stderr}`);
     assert.match(String(refused.stderr), /evidence\/verify-latest\.json missing/u);
@@ -5537,6 +5580,15 @@ test("the seeded security gate refuses a push with missing security evidence and
     };
 
     commit("seeded consumer");
+    // Keep this independent fresh consumer on the same current-map boundary
+    // before isolating the missing security-evidence refusal.
+    mkdirSync(join(path, "docs"), { recursive: true });
+    writeFileSync(join(path, "docs", "architecture-fixture-plan.md"), "Bounded architecture fixture plan.\n");
+    materializeArchitectureDesignFixture({
+      rootDir: path,
+      planPath: "docs/architecture-fixture-plan.md",
+      decisionRef: "SECGATE-1-ARCHITECTURE-FIXTURE",
+    });
     const refused = attemptPush();
     assert.equal(refused.status, 2, `the seeded gate must refuse: ${refused.stderr}`);
     assert.match(String(refused.stderr), /evidence\/security-latest\.json missing/u,
@@ -7313,7 +7365,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(validateV3BootstrapAuthority({ rootDir: path, deps: fakeDeps }).status, "restart-required");
     assert.equal(planRunnerProfileMigrationV3({ rootDir: path }).status, "noop");
     const source = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
-    assert.deepEqual(source.runners, { enabled: ["claude", "codex"], default: "codex" });
+    assert.deepEqual(source.runners, { enabled: ["codex"], default: "codex" });
     assert.equal(source.advisor_export.consent, "declined", "the seed cannot claim unasked export consent");
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
@@ -7705,8 +7757,12 @@ test("Codex bootstrap accepts a dual-runner source whose default runner is Claud
       deps: fakeDeps,
     }).status, "applied");
     const sourcePath = join(path, "pipeline.user.yaml");
-    const source = readFileSync(sourcePath, "utf8")
-      .replace('  default: "codex"\n', '  default: "claude"\n');
+    const seededSource = readFileSync(sourcePath, "utf8");
+    const source = seededSource
+      .replace('  default: "codex"\n', '  default: "claude"\n')
+      .replace('  enabled:\n    - "codex"\n', '  enabled:\n    - "claude"\n    - "codex"\n');
+    assert.notEqual(source, seededSource, "fixture must explicitly add Claude before selecting it as the default");
+    assert.deepEqual(parseYaml(source).runners, { enabled: ["claude", "codex"], default: "claude" });
     writeFileSync(sourcePath, source);
     captureFirstRestartFixtureInput(path, fakeDeps);
     const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
@@ -8126,7 +8182,13 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     const seed = planProjectOnboardingV3({ runner: "codex", rootDir: unsupported, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: unsupported, activate: true, deps: fakeDeps }).status, "applied");
     const sourcePath = join(unsupported, "pipeline.user.yaml");
-    writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(/default: "?codex"?/u, "default: \"claude\""));
+    const seededSource = readFileSync(sourcePath, "utf8");
+    const source = seededSource
+      .replace('  default: "codex"\n', '  default: "claude"\n')
+      .replace('  enabled:\n    - "codex"\n', '  enabled:\n    - "claude"\n    - "codex"\n');
+    assert.notEqual(source, seededSource, "fixture must explicitly enable Claude before selecting it as the default");
+    assert.deepEqual(parseYaml(source).runners, { enabled: ["claude", "codex"], default: "claude" });
+    writeFileSync(sourcePath, source);
     captureFirstRestartFixtureInput(unsupported, fakeDeps);
     const observedUnsupported = inspectProjectOnboardingV3({ runner: "codex", rootDir: unsupported, deps: fakeDeps });
     assert.equal(observedUnsupported.status, "runtime-initialization-required");

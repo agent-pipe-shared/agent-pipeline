@@ -190,8 +190,10 @@ export function inspectArchitectureDesign(rootDir, taskScope = null) {
     if (existsSync(physical(root, receiptPath))) {
       requireValue(bytes(root, receiptPath) === json(receipt), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
       requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
-      const pendingPhysicalSurfaces = [...new Set(input.modules.flatMap(module =>
-        [...module.publicContracts, ...module.verificationEntryPoints]))].filter(name => {
+      const pendingPhysicalSurfaces = [...new Set([
+        ...input.implementationSurface,
+        ...input.modules.flatMap(module => [...module.publicContracts, ...module.verificationEntryPoints]),
+      ])].filter(name => {
         try { return bytes(root, name).trim().length === 0; } catch { return true; }
       });
       return { ok: true, status: "materialized", input, targets, receipt, scope: input.disposition.scope,

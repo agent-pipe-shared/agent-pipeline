@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -141,6 +141,10 @@ test("installed-but-stale: an intact hook from plugin library A advises the exac
     const currentLib = join(dir, "pipeline-cache", "b", "lib");
     mkdirSync(oldLib, { recursive: true });
     mkdirSync(currentLib, { recursive: true });
+    writeFileSync(join(dirname(oldLib), "protected-baseline.json"), "{}\n");
+    writeFileSync(join(dirname(currentLib), "protected-baseline.json"), "{}\n");
+    writeFileSync(join(oldLib, "governance-scope.mjs"), "export const fixtureLibrary = 'A';\n");
+    writeFileSync(join(currentLib, "governance-scope.mjs"), "export const fixtureLibrary = 'B';\n");
     const install = applyInstall({ rootDir: dir, pluginLibDir: oldLib });
     assert.equal(install.status, "installed");
     const hookBefore = readFileSync(install.hookPath, "utf8");

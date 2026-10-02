@@ -117,7 +117,6 @@ import {
   CRITICAL_HUMAN_PROOF_POLICY_V3,
 } from "../lib/critical-human-proof-policy.mjs";
 import {
-  PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH,
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
   shellWord,
 } from "../lib/project-onboarding-v3.mjs";
@@ -648,7 +647,7 @@ export function applyInitialOnboardingAnswers({
 
   const sourcePath = join(root, "pipeline.user.yaml");
   const manifestPath = join(root, "project", "pipeline.yaml");
-  let receiptPath = join(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH);
+  let receiptPath;
   let pendingPath = null;
   let hostManaged = false;
   const home = effectiveEnv.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE
@@ -665,11 +664,11 @@ export function applyInitialOnboardingAnswers({
       return { ok: false, code: "INITIAL-ANSWERS-REPOSITORY-UNAVAILABLE" };
     }
     hostManaged = repository.mode === "host-managed";
-    if (hostManaged) {
-      const state = resolveInitialAnswersState(root, "host-managed");
-      receiptPath = state.receipt;
-      pendingPath = state.pending;
-    }
+    const answerState = resolveInitialAnswersState(root, repository.mode, {
+      requireGit: repository.mode === "local",
+    });
+    receiptPath = answerState.receipt;
+    pendingPath = answerState.pending;
     priorIntake = readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: repository.mode });
   } catch { return { ok: false, code: "INITIAL-ANSWERS-INTAKE-UNAVAILABLE" }; }
   if (hostManaged && gitAuthorName === null) {

@@ -5,7 +5,12 @@ import {observeGovernanceScope} from '../lib/governance-scope.mjs';
 export function nativeHookGovernanceAdmission({runner,rawInput}={}) {
   let input = null; try { input = JSON.parse(rawInput); } catch {}
   const rootDir = runner === 'antigravity'
-    ? input?.toolCall?.args?.Cwd ?? input?.workspacePaths?.[0] ?? input?.cwd ?? process.cwd()
+    ? [
+        input?.toolCall?.name === 'run_command' ? input?.toolCall?.args?.Cwd : null,
+        Array.isArray(input?.workspacePaths) ? input.workspacePaths[0] : null,
+        input?.cwd,
+        process.cwd(),
+      ].find(value => typeof value === 'string' && value.trim().length > 0)
     : input?.cwd ?? process.cwd();
   const scope = observeGovernanceScope({rootDir});
   if (scope.requiresEnforcement) return {requiresEnforcement:true,destructiveDenial:null};

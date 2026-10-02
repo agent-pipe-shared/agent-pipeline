@@ -258,7 +258,7 @@ function hasRequiredProtocol(source, suitePath) {
   if (bindings.includes("createTestCaseCompletionRecorder")) return hasOnboardingParentRecorder(source, suitePath, bindings);
   if (bindings.filter((binding) => binding === "registerTestCaseCompletion").length !== 1
     || bindings.some((binding) => /\bas\s+registerTestCaseCompletion$/u.test(binding))) return false;
-  const masked = maskNonCode(source);
+  const masked = maskNonCode(source, true);
   const calls = topLevelMatches(masked, /^\s*registerTestCaseCompletion\s*\(/gmu);
   if (calls.length !== 1) return false;
   const prefix = masked.slice(0, calls[0].index);
