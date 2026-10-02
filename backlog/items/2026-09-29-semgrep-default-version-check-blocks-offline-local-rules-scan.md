@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-09-29
+sprint: none
 done_when: manual
 source: "Bounded native Semgrep controls, 2026-09-29: same executable and shipped local rules time out with default version check; disabling only that check completes valid JSON in 3615ms."
 ---

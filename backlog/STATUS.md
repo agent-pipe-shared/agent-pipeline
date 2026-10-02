@@ -214,7 +214,7 @@
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
-| pipeline.design-package-parent-metadata-false-drift | open | defect | pipeline | — | 2026-09-29 | — | — |
+| pipeline.design-package-parent-metadata-false-drift | open | defect | pipeline | none | 2026-09-29 | — | — |
 | pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
 | pipeline.design-workflow-package-omits-contract | open | defect | pipeline | alfred | 2026-09-28 | — | — |
@@ -368,6 +368,7 @@
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.historical-plan-cancellation-blocks-current-withdrawal | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.hooks-enforce-available-parallel-dispatch | open | workflow-improvement | pipeline | none | 2026-10-01 | — | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | closed | defect | pipeline | — | 2026-08-12 | — | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -627,14 +628,14 @@
 | pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | — | 2026-07-25 | — | — |
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
-| pipeline.security-scanner-failure-provenance | open | workflow-improvement | pipeline | — | 2026-09-29 | — | — |
+| pipeline.security-scanner-failure-provenance | open | workflow-improvement | pipeline | none | 2026-09-29 | — | — |
 | pipeline.sed-regex-address-is-misread-as-an-absolute-path | closed | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.seed-security-gate-on | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing. |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.selected-critic-lane-contracts-unpinned | open | defect | pipeline | none | 2026-09-06 | — | Future native-Windows Codex sandbox package -- the selected-Codex-Critic lane (codex-critic-app-server.mjs) resolves roles/critic.md, templates/prompts/critic-review.md and the verdict schema against the live checkout with only an lstat, hands their paths into the child's prompt, and binds no digest of the briefed bytes into either receipt it constructs. The sibling native lane in codex-critic-host.mjs enforces pipelineRoot !== repoRoot, refuses a dirty ruleset checkout, and binds roleContractSha256/promptContractSha256/verdictSchemaSha256 into the prepared packet and the receipt. Under SEC-10's threat model an agent can edit roles/critic.md in the working tree, dispatch its own reviewer through the selected lane, and the tamper-evident execution receipt cannot show it. |
 | pipeline.self-application-integrity-check-absent | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
-| pipeline.semgrep-offline-default-version-check | open | defect | pipeline | — | 2026-09-29 | — | — |
+| pipeline.semgrep-offline-default-version-check | open | defect | pipeline | none | 2026-09-29 | — | — |
 | pipeline.semgrep-timeout-oversized-pipeline-state-test | closed | defect | pipeline | — | 2026-08-11 | — | — |
 | pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home | closed | workflow-improvement | pipeline | alfred | 2026-08-26 | — | — |
 | pipeline.sentinel-epic-acceptance-matrix-archive-drift | closed | defect | pipeline | — | 2026-08-19 | — | — |
@@ -771,7 +772,7 @@
 
 ## Counts
 
-- open: 106
+- open: 107
 - in_progress: 0
 - closed: 643
 - rejected: 3

@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-09-29
+sprint: none
 done_when: manual
 source: "Actual native DAA-DWP-PHYSICAL-DRIFT refusal and deterministic physical-reader diagnosis, 2026-09-29."
 ---

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-09-29
 sprint: alfred
+done_when: manual
 tracking: "The four targeted onboarding-init greenfield cases pass but take over six minutes because independent runner/key fixtures are sequential inside individual tests."
 source: "Focused onboarding-init test run on 2026-09-29: 4/4 pass in 368.5 seconds."
 ---

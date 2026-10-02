@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a4d68aa0cf584cc411ca3cb444b9b7bc1bc4ccb72faad0bf896091c73640fb93"
+    "transitionHead": "ba70a745c1e3e005314395f18e1edc755b775b22b98928b43bdd85a3f6794378"
   },
   "counts": {
-    "open": 106,
+    "open": 107,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -2783,7 +2783,8 @@
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Actual native DAA-DWP-PHYSICAL-DRIFT refusal and deterministic physical-reader diagnosis, 2026-09-29.",
-      "deferred": false
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
@@ -4806,6 +4807,16 @@
       "closureRepository": "self",
       "closureCommit": "b94b83c06504a45374c90570c04801e7a6811f58",
       "closureEvidence": "backlog/evidence/2026-09-11-git-boundary-critic-pass.md"
+    },
+    {
+      "id": "pipeline.hooks-enforce-available-parallel-dispatch",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-01",
+      "source": "Explicit PO direction: hooks must detect missed parallelization and require the Elephant to dispatch independent work in parallel.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",
@@ -8289,7 +8300,8 @@
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Read-only scanner policy/provenance audit, 2026-09-29; frozen manifest df50d7e8f373d694f07579119add740081c0ca636a71c46f77f72b6b2c9edaba.",
-      "deferred": false
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.sed-regex-address-is-misread-as-an-absolute-path",
@@ -8379,7 +8391,8 @@
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Bounded native Semgrep controls, 2026-09-29: same executable and shipped local rules time out with default version check; disabling only that check completes valid JSON in 3615ms.",
-      "deferred": false
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.semgrep-timeout-oversized-pipeline-state-test",

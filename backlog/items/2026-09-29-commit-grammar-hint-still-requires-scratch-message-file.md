@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-09-29
 sprint: alfred
+done_when: manual
 tracking: "The commit parser already accepts repeated -m and Git --trailer, but the lifecycle grammar denial and commit skill still direct ordinary multi-paragraph commits through a scratch message file."
 source: "PO feedback on 2026-09-29; guard-lifecycle-ready.mjs commitMessageFileRemediation; commit-message-policy.test.mjs CMP3a/CMP3c."
 ---

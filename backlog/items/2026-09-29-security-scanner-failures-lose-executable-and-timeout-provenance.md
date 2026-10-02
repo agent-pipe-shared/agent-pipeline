@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-09-29
+sprint: none
 done_when: manual
 source: "Read-only scanner policy/provenance audit, 2026-09-29; frozen manifest df50d7e8f373d694f07579119add740081c0ca636a71c46f77f72b6b2c9edaba."
 ---
