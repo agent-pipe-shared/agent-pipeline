@@ -45,6 +45,18 @@ product code. The installed candidate was `0.7.0+<runner>.20261003105506.1bd1d7b
   installed by the PO, and then the design course resumes on the patched
   candidate.
 
+- **Redesign direction (PO, later the same day):** the design-course and
+  onboarding-driver code (the continuity/CAS-based coordination, Codex-centric
+  Advisor acceptance, multi-step authoring registration) appears too complex
+  and error-prone. A redesign of the design run and the driver is a legitimate
+  option for this round, rather than patching each refusal. Live evidence the
+  same day:
+  - Registering the stage-0 authoring dispatch requires hand-building a full
+    continuity state for `continuity-cas`.
+  - `reopen-design` loops (K1-8).
+  - On native Windows every role the course needs (Advisor, readiness, Critic,
+    Goldfish) is blocked by the budget lock (K3-9).
+
 ## Verification summary (2026-10-03)
 
 Five read-only source verifications ran against HEAD `a0d83ce78`, whose code is
@@ -145,6 +157,8 @@ Items: `…-three-runner-happy-path-with-two-po-approvals.md`, `…-signature-ce
 | K4-3 | PO runs prepare/refreeze/diagnosis and JSON copy-back | X, C §4 | **partially**: by descriptor only `sign-intent` is human-only (`lib/human-guard-override.mjs:3170-3211,3560-3593`); the agent could not run the rest because the lifecycle guard refuses its own `guard-human-override.mjs` call and tells the human to run it (guard scope, same root as K1-x); `refreeze-plan` declares no boundary |
 | K4-4 | Multi-line PO commands break in terminals | A §5.2 | **confirmed**: backslash continuation in `variableBoundCopyCommand` (`lib/project-onboarding-v3.mjs:2406-2473`, `:2443`), used by the design-workflow sign action (`:2773-2789`) |
 | K4-5 | Signed config override undone by registry projection/migration | A B5 | **confirmed**: routes must equal the Core registry (`lib/runner-profiles-v3.mjs:338-339`); refresh replaces Core-owned surfaces (`lib/runner-profile-migration-v3.mjs:483-490,534-541`); no user override layer found |
+| K4-7 | Intermediate design-phase mutations (`reopen-design` after a source change, PO-profile receipt repair before `submit-plan`) are emitted with `requiresConfirmation: true` and need a PO confirmation. PO rule: on a design the PO gives exactly one final approval (signature or chat per mode); everything before it is agent work | PO, S | **confirmed live** (`pipeline-state inspect` nextAction `reopen-design … requiresConfirmation: true`; `submit-plan` blocked by `PO-PROFILE-RECEIPT-STALE`) |
+| K1-8 | `reopen-design` emitted for `PLAN-LIFECYCLE-DIGEST-DRIFT` is a no-op loop: it appends a duplicate `phaseHistory` entry carrying the previous timestamp, the lifecycle stays `DIGEST-DRIFT`, and `inspect` emits `reopen-design` again (explains five identical 2026-09-27 entries) | S | **confirmed live** 2026-10-03 (`phaseHistory` grew by one `2026-10-03T11:29:06.577Z` duplicate); the drift is only resolvable through a new `submit-plan`, which was itself blocked by `PO-PROFILE-RECEIPT-STALE` |
 | K4-6b | Current happy path has up to eight PO ceremony kinds in signature mode (key setup, onboarding kickoff/promotion confirmations, bootstrap plan acknowledgement, design-workflow package signature, plan approval, push approval, conditional guard overrides) | — | **confirmed from source** (not run end to end); see verification report for producing scripts |
 | K4-6 | Requirement: two approvals on the happy path, three runners | PO | requirement |
 

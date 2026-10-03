@@ -72,6 +72,16 @@ evidence for the one-approval happy path.
   (PRD/Spec/design/traceability) → binding → Advisor → `submit-plan` →
   readiness → presentation, emitted step by step as typed `nextAction`s.
 
+- **PO direction (2026-10-03, later):** consider a redesign of the whole
+  design-run and onboarding-driver code, which seems too complex and
+  error-prone, instead of patching individual refusals. Live the same day in
+  the Agent-Pipeline repository:
+  - Stage-0 authoring registration needs a hand-built full continuity state for
+    `continuity-cas`.
+  - `reopen-design` looped without resolving `PLAN-LIFECYCLE-DIGEST-DRIFT`.
+  - On native Windows none of the course's roles could run (dispatch-budget
+    lock).
+
 ## Triage
 
 The existing mini profile and previous cost work do not demonstrate this

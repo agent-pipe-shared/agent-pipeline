@@ -28,6 +28,14 @@ Observed 2026-10-03:
   ever reached, and one of them was burnt by a changing request digest.
 - Antigravity could not complete the design at all.
 
+**PO clarification (2026-10-03, later):** on a design the PO gives exactly
+**one** final approval, as a signature or in chat depending on the mode.
+Intermediate design-phase mutations are agent work and need no PO
+confirmation. Live counter-example in the Agent-Pipeline session: after a
+design-source change, `pipeline-state inspect` emitted `reopen-design` with
+`requiresConfirmation: true`, and `submit-plan` was blocked by
+`PO-PROFILE-RECEIPT-STALE` until a confirmed profile-receipt repair.
+
 ## Acceptance
 
 - One end-to-end greenfield scenario per runner (Claude on Windows, Codex,
