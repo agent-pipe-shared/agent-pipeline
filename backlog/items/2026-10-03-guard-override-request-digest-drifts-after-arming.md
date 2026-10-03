@@ -20,6 +20,17 @@ retried command was then refused with a **new** request digest (`4374f3…` →
 digest appears to include volatile state, for example the untracked `project/`
 files or the override store itself, which the arming step changes.
 
+**Live reproduction, Agent-Pipeline Claude/Windows session 2026-10-03:** a
+signed and armed override for a byte-identical Bash `command` was not consumed.
+The retried call carried a different Claude tool `description` text,
+`toolInputSha256` is computed over the whole `tool_input` including that
+cosmetic field (`7b6920c9…` vs `0486dd4a…`), and the retry was refused as if it
+were a fresh denial. Repeating the call with the original description text
+consumed the capability (`CS-CAS-APPLIED`). The governed digest must cover only
+semantically effective inputs (`command`, write target, content), never
+runner-cosmetic fields like `description`. A mismatch against an armed
+capability must say so explicitly.
+
 ## Acceptance
 
 - The request digest is computed only from the tool call and the stable
