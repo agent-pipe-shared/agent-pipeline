@@ -27,6 +27,19 @@ product code. The installed candidate was `0.7.0+<runner>.20261003105506.1bd1d7b
   approvals.
 - The result is a new stamped local 0.7.0 candidate for PO testing.
 
+## PO decisions (2026-10-03, chat)
+
+- **Scope:** the findings round is folded into the **complete Alfred package**
+  (all tracks A–E, the 2026-09-27/28 greenfield remediation slices, the
+  recovery-availability amendment and the model-family automation requirement).
+  The PO explicitly chose this over a findings-only or findings-plus-recovery
+  candidate.
+- **Design-round route:** the Alfred design course in this repository hits root
+  cause 1 itself (for example `continuity-cas` refused in draft). Each blocked
+  lifecycle step is passed with a **targeted human-guard override** (signature
+  mode). Before each step the tree is frozen so that no drift burns the
+  signature. The gate mode is not changed.
+
 ## Verification summary (2026-10-03)
 
 Five read-only source verifications ran against HEAD `a0d83ce78`, whose code is
