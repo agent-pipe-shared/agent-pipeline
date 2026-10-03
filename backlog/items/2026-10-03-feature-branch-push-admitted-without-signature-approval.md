@@ -27,6 +27,21 @@ release/main promotion keeps the full prerequisite chain (Verify, security,
 Critic and so on). In signature mode, **every** push, including a feature-branch
 checkpoint push, still needs a signed approval bound to the exact commit.
 
+**Source verification (2026-10-03):** the push was admitted through the
+deliberately unsigned *checkpoint lane*. Commit `a0d83ce78` carries
+`Checkpoint-Intent:`. `classifyPushDestination`
+(`lib/push-destination-policy.mjs:61-80`) classifies a same-ref push under
+`pushDestinationPolicy.checkpointNamespace: refs/heads/feat/` as
+`feature-checkpoint`. `guard-push.mjs:1948-2019` then admits it after checking
+a clean tree, HEAD, the single trailer and architecture currency, and checks no
+approval or signature. The pre-push hook mirrors the lane
+(`scripts/pre-push-hook-install.mjs:329-347,402-412`) and does not verify the
+Ed25519 proof at all (header `:230-241`). Protected-lane pushes do require an
+exact-commit approval plus a signature (`guard-push.mjs:2301-2335,2414-2451`).
+This was an earlier design choice. The PO requirement now reverses it: in
+signature mode the checkpoint lane needs a signed, commit-bound approval too,
+while keeping the slim prerequisite set (no Verify, security or Critic chain).
+
 ## Triggering situation
 
 End of the previous session (WSL checkout), handover push before the restart.
