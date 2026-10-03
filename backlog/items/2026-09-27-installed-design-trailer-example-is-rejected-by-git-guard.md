@@ -56,4 +56,12 @@ to obtain a commit.
 - Existing local stage-0-labeled design evidence commits are explicitly
   dispositioned as provenance debt; their history is not silently rewritten.
 
+## Evidence 2026-10-03
+
+Reproduced on all fronts on the 0.7.0 local test candidate (`1bd1d7bf`): the
+Codex greenfield report (P0: `templates/prompts/agent-obligations.md:176` vs
+`lib/commit-message-policy.mjs:85/:173`), the Antigravity report (Befund 7) and
+the Agent-Pipeline recovery handover `docs/0.7-recovery-2026-10-03.md` (consistency
+patch prepared in `scratch/design-trailer-consistency/`, unqualified).
+
 ## Triage

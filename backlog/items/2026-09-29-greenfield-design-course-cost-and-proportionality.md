@@ -56,6 +56,22 @@ evidence for the one-approval happy path.
 - Bound the synthetic Advisor/Readiness host test and split independent
   scenarios so a closed stdio channel cannot stall the suite.
 
+## Evidence 2026-10-03 (three-runner greenfield, PO)
+
+- **PO observation (all runners):** the route from material input to a
+  presented design is still too complicated and too long.
+- Claude/Windows (Claude test repo analysis V-5, V-11, V-14): `design-course.md`
+  documents Advisor → `submit-plan` → readiness. Only after `submit-plan` does
+  `inspect` demand an authoring dispatch plus `design.md`/`traceability.md`,
+  which are mentioned nowhere earlier. `intake-generate-design.md` tells the
+  Elephant to author PRD/Spec itself, while EL-16 forbids bulk artifacts by the
+  Elephant. A free Advisor consult was not accepted by the formal course, so the
+  Advisor work was duplicated. Searching the plugin source for the registration
+  route cost 41 tool calls at about 400k context (about 16M cache-read tokens).
+  Required: one continuous, documented sequence: intake → authoring dispatch
+  (PRD/Spec/design/traceability) → binding → Advisor → `submit-plan` →
+  readiness → presentation, emitted step by step as typed `nextAction`s.
+
 ## Triage
 
 The existing mini profile and previous cost work do not demonstrate this
