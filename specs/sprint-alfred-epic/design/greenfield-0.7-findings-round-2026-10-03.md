@@ -45,6 +45,13 @@ product code. The installed candidate was `0.7.0+<runner>.20261003105506.1bd1d7b
   installed by the PO, and then the design course resumes on the patched
   candidate.
 
+- **Route switch (PO, later the same day):** continuing in a WSL/Linux
+  session was rejected. The mini-patch route (B) is taken: an operator hotfix
+  of the installed `guard-dispatch-budget.mjs` for native Windows (K3-9),
+  authored by a recorded `general-purpose` self-dispatch fallback into
+  `scratch/`, tested and applied by the PO. The authoring-dispatch
+  registration uses a targeted override. The source fix follows through the
+  lifecycle (Spec §21.4 R4-4).
 - **Redesign direction (PO, later the same day):** the design-course and
   onboarding-driver code (the continuity/CAS-based coordination, Codex-centric
   Advisor acceptance, multi-step authoring registration) appears too complex
