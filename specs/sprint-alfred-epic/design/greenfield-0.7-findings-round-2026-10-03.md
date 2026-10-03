@@ -150,6 +150,8 @@ Items: `…-role-route-preflight-with-self-dispatch-fallback.md`, `…-agy-drive
 | K3-5 | Codex native host binding/host commit missing after design dispatch | X P0 | **partially**: host commit requires `spawn_agent` with `tool_use_id`/`session_id`, a v1/v2 marker in the prompt, role goldfish-implementor or goldfish-mechanic and `worker` type (`lib/native-goldfish-host-state.mjs:119-131`, `lib/native-goldfish-host-return.mjs:23-26,64-66`); an unmarked or other-role dispatch silently yields `NGHS-NOT-APPLICABLE` |
 | K3-6 | Dispatch guard demands inline briefing; route digest binds briefing file | C V-10 | **partially**: inline requirement confirmed (`lib/dispatch-policy.mjs:200-207`); the route digest hashes only the structured request (`lib/workflow-writer-preflight.mjs:25-34,181-186`), not a briefing file, and nothing links it to the sent prompt |
 | K3-8 | Dispatch guard rejects built-in `Explore`/`Plan` agent types with a misleading Advisor message | S | **confirmed**: `lib/advisor-prohibition-binding.mjs:23-27,54` |
+| K3-10 | The Advisor course store refuses its private directory/files on native Windows because `(lstat.mode & 0o077) !== 0` is always true there (`DACS-PRIVATE-DIRECTORY`); the same POSIX mode-bit pattern appears in about 30 production files | C V-2, S | **confirmed live** (producer stderr `DESIGN-ADVISORY-COORDINATOR-FAILED: error: DACS-PRIVATE-DIRECTORY`; `lib/design-advisor-course-store.mjs:17,33`) |
+| K3-11 | A `consult-advisor` dispatch whose briefing names no tool budget passes the pre-launch dispatch check, then every tool call is refused with `DISPATCH-BUDGET-INPUT-INVALID (base-calls-must-be-a-positive-safe-integer)`. The dispatch is bricked instead of refused before launch (as Goldfish briefings are, `DBB-BASE-CAP-MISSING`) | S | **confirmed live** 2026-10-03 |
 | K3-9 | On native Windows every budget-counted Pipeline subagent tool call is refused (`counter-lock-owner-ambiguous`); subagent also lacks the bootstrap-receipt step | S | **confirmed**: `hooks/guard-dispatch-budget.mjs:420-433,499-512` require `process.platform === "linux"` and `/proc`; item `2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md`. **Blocks every Goldfish/Critic dispatch on this Windows host.** Operator hotfix of the installed copy applied by the PO 2026-10-03 (receipt `d1b11ad9…` → `f28f2604…`, 10/10 hotfix tests green); a `pipeline-core:goldfish-mechanic` probe then completed preflight, Read, Bash and Write without budget or receipt denial. Source fix still pending (R4-4) |
 | K3-7 | Requirement: route preflight plus recorded self-dispatch fallback | PO | requirement |
 
@@ -221,6 +223,91 @@ Item: `…-forensics-and-audit-evidence-not-reconstructable.md`
 | K8-4 | No generated per-change audit index | X P2, C E26, A §6.2 | requirement |
 | K8-5 | Tracked Alfred artifacts contain a host-specific absolute user path (`specs/sprint-alfred-epic/plans/a1-enforcement-conformance.md:111`, `specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md:69,79`) | S | **confirmed** by in-repo scan; sanitize forward (no history rewrite) and add a pre-commit host-path check |
 | K2-6b | `rg -e <pattern>` operands and slash-containing search patterns are evaluated as read paths (`GUARD-READ-SCOPE-OUTSIDE-ROOT`) | S | **confirmed live**; same root as K2-4 (arguments classified as filesystem paths) |
+
+### K9 — Agent-side and classification findings from the reports
+
+Item: carried in Spec §21.5 (briefing/obligation quality) unless noted.
+
+| ID | Finding | Sources | Verification |
+|---|---|---|---|
+| K9-1 | A Goldfish read a derived (wrong) role path. Briefings must carry verified exact paths, checked before dispatch | X loops | agent error; mitigation = dispatch preflight path check (R4 route preflight) |
+| K9-2 | The bootstrap commit had 3 files/103 lines, exceeding the ordinary stage-0 bound (2 files/25 lines). Whether an onboarding exception applies is undecided | X §Rollen | classification question; resolve with K1-4 (scaffold commits) |
+| K9-3 | A private first name was written into a PRD (E24). The private-identifier pre-commit check did not stop it in the test repo | C E24 | agent error plus a check gap; verify the existing private-identifier pre-commit check covers consumer specs |
+| K9-4 | An analysis subagent stopped on a composed shell command; briefings must state the closed grammar | X loops, S | covered by generated obligations; verify that the briefing templates include them |
+| K9-5 | Antigravity transcripts carry no usage fields, so token accounting is only estimable | A §2.3 | host limitation; R6 reports usage only where supplied |
+
+## Report coverage (every finding of the three reports → register row)
+
+### Claude/Windows report
+
+| Report finding | Register |
+|---|---|
+| V-1 design course not completable without override (`continuity-cas` refused) | K1-1, K1-x |
+| V-2 Advisor producer fails silently | K3-1 (root cause found 2026-10-03: POSIX mode-bit check `DACS-PRIVATE-DIRECTORY`, K3-10) |
+| V-3 override digest changes after arming, signature burnt | K4-1, K4-9 |
+| V-4 `submit-plan` busy while dispatch registered; `integrate-final` refused | K1-2 |
+| V-5 contradictory course order; EL-16 vs intake authoring | K5-2, K5-3 |
+| V-6 scaffold commit refused in draft | K1-4 |
+| V-7 preflight forward slash vs backslash | K7-1 |
+| V-8 `scratch/` analysis scripts and transcript reads blocked | K1-5, K2-6 |
+| V-9 `--answers-json` length limit | K5-5 |
+| V-10 inline briefing vs file-bound digest | K3-6 |
+| V-11 duplicate Advisor work (consult not accepted) | K3-2 |
+| V-12 language asked twice | K5-6 |
+| V-13 `docs/state.md` projection stale | K7-7 |
+| V-14 context growth from searching the plugin source | K5-1 (consequence of V-1/V-5) |
+| E6/E7 ADRs not created (draft lock) | K1-4/K1-x (draft write admission), K5-2 |
+| E8 no PO architecture-adoption disposition asked | K5-2 (course sequence must emit it) |
+| E11/E18 Critic required (T3) but never dispatched | K3-9 (Windows subagents blocked), K3-7 |
+| E24 private first name in PRD | K9-3 |
+| E25 signature friction (external terminal, JSON copy-back, 30-min window) | K4-3, K4-4 |
+| E26 evidence package not reconstructable | K8-4 |
+| §4 freigaben rows 5/6 (two override signatures) | K4-6, K4-6b |
+
+### Antigravity report
+
+| Report finding | Register |
+|---|---|
+| Befund 1: circular refusal of scripts in draft/awaiting-approval | K1-5, K1-x |
+| Befund 2: subagent bootstrap deadlock (`requires-bootstrap.pending`) | K3-4 |
+| Befund 3: stale bootstrap lock after resume (30-min mtime) | K7-4 |
+| Befund 4: mandatory roles `unavailable` for profile `feature` | K3-3 |
+| Befund 5: signed override undone by registry projection | K4-5 |
+| Befund 6: scaffold-commit circularity (HEAD-read config) | K1-4 |
+| Befund 7: `Dispatch: design (elephant)` rejected | K5-4 |
+| §5.2(1) unborn HEAD breaks signing intent | K4-2 |
+| §5.2(2) multi-line commands break in terminal | K4-4 |
+| §5.2(3) window switching, path resolution, JSON copy-back | K4-3 |
+| §6.5 Advisor never reached (stage-0 authoring blocked) | K1-1, K3-3 |
+| §2.3 no usage fields in transcripts | K9-5 |
+| §8.2 priorities 1–8 | identical to Befund 1–7 plus §5.2 above |
+| E15 resume blocked by stale lock | K7-4 |
+| E25 signature mode not wrap-safe | K4-4 |
+
+### Codex report
+
+| Report finding | Register |
+|---|---|
+| Method: session directory scan refused, transcript reader `requested-session-unavailable` | K2-6, K8-1 |
+| P0 no coherent candidate commit/plan approval; needs full greenfield acceptance test | K4-6 (three-runner end-to-end requirement) |
+| P0 `design(elephant)` trailer rejected | K5-4 |
+| P0 native host binding/host commit missing | K3-5 |
+| P0 session evaluation fails at the official reader | K8-1 |
+| P1 continuity PRD/Spec digests differ from checkout | K8-2 |
+| P1 five design sources incomplete / design+traceability not admitted | K5-2 |
+| P1 EL-16 short form contradicts full text | K5-3 |
+| P1 PO ran recovery commands; stale request drift | K4-3, K4-1 |
+| P2 `verify: null`, no product test contract | K8-3 |
+| P2 audit index must be hand-assembled | K8-4 |
+| Loops: signing intent not buildable (unborn HEAD) ×2 | K4-2 |
+| Loops: refreeze with stale request (`HGO-DRIFT`) | K4-1 |
+| Loops: scaffolding commit refused | K1-4 |
+| Loops: two one-off HGO authorizations (model run/choice) | K4-6b |
+| Loops: first Goldfish read a wrong role path | K9-1 |
+| Loops: host commit absent; diagnose → same refusal | K3-5 |
+| Loops: external directory diagnosis by the PO | K4-3 |
+| Loops: forensic subagent stopped on composed command | K9-4 |
+| Bootstrap commit size vs stage-0 bound | K9-2 |
 
 ## Next steps
 
