@@ -41,6 +41,17 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | AC-24 | **Provider-free AGY dispatch seam:** a complete runner-neutral Goldfish packet reaches `invokeAgy` through one production caller with candidate/input/result isolation and a typed receipt. Fake executable cases prove success, malformed output, model mismatch, timeout and cancellation; a missing/mismatched repo-local plugin/pipeline-start marker refuses or remains unavailable. `agy plugins list`, a sandbox flag, and fixture success do not count as native guard or three-runner proof. | E3 Verify suite; `pipeline.cross-runner-dispatch-receipt.v1` fixture receipt; A1/A2/A3/A5 precondition readback |
 | AC-25 | **Native Claude/Codex Host-Commit:** each direct runner route binds the exact prelaunch candidate and child/session/model identity to one validated structured final return; only its exact allowed diff is committed by the host with ordinary Git hooks, then commit readback, private local observation, and authored v4 publication occur in that order. Ambiguous or invalid returns do not gain authorship; a fresh clone without a separately approved signed export remains `UNVERIFIABLE`; no provider attestation is claimed. | Native Goldfish host state/return/finalizer/commit-execution Verify suites; authorship writer/verifier regressions; runner-hook contract readback |
 
+### 2026-10-03 findings round (Spec §21)
+
+| # | Criterion | Evidence |
+|---|---|---|
+| AC-26 | **Lifecycle-command admission:** every Pipeline-emitted `nextAction`/recovery/course command is admitted in each phase that emits it, under every supported path spelling, and a greenfield design course reaches `present-plan` with zero guard overrides | §21.1 R1-1…R1-6 fixtures (win32 + POSIX dialects) |
+| AC-27 | **Read policy:** ordinary in-root reads (Read, Grep incl. directory/glob, Glob, `rg` flags, `git … \| head`) and exact WSL UNC files are admitted despite auxiliary-root failures; credential roots stay denied; refusal texts name the real cause | §21.2 R2-1…R2-5 fixtures, incl. case-mismatched session-root fixture |
+| AC-28 | **Two-decision ceremonies:** onboarding → push asks the PO exactly twice per runner; every signature-mode push (checkpoint included) is signed and commit-bound in guard and pre-push hook; armed overrides survive unrelated working-tree changes; unborn HEAD signs | §21.3 R3-1…R3-5 fixtures; ceremony inventory test |
+| AC-29 | **Runner parity:** role-route preflight with recorded self-dispatch fallback; Antigravity `feature` profile reaches readiness/Critic; native-Windows Pipeline subagents run under the budget lock; built-in agent types admitted; runner-specific SessionStart hints | §21.4 R4-1…R4-6 fixtures + per-runner host evidence |
+| AC-30 | **Design-course contract:** documented and emitted sequence agree; one trailer grammar; `--answers-file`; language asked once; Verify contract fixed before presentation | §21.5 R5-1…R5-4 fixtures |
+| AC-31 | **Forensics/audit:** multi-runner multi-segment transcript reader; continuity digest drift surfaced; unclassified docs refused at commit; generated audit index | §21.6 R6-1…R6-4 fixtures |
+
 ## B. Incident-derived regression criteria (live-measured classes)
 
 | # | Criterion | Evidence |

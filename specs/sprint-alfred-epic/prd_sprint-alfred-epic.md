@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 336d7d31c200c9a18ee743958dffb9a129da3e1c964f7742238a9fc373693b53 -->
+<!-- technical-spec-sha256: 9137adbe3d6e3ba89905e98da50e6937b12ea06d2c0bee8217cc63de7067958c -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -9,9 +9,10 @@ surfaces throughout)
 **Gate:** PRD/Spec accepted by the PO; implementation begins only after the
 sanctioned State submission/approval, the phase transition, and the Nova
 rebase precondition below.
-**Current amendment:** The 2026-09-27 greenfield remediation increment is
-prepared for PO review. The current State is reopened design/draft; the
-amendment grants no implementation authority by itself.
+**Current amendment:** The 2026-09-27 greenfield remediation increment remains
+in scope. A bounded 2026-10-03 recovery-availability addition and the
+2026-10-03 findings round (§14) are prepared as design input; the current State remains reopened design/draft and this
+addition grants no implementation authority by itself.
 **Current design base:** `feat/sprint-alfred` at `a50c8093` (clone of the Nova
 line); epic opened by PO-released `discard-feature` + `set-feature`
 (2026-08-27, commit `0d0031ea`).
@@ -38,9 +39,17 @@ rework directive), [`design/issue-intake.md`](design/issue-intake.md),
 [`design/external-research.md`](design/external-research.md),
 [`design/gap-analysis-2026-08-28.md`](design/gap-analysis-2026-08-28.md)
 (per-issue audit behind the rework).
+The current five-source design package is
+[`design-input.md`](design-input.md), this PRD, [`spec.md`](spec.md),
+[`design.md`](design.md), and [`traceability.md`](traceability.md). These
+proposed sources do not constitute an approval or implementation receipt.
 The next local 0.7 candidate also follows
 [`design/greenfield-0.7-remediation-2026-09-27.md`](design/greenfield-0.7-remediation-2026-09-27.md),
 which binds the later three-runner findings into five reviewable slices.
+The current recovery input and sanitized handover are linked from
+[`design-input.md`](design-input.md) and bounded in
+[`design/recovery-availability-2026-10-03.md`](design/recovery-availability-2026-10-03.md);
+the handover is narrative evidence, not verified live output.
 
 ---
 
@@ -579,6 +588,21 @@ named in `spec.md` §12 and `acceptance.md`:
     cases never become authored PASS; local observation is not provider
     attestation, and a fresh clone without an independently signed export
     remains unverifiable.
+11. **Recovery remains available when the current session cannot verify or
+    repair itself.** Keep intrinsic known-shape repair and existing scoped
+    GMW/HGO within their current authority; for other refusal classes provide
+    an attended external handoff or typed unavailable result with a concrete
+    prerequisite. The proposed external source/install protocol and P1 legacy
+    owner boundary are specified in `spec.md` §20 and
+    `design/recovery-availability-2026-10-03.md`. This is design input only:
+    implementation, evidence, review and PO disposition remain open.
+12. **All three runners walk the happy path with two PO approvals.** Claude
+    (native Windows and POSIX), Codex and Antigravity complete onboarding,
+    design, Advisor, plan approval, implementation and push without guard
+    overrides or recovery ceremonies. The PO is asked only for the final plan
+    approval and the push approval. Every signature-mode push, checkpoint
+    pushes included, is signed and commit-bound. Contracts and acceptance:
+    `spec.md` §21 and PRD §14.
 
 ## 8. Assumptions and risks
 
@@ -668,6 +692,8 @@ executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
 | External research | `design/external-research.md` → D2 representation pin, D3 deterministic-pass rule, A1 rationale, positioning |
 | 2026-08-27 incidents | `docs/state.md` current section; the two filed items → A4/A5, C1 seed codes |
 | 2026-09-27 three-runner greenfield findings | `design/greenfield-0.7-remediation-2026-09-27.md` → five non-overlapping implementation slices, exact backlog acceptance, host readbacks and candidate evidence |
+| 2026-10-03 recovery request and handover | `design-input.md` and `design/recovery-availability-2026-10-03.md` → proposed recovery levels and P1 archival boundary; handover is reported narrative, not verified live evidence |
+| 2026-10-03 findings round (PO observations, three-runner greenfield analyses, live bootstrap defects) | `design/greenfield-0.7-findings-round-2026-10-03.md` → source-verified register K1–K8; PRD §14; Spec §21 R1–R6 |
 
 The agent submits the 2026-09-27 amendment autonomously after preparing the
 design and required evidence. No separate PO content acknowledgement or
@@ -733,3 +759,81 @@ Pipeline behavior requires explicit repository enrollment observed through one s
 Antigravity installation and refresh diagnose managed/imported, global and workspace sources independently of the loaded copy. Unknown precedence needs isolated actual CLI and fresh loaded-source evidence; registry-only or version-label agreement is insufficient. Refresh preserves unrelated configuration and has one derived effective source per explicitly selected scope.
 
 A sanctioned repository uninstall unregisters mechanics and preserves all source, docs, AGENTS/architecture, packages, ADRs, backlog, evidence, handovers and Git history by default. It removes only proven owned bindings/keys/hooks, keeps foreign or modified artifacts, persists decline outside removed private state, survives interruption, and leaves ordinary Git and project workflows usable. Re-enrollment is explicit and preserves retained work. Global plugin lifecycle remains a separate action.
+
+## 13. Recovery availability design amendment (2026-10-03)
+
+This bounded addition responds to the latest recovery requirement preserved
+in `design-input.md`: a repair path must remain available when ordinary
+in-session maintenance cannot safely proceed. It does not replace or reduce
+the existing five-track, eighteen-work-package scope, the 2026-09-27
+greenfield increment, or the 2026-09-28 activation/topology/uninstall work.
+
+The design has three levels: evidence-preserving repair for a closed known
+shape; existing scoped GMW/HGO only while their verifier and proof remain
+valid; and a proposed attended external route independent of a broken runner
+for verifier/lifecycle failures. The P1 handover is a sanitized narrative,
+not verified live output. It does not prove receipt truncation, owner death or
+a source fix or descriptor schema. Source inspection distinguishes V2
+`ownerRuntime: null` (`unavailable`) from V1 field-absent (`unobserved`);
+neither is `not-live`. Legacy custody binds exact receipt bytes or explicit
+absence and a signed disposition: preserve valid matching receipts; permit
+existing replay only if all real replay preconditions hold; otherwise require
+new explicit signed custody authority. Conflicting/stale and bounded readable
+invalid/malformed bytes may be archived by exact digest; absence is bound,
+never fabricated; unreadable/symlinked/ambiguous targets return typed
+unavailable. Archived receipts confer no authority; valid matching receipts
+permit only proven exact replay or require new explicit signed custody
+authority. State, `activeFeature`, proofs, history and resources remain
+unchanged. Details and acceptance cases are in
+`spec.md` §20.
+
+This is proposed design material only. It does not satisfy the PRD/Spec PO
+gate, enter implementation, change lifecycle state, establish native host
+evidence, or claim the external mechanism exists. Missing secrets, trust
+anchors or evidence remain typed unavailable; bytes and history are preserved
+rather than reconstructed.
+
+## 14. 2026-10-03 findings round amendment
+
+**Problem.** On the stamped 0.7.0 test candidate (`1bd1d7bf`), a greenfield
+mini HTML game was run on all three runners. Every run stopped in
+`design`/`draft` with no product code. The Pipeline's own guards refused the
+coordination commands its design course emits. Signature ceremonies multiplied,
+and one signature was burnt. Antigravity lacked usable Critic, Advisor and
+readiness routes. On native Windows, Claude could not read its own repository
+and could not run any Pipeline subagent. The same defects reproduced live in
+this repository's own session.
+
+**Scope.** The source-verified findings register
+[`design/greenfield-0.7-findings-round-2026-10-03.md`](design/greenfield-0.7-findings-round-2026-10-03.md)
+is in scope in full, through six workstreams specified in `spec.md` §21:
+
+- R1: lifecycle-command admission
+- R2: read policy
+- R3: authorization ceremonies, including signed checkpoint pushes
+- R4: runner parity and role routes, including the self-dispatch fallback and
+  the native-Windows budget lock
+- R5: design-course contract consistency
+- R6: forensics and audit chain
+
+**PO decisions (2026-10-03).**
+
+- The amendment is added to the complete Alfred scope. Nothing above is
+  reduced.
+- Every finding is verified against source before it is designed.
+- The happy path asks the PO twice (plan, push) on all three runners.
+- In signature mode every push is signed, while non-release pushes keep a slim
+  prerequisite set.
+- Agents may fall back to self-dispatching the canonical role template when a
+  native route fails, recording the fallback.
+- This repository's own design round may use targeted guard overrides, or
+  switch to a bounded mini patch applied by an attended external script,
+  stamped and installed by the PO.
+
+**Non-goals.** No weakening of credential-root protection, the independence of
+Critic and Advisor, template-only briefings, or the release/main promotion
+chain. No retroactive rewriting of history or evidence.
+
+**Success.** Each runner completes the scenario in Spec §21 on the stamped
+local candidate, with host evidence per runner. The findings are traceable
+from register ID to Spec acceptance case in `traceability.md`.

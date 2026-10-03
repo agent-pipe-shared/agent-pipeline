@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-repair-availability",
+  "title": "Keep recovery available when the in-session verifier is broken",
+  "status": "proposed",
+  "digest": "1c93838bd749dfa23e53d6a0aaa4a9907cd7dea11d18be957d6763b524741c81",
+  "scope": "global",
+  "date": "2026-10-03"
+}

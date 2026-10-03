@@ -39,6 +39,11 @@ product code. The installed candidate was `0.7.0+<runner>.20261003105506.1bd1d7b
   lifecycle step is passed with a **targeted human-guard override** (signature
   mode). Before each step the tree is frozen so that no drift burns the
   signature. The gate mode is not changed.
+- **Mini-patch option (PO, later the same day):** if a bounded mini patch fits
+  better, the Elephant may switch to it at any time. That patch would fix the
+  design-phase blockers via an attended external script, be freshly stamped and
+  installed by the PO, and then the design course resumes on the patched
+  candidate.
 
 ## Verification summary (2026-10-03)
 
@@ -191,6 +196,8 @@ Item: `…-forensics-and-audit-evidence-not-reconstructable.md`
 | K8-2 | Continuity source digests drift from checkout without surfaced recovery | X P1 | **partially**: `inspect` compares working-tree plan files to submission/approval (`pipeline-state.mjs:3983-3992`, `lib/plan-spec-state-v2.mjs:612-613`); no inspect-side comparison of `continuity.authority` PRD/Spec digests found (digest checks only in rebind/migration/bootstrap commands, `pipeline-state.mjs:4838-4844,5006`) |
 | K8-3 | `verify: null` in greenfield; no Verify contract fixed during design | X P2, C E17 | **partially**: `verify: null` written (`lib/project-onboarding-v3.mjs:1159,1453`), but enforced at design→implementation by `checkVerifyContractConfigured` `collect-input` (`:3080-3081,6464-6483`); design course itself does not require it (`design-course.md:7-9`) |
 | K8-4 | No generated per-change audit index | X P2, C E26, A §6.2 | requirement |
+| K8-5 | Tracked Alfred artifacts contain a host-specific absolute user path (`specs/sprint-alfred-epic/plans/a1-enforcement-conformance.md:111`, `specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md:69,79`) | S | **confirmed** by in-repo scan; sanitize forward (no history rewrite) and add a pre-commit host-path check |
+| K2-6b | `rg -e <pattern>` operands and slash-containing search patterns are evaluated as read paths (`GUARD-READ-SCOPE-OUTSIDE-ROOT`) | S | **confirmed live**; same root as K2-4 (arguments classified as filesystem paths) |
 
 ## Next steps
 

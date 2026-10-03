@@ -19,6 +19,9 @@ this document fixes the contracts those plans implement. PRD:
   doctrine governs and this document is corrected — not the other way round.
 - Design base `a50c8093` on `feat/sprint-alfred`; implementation base is the
   post-Nova `origin/main` after rebase (PRD §5 wave 0).
+- Current proposed package sources are `design-input.md`, this Spec, the
+  PRD, `design.md`, and `traceability.md`; they do not change the reopened
+  design/draft lifecycle state or grant implementation authority.
 - Everything here binds agents and tools. Nothing here constrains the human
   repository owner acting outside the Pipeline (#101/#102 non-goals), and no
   control claims otherwise in its diagnostics.
@@ -1048,3 +1051,358 @@ The implementation sequence, exclusive ownership and complete acceptance matrix 
 The canonical closed design-workflow approval request carries its digest at `approvalIntent.sha256`; signing that transport preserves the full default current-package validator, bounded disclosure, exactly one attended confirmation and key-access ordering. A malformed nested digest cannot fall back to a top-level alias. Stale sources, mismatched request/package digests, unknown keys and absent/failed readiness refuse signing. A fixture with synthetic readiness authority is labelled as such and cannot attest a native model review.
 
 Historical exact v1 cancellation receipts remain valid. Withdrawal of a different current submission creates a closed v2 chain retaining the previous receipt, with bounded count/UTF-8 size, same-feature identity, unique submission digests and chronological ordering. Exact latest completed replay is zero-write. Stale submission names, malformed or over-capacity history refuse before mutation. Canonical writer lock/CAS/readback tests exercise two successive submissions and retained historical data. An older installed decoder is not upgraded by a source test; controlled refresh compatibility and installed readback remain required. Slice B owns these two confirmed source items and their acceptance.
+
+## 20. Recovery availability when the in-session verifier is unavailable
+
+This bounded design amendment is sourced from the latest user requirement
+and sanitized Toolbox handover in
+[`design/recovery-availability-2026-10-03.md`](design/recovery-availability-2026-10-03.md).
+The handover is narrative with shortened digests and no complete argv/raw
+JSON; it is not verified live output. Existing full Alfred scope remains
+binding. No approval, implementation authority, source fix or installed-host
+result is implied.
+
+### 20.1 Recovery levels and authority boundary
+
+1. **Intrinsic known-shape repair:** retain narrow diagnosis and writers such
+   as ADR-0082 continuity repair. A plan binds diagnosis, immutable preimage
+   and exact postimage, then uses lock/CAS and complete readback. Ambiguity,
+   missing evidence and unrelated corruption remain refused.
+2. **In-session maintenance:** use existing GMW/HGO only within existing
+   scope while the verifier, repository identity, proof and bounded expiry
+   can be validated. This amendment does not expand GMW, lift its kernel, or
+   let an in-session verifier authorize its own replacement.
+3. **Attended external recovery (proposed):** independently establish a
+   known-good verifier/source outside the broken runner. The current design
+   specifies a pinned standalone Node CLI using built-ins only, an attended
+   operator-selected external artifact and public signer anchor, configured
+   detached human Ed25519 authorization, owner-private preimages, exact
+   bounded Pipeline code/test paths, lock/CAS and forward recovery. State,
+   runtime-private evidence, proofs, trust anchors and unrelated plugin
+   configuration are excluded and remain with their sanctioned writers.
+
+Unknown owner, missing proof/key/source trust, ambiguous bytes, or unsupported
+host layout produces typed unavailable with the concrete attended
+prerequisite. No route may report ready, guess that an owner is dead, invent
+proof, or end in an unexplained `nobody` dead end. Lost bytes and secrets are
+not recoverable by inference.
+
+### 20.2 P1 legacy-owner archival requirements
+
+The Toolbox handover reports a Windows hard crash during Verify-evidence push
+preparation, one orphan descriptor, unavailable owner and a PO CAS conflict.
+This report does not establish process liveness or receipt validity. The
+source diagnosis is that the current V2 descriptor creator stores
+`ownerRuntime: null` when process-start identity is unavailable; its current
+identity helper is Linux-only. V2 null is observed as `unavailable`. Legacy
+V1 descriptors have the field absent and are observed as `unobserved`. Neither
+status means `not-live`, and neither supports retroactive reboot inference.
+The handover supplies no raw descriptor JSON, so that descriptor's schema is
+unknown. New native owner observation and legacy signed custody are separate
+mechanisms.
+
+Before a CAS conflict can be classified, collect bounded sanitized
+status/schema/digest data and matching compare flags. Do not presume a
+truncated receipt or authentic stale receipt. After affected sessions have
+ended, a separately signed, attended legacy-custody transaction binds the
+physical repository and target, observed bytes or explicit absence, receipt
+classification/schema, exact digests/comparison, session-ended confirmation,
+action/disposition, archive destination where applicable, expiry and CAS
+precondition. Its disposition matrix is:
+
+| Receipt observation | Permitted signed disposition |
+| --- | --- |
+| Valid and matching | Preserve exact bytes and metadata. Replay an existing action only when its actual full replay preconditions verify; otherwise use new explicit signed custody authority. |
+| Valid but conflicting or stale | Archive/quarantine exact bytes under a signed disposition binding compared digests and conflict; the old receipt grants no authority. |
+| Absent | Bind exact absence and CAS precondition; never fabricate bytes. New explicit signed custody authority may proceed where other prerequisites hold. |
+| Malformed or explicitly invalid, with bounded readable bytes | Archive/quarantine only exact observed bytes under a signed disposition binding digest and independent comparison/classification; the old receipt grants no authority. |
+| Unreadable, symlinked, or physically ambiguous | Return typed unavailable with the concrete read/identity prerequisite; do not mutate or guess. |
+
+Archive preserves original receipt bytes and records a separate disposition;
+it never deletes/rewrites history, asserts unsupported `not-live`, or modifies
+State, `activeFeature`, proofs, history or resources. Archived conflicting,
+stale, invalid or malformed receipts confer no authority. A valid matching
+receipt permits only its existing exact replay when all actual replay
+preconditions hold; otherwise new explicit signed custody authority is
+required. Missing or invalid human signer proof is a separate authorization
+failure and prevents every mutation. Required consumer instructions must be signed and state exact
+inputs, host prerequisites, readback, session-ended confirmation, receipt
+class, preservation destination/digest, proof subject, CAS precondition and
+stop conditions.
+
+### 20.3 Required acceptance evidence
+
+The proposed recovery path is acceptable only after implementation and
+candidate-bound evidence demonstrate:
+
+- V2 `ownerRuntime: null` is `unavailable`, V1 field-absent is `unobserved`,
+  and neither becomes `not-live`; a new native observer reports live/dead only
+  where platform evidence supports it and never retroactively infers reboot;
+- CAS-conflict classification requires matching bounded status/schema/digest
+  and compare flags; mismatch or ambiguity preserves bytes and returns typed
+  unavailable;
+- detached human proof binds exact receipt bytes or explicit absence,
+  repository, classification/comparison, disposition, session-ended
+  confirmation and CAS precondition;
+- valid matching receipts preserve exact bytes/metadata and replay only with
+  full actual replay preconditions; valid conflicting/stale and bounded
+  readable invalid/malformed receipts archive only by signed disposition;
+  absent receipts bind absence without fabrication; unreadable/symlinked/
+  ambiguous targets return typed unavailable;
+- archive readback preserves exact original bytes and grants no authority to
+  archived receipts; missing/invalid signer proof, wrong repo, receipt drift,
+  concurrent writer, symlink target and interrupted archive refuse safely;
+- Pipeline State, `activeFeature`, proofs and history remain byte-for-byte
+  unchanged across archival; crash recovery is forward-only and preserves
+  intervening changes;
+- every new refusal path has observed positive/negative fixtures and an
+  explicit recovery/handoff disposition; CI wiring detects an unregistered
+  producer, while runtime unknowns return an attended diagnostic handoff.
+
+R1–R5 and B2 from the handover remain reported findings, not accepted backlog
+changes. Resolve P1 first; source-confirm minor items before changing scope.
+R2 (`windows-acl` phase) and R3 (per-build stale pre-push evidence) are
+expressly unconfirmed. Do not claim their defects or fixes without real
+source/runtime evidence. Host/platform evidence, implementation, independent
+review, Verify, and PO disposition remain open.
+
+## 21. 2026-10-03 findings round: three-runner happy path
+
+Source of findings, verdicts and code references:
+[`design/greenfield-0.7-findings-round-2026-10-03.md`](design/greenfield-0.7-findings-round-2026-10-03.md)
+(the register; IDs K1-1 … K8-4). Only `confirmed` and `partially` rows are
+in scope, and they carry the register's verdict wording. Rows marked
+`not determinable from source` (K7-8) get a reproduction step, not a fix. This
+section is additive. It does not relax §§1–20 and grants no implementation
+authority.
+
+**Governing requirement (PO, 2026-10-03):** on the happy path, Claude (native
+Windows and POSIX), Codex and Antigravity each complete onboarding, design,
+Advisor, plan approval, implementation and push without guard overrides,
+recovery ceremonies or repeated signatures. The PO is asked exactly twice: the
+final plan approval and the push approval. A signature-mode push of any
+branch, including a feature-branch checkpoint, requires a signed approval bound
+to the exact commit.
+
+### 21.1 R1 — Lifecycle-command admission (K1-x, K1-1…K1-7, K4-3, K7-1, K7-2)
+
+Contract:
+
+- Every command the Pipeline itself emits as `nextAction`, recovery action or
+  documented course step is admitted in every lifecycle phase that emits it.
+  The guard derives admission from one shared registry of closed argv shapes,
+  the same registry the emitters render from, never from a separately
+  maintained allowlist. This covers `continuity-cas`, `continuity-integrate-final`,
+  `cancel-submitted-plan`, `design-course-session` stages,
+  `guard-human-override.mjs` agent-side steps (`plan`, `prepare-authorization`,
+  `prepare-for-signature`, `refreeze-plan`, `emit-signature-digest`,
+  `authorize-by-signature`), `check-observation-governance.mjs`,
+  `pipeline-start-preflight.mjs` and `project-onboarding-v3.mjs inspect` for
+  every intent.
+- Script paths are compared after normalisation: drive letter case,
+  backslash and forward slash, MSYS `/d/...`, repository-relative and absolute,
+  and the documented `${PIPELINE_PLUGIN_ROOT}` placeholder resolved against the
+  verified plugin root. Unknown spellings stay refused.
+- A read-only script under `scratch/` is classified as read-only execution
+  when its argv carries no write target and the script is not a known
+  writer. A typed denial names the reason instead of the generic opaque lane.
+- `git stash list` and `git stash show [<stash>]` are read-only. Denials name
+  the real target operand, never a subcommand word.
+- Onboarding scaffold paths (`.gitignore`, `AGENTS.md`, `architecture/`,
+  `pipeline.user.yaml`, `project/`) are committable in every phase, or
+  onboarding commits them itself. Configuration read from `HEAD`
+  (`resolveV3DutyRoute`) never depends on a commit the current phase refuses.
+- The governed repair a typed recovery prescribes (for example F6 inventory
+  classification under `governance/`) is reachable without a guard override.
+- `pipeline-start` documents every preflight status, including
+  `hook-provisioning-required`, with its action.
+
+Acceptance cases:
+
+- R1-1 A consistency test enumerates every emitted `nextAction`/recovery argv
+  across lifecycle phases and asserts guard admission for each, on win32 and
+  POSIX command dialects.
+- R1-2 A greenfield design course in `draft` reaches `present-plan` with zero
+  guard overrides (Claude/Windows Git Bash fixture and POSIX fixture).
+- R1-3 Preflight admitted for backslash, forward-slash, MSYS and placeholder
+  spellings; refused for a different script with the same basename.
+- R1-4 `node scratch/<read-only>.mjs` admitted; `node scratch/<writer>.mjs` that
+  writes outside `scratch/` refused with a typed reason.
+- R1-5 `git stash list` admitted in draft; `git stash pop` refused.
+- R1-6 Scaffold commit in draft admitted; production path commit in draft refused.
+
+### 21.2 R2 — Read policy (K2-1…K2-5, K7-3 read part)
+
+Contract:
+
+- `isAllowedPassiveReadTarget` evaluates each auxiliary root independently. An
+  unusable root is skipped and reported, and never fails an otherwise admitted
+  target. Session roots are derived with the same realpath implementation the
+  policy compares with (`realpathSync.native`). On win32, path identity
+  comparison is case-insensitive.
+- Windows UNC paths to WSL (`\\wsl.localhost\<distro>\...`, `\\wsl$\...`) are
+  user-visible host paths for exact-file reads. Credential roots stay denied
+  through every spelling.
+- Native Grep admits in-repo directories and `glob`/`type` filters within the
+  project root. Native Glob admits wildcard patterns within the project root.
+  Read-only `rg` flags (`-A/-B/-C`, `--glob`) are admitted on in-root targets.
+- `git <read-only> ... | head -n N` treats revision arguments (`<rev>:<path>`,
+  `HEAD~N`) as revisions, not filesystem paths. Every grammar example printed in
+  refusal text is covered by an admission test.
+- Denial texts name the guard code and the real cause. They never say "outside
+  the project root" for an in-root target, and never imply absence.
+
+Acceptance cases:
+
+- R2-1 Windows fixture: a transcript-directory case mismatch between runner
+  input and disk does not refuse in-root Read, Grep, Glob or `head`.
+- R2-2 UNC WSL exact-file Read admitted; UNC credential path refused.
+- R2-3 Grep directory, Grep `glob`, Glob `**/*.md`, `rg -A2 --glob` admitted in
+  root; the same shapes targeting `~/.ssh` refused.
+- R2-4 `git show HEAD:docs/state.md | head -n 5` admitted; every printed grammar
+  example passes its admission test.
+- R2-5 Refusal-text audit test: no in-root target yields
+  `GUARD-READ-SCOPE-OUTSIDE-ROOT`.
+
+### 21.3 R3 — Authorization ceremonies (K4-1…K4-6b, K6-1…K6-3)
+
+Contract:
+
+- The happy path issues exactly two PO decisions: final plan approval
+  (design-workflow package plus plan approval as one signed act) and push
+  approval. Bootstrap plan acknowledgement, onboarding confirmations and key
+  setup are folded into these or removed from the happy path. Each that
+  remains is listed with its reason in the ceremony inventory test.
+- In signature mode every push requires a signed approval bound to the exact
+  commit, remote and destination, including `feature-checkpoint` pushes. A
+  checkpoint push keeps its slim prerequisite set (no Verify, security or
+  Critic chain); release/main promotion keeps the full chain. The pre-push hook
+  enforces the same rule, including Ed25519 proof verification, so an unsigned
+  push outside the session guard is refused.
+- Guard-override retries match an armed capability on the governed action
+  (tool, `toolInputSha256`, denials, policy). They do not match on unrelated
+  working-tree state: untracked files and Pipeline-owned writes outside the
+  governed target do not drift the capability. Drift that does refuse names
+  the drifted inputs.
+- Signing intents work in an unborn-HEAD repository.
+- All agent-side preparation runs in-session. The PO receives one single-line
+  signing command per decision and never copies JSON back. PO copy commands
+  never use backslash line continuation.
+- A PO-signed configuration override is a durable layer that migrations
+  respect, or the override route is refused up front with the correct
+  alternative.
+
+Acceptance cases:
+
+- R3-1 Ceremony inventory test per runner: onboarding → push yields exactly
+  two PO proofs in signature mode, and the same two confirmations in chat mode.
+- R3-2 Signature-mode checkpoint push without approval refused by session
+  guard and by pre-push hook; with an exact-commit signed approval admitted.
+- R3-3 Arm → unrelated untracked file created → identical retry consumes the
+  capability; arm → governed target changed → refused with named drift.
+- R3-4 Unborn-HEAD signing intent builds and verifies.
+- R3-5 Rendered PO commands contain no line continuation and fit the
+  documented column bound.
+
+### 21.4 R4 — Runner parity and role routes (K3-1…K3-9, K7-4, K7-5)
+
+Contract:
+
+- A typed, read-only role-route preflight reports, per runner and role
+  (Advisor, Critic, Goldfish tiers, readiness), `native` or
+  `fallback-self-dispatch` with a reason code. On `fallback-self-dispatch` the
+  agent dispatches the canonical role template through its native subagent
+  mechanism. The course accepts the result as that role's evidence with an
+  assurance label recording the fallback. Independence (fresh context,
+  read-only Critic/Advisor) and template-only briefings remain mandatory.
+- Producer failures surface stderr text (bounded, sanitized) and exit code.
+- Antigravity defaults make every duty that profile `feature` requires
+  available or fallback-routed. Native subagents receive a bootstrap path they
+  can satisfy. Bootstrap-lock freshness is bound to the session, not a fixed
+  30-minute mtime window.
+- Claude: the dispatch guard accepts built-in agent types (`Explore`, `Plan`,
+  `general-purpose`) and runs Advisor-prohibition parsing only when the line is
+  present. The dispatch-budget counter lock works on native Windows and macOS
+  with the same live/dead/ambiguous semantics. Goldfish/Critic templates state
+  the bootstrap-receipt step and its admitted spelling.
+- Codex: native host commit requirements (marker, role, `worker` type) are
+  stated in the briefing template and checked before dispatch. An ineligible
+  dispatch is reported, never silently `NGHS-NOT-APPLICABLE`.
+- SessionStart hints are runner-specific. A Claude session never receives
+  Codex transcript instructions.
+
+Acceptance cases:
+
+- R4-1 Route preflight fixtures per runner, covering both outcomes.
+- R4-2 Fallback Advisor/Critic results accepted by the course with the
+  fallback assurance label; a self-review attempt is refused.
+- R4-3 Antigravity `feature` profile reaches readiness and Critic; a subagent
+  completes Read/Write after its bootstrap step; a resumed session after more
+  than 30 minutes is observed as hard-enforced.
+- R4-4 Native-Windows budget-counted subagent completes Read, Write and Bash
+  calls under the real hook; `Explore` dispatch admitted.
+- R4-5 Codex unmarked dispatch yields a typed pre-dispatch finding.
+- R4-6 Claude SessionStart output contains no other runner's name.
+
+### 21.5 R5 — Design-course contract consistency (K5-2…K5-6, K8-3)
+
+Contract:
+
+- One documented, machine-emitted sequence: intake → stage-0 authoring (the
+  Elephant authors PRD/Spec/design/traceability under the EL-16 design-phase
+  exemption, or dispatches) → binding → Advisor → `submit-plan` → readiness →
+  presentation. The authoring dispatch is registrable through an admitted
+  command (R1). Generated short forms of role rules do not drop qualifiers
+  (EL-16 design-phase exemption).
+- One trailer grammar generates obligations, guard admission and authorship
+  verification. `Dispatch: design (elephant)` is admitted for design paths in
+  design phases and refused for production paths.
+- `--answers-file` (with digest) is available wherever `--answers-json` is
+  accepted. Intake reuses the onboarding-confirmed language without asking
+  again.
+- The design course fixes an executable Verify contract before presentation.
+  The design→implementation `collect-input` remains as a backstop.
+
+Acceptance cases:
+
+- R5-1 The course doc/emitter consistency test fails if the documented
+  sequence and the inspect-emitted steps diverge.
+- R5-2 Every printed commit example passes the installed commit guard and
+  commit-msg hook.
+- R5-3 A 30 KB answers file is accepted on Windows; the language is asked
+  once.
+- R5-4 Presentation refused without a configured Verify contract.
+
+### 21.6 R6 — Forensics and audit chain (K8-1, K8-2, K8-4, K7-6, K7-7)
+
+Contract:
+
+- The project-bound transcript reader supports Claude, Codex and Antigravity,
+  merges multi-file segments of one session and child sessions, and reports
+  usage only where the host supplies it.
+- `inspect` compares continuity PRD/Spec digests with the checkout and
+  surfaces drift as an open recovery.
+- A new `docs/*.md` cannot be committed unclassified. The observation-governance
+  check runs in the pre-commit hook. The handover writer classifies its own
+  documents.
+- A generated per-change audit index lists source, commit and gate digests and
+  names missing steps explicitly.
+
+Acceptance cases:
+
+- R6-1 Multi-segment session fixture readable per runner.
+- R6-2 Continuity digest drift fixture reported by `inspect`.
+- R6-3 Unclassified `docs/*.md` commit refused by pre-commit.
+- R6-4 Audit index generated for a fixture change with one deliberately
+  missing gate.
+
+### 21.7 Sequencing and completion
+
+R1 and R2 come first. They block the design course and every runner, so no
+other workstream can be validated end to end without them. R4's Windows
+budget-lock and route preflight follow, because Goldfish dispatch on Windows
+depends on them. R3, R5 and R6 can then proceed in parallel slices. The round
+is complete only when the three-runner end-to-end scenarios required above
+pass on the stamped local candidate. Each runner has its own host evidence;
+source fixtures do not substitute for native runner observations. Independent
+Critic review, Verify, security and PO acceptance remain separate gates.
