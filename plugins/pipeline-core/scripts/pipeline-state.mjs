@@ -424,6 +424,7 @@ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnr
 import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+import { inspectArchitectureDesign, inspectArchitectureDesignDraft } from "../lib/architecture-design.mjs";
 import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
 import {
   createDesignWorkflowPackageApprovalRequest,
@@ -433,6 +434,7 @@ import {
 } from "../lib/design-workflow-approval.mjs";
 import { materializeArchitectureDesign } from "../lib/architecture-design.mjs";
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
+import { publishRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
 import {
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
@@ -509,7 +511,7 @@ import {
   readHumanApprovalMode,
 } from "../lib/critical-human-proof-policy.mjs";
 import { readRepoKeyDirectory } from "../lib/po-key-directory.mjs";
-import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { criticalPushScratchArtifactPaths } from "./po-human-approval.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
@@ -1122,17 +1124,15 @@ function syncStatePhaseMarker(dir, state) {
  * exit 0 by the time this runs.
  */
 function syncNextActionDocs(dir, state) {
-  try {
-    syncStateMdNextAction(dir, state);
-  } catch {
-    // Docs sync is best-effort; the State write above is what already
-    // succeeded and is what this command reports.
-  }
-  try {
-    syncStatePhaseMarker(dir, state);
-  } catch {
-    // Same best-effort contract as the "## Next action" resync above.
-  }
+  // State is canonical. Git-backed projects keep this advisory projection in
+  // private metadata so a lifecycle transition cannot dirty tracked docs.
+  const projected = publishRuntimeNextAction({ rootDir: dir, state,
+    sectionText: statePhaseProjectionMarker(state) + "\n\n" + nextActionSection(state) });
+  if (projected.code !== "RUNTIME-HANDOVER-NON-GIT") return;
+  // Legacy non-Git kickoff fixtures retain their existing document projection.
+  // A failed private-boundary check never falls back to tracked writes.
+  try { syncStateMdNextAction(dir, state); } catch {}
+  try { syncStatePhaseMarker(dir, state); } catch {}
 }
 
 /** Adjacent continuity lock path. It is transient and must never be committed. */
@@ -3779,13 +3779,96 @@ function resolveLocalGitUserName(dir, deps = {}) {
   return null;
 }
 
+// A profile is a persisted PO course choice. Only the existing attended
+// acknowledgement transaction may change it; its audit is data integrity,
+// not cryptographic human identity. Initial selection survives cancellation.
+function validProfileChangeReason(value) {
+  return typeof value === "string" && value.trim() !== ""
+    && Buffer.byteLength(value, "utf8") <= 2048 && !/[\x00-\x1f\x7f]/u.test(value);
+}
+
+function validProfileChangeBinding(binding) {
+  const oid = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+  const document = (value) => exactObjectKeys(value, ["path", "sha256"])
+    && typeof value.path === "string" && value.path !== "" && !isAbsolute(value.path)
+    && !value.path.includes("\\") && !value.path.split("/").some(part => part === "" || part === "." || part === "..")
+    && SHA256_RE.test(value.sha256);
+  return exactObjectKeys(binding, ["featureId", "from", "to", "reason", "candidate", "stateSha256", "continuityRevision", "intakeProfile", "intakeSha256", "prd", "spec"])
+    && !isBlank(binding.featureId) && DRAFT_PLAN_PROFILES.has(binding.from) && DRAFT_PLAN_PROFILES.has(binding.to)
+    && binding.from !== binding.to && validProfileChangeReason(binding.reason)
+    && exactObjectKeys(binding.candidate, ["commit", "tree"]) && oid.test(binding.candidate.commit) && oid.test(binding.candidate.tree)
+    && SHA256_RE.test(binding.stateSha256) && Number.isSafeInteger(binding.continuityRevision) && binding.continuityRevision >= 0
+    && (binding.intakeProfile === null || DRAFT_PLAN_PROFILES.has(binding.intakeProfile))
+    && (binding.intakeSha256 === null || SHA256_RE.test(binding.intakeSha256))
+    && document(binding.prd) && document(binding.spec);
+}
+
+function inspectSelectedPlanProfile(dir, state) {
+  const choices = new Set();
+  const add = (value) => {
+    if (!DRAFT_PLAN_PROFILES.has(value)) return false;
+    choices.add(value);
+    return true;
+  };
+  if (Object.hasOwn(state, "selectedProfile") && !add(state.selectedProfile)) {
+    return { ok: false, code: "PROFILE-AUTHORITY-INVALID" };
+  }
+  let intakeProfile = null;
+  let intakeSha256 = null;
+  try {
+    const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: dir });
+    intakeProfile = checkpoint.status === "present" ? checkpoint.value?.values?.profile : null;
+    intakeSha256 = checkpoint.status === "present" ? checkpoint.sha256 : null;
+    if (intakeProfile !== null && !DRAFT_PLAN_PROFILES.has(intakeProfile)) return { ok: false, code: "PROFILE-AUTHORITY-INVALID" };
+  } catch {
+    return { ok: false, code: "PROFILE-AUTHORITY-INVALID" };
+  }
+  const history = state.poGateAcknowledgement?.profileChanges;
+  if (history !== undefined) {
+    if (!Array.isArray(history) || history.length === 0) return { ok: false, code: "PROFILE-AUTHORITY-INVALID" };
+    let previous = null;
+    for (const event of history) {
+      if (!exactObjectKeys(event, ["by", "at", "binding", "bindingSha256"])
+        || isBlank(event.by) || !canonicalIso(event.at) || !validProfileChangeBinding(event.binding)
+        || event.bindingSha256 !== sha256CanonicalJson(event.binding)
+        || (previous !== null && (event.binding.from !== previous.to || event.binding.intakeProfile !== previous.intakeProfile))) {
+        return { ok: false, code: "PROFILE-AUTHORITY-INVALID" };
+      }
+      previous = event.binding;
+    }
+    const initial = history[0].binding;
+    if ((initial.intakeProfile !== null && initial.from !== initial.intakeProfile)
+      || intakeProfile !== initial.intakeProfile || state.selectedProfile !== previous.to) {
+      return { ok: false, code: "PROFILE-AUTHORITY-CONFLICT" };
+    }
+    const submission = state.planSubmission;
+    if (submission != null && submission.profile !== previous.to) {
+      const lifecycle = derivePlanLifecycle(state);
+      if (!validPlanSubmission(submission) || !lifecycle.ok || lifecycle.status !== "draft"
+        || state.planApproved !== false || state.activeFeature?.phase !== "design"
+        || state.planInvalidation?.invalidatedSubmissionSha256 !== sha256CanonicalJson(submission)
+        || state.planInvalidation.invalidatedApprovalSha256 !== (state.planApproval === undefined ? null : sha256CanonicalJson(state.planApproval))) {
+        return { ok: false, code: "PROFILE-AUTHORITY-CONFLICT" };
+      }
+    }
+    return { ok: true, profile: previous.to, intakeProfile, intakeSha256 };
+  }
+  if (intakeProfile !== null) add(intakeProfile);
+  if (state.planSubmission != null && !add(state.planSubmission.profile)) {
+    return { ok: false, code: "PROFILE-AUTHORITY-INVALID" };
+  }
+  return choices.size > 1
+    ? { ok: false, code: "PROFILE-AUTHORITY-CONFLICT" }
+    : { ok: true, profile: choices.values().next().value ?? null, intakeProfile, intakeSha256 };
+}
+
 function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
   const by = resolveLocalGitUserName(dir, deps);
   let profile = null;
   try {
-    const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: dir });
-    const candidate = checkpoint.status === "present" ? checkpoint.value?.values?.profile : null;
-    if (typeof candidate === "string" && DRAFT_PLAN_PROFILES.has(candidate)) profile = candidate;
+    const state = readState(dir);
+    const selection = inspectSelectedPlanProfile(dir, state.status === "ok" ? state.state : {});
+    if (selection.ok) profile = selection.profile;
   } catch {
     // A malformed checkpoint is not a value this command may invent a
     // reading from -- treat it exactly like "no checkpoint": ask.
@@ -3958,6 +4041,22 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
   }
   if (!lifecycle.ok || lifecycle.status === null) return null;
   if (lifecycle.status === "draft") {
+    const draftProfile = resolveDraftPlanSubmissionDefaults(dir).profile;
+    if (["epic", "feature"].includes(draftProfile)) {
+      const authority = checkPoGateAuthority({ repoRoot: dir }, deps);
+      if (authority?.ok && authority.value?.planPath === state.activeFeature?.planPath) {
+        const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
+          planPath: authority.value.planPath, expectedPlanSha256: authority.value.planSha256 });
+        if (!designDraft.ok) return {
+          kind: designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" ? "architecture-design-required" : "repair-required",
+          ...(designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" ? { prdPath: designDraft.prdPath } : {}),
+          code: designDraft.code,
+          guidance: designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED"
+            ? "Author and validate the architecture design in this exact draft PRD before submit-plan. No PO signature request exists until the completed design and Advisor/readiness package are presented together once."
+            : "The draft PRD could not be safely read and bound to current authority; repair its exact physical source and inspect again before submission.",
+        };
+      }
+    }
     const profileAction = resolveDraftProfileReceiptAction(dir, deps);
     if (profileAction !== null) return profileAction;
     const derived = resolveDraftPlanSubmissionDefaults(dir);
@@ -3995,6 +4094,31 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
   if (lifecycle.status === "awaiting-approval") {
     const submission = state.planSubmission && typeof state.planSubmission === "object" ? state.planSubmission : {};
     const requiresWorkflowPackage = ["epic", "feature"].includes(submission.profile);
+    if (requiresWorkflowPackage) {
+      const designDraft = inspectArchitectureDesignDraft({ rootDir: dir, planPath: submission.planPath,
+        expectedPlanSha256: submission.planSha256 });
+      if (!designDraft.ok) {
+        const scriptPath = fileURLToPath(import.meta.url);
+        const by = resolveLocalGitUserName(dir, deps);
+        const cancelArgv = [scriptPath, "cancel-submitted-plan", "--by", by ?? placeholder("<recovery actor's name>"),
+          "--submission-sha256", lifecycle.submissionSha256];
+        const cancelAction = { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: cancelArgv }),
+          mutation: true, requiresConfirmation: true };
+        return by !== null ? {
+          kind: "repair-required", code: designDraft.code,
+          ...(designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" ? { prdPath: designDraft.prdPath } : {}),
+          guidance: "This already-submitted PRD is immutable. Cancel exactly this unsigned submission with the sanctioned action, complete the design in draft, then submit and present one final package once.",
+          applyAction: cancelAction,
+        } : {
+          kind: "collect-input",
+          inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+          mutation: false, requiresConfirmation: false,
+          guidance: "This already-submitted PRD is immutable. Provide the recovery actor to cancel exactly this unsigned submission, then complete the design in draft and submit once.",
+          applyAction: cancelAction,
+          expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
+        };
+      }
+    }
     // NVA-CF-PRESENTPLANDRIVER: `approve-plan` refuses unseen content (case
     // "approve-plan", ~line 8364) unless a `planPresentation` record exists
     // bound to this EXACT submission's sha256 -- a session following only
@@ -4013,18 +4137,32 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       const scriptPath = fileURLToPath(import.meta.url);
       const by = resolveLocalGitUserName(dir, deps);
       if (requiresWorkflowPackage) {
-        const inputs = [];
-        if (by === null) inputs.push({ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true });
-        inputs.push({ name: "design-workflow-package", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true });
-        const byArg = by ?? placeholder("<presenter's name>");
-        const packageArg = placeholder("<complete-package-repo-path>");
-        const command = boundedCopySafeCommand({ executable: process.execPath, argv: [scriptPath, "present-plan", "--by", byArg, "--design-workflow-package", packageArg] });
-        return {
-          kind: "collect-input", inputs, mutation: false, requiresConfirmation: false,
-          guidance: "Before one final PO decision, assemble and validate a complete design-workflow package containing the original input, current PRD/Spec, revised design, traceability, completed Advisor route (normal plus governed fallback if needed), and independent readiness. No intermediate presentation locks approval. Then fill the exact package path and run the returned present-plan action; it will show the complete bounded review and create the exact signature request.",
-          applyAction: { kind: "command", ...command, mutation: true, requiresConfirmation: false },
-          expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+        const packagePath = deps.designWorkflowPackagePath;
+        if (typeof packagePath === "string" && DESIGN_WORKFLOW_PACKAGE_PATH_RE.test(packagePath)) {
+          const presentArgv = [scriptPath, "present-plan", "--by", by ?? placeholder("<presenter's name>"),
+            "--design-workflow-package", packagePath];
+          const presentAction = { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: presentArgv }),
+            mutation: true, requiresConfirmation: false };
+          if (by !== null) return presentAction;
+          return { kind: "collect-input",
+            inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+            mutation: false, requiresConfirmation: false,
+            guidance: "A complete package path is already available. Collect the presenter's name, then run the exact canonical present-plan action for final package review.",
+            applyAction: presentAction, expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] } };
+        }
+        const runner = resolvePoRebindRunner(deps.runner, deps.env ?? process.env);
+        if (!runner.ok) return {
+          kind: "agent-owned-coordination-required", code: "DESIGN-COURSE-RUNNER-SELECTION-REQUIRED",
+          required: "Select the active supported runner from the runtime authority, then inspect the bound design course.",
+          mutation: false, requiresConfirmation: false,
         };
+        const courseScript = fileURLToPath(new URL("./design-course-session.mjs", import.meta.url));
+        const action = { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath,
+          argv: [courseScript, "--inspect", "--root", resolve(dir), "--runner", runner.runner] }),
+          mutation: false, requiresConfirmation: false,
+          expected: { schema: "pipeline.design-course-inspection.v1",
+            statuses: ["authoring-dispatch-required", "authoring-required", "advisor-ready"] } };
+        return action;
       }
       if (by !== null) {
         return {
@@ -4070,9 +4208,16 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         planPath: submission.planPath, planSha256: submission.planSha256,
         specPath: submission.specPath, specSha256: submission.specSha256,
       }, deps });
-      if (!signed.ok) return { kind: "collect-input", mutation: false, requiresConfirmation: false,
-        guidance: `The final complete package requires its exact PO signature (${signed.code}). In the PO terminal, run: ${process.execPath} ${fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url))} sign-intent --repo-root <absolute-repo> --request ${state.planPresentation.designWorkflowApprovalRequestPath}. The review includes any proposed Advisor-only exception. Then inspect again.`,
-        expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] } };
+      if (!signed.ok) {
+        const rendered = boundedCopySafeCommand({ executable: process.execPath,
+          argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)),
+            "sign-intent", "--repo-root", dir, "--request", state.planPresentation.designWorkflowApprovalRequestPath],
+          forceCopyCommand: true });
+        return { kind: "command", ...rendered, invocation: "user-copy-only",
+          executionBoundary: "human-terminal", mutation: true, requiresConfirmation: true,
+          guidance: `The final complete package requires its exact PO signature (${signed.code}). Review the bound package and use the returned copyCommand in your attended terminal. This one approval includes any proposed Advisor-only exception. Then inspect again.`,
+          expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] } };
+      }
       return { kind: "command", executable: process.execPath,
         argv: [scriptPath, "approve-plan", "--design-workflow-approval-request", state.planPresentation.designWorkflowApprovalRequestPath],
         mutation: true, requiresConfirmation: false, expected: { schema: INSPECT_SCHEMA, statuses: ["approved"] } };
@@ -4169,6 +4314,11 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       rootDir: dir,
       taskScope: state.activeFeature?.planPath ?? null,
       now: new Date(),
+      deps: { inspectArchitectureDesign: (root, scope) => inspectArchitectureDesign(root, scope, {
+        gitCandidate: deps.gitCandidate,
+        trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+        verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
+      }) },
     });
     if (architecture.status !== "ready") return architecture.nextAction;
     const verifyStatus = readCalibrationVerifyStatus(dir);
@@ -6590,8 +6740,8 @@ function parsePoRebindApply(argv) {
 // preimage/postimage field already relies on.
 function parsePoAcknowledgeFlags(argv, { apply }) {
   const valueFlags = apply
-    ? new Set(["plan-sha256", "updated-at", "by", "runner", "root"])
-    : new Set(["by", "runner", "root"]);
+    ? new Set(["plan-sha256", "updated-at", "by", "runner", "root", "profile", "reason"])
+    : new Set(["by", "runner", "root", "profile", "reason"]);
   const values = {};
   let activate = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -6615,11 +6765,16 @@ function parsePoAcknowledgeFlags(argv, { apply }) {
     index += 1;
   }
   if (isBlank(values.by)) return { ok: false, error: "missing --by <name>" };
+  const profileChange = values.profile !== undefined || values.reason !== undefined;
+  if (profileChange && (!DRAFT_PLAN_PROFILES.has(values.profile) || !validProfileChangeReason(values.reason))) {
+    return { ok: false, error: "--profile <epic|feature|mini> and --reason <nonblank single-line text, at most 2048 UTF-8 bytes> are an indivisible pair" };
+  }
+  const change = profileChange ? { profile: values.profile, reason: values.reason } : {};
   if (!apply) {
     if (!PO_REBIND_RUNNERS.has(values.runner)) {
       return { ok: false, error: "--runner requires claude, codex, or antigravity" };
     }
-    return { ok: true, value: { by: values.by, runner: values.runner, ...(values.root === undefined ? {} : { root: values.root }) } };
+    return { ok: true, value: { by: values.by, runner: values.runner, ...change, ...(values.root === undefined ? {} : { root: values.root }) } };
   }
   if (!SHA256_RE.test(values["plan-sha256"] ?? "")) return { ok: false, error: "--plan-sha256 requires one lowercase sha256" };
   if (!canonicalIso(values["updated-at"])) return { ok: false, error: "--updated-at requires a canonical ISO-8601 timestamp" };
@@ -6633,6 +6788,7 @@ function parsePoAcknowledgeFlags(argv, { apply }) {
       planSha256: values["plan-sha256"],
       plannedAt: values["updated-at"],
       by: values.by,
+      ...change,
       ...(values.runner === undefined ? {} : { runner: values.runner }),
       ...(values.root === undefined ? {} : { root: values.root }),
     },
@@ -6887,6 +7043,19 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   const runnerResolved = resolvePoRebindRunner(deps.acknowledgeRunner ?? deps.runner, deps.env ?? process.env);
   if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-ACK-STATE" };
   const state = existing.state;
+  const changingProfile = deps.acknowledgeProfile !== undefined;
+  const selection = changingProfile ? inspectSelectedPlanProfile(dir, state) : null;
+  if (changingProfile && (!selection.ok || selection.profile === null)) {
+    return { ok: false, code: selection.code ?? "PO-ACK-PROFILE-SELECTION-ABSENT" };
+  }
+  if (changingProfile && (!DRAFT_PLAN_PROFILES.has(deps.acknowledgeProfile)
+    || !validProfileChangeReason(deps.acknowledgeReason) || deps.acknowledgeProfile === selection.profile)) {
+    return { ok: false, code: "PO-ACK-PROFILE-CHANGE-INVALID" };
+  }
+  const lifecycle = changingProfile ? derivePlanLifecycle(state) : null;
+  if (changingProfile && (!lifecycle.ok || !new Set(["draft", "awaiting-approval", "approved", "implementing"]).has(lifecycle.status))) {
+    return { ok: false, code: "PO-ACK-STATE" };
+  }
   // A reopened approved plan retains its old submission and approval as
   // historical evidence. Admit the PO ceremony only when the invalidation
   // binds both exact records and the lifecycle is an editable Design/Draft.
@@ -6903,7 +7072,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
     && derivePlanLifecycle(state).ok
     && derivePlanLifecycle(state).status === "draft";
   if (state.schema !== SCHEMA_ID || !state.activeFeature || typeof state.activeFeature.planPath !== "string"
-    || state.planApproved === true || (state.planSubmission != null && !reopenedApprovedDraft)) return { ok: false, code: "PO-ACK-STATE" };
+    || (!changingProfile && (state.planApproved === true || (state.planSubmission != null && !reopenedApprovedDraft)))) return { ok: false, code: "PO-ACK-STATE" };
   const prd = physicalRebindFile(dir, state.activeFeature.planPath);
   if (prd === null) return { ok: false, code: "PO-ACK-PRD-IDENTITY" };
   const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
@@ -6918,18 +7087,22 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   const marker = rebindMarker(prdText);
   const acknowledgedStaleSpec = acknowledgementMarkers.length === 1
     && marker !== null && marker.digest !== spec.sha256;
-  if (acknowledgementMarkers.length === 1 && !acknowledgedStaleSpec) {
+  if (!changingProfile && acknowledgementMarkers.length === 1 && !acknowledgedStaleSpec) {
     return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
   }
-  const continuity = eligibleAcknowledgeContinuity(state, prd, spec, reopenedApprovedDraft);
+  const continuity = eligibleAcknowledgeContinuity(state, prd, spec, changingProfile ? false : reopenedApprovedDraft);
   if (continuity === null) return { ok: false, code: "PO-ACK-CONTINUITY" };
+  if (changingProfile && (continuity.authority.result !== null || continuity.acknowledgedFinal !== null
+    || continuity.recovery !== null || (marker !== null && marker.digest !== spec.sha256))) {
+    return { ok: false, code: "PO-ACK-CONTINUITY" };
+  }
   const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
   const currentProfile = validCurrentPoProfile(profile);
   if (currentProfile === null) return { ok: false, code: "PO-ACK-PROFILE" };
   // A draft may retain a genuine PO acknowledgement while its technical Spec
   // marker became stale before the first submission. The same attended,
   // attributed acknowledgement rebinds only that computed marker.
-  const nextPrdBytes = acknowledgedStaleSpec
+  const nextPrdBytes = changingProfile ? Buffer.from(prd.bytes) : acknowledgedStaleSpec
     ? replaceRebindMarker(prd.bytes, marker, spec.sha256)
     : appendAcknowledgementMarker(prd.bytes);
   if (nextPrdBytes === null) return { ok: false, code: "PO-ACK-PRD-MARKER" };
@@ -6952,7 +7125,26 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   nextContinuity.authority.prd.sha256 = nextPrdSha256;
   nextContinuity.authority.spec.sha256 = spec.sha256;
   if (!validateContinuityState(nextContinuity, state.activeFeature.id).ok) return { ok: false, code: "PO-ACK-CONTINUITY" };
-  const nextState = structuredClone(state);
+  let profileChange = null;
+  let reopened = null;
+  if (changingProfile) {
+    const candidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+    if (!candidate?.ok) return { ok: false, code: "PO-ACK-CANDIDATE" };
+    profileChange = {
+      featureId: state.activeFeature.id, from: selection.profile, to: deps.acknowledgeProfile, reason: deps.acknowledgeReason,
+      candidate: { commit: candidate.commit, tree: candidate.tree }, stateSha256: stateFile.sha256,
+      continuityRevision: continuity.revision, intakeProfile: selection.intakeProfile, intakeSha256: selection.intakeSha256,
+      prd: { path: prd.path, sha256: prd.sha256 }, spec: { path: spec.path, sha256: spec.sha256 },
+    };
+    if (!validProfileChangeBinding(profileChange)) return { ok: false, code: "PO-ACK-PROFILE-BINDING" };
+    if (state.planSubmission !== undefined || state.planApproval !== undefined) {
+      reopened = reopenPlanDesign({ state, expectedStateSha256: sha256CanonicalJson(state), by, at: plannedAt });
+      if (!reopened.ok) return reopened;
+    }
+    nextContinuity.nativeContinuation = null;
+    nextContinuity.resume = { mode: "immediate", sourceRevision: nextContinuity.revision, reasonCode: "active-turn" };
+  }
+  const nextState = structuredClone(reopened?.state ?? state);
   nextState.continuity = nextContinuity;
   nextState.updatedAt = plannedAt;
   // Critic finding F-A, 2026-08-19 (dispatch W4-CRITIC-2B round 2): --by was
@@ -6969,10 +7161,23 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   nextState.poGateAcknowledgement = {
     by,
     at: plannedAt,
+    ...(state.poGateAcknowledgement?.profileChanges === undefined ? {} : { profileChanges: structuredClone(state.poGateAcknowledgement.profileChanges) }),
     ...(deps.acknowledgeGlobalHumanApproval === true
       ? { humanApproval: chatAttributionRecord({ kind: "po-plan-acknowledgement", by }) }
       : {}),
   };
+  if (changingProfile) {
+    nextState.selectedProfile = profileChange.to;
+    nextState.planApproved = false;
+    nextState.activeFeature.phase = "design";
+    nextState.poGateAcknowledgement.profileChanges = [
+      ...(nextState.poGateAcknowledgement.profileChanges ?? []),
+      { by, at: plannedAt, binding: profileChange, bindingSha256: sha256CanonicalJson(profileChange) },
+    ];
+    if (!inspectSelectedPlanProfile(dir, nextState).ok || !derivePlanLifecycle(nextState).ok) {
+      return { ok: false, code: "PO-ACK-PROFILE-POSTIMAGE" };
+    }
+  }
   if (nextState.gateEstimate !== undefined) return { ok: false, code: "PO-ACK-STATE" };
   const payload = {
     schema: PO_ACK_PLAN_SCHEMA,
@@ -6980,6 +7185,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
     by,
     ...(runnerResolved.ok ? { runner: runnerResolved.runner } : {}),
     plannedAt,
+    ...(profileChange === null ? {} : { profileChange }),
     preimage: {
       state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null, continuityRevision: continuity.revision },
       prd: { path: prd.path, sha256: prd.sha256, identity: prd.identity },
@@ -7016,6 +7222,11 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
   deps = selectedRoot === undefined ? deps : { ...deps, dir: resolve(selectedRoot) };
   const planBy = plan?.value.by ?? null;
   const apply = parsedApply?.value ?? null;
+  const changingProfile = (plan?.value.profile ?? apply?.profile) !== undefined;
+  const changeDeps = changingProfile ? {
+    acknowledgeProfile: plan?.value.profile ?? apply.profile,
+    acknowledgeReason: plan?.value.reason ?? apply.reason,
+  } : {};
   if (sub === "po-authority-acknowledge-plan" && existsSync(rebindTransactionPath(deps.dir))) {
     console.error("Error: PO authority acknowledge recovery is pending; replay the exact previously confirmed apply action.");
     return 2;
@@ -7040,14 +7251,54 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     // as the first statement in this branch, before the lock/transaction below,
     // so an unattended or mismatched attempt touches no lock and no rebind
     // transaction file.
-    const globalChat = committedGlobalChatHumanApproval(deps.dir, deps);
+    // Global chat attribution is never a substitute for this separate,
+    // deliberate profile decision. The unchanged primitive is the attended
+    // step; the runner guard must also exclude agent-created PTYs.
+    const globalChat = !changingProfile && committedGlobalChatHumanApproval(deps.dir, deps);
+    let confirmationPlan = null;
+    if (changingProfile) {
+      if (!isAttendedTerminal(deps)) {
+        console.error("Error: po-authority-acknowledge-apply refused (CHAT-GATE-NOT-ATTENDED); profile changes require the PO's external attended terminal, including under global chat approval.");
+        const action = boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(import.meta.url), ...rest] });
+        console.error(JSON.stringify({ schema: PO_ACK_APPLY_SCHEMA, status: "confirmation-required", applyAction: action }));
+        return 1;
+      }
+      if (!existsSync(rebindTransactionPath(deps.dir))) {
+        const existing = readStateRaw(deps.dir);
+        for (const candidateRunner of apply.runner === undefined ? ["claude", "codex", "antigravity"] : [apply.runner]) {
+          const candidatePlan = buildPoAuthorityAcknowledgePlan(deps.dir, {
+            ...deps, ...changeDeps, acknowledgeBy: apply.by,
+            acknowledgeGlobalHumanApproval: false, acknowledgeRunner: candidateRunner,
+          }, existing, apply.plannedAt);
+          if (candidatePlan.ok && candidatePlan.planSha256 === apply.planSha256) {
+            confirmationPlan = candidatePlan;
+            break;
+          }
+        }
+        if (confirmationPlan === null) {
+          console.error("Error: PO profile-change acknowledgement plan is stale; zero mutation.");
+          return 2;
+        }
+      }
+    }
     if (!globalChat) {
+      const binding = confirmationPlan?.payload.profileChange;
       const confirmation = requireAttendedChatGateConfirmation({
         summaryLines: [
-          "PO PLAN ACKNOWLEDGEMENT CONFIRMATION -- read before you type the value:",
+          changingProfile ? "PO PROFILE CHANGE CONFIRMATION -- read before you type the value:" : "PO PLAN ACKNOWLEDGEMENT CONFIRMATION -- read before you type the value:",
           `  by: ${apply.by}`,
           `  plan-sha256: ${apply.planSha256}`,
           `  updated-at: ${apply.plannedAt}`,
+          ...(binding === undefined ? (changingProfile ? ["  recovery journal pending: exact rollback/revalidation only; no stale profile approval"] : []) : [
+            `  selected profile: ${binding.from}`,
+            `  requested profile: ${binding.to}`,
+            `  reason: ${binding.reason}`,
+            `  state-sha256: ${binding.stateSha256}`,
+            `  continuity revision: ${binding.continuityRevision}`,
+            `  PRD: ${binding.prd.path} (${binding.prd.sha256})`,
+            `  Spec: ${binding.spec.path} (${binding.spec.sha256})`,
+            `  candidate: ${binding.candidate.commit} / ${binding.candidate.tree}`,
+          ]),
           `  confirmation value: ${PO_ACK_APPLY_CONFIRMATION_TOKEN}`,
         ],
         expected: PO_ACK_APPLY_CONFIRMATION_TOKEN,
@@ -7064,13 +7315,14 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
         return 1;
       }
     }
-    let runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    let runnerResolved = resolvePoRebindRunner(apply.runner ?? confirmationPlan?.payload.runner, deps.env ?? process.env);
     let runner = runnerResolved.ok ? runnerResolved.runner : null;
     if (!runner && apply.runner === undefined) {
       const existing = readStateRaw(deps.dir);
       for (const candidateRunner of ["claude", "codex", "antigravity"]) {
         const candidateDeps = {
           ...deps,
+          ...changeDeps,
           acknowledgeBy: apply.by,
           acknowledgeGlobalHumanApproval: globalChat,
           acknowledgeRunner: candidateRunner,
@@ -7086,7 +7338,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
       console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code ?? "PO-REBIND-RUNNER-UNKNOWN"}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
       return 2;
     }
-    const ackDeps = { ...deps, acknowledgeBy: apply.by, acknowledgeGlobalHumanApproval: globalChat, acknowledgeRunner: runner };
+    const ackDeps = { ...deps, ...changeDeps, acknowledgeBy: apply.by, acknowledgeGlobalHumanApproval: globalChat, acknowledgeRunner: runner };
     const lock = acquireContinuityLock(ackDeps.dir, PO_REBIND_LOCK_TOKEN, ackDeps);
     if (!lock.ok) { console.error(`Error: PO authority acknowledge refused (${lock.code}); zero mutation.`); return 2; }
     try {
@@ -7111,8 +7363,9 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
   }
   const ackDeps = {
     ...deps,
+    ...changeDeps,
     acknowledgeBy: planBy,
-    acknowledgeGlobalHumanApproval: committedGlobalChatHumanApproval(deps.dir, deps),
+    acknowledgeGlobalHumanApproval: !changingProfile && committedGlobalChatHumanApproval(deps.dir, deps),
     acknowledgeRunner: runnerResolved.runner,
   };
   const planned = buildPoAuthorityAcknowledgePlan(ackDeps.dir, ackDeps, existing);
@@ -7120,9 +7373,10 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     console.error(`Error: PO authority acknowledge refused (${planned.code}); zero mutation.`);
     return 2;
   }
+  const applyArgv = [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--root", planned.payload.root, "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--by", planBy, "--activate", "--runner", runnerResolved.runner,
+    ...(changingProfile ? ["--profile", plan.value.profile, "--reason", plan.value.reason] : [])];
   console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: {
-    executable: process.execPath,
-    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--root", planned.payload.root, "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--by", planBy, "--activate", "--runner", runnerResolved.runner],
+    ...boundedCopySafeCommand({ executable: process.execPath, argv: applyArgv }),
     mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
   } }, null, 2));
   return 0;
@@ -7430,6 +7684,14 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
     const published = publishRebindTransaction(deps.dir, transaction, lock.ownerNonce);
     if (!published.ok) { console.error(`Error: PO authority rebind transaction prepare failed (${published.code}); zero authority mutation.`); return 2; }
     deps.afterRebindTransactionPrepared?.();
+    if (deps.acknowledgeProfile !== undefined) {
+      const fresh = buildPlan(deps.dir, deps, readStateRaw(deps.dir), apply.plannedAt);
+      if (!fresh.ok || fresh.planSha256 !== apply.planSha256) {
+        const cleared = clearRebindTransaction(deps.dir);
+        console.error(`Error: PO profile-change preimage drifted before authority writes; ${cleared ? "zero new authority mutation" : "recovery journal retained"}.`);
+        return 2;
+      }
+    }
     const prdWriteRequired = Buffer.compare(rebuilt.nextPrdBytes, prd.bytes) !== 0;
     const wrotePrd = prdWriteRequired
       ? writeRebindFile(prd.absolute, rebuilt.nextPrdBytes, prd.identity.mode, lock.ownerNonce, io.replace, io.rename, io.sync)
@@ -7441,6 +7703,14 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
       return 2;
     }
     deps.afterRebindPrdWritten?.();
+    if (deps.acknowledgeProfile !== undefined) {
+      const fresh = buildPlan(deps.dir, deps, readStateRaw(deps.dir), apply.plannedAt);
+      if (!fresh.ok || fresh.planSha256 !== apply.planSha256) {
+        const cleared = clearRebindTransaction(deps.dir);
+        console.error(`Error: PO profile-change state/document preimage drifted before State write; ${cleared ? "zero new authority mutation" : "recovery journal retained"}.`);
+        return 2;
+      }
+    }
     const stateBytes = Buffer.from(JSON.stringify(rebuilt.nextState, null, 2) + "\n", "utf8");
     const wroteState = writeRebindFile(stateFile.absolute, stateBytes, stateFile.identity.mode, lock.ownerNonce, stateIo.replace, stateIo.rename, stateIo.sync);
     if (!wroteState.ok) {
@@ -7476,6 +7746,17 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
     const v4Readbacks = ["bootstrap", "session", "dispatch"]
       .map((intent) => inspectV4({ rootDir: deps.dir, intent, runner, deps: inTransactionV4Deps }));
     const expectedAuthority = postimage.poGateAuthority ?? postimage.authority;
+    let profilePostimageOk = true;
+    if (rebuilt.payload.profileChange !== undefined) {
+      const binding = rebuilt.payload.profileChange;
+      const selection = postState.status === "ok" ? inspectSelectedPlanProfile(deps.dir, postState.state) : null;
+      const candidate = (deps.gitCandidate ?? defaultGitCandidate)(deps.dir);
+      const spec = physicalRebindFile(deps.dir, binding.spec.path);
+      profilePostimageOk = selection?.ok === true && selection.profile === binding.to
+        && selection.intakeSha256 === binding.intakeSha256
+        && candidate?.ok === true && candidate.commit === binding.candidate.commit && candidate.tree === binding.candidate.tree
+        && spec?.sha256 === binding.spec.sha256 && sameJson(spec.identity, rebuilt.payload.preimage.spec.identity);
+    }
     const postimageEvidence = {
       schema: "pipeline.po-authority-postimage-readback.v1",
       predicates: {
@@ -7505,6 +7786,7 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
     };
     deps.observeRebindPostimageEvidence?.(postimageEvidence);
     const postOk = postimageEvidence.predicates.prdDigest.ok
+      && profilePostimageOk
       && postimageEvidence.predicates.stateFile.ok
       && postimageEvidence.predicates.stateValue.ok
       && postimageEvidence.predicates.poAuthority.ok
@@ -7513,7 +7795,7 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
       const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
       const prdRollback = !prdWriteRequired || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       const cleared = stateRollback && prdRollback && clearRebindTransaction(deps.dir);
-      const predicateSummary = describeFailedPostimagePredicates(postimageEvidence);
+      const predicateSummary = profilePostimageOk ? describeFailedPostimagePredicates(postimageEvidence) : "profile-change-bound-evidence";
       console.error(`Error: PO authority rebind postimage readback failed (${predicateSummary}); ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
@@ -9911,7 +10193,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const lock = acquireContinuityLock(dir, "architecture-design-materialization");
       if (!lock.ok) { console.error(JSON.stringify(lock)); return 2; }
       try {
-        const result = materializeArchitectureDesign(dir, { lock });
+        const result = materializeArchitectureDesign(dir, { lock, gitCandidate: deps.gitCandidate,
+          trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+          verifyReadinessExecution: deps.verifyDesignReadinessHostExecution });
         console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
           code: result.code ?? null, receipt: result.receipt ?? null }));
         return result.ok && result.status === "materialized" ? 0 : 2;
@@ -9923,6 +10207,13 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (!new Set(["design", "implementation"]).has(phase)) {
         console.error('Error: set-phase requires --phase <design|implementation>.');
         return 2;
+      }
+      if (phase === "implementation") {
+        const selection = inspectSelectedPlanProfile(dir, base);
+        if (!selection.ok) {
+          console.error(`Error: set-phase implementation refused (${selection.code}); persisted profile authority must agree before implementation.`);
+          return 2;
+        }
       }
       const lifecycle = derivePlanLifecycle(base);
       if (!lifecycle.ok || lifecycle.status === null) {
@@ -9941,6 +10232,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         rootDir: dir,
         taskScope: base.activeFeature?.planPath ?? null,
         now: new Date(now()),
+        deps: { inspectArchitectureDesign: (root, scope) => inspectArchitectureDesign(root, scope, {
+          gitCandidate: deps.gitCandidate,
+          trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+          verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
+        }) },
       });
       if (architecture.status !== "ready") {
         console.error(`Error: set-phase implementation refused (${architecture.code}); ${architecture.message}`);
@@ -10047,6 +10343,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error("Error: submit-plan requires --by <name> --profile <epic|feature|mini>.");
         return 2;
       }
+      const selection = inspectSelectedPlanProfile(dir, base);
+      if (!selection.ok) {
+        console.error(`Error: submit-plan refused (${selection.code}); persisted profile sources must agree. Zero authority mutation.`);
+        return 2;
+      }
+      if (selection.profile !== null && selection.profile !== profileName) {
+        console.error(`Error: submit-plan refused (PROFILE-CHANGE-REQUIRES-PO); the selected profile is ${selection.profile}, requested ${profileName}. Use the existing po-authority-acknowledge-plan/apply with --profile and --reason, and confirm its apply in the PO's external attended terminal. A plan approval/signature or --by label does not establish that change.`);
+        return 2;
+      }
       const authority = poGateAuthority({ repoRoot: dir });
       const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
       if (!authority?.ok || authority.value?.planPath !== base.activeFeature?.planPath || !profile?.ok) {
@@ -10083,6 +10388,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: submit-plan blocked by ${framingRefusal.code}: the PRD at ${framingRefusal.planPath} still contains its own unmodified framing placeholder text ("${framingRefusal.marker}"). Author the framing section before submitting.`);
         return 2;
       }
+      if (["epic", "feature"].includes(profileName)) {
+        const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
+          planPath: authority.value.planPath, expectedPlanSha256: authority.value.planSha256 });
+        if (!designDraft.ok) {
+          console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
+          return 2;
+        }
+      }
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
@@ -10101,6 +10414,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           submittedAt = now();
+          const currentSelection = inspectSelectedPlanProfile(dir, observed);
+          if (!currentSelection.ok) return currentSelection;
+          if (currentSelection.profile !== null && currentSelection.profile !== profileName) {
+            return { ok: false, code: "PROFILE-CHANGE-REQUIRES-PO" };
+          }
           const transition = submitPlan({
             state: observed,
             expectedStateSha256: sha256CanonicalJson(observed),
@@ -10124,9 +10442,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             profile: transition.submission.profile,
             profileSha256: transition.submission.profileSha256,
           });
-          return { ...transition, state: { ...transition.state, updatedAt: submittedAt, planApprovalBriefing: submittedBriefing } };
+          return { ...transition, state: { ...transition.state, selectedProfile: profileName, updatedAt: submittedAt, planApprovalBriefing: submittedBriefing } };
         },
         beforeCommit: () => {
+          const currentSelection = inspectSelectedPlanProfile(dir, base);
+          if (!currentSelection.ok) return currentSelection;
+          if (currentSelection.profile !== null && currentSelection.profile !== profileName) {
+            return { ok: false, code: "PROFILE-CHANGE-REQUIRES-PO" };
+          }
           const nextAuthority = poGateAuthority({ repoRoot: dir, ...(profileName === "mini" ? { expectedPlanSha256, expectedSpecSha256 } : {}) });
           const nextProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
           return nextAuthority?.ok
@@ -10169,6 +10492,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           cancelledAt = retainedReplayTimestamp ?? now();
+          const selection = inspectSelectedPlanProfile(dir, observed);
+          if (!selection.ok) return selection;
           const transition = cancelSubmittedPlan({
             state: observed,
             expectedStateSha256: sha256CanonicalJson(observed),
@@ -10177,7 +10502,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             at: cancelledAt,
           });
           return transition.ok && !transition.replay
-            ? { ...transition, state: { ...transition.state, updatedAt: cancelledAt } }
+            ? { ...transition, state: { ...transition.state, ...(selection.profile === null ? {} : { selectedProfile: selection.profile }), updatedAt: cancelledAt } }
             : transition;
         },
         allowContinuityAdvance: true,
@@ -10219,6 +10544,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           recoveredAt = retainedReplayTimestamp ?? now();
+          const selection = inspectSelectedPlanProfile(dir, observed);
+          if (!selection.ok) return selection;
           const transition = cancelMixedPlanState({
             state: observed,
             expectedStateSha256: sha256CanonicalJson(observed),
@@ -10230,7 +10557,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             reason: value.reason,
           });
           return transition.ok && !transition.replay
-            ? { ...transition, state: { ...transition.state, updatedAt: recoveredAt } }
+            ? { ...transition, state: { ...transition.state, ...(selection.profile === null ? {} : { selectedProfile: selection.profile }), updatedAt: recoveredAt } }
             : transition;
         },
         allowContinuityAdvance: true,
@@ -10297,6 +10624,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         });
         if (!packageResult.ok) {
           console.error(`Error: present-plan requires one complete, current design-workflow package (${packageResult.code}); no presentation or approval lock was recorded.`);
+          return 2;
+        }
+        const designDraft = inspectArchitectureDesignDraft({ rootDir: dir, planPath: submitted.planPath,
+          expectedPlanSha256: submitted.planSha256 });
+        if (!designDraft.ok) {
+          console.error(`Error: present-plan requires the complete architecture design in the exact current PRD before the one final package signature (${designDraft.code}); no signature request, presentation, or approval lock was recorded.`);
           return 2;
         }
         const persisted = writeDesignWorkflowApprovalRequest(dir, packageResult.request);
@@ -10481,6 +10814,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "approve-plan": {
+      const selection = inspectSelectedPlanProfile(dir, base);
+      if (!selection.ok) {
+        console.error(`Error: approve-plan refused (${selection.code}); approval of a plan cannot retroactively authorize a different selected profile.`);
+        return 2;
+      }
       // `--dir` is a historical test/invocation wrapper accepted by this CLI's
       // outer entry point. It never selects a filesystem root here (the root
       // is already resolved before dispatch), so strip only that inert pair

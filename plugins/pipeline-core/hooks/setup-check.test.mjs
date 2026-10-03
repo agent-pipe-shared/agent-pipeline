@@ -409,7 +409,7 @@ function preflightAt(rootDir, installedVersion = "0.5.3+test") {
 // ---- the reconciliation contract itself ------------------------------------------------
 {
   const { observation } = decideOutput({ fileExists: false, parsed: null });
-  const declaredPreflight = { status: "ready", statusScope: "plugin-distribution-identity" };
+  const declaredPreflight = { status: "ready", statusScope: "plugin-distribution-identity-and-mandatory-local-hooks" };
   ok(
     "reconcile: a preflight that does not declare its scope is NOT reconcilable",
     reconcileSetupObservation({ preflight: { status: "ready" }, observation }).reconcilable === false,

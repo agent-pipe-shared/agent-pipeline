@@ -5,6 +5,7 @@ import { isAbsolute } from "node:path";
 
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import { diagnosticReviewerReferences, validateDiagnosticBundleShape } from "./critic-diagnostic-packet.mjs";
+import { sha256Canonical } from "./review-economy.mjs";
 
 export const CRITIC_EXPORT_RECEIPT_SCHEMA = "pipeline.critic-export-receipt.v1";
 export const CRITIC_EXPORT_DATA_CLASS = "repository-candidate";
@@ -108,7 +109,9 @@ function validTimestamp(value) {
 
 function validPacketBoundary(packet) {
   const withDiagnostics = Object.hasOwn(packet ?? {}, "diagnostics");
-  if (!exactKeys(packet, withDiagnostics ? [...PACKET_KEYS, "diagnostics"] : PACKET_KEYS) || packet.schema !== "pipeline.critic-candidate-packet.v1"
+  const withCoordinatorOnly = Object.hasOwn(packet ?? {}, "coordinatorOnly");
+  const packetKeys = [...PACKET_KEYS, ...(withDiagnostics ? ["diagnostics"] : []), ...(withCoordinatorOnly ? ["coordinatorOnly"] : [])];
+  if (!exactKeys(packet, packetKeys) || packet.schema !== "pipeline.critic-candidate-packet.v1"
     || (withDiagnostics && !validateDiagnosticBundleShape(packet.diagnostics))
     || !/^[a-f0-9]{32}$/u.test(packet.packetId ?? "")
     || !validTimestamp(packet.createdAt) || !validTimestamp(packet.expiresAt)
@@ -145,7 +148,34 @@ function validPacketBoundary(packet) {
     || packet.checkout.candidateOid !== packet.candidate.commit || packet.checkout.candidateTree !== packet.candidate.tree
     || !/^[a-f0-9]{64}$/u.test(packet.checkout.creatorNonce ?? "")
     || !/^[a-f0-9]{64}$/u.test(packet.cleanupCapability ?? "")
-    || !exactKeys(packet.bindings, ["requestSha256", "diffPathsSha256", "governanceSha256", ...(withDiagnostics ? ["diagnosticsSha256"] : [])])) return false;
+    || !exactKeys(packet.bindings, ["requestSha256", "diffPathsSha256", "governanceSha256", ...(withDiagnostics ? ["diagnosticsSha256"] : []), ...(withCoordinatorOnly ? ["coordinatorOnlySha256"] : [])])) return false;
+  if (withCoordinatorOnly) {
+    const coordinator = packet.coordinatorOnly;
+    if (exactKeys(coordinator, ["localDispatchEvidence"])) {
+      const evidence = coordinator.localDispatchEvidence;
+      const safeTaskId = typeof evidence?.taskId === "string" && /^[A-Za-z0-9._-]+$/u.test(evidence.taskId);
+      const snapshot = evidence && {
+        schema: evidence.schema, taskId: evidence.taskId, recordPath: evidence.recordPath,
+        recordSha256: evidence.recordSha256, sourceCandidateCommit: evidence.sourceCandidateCommit,
+        reviewCandidateCommit: evidence.reviewCandidateCommit,
+      };
+      if (!exactKeys(evidence, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])
+        || evidence.schema !== "pipeline.local-dispatch-evidence.v1" || !safeTaskId || evidence.taskId !== packet.request.taskId
+        || evidence.recordPath !== `evidence/dispatch-record-${evidence.taskId}.json`
+        || !/^[a-f0-9]{64}$/u.test(evidence.recordSha256 ?? "")
+        || !validOid(evidence.sourceCandidateCommit) || evidence.sourceCandidateCommit.length !== packet.ruleset.oid.length
+        || evidence.reviewCandidateCommit !== packet.candidate.commit
+        || evidence.snapshotId !== sha256Canonical(snapshot)) return false;
+    } else if (exactKeys(coordinator, ["signedQualityImportAnchor"])) {
+      const anchor = coordinator.signedQualityImportAnchor;
+      if (!exactKeys(anchor, ["schema", "intentSha256", "integrationCommit", "baseCommit", "candidateCommit", "taskId"])
+        || anchor.schema !== "pipeline.signed-quality-import-review-anchor.v1"
+        || !/^[a-f0-9]{64}$/u.test(anchor.intentSha256 ?? "")
+        || !validOid(anchor.integrationCommit) || anchor.integrationCommit.length !== packet.ruleset.oid.length
+        || anchor.baseCommit !== packet.candidate.base || anchor.candidateCommit !== packet.candidate.commit
+        || anchor.taskId !== `signed-import-${anchor.intentSha256}` || anchor.taskId !== packet.request.taskId) return false;
+    } else return false;
+  }
   const references = packet.references.map((entry) => exactKeys(entry, ["kind", "path", "candidateBlobOid"])
     && REFERENCE_KINDS.has(entry.kind) && validPath(entry.path) && validOid(entry.candidateBlobOid));
   if (references.some((valid) => !valid)) return false;
@@ -167,6 +197,7 @@ function validPacketBoundary(packet) {
     diffPathsSha256: bindingDigest(packet.diffPaths),
     governanceSha256: bindingDigest(packet.governance),
     ...(withDiagnostics ? { diagnosticsSha256: bindingDigest(packet.diagnostics) } : {}),
+    ...(withCoordinatorOnly ? { coordinatorOnlySha256: bindingDigest(packet.coordinatorOnly) } : {}),
   };
   return JSON.stringify(packet.bindings) === JSON.stringify(expectedBindings);
 }

@@ -38,6 +38,7 @@ import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";
 import { designWorkflowAdvisorQuestionSha256 } from "../lib/design-workflow-package.mjs";
 import { designReadinessReportSha256 } from "../lib/design-readiness-host-evidence.mjs";
 import { createAdvisoryAttemptTrail } from "../lib/advisory-attempt-trail.mjs";
+import { readRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -45,7 +46,13 @@ const specSha256 = createHash("sha256").update("spec").digest("hex");
 const now = "2026-08-08T18:40:00.000Z";
 
 function mktempProjectDir() {
-  return mkdtempSync(join(tmpdir(), "cb-1a-fixture-"));
+  const root = mkdtempSync(join(tmpdir(), "cb-1a-fixture-"));
+  // A disposable fixture can live inside the source checkout's TMPDIR. Its
+  // own Git root keeps the private handover projection scoped to this project
+  // rather than accidentally inheriting the enclosing source repository.
+  const initialized = spawnSync("git", ["init", "-q", "-b", "main", root], { encoding: "utf8" });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  return root;
 }
 
 function freshFixture() {
@@ -1494,6 +1501,16 @@ function attendedFeaturePlanDeps(root, deps) {
     "Notes: reviewed and ready.",
   ].join("\n"));
   writeFileSync(join(root, specPath), "# spec\n");
+  // This test authors a new draft after constructing its isolated authority
+  // fixture. Bind that fixture to the actual revised bytes before submission;
+  // a stale digest must remain refused by the production draft validator.
+  const originalAuthority = deps.poGateAuthority;
+  deps.poGateAuthority = () => {
+    const observed = originalAuthority();
+    return { ...observed, value: { ...observed.value,
+      planSha256: sha256Hex(readFileSync(join(root, planPath))),
+      specSha256: sha256Hex(readFileSync(join(root, specPath))) } };
+  };
   const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
   assert.equal(submitted.result, 0, `genuinely authored framing must not be refused: ${submitted.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
@@ -1639,10 +1656,16 @@ function awaitingApprovalFixture() {
   assert.equal(run(presentFeaturePlanArgs(deps), deps), 0);
   const inspected = capturedStdout(() => run(["inspect"], deps));
   const action = JSON.parse(inspected.lines.join("\n")).nextAction;
-  assert.equal(action.kind, "collect-input");
+  assert.equal(action.kind, "command");
+  assert.equal(action.invocation, "user-copy-only");
+  assert.equal(action.executionBoundary, "human-terminal");
+  assert.equal(action.requiresConfirmation, true);
+  assert.ok(action.argv.includes("sign-intent"));
+  assert.ok(action.copyCommand.posix);
+  assert.ok(action.copyCommand.powershell);
   assert.equal(action.input, undefined, "signature mode must request the exact final package proof, not PO-name attribution");
   assert.equal(action.inputs, undefined, "a second Advisor choice must not precede the package's one final PO approval");
-  assert.match(action.guidance, /sign-intent.*--request/u);
+  assert.ok(action.argv.includes("--request"));
   signPresentedFeaturePlan(authorityFixture.root, deps);
   const ready = capturedStdout(() => run(["inspect"], deps));
   const readyAction = JSON.parse(ready.lines.join("\n")).nextAction;
@@ -1843,22 +1866,29 @@ function awaitingApprovalFixture() {
     "an unattributed approve-plan must stay refused by the same guard");
 }
 
-// NVA-R31-STATEPHASEDRIFT (pipeline.state-phase-projection-atomicity):
-// set-feature's existing best-effort docs resync must also write the
-// statePhaseProjectionMarker() line into docs/state.md, atomically with the
-// state file it derives from -- not leave the marker for a separate manual
-// step that can lag behind. check-state-phase-consistency.test.mjs covers
-// the checker end to end; this pins the emission point in pipeline-state.mjs
-// itself, at the smallest single transition (set-feature, phase="design").
+// NVA-R31-STATEPHASEDRIFT: Git-backed fixtures read the existing private
+// advisory handover through its canonical reader. The exact phase marker
+// must follow the current canonical state while tracked docs/index stay
+// unchanged; stale state must not admit the previous advisory projection.
 {
   const root = mktempProjectDir();
   mkdirSync(join(root, "docs"), { recursive: true });
   writeFileSync(join(root, "docs/state.md"), "# Project state\n\n## Next action\n\nplaceholder\n");
+  const staged = spawnSync("git", ["-C", root, "add", "docs/state.md"], { encoding: "utf8" });
+  assert.equal(staged.status, 0, staged.stderr);
+  const trackedBefore = readFileSync(join(root, "docs/state.md"));
+  const indexBefore = readFileSync(join(root, ".git/index"));
   const code = run(["set-feature", "--id", "marker-check", "--plan-path", "specs/marker-check/prd.md"], { dir: root, now: () => now });
   assert.equal(code, 0);
-  const handover = readFileSync(join(root, "docs/state.md"), "utf8");
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const handover = readRuntimeNextAction({ rootDir: root, state });
+  assert.equal(handover.status, "available");
+  assert.equal(handover.authority, "advisory-only");
   const expectedMarker = statePhaseProjectionMarker({ activeFeature: { id: "marker-check", phase: "design" } });
-  assert.ok(handover.includes(expectedMarker), `docs/state.md must carry the marker verbatim; got:\n${handover}`);
+  assert.ok(handover.sectionText.includes(expectedMarker), `runtime handover must carry the marker verbatim; got:\n${handover.sectionText}`);
+  assert.deepEqual(readFileSync(join(root, "docs/state.md")), trackedBefore, "lifecycle projection leaves tracked handover bytes unchanged");
+  assert.deepEqual(readFileSync(join(root, ".git/index")), indexBefore, "lifecycle projection leaves the Git index unchanged");
+  assert.equal(readRuntimeNextAction({ rootDir: root, state: { ...state, updatedAt: "2026-08-08T18:41:00.000Z" } }).status, "unavailable");
 }
 
 // NVA-B-CALIBRATION-PREFLIGHT-FIX-R2: ordinary set-phase is the sanctioned
@@ -2496,3 +2526,307 @@ console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
   assert.equal(competing.result, 2);
   assert.ok(competing.lines.some((line) => line.includes("PLAN-MIXED-CANCEL-ALREADY-RECOVERED")));
 }
+
+// PROFILE-EXISTING-GATE-R3: real canonical writer and shared attended primitive.
+import { resolveIntakeCheckpointPaths, readOnboardingIntakeCheckpoint } from '../lib/onboarding-continuity.mjs';
+function persistedProfileFixture(profile = 'feature') {
+  const id = `profile-authority-${profile}`;
+  const fixture = planAuthorityFixture({ featureId: id, planPath: `specs/${id}/prd_${id}.md`, specPath: `specs/${id}/spec.md` });
+  const paths = resolveIntakeCheckpointPaths({ rootDir: fixture.root, create: true });
+  mkdirSync(paths.directory, { recursive: true });
+  const checkpoint = { schema: 'pipeline.onboarding-intake-checkpoint.v1', root: fixture.root, revision: 0,
+    createdAt: now, updatedAt: now, consent: null, values: { gitAuthor: null, language: 'en', profile },
+    materialInput: [], designQuestions: null, transactionState: 'collecting', generated: null };
+  writeFileSync(paths.checkpoint, JSON.stringify({ ...checkpoint, contentSha256: sha256CanonicalJson(checkpoint) }) + '\n');
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: fixture.root }).value.values.profile, profile);
+  return { ...fixture, checkpointPath: paths.checkpoint };
+}
+function profileSourceBytes(fixture) {
+  return [statePath(fixture.root), join(fixture.root, fixture.planPath), join(fixture.root, fixture.specPath), fixture.checkpointPath].filter(Boolean).map(p => [p, readFileSync(p)]);
+}
+function assertProfileBytesUnchanged(before) {
+  for (const [p, bytes] of before) assert.deepEqual(readFileSync(p), bytes, 'refused profile action changes no source authority');
+}
+function profilePlan(fixture, to = 'mini', reason = 'Use the smaller course after explicit PO review.') {
+  const result = invokeCaptured(['po-authority-acknowledge-plan', '--root', fixture.root, '--by', 'PO', '--runner', 'codex', '--profile', to, '--reason', reason], fixture.deps);
+  assert.equal(result.status, 0, result.err);
+  return JSON.parse(result.out);
+}
+function attendedProfileDeps(fixture, extra = {}) {
+  return { ...fixture.deps, v4Inspection: () => ({ status: 'ready' }), isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN, ...extra };
+}
+
+{
+  const fixture = persistedProfileFixture();
+  const before = profileSourceBytes(fixture);
+  const denied = invokeCaptured(['submit-plan', '--by', 'Human', '--profile', 'mini'], fixture.deps);
+  assert.equal(denied.status, 2);
+  assert.match(denied.err, /PROFILE-CHANGE-REQUIRES-PO/);
+  assertProfileBytesUnchanged(before);
+  console.log('PASS canonical feature -> mini denial and zero mutation');
+}
+
+{
+  const fixture = persistedProfileFixture();
+  const { root, deps } = fixture;
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], deps).status, 0);
+  assert.equal(JSON.parse(readFileSync(statePath(root), 'utf8')).selectedProfile, 'feature');
+  const awaiting = profileSourceBytes(fixture);
+  const repeated = invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], deps);
+  assert.equal(repeated.status, 2);
+  assert.match(repeated.err, /PLAN-SUBMIT-STATE-INVALID/);
+  assertProfileBytesUnchanged(awaiting);
+  const submitted = JSON.parse(readFileSync(statePath(root), 'utf8'));
+  assert.equal(invokeCaptured(['cancel-submitted-plan', '--by', 'PO', '--submission-sha256', sha256CanonicalJson(submitted.planSubmission)], deps).status, 0);
+  const laterDeps = { ...deps, now: () => '2026-08-27T10:01:00.000Z' };
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], laterDeps).status, 0, 'same profile submits a new timestamped submission after returning to Draft');
+  assert.equal(invokeCaptured(presentFeaturePlanArgs(laterDeps), laterDeps).status, 0);
+  signPresentedFeaturePlan(root, laterDeps);
+  assert.equal(invokeCaptured(approveFeaturePlanArgs(root), laterDeps).status, 0);
+  const approved = profileSourceBytes(fixture);
+  const deniedApproved = invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], laterDeps);
+  assert.equal(deniedApproved.status, 2);
+  assert.match(deniedApproved.err, /PLAN-SUBMIT-STATE-INVALID/);
+  assertProfileBytesUnchanged(approved);
+  console.log('PASS same-profile Draft contract and exact approved-state preservation');
+}
+
+{
+  const id = 'profile-initial-selection';
+  const fixture = planAuthorityFixture({ featureId: id, planPath: `specs/${id}/prd_${id}.md`, specPath: `specs/${id}/spec.md` });
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], fixture.deps).status, 0);
+  const submitted = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+  assert.equal(submitted.selectedProfile, 'feature');
+  assert.equal(invokeCaptured(['cancel-submitted-plan', '--by', 'PO', '--submission-sha256', sha256CanonicalJson(submitted.planSubmission)], fixture.deps).status, 0);
+  const cancelled = profileSourceBytes(fixture);
+  const denied = invokeCaptured(['submit-plan', '--by', 'Human', '--profile', 'mini'], fixture.deps);
+  assert.equal(denied.status, 2);
+  assert.match(denied.err, /PROFILE-CHANGE-REQUIRES-PO/);
+  assertProfileBytesUnchanged(cancelled);
+  console.log('PASS initial selection survives cancellation without intake');
+}
+
+{
+  const fixture = persistedProfileFixture('mini');
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'mini'], fixture.deps).status, 0);
+  const state = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+  state.selectedProfile = 'feature';
+  writeFileSync(statePath(fixture.root), JSON.stringify(state, null, 2) + '\n');
+  const before = profileSourceBytes(fixture);
+  for (const argv of [['submit-plan', '--by', 'Human', '--profile', 'mini'], ['approve-plan', '--by', 'Human'], ['set-phase', '--phase', 'implementation']]) {
+    const result = invokeCaptured(argv, fixture.deps);
+    assert.equal(result.status, 2);
+    assert.match(result.err, /PROFILE-AUTHORITY-CONFLICT/);
+    assertProfileBytesUnchanged(before);
+  }
+  console.log('PASS conflicting choice blocks submission/approval/implementation');
+}
+
+{
+  const fixture = persistedProfileFixture();
+  const checkpoint = JSON.parse(readFileSync(fixture.checkpointPath, 'utf8'));
+  checkpoint.values.profile = 'mini';
+  writeFileSync(fixture.checkpointPath, JSON.stringify(checkpoint) + '\n');
+  const before = profileSourceBytes(fixture);
+  const invalid = invokeCaptured(['submit-plan', '--by', 'Human', '--profile', 'mini'], fixture.deps);
+  assert.equal(invalid.status, 2);
+  assert.match(invalid.err, /PROFILE-AUTHORITY-INVALID/);
+  assertProfileBytesUnchanged(before);
+  console.log('PASS malformed intake cannot reset selection');
+}
+
+// The following action tests reuse the real existing PO acknowledgement
+// plan/apply, shared attended primitive and lock/journal/postimage machinery.
+{
+  const fixture = persistedProfileFixture();
+  const planned = profilePlan(fixture);
+  assert.deepEqual(planned.profileChange.from, 'feature');
+  assert.equal(planned.profileChange.to, 'mini');
+  assert.equal(planned.profileChange.stateSha256, sha256Hex(readFileSync(statePath(fixture.root))));
+  const before = profileSourceBytes(fixture);
+  const unattended = invokeCaptured(acknowledgedApplyArgs(planned), { ...fixture.deps, isattyFn: () => false, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN });
+  assert.equal(unattended.status, 1);
+  assert.match(unattended.err, /CHAT-GATE-NOT-ATTENDED/);
+  assertProfileBytesUnchanged(before);
+  const wrong = invokeCaptured(acknowledgedApplyArgs(planned), attendedProfileDeps(fixture, { readLineFn: () => 'WRONG' }));
+  assert.equal(wrong.status, 1);
+  assert.match(wrong.err, /CHAT-GATE-CONFIRMATION-MISMATCH/);
+  assertProfileBytesUnchanged(before);
+  const pipe = spawnSync(process.execPath, planned.applyAction.argv, { cwd: fixture.root, encoding: 'utf8', input: `${PO_ACK_APPLY_CONFIRMATION_TOKEN}\n` });
+  assert.equal(pipe.status, 1, pipe.stderr);
+  assert.match(pipe.stderr, /CHAT-GATE-NOT-ATTENDED/);
+  assertProfileBytesUnchanged(before);
+  const applied = invokeCaptured(acknowledgedApplyArgs(planned), attendedProfileDeps(fixture));
+  assert.equal(applied.status, 0, applied.err);
+  const changed = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+  assert.equal(changed.selectedProfile, 'mini');
+  assert.equal(changed.planApproved, false);
+  assert.equal(changed.activeFeature.phase, 'design');
+  assert.equal(changed.poGateAcknowledgement.profileChanges.at(-1).binding.from, 'feature');
+  assert.equal(changed.poGateAcknowledgement.profileChanges.at(-1).binding.to, 'mini');
+  assert.equal(changed.poGateAcknowledgement.profileChanges.at(-1).binding.reason, planned.profileChange.reason);
+  const after = profileSourceBytes(fixture);
+  assert.deepEqual(after.slice(1), before.slice(1), 'profile confirmation itself changes no document/intake bytes');
+  const replay = invokeCaptured(acknowledgedApplyArgs(planned), attendedProfileDeps(fixture));
+  assert.equal(replay.status, 2);
+  assertProfileBytesUnchanged(after);
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'mini'], fixture.deps).status, 0, 'explicitly changed profile is now current');
+  console.log('PASS existing attended apply, real pipe/wrong/unattended denial, audit and one-use replay');
+}
+{
+  const id = 'profile-legacy-cancellation';
+  const fixture = planAuthorityFixture({ featureId: id, planPath: `specs/${id}/prd_${id}.md`, specPath: `specs/${id}/spec.md` });
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], fixture.deps).status, 0);
+  const legacy = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+  delete legacy.selectedProfile;
+  writeFileSync(statePath(fixture.root), JSON.stringify(legacy, null, 2) + '\n');
+  assert.equal(invokeCaptured(['cancel-submitted-plan', '--by', 'PO', '--submission-sha256', sha256CanonicalJson(legacy.planSubmission)], fixture.deps).status, 0);
+  assert.equal(JSON.parse(readFileSync(statePath(fixture.root), 'utf8')).selectedProfile, 'feature');
+  const before = profileSourceBytes(fixture);
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'Human', '--profile', 'mini'], fixture.deps).status, 2);
+  assertProfileBytesUnchanged(before);
+  console.log('PASS legacy submission-only choice survives cancellation');
+}
+
+{
+  const fixture = persistedProfileFixture();
+  const args = ['po-authority-acknowledge-plan', '--root', fixture.root, '--by', 'PO', '--runner', 'codex'];
+  const before = profileSourceBytes(fixture);
+  for (const pair of [['--profile', 'mini'], ['--reason', 'reviewed'], ['--profile', 'mini', '--reason', ''],
+    ['--profile', 'mini', '--reason', 'line\nbreak'], ['--profile', 'mini', '--reason', 'é'.repeat(1025)],
+    ['--profile', 'mini', '--reason', 'reviewed', '--profile', 'feature'], ['--profile=mini', '--reason', 'reviewed']]) {
+    assert.equal(invokeCaptured([...args, ...pair], fixture.deps).status, 2);
+    assertProfileBytesUnchanged(before);
+  }
+  assert.equal(invokeCaptured([...args, '--profile', 'feature', '--reason', 'same'], fixture.deps).status, 2);
+  const plan = profilePlan(fixture);
+  const apply = acknowledgedApplyArgs(plan);
+  for (const flag of ['--profile', '--reason', '--by', '--runner']) {
+    const changed = [...apply];
+    changed[changed.indexOf(flag) + 1] = flag === '--profile' ? 'epic' : flag === '--runner' ? 'claude' : 'different';
+    assert.equal(invokeCaptured(changed, attendedProfileDeps(fixture)).status, 2);
+    assertProfileBytesUnchanged(before);
+  }
+  const absentId = 'profile-absent-choice';
+  const absent = planAuthorityFixture({ featureId: absentId, planPath: `specs/${absentId}/prd_${absentId}.md`, specPath: `specs/${absentId}/spec.md` });
+  const refused = invokeCaptured(['po-authority-acknowledge-plan', '--root', absent.root, '--by', 'PO', '--runner', 'codex', '--profile', 'mini', '--reason', 'reviewed'], absent.deps);
+  assert.equal(refused.status, 2);
+  assert.match(refused.err, /PO-ACK-PROFILE-SELECTION-ABSENT/);
+  console.log('PASS exact profile/reason grammar and bound actor/runner/choice/reason refusal');
+}
+
+for (const kind of ['state', 'revision', 'prd', 'spec', 'intake', 'candidate']) {
+  const fixture = persistedProfileFixture();
+  const plan = profilePlan(fixture);
+  let deps = attendedProfileDeps(fixture);
+  if (kind === 'state' || kind === 'revision') {
+    const state = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+    if (kind === 'state') state.updatedAt = '2026-08-27T10:02:00.000Z';
+    else state.continuity.revision += 1;
+    writeFileSync(statePath(fixture.root), JSON.stringify(state, null, 2) + '\n');
+  } else if (kind === 'candidate') {
+    deps = { ...deps, gitCandidate: () => ({ ok: true, commit: 'e'.repeat(40), tree: 'f'.repeat(40) }) };
+  } else {
+    const p = kind === 'intake' ? fixture.checkpointPath : join(fixture.root, kind === 'prd' ? fixture.planPath : fixture.specPath);
+    writeFileSync(p, readFileSync(p, 'utf8') + '\n');
+  }
+  const before = profileSourceBytes(fixture);
+  const result = invokeCaptured(acknowledgedApplyArgs(plan), deps);
+  assert.equal(result.status, 2, `${kind}: ${result.err}`);
+  assert.match(result.err, /stale/);
+  assertProfileBytesUnchanged(before);
+}
+console.log('PASS pre-confirmation state/revision/PRD/Spec/intake/candidate drift');
+
+for (const seam of ['afterRebindTransactionPrepared', 'afterRebindPrdWritten']) {
+  const fixture = persistedProfileFixture();
+  const plan = profilePlan(fixture);
+  const initial = profileSourceBytes(fixture);
+  let raced;
+  const deps = attendedProfileDeps(fixture, { [seam]: () => {
+    const state = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+    state.continuity.revision += 1;
+    writeFileSync(statePath(fixture.root), JSON.stringify(state, null, 2) + '\n');
+    raced = profileSourceBytes(fixture);
+  } });
+  const result = invokeCaptured(acknowledgedApplyArgs(plan), deps);
+  assert.equal(result.status, 2, result.err);
+  assert.match(result.err, /preimage drifted/);
+  assertProfileBytesUnchanged(raced);
+  assert.deepEqual(raced.slice(1), initial.slice(1));
+}
+console.log('PASS lock/journal prepared and immediately-before-State-write CAS refusal');
+
+for (const kind of ['spec', 'candidate', 'v4']) {
+  const fixture = persistedProfileFixture();
+  const plan = profilePlan(fixture);
+  const before = profileSourceBytes(fixture);
+  let changedCandidate = false;
+  const deps = attendedProfileDeps(fixture, {
+    ...(kind === 'candidate' ? { gitCandidate: () => changedCandidate
+      ? { ok: true, commit: 'e'.repeat(40), tree: 'f'.repeat(40) } : fixture.deps.gitCandidate(fixture.root) } : {}),
+    ...(kind === 'v4' ? { v4Inspection: () => ({ status: 'blocked' }) } : {}),
+    afterRebindStateWritten: () => {
+      changedCandidate = true;
+      if (kind === 'spec') writeFileSync(join(fixture.root, fixture.specPath), '# drift after State write\n');
+    },
+  });
+  const result = invokeCaptured(acknowledgedApplyArgs(plan), deps);
+  assert.equal(result.status, 2, `${kind}: ${result.err}`);
+  assert.match(result.err, /postimage readback failed.*rollback verified/);
+  assert.deepEqual(readFileSync(statePath(fixture.root)), before[0][1]);
+  assert.deepEqual(readFileSync(join(fixture.root, fixture.planPath)), before[1][1]);
+  assert.deepEqual(readFileSync(fixture.checkpointPath), before[3][1]);
+}
+console.log('PASS exact postimage candidate/Spec and existing V4 failure rollback');
+
+{
+  const fixture = persistedProfileFixture();
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], fixture.deps).status, 0);
+  commitGlobalHumanApproval(fixture.root, 'chat');
+  const plan = profilePlan(fixture);
+  const before = profileSourceBytes(fixture);
+  let touchedInput = false;
+  const result = invokeCaptured(acknowledgedApplyArgs(plan), { ...fixture.deps, isattyFn: () => false, readLineFn: () => { touchedInput = true; return PO_ACK_APPLY_CONFIRMATION_TOKEN; } });
+  assert.equal(result.status, 1);
+  assert.match(result.err, /CHAT-GATE-NOT-ATTENDED/);
+  assert.equal(touchedInput, false);
+  assertProfileBytesUnchanged(before);
+  console.log('PASS committed global chat never bypasses attended profile confirmation');
+}
+
+for (const startingLifecycle of ['approved', 'implementing']) {
+  const fixture = persistedProfileFixture();
+  assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], fixture.deps).status, 0);
+  assert.equal(invokeCaptured(presentFeaturePlanArgs(fixture.deps), fixture.deps).status, 0);
+  signPresentedFeaturePlan(fixture.root, fixture.deps);
+  assert.equal(invokeCaptured(approveFeaturePlanArgs(fixture.root), fixture.deps).status, 0);
+  if (startingLifecycle === 'implementing') {
+    mkdirSync(join(fixture.root, '.claude'), { recursive: true });
+    const calibration = JSON.stringify({ project: 'synthetic-profile-test', verify: 'node --test', handover: 'docs/state.md' }) + '\n';
+    writeFileSync(join(fixture.root, 'project/pipeline.json'), calibration);
+    writeFileSync(join(fixture.root, '.claude/pipeline.json'), calibration);
+    const entered = invokeCaptured(['set-phase', '--phase', 'implementation'], {
+      ...fixture.deps, architectureEntryReadiness: () => ({ status: 'ready' }),
+    });
+    assert.equal(entered.status, 0, entered.err);
+  }
+  const approved = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+  const plan = profilePlan(fixture);
+  const result = invokeCaptured(acknowledgedApplyArgs(plan), attendedProfileDeps(fixture));
+  assert.equal(result.status, 0, result.err);
+  const state = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+  assert.equal(state.activeFeature.phase, 'design');
+  assert.equal(state.planApproved, false);
+  assert.deepEqual(state.planApproval, approved.planApproval);
+  assert.equal(state.planInvalidation.invalidatedApprovalSha256, sha256CanonicalJson(approved.planApproval));
+  assert.equal(invokeCaptured(['set-phase', '--phase', 'implementation'], fixture.deps).status, 2);
+  assert.equal(invokeCaptured(approveFeaturePlanArgs(fixture.root), fixture.deps).status, 2, 'old final signed approval cannot reapprove the changed choice');
+  const reverse = profilePlan(fixture, 'feature', 'PO chooses the feature course again.');
+  assert.equal(invokeCaptured(acknowledgedApplyArgs(reverse), attendedProfileDeps(fixture)).status, 0);
+  const reversed = JSON.parse(readFileSync(statePath(fixture.root), 'utf8'));
+  assert.equal(reversed.poGateAcknowledgement.profileChanges.length, 2);
+  assert.equal(reversed.selectedProfile, 'feature');
+  console.log(`PASS ${startingLifecycle} choice reopens real design and invalidates exact approval; chained change`);
+}
+console.log('PROFILE R3 focused regressions complete.');

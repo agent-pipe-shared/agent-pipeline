@@ -14,6 +14,7 @@ import { resolveCriticExportConsentState } from "../scripts/critic-export-consen
 
 import { checkCriticExport, deriveCriticExportView, validateCriticExportAuthorization } from "./critic-export-policy.mjs";
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+import { sha256Canonical } from "./review-economy.mjs";
 
 const registry = loadRunnerProfilesV3Registry();
 // Real Git and CLI fixtures exercise path interpretation and filesystem effects.
@@ -217,6 +218,46 @@ test("session-bound Critic packet model authority stays private while the route 
     invalid.bindings.requestSha256 = hash(invalid.request);
     assert.equal(deriveCriticExportView(invalid), null);
   }
+});
+
+test("coordinator-only dispatch and signed-import bindings are digest-bound but never exported", () => {
+  const local = structuredClone(packet);
+  const localBinding = {
+    schema: "pipeline.local-dispatch-evidence.v1", taskId: "critic-export-test",
+    recordPath: "evidence/dispatch-record-critic-export-test.json", recordSha256: "7".repeat(64),
+    sourceCandidateCommit: "b".repeat(40), reviewCandidateCommit: "b".repeat(40),
+  };
+  localBinding.snapshotId = sha256Canonical(localBinding);
+  local.coordinatorOnly = { localDispatchEvidence: localBinding };
+  local.bindings.coordinatorOnlySha256 = hash(local.coordinatorOnly);
+  const localView = deriveCriticExportView(local);
+  assert.notEqual(localView, null);
+  assert.equal(JSON.stringify(localView).includes(localBinding.recordPath), false);
+  assert.equal(JSON.stringify(localView).includes(localBinding.recordSha256), false);
+
+  const imported = structuredClone(packet);
+  const intentSha256 = "8".repeat(64);
+  imported.request.taskId = `signed-import-${intentSha256}`;
+  imported.coordinatorOnly = { signedQualityImportAnchor: {
+    schema: "pipeline.signed-quality-import-review-anchor.v1", intentSha256,
+    integrationCommit: "9".repeat(40), baseCommit: imported.candidate.base,
+    candidateCommit: imported.candidate.commit, taskId: imported.request.taskId,
+  } };
+  imported.bindings.requestSha256 = hash(imported.request);
+  imported.bindings.coordinatorOnlySha256 = hash(imported.coordinatorOnly);
+  const importedView = deriveCriticExportView(imported);
+  assert.notEqual(importedView, null);
+  assert.equal(JSON.stringify(importedView).includes(intentSha256), false);
+  assert.equal(JSON.stringify(importedView).includes(imported.request.taskId), false);
+
+  const changed = structuredClone(imported);
+  changed.coordinatorOnly.signedQualityImportAnchor.integrationCommit = "0".repeat(40);
+  assert.equal(deriveCriticExportView(changed), null);
+  changed.bindings.coordinatorOnlySha256 = hash(changed.coordinatorOnly);
+  assert.notEqual(deriveCriticExportView(changed), null, "the pure export boundary validates shape; canonical admission validates the import authority");
+  changed.coordinatorOnly.signedQualityImportAnchor.baseCommit = "0".repeat(40);
+  changed.bindings.coordinatorOnlySha256 = hash(changed.coordinatorOnly);
+  assert.equal(deriveCriticExportView(changed), null);
 });
 
 test("provider must match the packet runner", () => {

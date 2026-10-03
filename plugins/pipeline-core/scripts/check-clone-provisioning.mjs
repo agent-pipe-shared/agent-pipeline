@@ -17,6 +17,32 @@ import { planInstall as planCommitMsgHookInstall } from "./commit-msg-hook-insta
 
 export const CLONE_PROVISIONING_REPORT_SCHEMA = "pipeline.clone-provisioning-report.v1";
 
+export function assessMandatoryHookReadiness(report) {
+  const checks = Array.isArray(report?.checks) ? report.checks : [];
+  const byId = new Map(checks.map((entry) => [entry.id, entry]));
+  const required = ["pre-commit-hook", "commit-msg-hook"].map((id) => byId.get(id));
+  if (required.some((entry) => !entry)) return { status: "unresolved", code: "HOOK-READINESS-OBSERVATION-INCOMPLETE", required: [] };
+  const projection = required.map(({ id, status, repairAction, path }) => ({ id, status, path, repairAction }));
+  if (required.every((entry) => entry.status === "current")) return { status: "ready", code: null, required: projection };
+  if (required.some((entry) => entry.status === "foreign-owner" || entry.status === "decline")) {
+    return { status: "blocked", code: "HOOK-READINESS-OWNER-OR-DECLINE", required: projection };
+  }
+  if (required.some((entry) => entry.status === "unresolved")) {
+    return { status: "unresolved", code: "HOOK-READINESS-REPOSITORY-UNRESOLVED", required: projection };
+  }
+  if (required.every((entry) => entry.status === "install")) {
+    return { status: "provisioning-required", code: "HOOK-READINESS-INSTALL-REQUIRED", required: projection };
+  }
+  return { status: "blocked", code: "HOOK-READINESS-STATE-UNSUPPORTED", required: projection };
+}
+
+export function applyMandatoryHookGate(status, readiness) {
+  if (status !== "ready") return status;
+  if (readiness?.status === "ready") return status;
+  if (readiness?.status === "provisioning-required") return "hook-provisioning-required";
+  return "hook-provisioning-blocked";
+}
+
 const HOOK_SPECS = Object.freeze([
   { id: "pre-push-hook", name: "pre-push", planInstall: planPrePushHookInstall, installer: "pre-push-hook-install.mjs", pushBackstop: true },
   { id: "pre-commit-hook", name: "pre-commit", planInstall: planPreCommitHookInstall, installer: "pre-commit-hook-install.mjs" },

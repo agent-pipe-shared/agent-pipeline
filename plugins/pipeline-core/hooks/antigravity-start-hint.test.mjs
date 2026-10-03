@@ -2,17 +2,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const HOOK = fileURLToPath(new URL("./antigravity-start-hint.mjs", import.meta.url));
 const PRETOOL = fileURLToPath(new URL("./antigravity-pretool-guard.mjs", import.meta.url));
+const TEST_SCRATCH = join(process.cwd(), "scratch/agy-report-hotfixes-20261003/start-hint-test-fixtures");
+
+function testTemp(prefix) {
+  mkdirSync(TEST_SCRATCH, { recursive: true });
+  return mkdtempSync(join(TEST_SCRATCH, prefix));
+}
 
 function initializedRoot() {
-  const root = mkdtempSync(join(tmpdir(), "agy-start-hint-git-"));
+  const root = testTemp("agy-start-hint-git-");
   const git = spawnSync("git", ["init", "-q", root], { encoding: "utf8" });
   assert.equal(git.status, 0, git.stderr);
   return root;
@@ -41,7 +46,7 @@ test("antigravity-start-hint: missing workspace paths fail-closed", () => {
 });
 
 test("antigravity-start-hint: absolute ungoverned workspace remains an onboarding hint without creating Git", () => {
-  const root = mkdtempSync(join(tmpdir(), "agy-start-hint-"));
+  const root = testTemp("agy-start-hint-");
   try {
     const input = { invocationNum: 1, workspacePaths: [root], conversationId: "fixture" };
     const res = spawnSync("node", [HOOK], { input: JSON.stringify(input), encoding: "utf8" });
@@ -68,7 +73,18 @@ test("antigravity-start-hint: conversationId arms the lock consumed by the preto
       /--runner antigravity --host-session-id/u);
     assert.match(JSON.parse(start.stdout).injectSteps[0].ephemeralMessage,
       /agy-conversation-1/u);
-    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "run", `session-${session}`, "requires-bootstrap.lock")), true);
+    const sessionDir = join(root, ".git", "agent-pipeline", "run", `session-${session}`);
+    const proofLock = join(sessionDir, "requires-bootstrap.lock");
+    const pendingBarrier = join(sessionDir, "requires-bootstrap.pending");
+    assert.equal(existsSync(proofLock), true);
+    assert.equal(existsSync(pendingBarrier), true);
+    const firstLock = statSync(proofLock);
+    const repeatStart = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: session }), encoding: "utf8",
+    });
+    assert.equal(repeatStart.status, 0, repeatStart.stderr);
+    assert.equal(statSync(proofLock).mtimeMs, firstLock.mtimeMs, "a ready inference does not rewrite its session proof lock");
+    assert.equal(existsSync(pendingBarrier), true, "the startup barrier remains pending until an allowed bootstrap read");
     const tool = spawnSync(process.execPath, [PRETOOL], {
       cwd: root,
       input: JSON.stringify({
@@ -79,6 +95,22 @@ test("antigravity-start-hint: conversationId arms the lock consumed by the preto
     });
     assert.equal(tool.status, 2, tool.stderr);
     assert.match(tool.stderr, /Mandatory Session Bootstrap/u);
+    const bootstrapRead = spawnSync(process.execPath, [PRETOOL], {
+      cwd: root,
+      input: JSON.stringify({
+        workspacePaths: [root], conversationId: session,
+        toolCall: { name: "run_command", args: { CommandLine: "pwd", Cwd: root } },
+      }),
+      encoding: "utf8",
+    });
+    assert.equal(bootstrapRead.status, 0, bootstrapRead.stderr);
+    assert.equal(existsSync(pendingBarrier), false, "the one-shot barrier is consumed by an admitted bootstrap read");
+    assert.equal(existsSync(proofLock), true, "the hook-authored proof lock remains available to preflight");
+    const afterReadStart = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: session }), encoding: "utf8",
+    });
+    assert.equal(afterReadStart.status, 0, afterReadStart.stderr);
+    assert.equal(existsSync(pendingBarrier), false, "a ready inference does not manufacture a new pending barrier");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

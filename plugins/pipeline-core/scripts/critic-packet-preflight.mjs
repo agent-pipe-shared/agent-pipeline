@@ -32,6 +32,7 @@ import { spawnSync } from "node:child_process";
 
 import { loadManifest } from "../lib/manifest.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+import { sha256Canonical } from "../lib/review-economy.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { deriveCriticExportView, validateCriticExportAuthorization } from "../lib/critic-export-policy.mjs";
@@ -41,7 +42,7 @@ import {
   validateCriticPacketGovernance,
 } from "../lib/critic-packet-governance.mjs";
 import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
-import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
+import { createLocalDispatchEvidenceBinding, evaluateReviewAdmission, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import { createDiagnosticBundle, materializeDiagnosticBundle, revalidateDiagnosticBundle, validateDiagnosticBundleShape } from "../lib/critic-diagnostic-packet.mjs";
 
 export const PACKET_SCHEMA = "pipeline.critic-candidate-packet.v1";
@@ -64,6 +65,7 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const REFERENCE_KINDS = new Set(["spec", "calibration", "guardrail", "evidence"]);
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 const SESSION_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
+const SIGNED_IMPORT_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
 
 export class CriticPacketError extends Error {
   constructor(code, message) {
@@ -306,6 +308,7 @@ function bindingsFor(packet) {
     diffPathsSha256: sha256(canonicalJson(packet.diffPaths)),
     governanceSha256: sha256(canonicalJson(packet.governance)),
     ...(packet.diagnostics === undefined ? {} : { diagnosticsSha256: sha256(canonicalJson(packet.diagnostics)) }),
+    ...(packet.coordinatorOnly === undefined ? {} : { coordinatorOnlySha256: sha256(canonicalJson(packet.coordinatorOnly)) }),
   };
 }
 function recordBody(packet, revision, priorStateDigest, phase, body, timestamp) {
@@ -318,7 +321,43 @@ function validatePacketShape(packet) {
   const expected = bindingsFor(packet);
   if (JSON.stringify(expected) !== JSON.stringify(packet.bindings)) fail("CPP-DIGEST", "Packet binding digest mismatch.");
   if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding, packet.route);
+  if (packet.coordinatorOnly !== undefined) {
+    const coordinator = normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate);
+    const taskId = coordinator.localDispatchEvidence?.taskId ?? coordinator.signedQualityImportAnchor?.taskId;
+    if (taskId !== packet.request?.taskId) fail("CPP-COORDINATOR-BINDING", "Coordinator-only binding does not name the packet task.");
+  }
   if (packet.diagnostics !== undefined && !validateDiagnosticBundleShape(packet.diagnostics)) fail("CPP-DIAGNOSTIC", "Invalid diagnostic bundle.");
+}
+
+function normalizeCoordinatorOnly(value, candidate) {
+  if (exactKeys(value, ["signedQualityImportAnchor"])) {
+    const anchor = value.signedQualityImportAnchor;
+    if (!exactKeys(anchor, ["schema", "intentSha256", "integrationCommit", "baseCommit", "candidateCommit", "taskId"])
+      || anchor.schema !== SIGNED_IMPORT_ANCHOR_SCHEMA
+      || !SHA256.test(anchor.intentSha256 ?? "")
+      || !OID.test(anchor.integrationCommit ?? "") || anchor.integrationCommit.length !== candidate.commit.length
+      || !OID.test(anchor.baseCommit ?? "") || anchor.baseCommit.length !== candidate.commit.length
+      || anchor.candidateCommit !== candidate.commit || anchor.baseCommit !== candidate.base
+      || !isSafeTaskId(anchor.taskId) || anchor.taskId !== `signed-import-${anchor.intentSha256}`) {
+      fail("CPP-COORDINATOR-BINDING", "Signed import anchor is not closed or does not bind this candidate range.");
+    }
+    return Object.freeze({ signedQualityImportAnchor: Object.freeze({ ...anchor }) });
+  }
+  if (exactKeys(value, ["localDispatchEvidence"])) {
+    const binding = value.localDispatchEvidence;
+    if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])
+      || binding.schema !== "pipeline.local-dispatch-evidence.v1"
+      || !isSafeTaskId(binding.taskId) || binding.recordPath !== `evidence/dispatch-record-${binding.taskId}.json`
+      || !SHA256.test(binding.recordSha256 ?? "") || !OID.test(binding.sourceCandidateCommit ?? "")
+      || binding.sourceCandidateCommit.length !== candidate.commit.length || binding.reviewCandidateCommit !== candidate.commit
+      || binding.snapshotId !== sha256Canonical({ schema: binding.schema, taskId: binding.taskId,
+        recordPath: binding.recordPath, recordSha256: binding.recordSha256,
+        sourceCandidateCommit: binding.sourceCandidateCommit, reviewCandidateCommit: binding.reviewCandidateCommit })) {
+      fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
+    }
+    return Object.freeze({ localDispatchEvidence: Object.freeze({ ...binding }) });
+  }
+  fail("CPP-COORDINATOR-BINDING", "Coordinator-only packet binding is invalid.");
 }
 function packetContext(controlRoot, packetId) {
   if (!PACKET_ID.test(packetId)) fail("CPP-ARGUMENT", "packetId must be 32 lowercase hex characters.");
@@ -429,7 +468,8 @@ function revalidateCandidate(packet) {
   }
 }
 
-export function prepareCandidatePacket(options, { now = new Date(), nonce = randomBytes } = {}) {
+export function prepareCandidatePacket(options, { now = new Date(), nonce = randomBytes, evaluateSignedQualityImportReviewAdmissionFn = evaluateSignedQualityImportReviewAdmission,
+  createLocalDispatchEvidenceBindingFn = createLocalDispatchEvidenceBinding } = {}) {
   try {
     const repoRoot = realpathSync(resolve(options.repoRoot));
     const commonDirObserved = gitText(repoRoot, ["rev-parse", "--git-common-dir"]);
@@ -444,8 +484,20 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const base = assertOid(options.baseCommit, objectFormat, "baseCommit");
     const candidate = assertOid(options.candidateCommit, objectFormat, "candidateCommit");
     const rulesetOid = assertOid(options.rulesetOid, objectFormat, "rulesetOid");
-    const reviewAdmission = evaluateReviewAdmission({ root: repoRoot, taskId: options.taskId, candidateCommit: candidate });
-    if (!reviewAdmission.ok) fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${reviewAdmission.readFindings.join("; ")}`);
+    const signedImportAnchor = options.signedQualityImportAnchor === undefined
+      ? undefined : normalizeCoordinatorOnly({ signedQualityImportAnchor: options.signedQualityImportAnchor }, { base, commit: candidate }).signedQualityImportAnchor;
+    const reviewAdmission = signedImportAnchor === undefined
+      ? evaluateReviewAdmission({ root: repoRoot, taskId: options.taskId, candidateCommit: candidate })
+      : evaluateSignedQualityImportReviewAdmissionFn({ root: repoRoot, anchor: signedImportAnchor });
+    if (!reviewAdmission.ok) fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${(reviewAdmission.readFindings ?? reviewAdmission.findings ?? []).join("; ")}`);
+    if (signedImportAnchor !== undefined && reviewAdmission.code !== "signed-quality-import-review-admitted") fail("CPP-REVIEW-ADMISSION", "Signed import review admission did not return its distinct success code.");
+    if (signedImportAnchor !== undefined && options.taskId !== signedImportAnchor.taskId) fail("CPP-COORDINATOR-BINDING", "Packet task identity does not match the signed import intent.");
+    const localDispatchEvidence = signedImportAnchor === undefined
+      ? createLocalDispatchEvidenceBindingFn({ root: repoRoot, taskId: options.taskId, reviewCandidateCommit: candidate })
+      : undefined;
+    const coordinatorOnly = signedImportAnchor === undefined
+      ? normalizeCoordinatorOnly({ localDispatchEvidence }, { base, commit: candidate })
+      : normalizeCoordinatorOnly({ signedQualityImportAnchor: signedImportAnchor }, { base, commit: candidate });
     const baseType = gitText(repoRoot, ["cat-file", "-t", base]);
     if (gitText(repoRoot, ["cat-file", "-t", candidate]) !== "commit") fail("CPP-REF", "Candidate ref is not a commit.");
     if (baseType === "commit") {
@@ -521,6 +573,7 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
       diffPaths,
       references: normalizeReferences(options.references ?? [], candidateByPath),
       governance,
+      coordinatorOnly,
       ...(diagnostics === undefined ? {} : { diagnostics }),
       checkout,
       cleanupCapability,

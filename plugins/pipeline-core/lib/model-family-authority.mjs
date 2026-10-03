@@ -124,6 +124,8 @@ function migrationValid(migration, predecessor, assignments, routeSource, target
     || old.approvalSha256 !== migration.historicApprovalIntentSha256)) return null;
   const old = historicResults[0];
   const history = predecessor.historicRouteSource;
+  const historicSource = sourceProjection(history);
+  if (!historicSource) return null;
   const oldMembers = new Map();
   const oldUnavailable = new Set();
   for (const t of history.taskRoutes ?? []) {
@@ -146,21 +148,31 @@ function migrationValid(migration, predecessor, assignments, routeSource, target
   const seen = new Set();
   const projectedHistoricMembers = new Set();
   const expected = new Map(assignments.map((a) => [tuple(a.runner, a.taskRoute, a.role, a.effort), a]));
+  // A migration request binds every available target, including explicit new
+  // approvals absent from the authenticated predecessor. Omitting those rows
+  // cannot turn a partial proposal into complete first-adoption authority.
+  const available = routeSource.taskRoutes.filter((t) => t.state !== "unavailable");
+  if (available.length !== assignments.length || available.some((t) => !expected.has(tuple(t.runner, t.taskRoute, t.role, t.effort)))) return null;
   for (const row of projection) {
     if (!own(row, ["runner", "taskRoute", "role", "effort", "historicRole", "historicEffort", "historicModelId", "familyId", "minimumVersion", "adapterContractSha256"])
-      || typeof row.historicModelId !== "string" || !row.historicModelId
+      || (row.historicModelId !== null && (typeof row.historicModelId !== "string" || !row.historicModelId))
       || !Array.isArray(row.minimumVersion) || !SHA.test(row.adapterContractSha256)) return null;
     const k = tuple(row.runner, row.taskRoute, row.role, row.effort);
     const a = expected.get(k);
     const oldKey = tuple(row.runner, row.historicRole, row.historicEffort);
     const slot = oldSlots.get(oldKey);
-    if (seen.has(k) || !a || !slot || slot.policy.approved.length !== 1
+    const historicTask = historicSource.tasks.get(tuple(row.runner, row.taskRoute));
+    if (seen.has(k) || !a || !historicTask || historicTask.state === "unavailable"
+      || historicTask.role !== row.historicRole || historicTask.effort !== row.historicEffort
+      || historicTask.role !== row.role
       || !(oldMembers.get(oldKey)?.has(row.taskRoute))
-      || slot.policy.approved[0].modelId !== row.historicModelId
       || a.familyId !== row.familyId || canonical(a.minimumVersion) !== canonical(row.minimumVersion)
       || a.adapterContractSha256 !== row.adapterContractSha256) return null;
+    if (slot) {
+      if (slot.policy.approved.length !== 1 || slot.policy.approved[0].modelId !== row.historicModelId) return null;
+      projectedHistoricMembers.add(tuple(oldKey, row.taskRoute));
+    } else if (row.historicModelId !== null) return null;
     seen.add(k);
-    projectedHistoricMembers.add(tuple(oldKey, row.taskRoute));
   }
   if (seen.size !== expected.size || migration.adapterContractSha256s.some((h) => !assignments.some((a) => a.adapterContractSha256 === h))) return null;
   const expectedHistoricMembers = new Set();

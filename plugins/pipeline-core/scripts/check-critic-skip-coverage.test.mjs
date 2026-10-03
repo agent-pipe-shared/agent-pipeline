@@ -8,9 +8,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, verifyCriticDispositionAddendumForRecord, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+import { DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, createLocalDispatchEvidenceBinding, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, evaluateSignedQualityImportReviewAdmission, readCommitChangedPaths, verifyCriticDispositionAddendumForRecord, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+import { sha256Canonical } from "../lib/review-economy.mjs";
 
 const SHA = "a".repeat(40);
 const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
@@ -54,6 +55,33 @@ const boundReview = (recordBytes, taskId = "UNDELIVERED") => ({
     references: [{ kind: "evidence", path: `evidence/dispatch-record-${taskId}.json`, candidateBlobOid: recordBlobOid }] },
   critic: { reviewPass: true, candidate: { commit: reviewCandidateCommit } }, criticReceiptSha256 }),
 });
+function localDispatchSnapshot(taskId, recordBytes, overrides = {}) {
+  const targetReviewCommit = overrides.reviewCandidateCommit ?? reviewCandidateCommit;
+  const record = JSON.parse(recordBytes);
+  const binding = {
+    schema: "pipeline.local-dispatch-evidence.v1",
+    taskId,
+    recordPath: `evidence/dispatch-record-${taskId}.json`,
+    recordSha256: sha256(recordBytes),
+    sourceCandidateCommit: record.candidateCommit,
+    reviewCandidateCommit: targetReviewCommit,
+    ...overrides,
+  };
+  return { ...binding, snapshotId: sha256Canonical(binding) };
+}
+function boundLocalDispatchReview(recordBytes, taskId, localDispatchEvidence = localDispatchSnapshot(taskId, recordBytes), root = null) {
+  const gitRead = root
+    ? (args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim()
+    : (args) => args[1] === "--git-common-dir" ? ".git" : recordBlobOid;
+  return {
+    gitRead,
+    readBoundCriticReceipt: () => ({
+      packet: { request: { taskId }, candidate: { commit: localDispatchEvidence.reviewCandidateCommit }, references: [],
+        coordinatorOnly: { localDispatchEvidence } },
+      critic: { reviewPass: true, candidate: { commit: localDispatchEvidence.reviewCandidateCommit } }, criticReceiptSha256,
+    }),
+  };
+}
 function reconcileIndex(entry) { return json({ schema: LEGACY_RECONCILE_SCHEMA, entries: [entry] }); }
 function reconciledNoCommitRecord(taskId = "HISTORICAL") {
   return v3(taskId, { outcome: "partial-analysis-only", commits: [], criticRequired: required() });
@@ -77,6 +105,57 @@ function addendum(taskId, recordBytes, criticBytes) {
     criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: SHA,
       path: `evidence/critic-${taskId}.md`, sha256: sha256(criticBytes) },
   };
+}
+
+function signedImportFixture({ stamp = true, changedPath = false, alterManifest = false, wrongPrefix = false, mismatchedTimestamps = false,
+  timestamp = "20261002142748" } = {}) {
+  const paths = [
+    ["codex", "plugins/pipeline-core/.codex-plugin/plugin.json"],
+    ["claude", "plugins/pipeline-core/.claude-plugin/plugin.json"],
+    ["antigravity", "plugins/pipeline-core/plugin.json"],
+  ];
+  const initialFiles = { ".gitignore": "/evidence/\n", "source.txt": "base\n" };
+  for (const [runner, path] of paths) {
+    initialFiles[path] = json({ name: "pipeline-core", version: `0.7.0+${runner}.20261001120000.abcdef12` });
+  }
+  const root = fixture(initialFiles);
+  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  const blob = (commit, path) => execFileSync("git", ["show", `${commit}:${path}`], { cwd: root, encoding: "utf8" });
+  git("init", "-q");
+  git("add", ".gitignore", "source.txt", ...paths.map(([, path]) => path));
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "base source");
+  writeFileSync(join(root, "source.txt"), "integrated source\n");
+  git("add", "source.txt");
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "signed import candidate");
+  const integrationCommit = git("rev-parse", "HEAD");
+  const baseCommit = git("rev-parse", `${integrationCommit}^`);
+  const intentSha256 = "a".repeat(64);
+  let candidateCommit = integrationCommit;
+  if (stamp) {
+    const prefix = wrongPrefix ? "ffffffff" : integrationCommit.slice(0, 8);
+    for (const [runner, path] of paths) {
+      const rawBefore = blob(integrationCommit, path);
+      const before = JSON.parse(rawBefore);
+      const versionTimestamp = mismatchedTimestamps && runner === "claude" ? "20261002142749" : timestamp;
+      const after = `0.7.0+${runner}.${versionTimestamp}.${prefix}`;
+      writeFileSync(join(root, path), rawBefore.replace(JSON.stringify(before.version), JSON.stringify(after)));
+    }
+    if (alterManifest) {
+      const [runner, path] = paths[0];
+      const value = JSON.parse(blob(integrationCommit, path));
+      value.name = "different-package";
+      const versionTimestamp = mismatchedTimestamps && runner === "claude" ? "20261002142749" : timestamp;
+      value.version = `0.7.0+${runner}.${versionTimestamp}.${prefix}`;
+      writeFileSync(join(root, path), json(value));
+    }
+    if (changedPath) writeFileSync(join(root, "outside-version-surface.txt"), "unexpected\n");
+    git("add", "-A");
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "stamp candidate");
+    candidateCommit = git("rev-parse", "HEAD");
+  }
+  const anchor = { schema: "pipeline.signed-quality-import-review-anchor.v1", intentSha256,
+    integrationCommit, baseCommit, candidateCommit, taskId: `signed-import-${intentSha256}` };
+  return { root, anchor };
 }
 
 function abandonedRecoveryFiles() {
@@ -233,6 +312,93 @@ test("Critic addendum checks the reviewed candidate's real Git blob and explicit
   assert.equal(passing.ok, true, passing.readFindings.join("\n"));
   const unreferenced = evaluate(root, [], { readBoundCriticReceipt: () => ({ ...review, packet: { ...review.packet, references: [] } }) });
   assert.match(unreferenced.readFindings.join("\n"), /does not bind the exact immutable dispatch record/u);
+});
+
+test("ignored historical dispatch records bind through the consumed private snapshot only", () => {
+  const taskId = "HISTORICAL-AUTHORED";
+  const root = fixture({ "source.txt": "reviewed source\n", "evidence/.keep": "" });
+  writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  git("init", "-q");
+  git("add", ".gitignore", "source.txt");
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "historical candidate");
+  const candidateCommit = git("rev-parse", "HEAD");
+  assert.doesNotThrow(() => git("check-ignore", "-q", `evidence/dispatch-record-${taskId}.json`));
+  const record = v3(taskId, { candidateCommit, outcome: "completed", resultSha256: sha256("Done."),
+    commits: [candidateCommit], report: { text: "Private implementation prose that must not be exported.", changedFiles: ["source.txt"] },
+    criticRequired: required() });
+  const recordBytes = json(record);
+  const criticBytes = "Independent Critic review of the historical source range.\n";
+  const recordPath = `evidence/dispatch-record-${taskId}.json`;
+  writeFileSync(join(root, recordPath), recordBytes);
+  writeFileSync(join(root, `evidence/critic-${taskId}.md`), criticBytes);
+  const entry = { ...addendum(taskId, recordBytes, criticBytes), candidateCommit, reviewCandidateCommit: candidateCommit,
+    criticEvidence: { ...addendum(taskId, recordBytes, criticBytes).criticEvidence, candidateCommit } };
+  assert.throws(() => execFileSync("git", ["cat-file", "-e", `${candidateCommit}:${recordPath}`], { cwd: root, stdio: "ignore" }));
+  const binding = localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit });
+  assert.deepEqual(createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit: candidateCommit }), binding);
+  writeFileSync(join(root, criticDispositionAddendumPath(taskId)), json(entry));
+  const valid = evaluate(root, ["source.txt"], boundLocalDispatchReview(recordBytes, taskId, binding, root));
+  assert.equal(valid.ok, true, valid.readFindings.join("\n"));
+  assert.equal(valid.criticEvidenceRecordCount, 1);
+
+  for (const malformed of [
+    localDispatchSnapshot("OTHER-TASK", recordBytes, { reviewCandidateCommit: candidateCommit }),
+    localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit, sourceCandidateCommit: "f".repeat(40) }),
+    localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit, recordSha256: "f".repeat(64) }),
+    { ...localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit }), snapshotId: "f".repeat(64) },
+    { ...localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit }), recordContent: record.report.text },
+  ]) {
+    const result = evaluate(root, ["source.txt"], boundLocalDispatchReview(recordBytes, taskId, malformed, root));
+    assert.match(result.readFindings.join("\n"), /private local dispatch snapshot does not bind/u);
+  }
+
+  const exposed = localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit });
+  const exposedBound = boundLocalDispatchReview(recordBytes, taskId, exposed, root);
+  exposedBound.readBoundCriticReceipt = () => ({
+    packet: { request: { taskId }, candidate: { commit: candidateCommit },
+      references: [{ kind: "evidence", path: `evidence/dispatch-record-${taskId}.json`, candidateBlobOid: recordBlobOid }],
+      coordinatorOnly: { localDispatchEvidence: exposed } },
+    critic: { reviewPass: true, candidate: { commit: candidateCommit } }, criticReceiptSha256,
+  });
+  assert.match(evaluate(root, ["source.txt"], exposedBound).readFindings.join("\n"),
+    /private local dispatch snapshot does not bind/u);
+
+  const arbitraryPacketOnly = evaluate(root, ["source.txt"], { gitRead: (args) => args[1] === "--git-common-dir" ? ".git" : recordBlobOid });
+  assert.notEqual(arbitraryPacketOnly.ok, true);
+  assert.match(arbitraryPacketOnly.readFindings.join("\n"), /consumed Critic receipt is unavailable/u);
+});
+
+test("signed quality import admission rejects unsigned imports and requires clean version-only descendants", () => {
+  const valid = signedImportFixture();
+  const unsigned = evaluateSignedQualityImportReviewAdmission(valid);
+  assert.equal(unsigned.ok, false);
+  assert.equal(unsigned.code, "signed-import-not-authorized", JSON.stringify(unsigned));
+
+  const exactImport = signedImportFixture({ stamp: false });
+  const unsignedExact = evaluateSignedQualityImportReviewAdmission(exactImport);
+  assert.equal(unsignedExact.code, "signed-import-not-authorized");
+
+  const withExtraPath = signedImportFixture({ changedPath: true });
+  assert.equal(evaluateSignedQualityImportReviewAdmission(withExtraPath).code, "signed-import-nonversion-path");
+
+  const changedManifest = signedImportFixture({ alterManifest: true });
+  assert.equal(evaluateSignedQualityImportReviewAdmission(changedManifest).code, "signed-import-nonversion-manifest-change");
+
+  const wrongPrefix = signedImportFixture({ wrongPrefix: true });
+  assert.equal(evaluateSignedQualityImportReviewAdmission(wrongPrefix).code, "signed-import-version-binding");
+
+  const splitTimestamp = signedImportFixture({ mismatchedTimestamps: true });
+  assert.equal(evaluateSignedQualityImportReviewAdmission(splitTimestamp).code, "signed-import-version-timestamp");
+
+  const wrongTask = { ...valid, anchor: { ...valid.anchor, taskId: "ordinary-worker" } };
+  assert.equal(evaluateSignedQualityImportReviewAdmission(wrongTask).code, "signed-import-anchor-shape");
+
+  const wrongBase = { ...valid, anchor: { ...valid.anchor, baseCommit: "f".repeat(40) } };
+  assert.equal(evaluateSignedQualityImportReviewAdmission(wrongBase).code, "signed-import-base-mismatch");
+
+  const wrongCandidate = { ...valid, anchor: { ...valid.anchor, candidateCommit: valid.anchor.baseCommit } };
+  assert.equal(evaluateSignedQualityImportReviewAdmission(wrongCandidate).code, "signed-import-candidate-ancestry");
 });
 
 test("Critic addendum rejects record drift, evidence drift, forged binding and orphan files", () => {

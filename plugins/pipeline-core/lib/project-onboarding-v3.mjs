@@ -36,6 +36,7 @@ import { isSessionCapabilityFailurePhase, observeCodexOnboardingCapabilities } f
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import {
   applyOnboardingContinuityRepair,
+  applyOnboardingIntakeCapture,
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   classifyOnboardingContinuity,
@@ -59,6 +60,8 @@ import {
   reconstructOnboardingKickoffPromotionPlan,
 } from "./onboarding-continuity.mjs";
 import { resolveInitialAnswersState } from "./onboarding-initial-answers-state.mjs";
+import { CLAUDE_INITIAL_PROMPT_REFERENCE_SCHEMA, readClaudeInitialPromptPointerAfterConsent } from "./claude-initial-prompt-pointer.mjs";
+import { CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA, readClaudeIntakePromptCapture } from "./claude-intake-prompt-capture.mjs";
 import { inspectConfirmedIntakeLanguageProjection } from "./onboarding-later-language.mjs";
 import { applyRunnerProfileMigrationV3, inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3, renderCanonicalV3Manifest } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -1785,7 +1788,8 @@ function persistedPoAuthority(root, fs) {
         ? { specSha256: continuity.spec.sha256 }
         : {}),
     });
-    if (!lifecycle.ok) return { status: "drifted", nextAction: lifecycle.nextAction };
+    if (!lifecycle.ok) return { status: "drifted", nextAction: lifecycle.nextAction,
+      lifecycleStatus: lifecycle.status, planPath: state.planApproval?.poGateAuthority?.planPath ?? state.activeFeature?.planPath ?? null };
     if (lifecycle.status === null) return { status: "absent", lifecycleStatus: null };
     if (lifecycle.status === "draft"
       || lifecycle.status === "awaiting-approval") {
@@ -1798,6 +1802,8 @@ function persistedPoAuthority(root, fs) {
       || continuity?.spec?.path !== approval.specPath) return { status: "drifted" };
     return {
       status: "observed",
+      planPath: approval.planPath,
+      specPath: approval.specPath,
       planSha256: approval.planSha256,
       specSha256: approval.specSha256,
       lifecycleStatus: lifecycle.status,
@@ -2541,6 +2547,7 @@ const INTAKE_DESIGN_ANSWERS_PLACEHOLDER = "<PO_INTAKE_DESIGN_ANSWERS_JSON>";
 const INTAKE_TEXT_FILE = "scratch/onboarding-intake.txt";
 const INTAKE_EXISTING_FILE_PLACEHOLDER = "<existing-repository-file>";
 const INTAKE_EXISTING_FILE_SHA256_PLACEHOLDER = "<sha256-of-existing-file>";
+const INTAKE_TEXT_TURN_REF_PLACEHOLDER = "<native-text-turn-reference-json>";
 
 function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, initialLanguage = null) {
   const values = checkpoint.status === "present"
@@ -2558,20 +2565,25 @@ function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, in
     ] : []),
     ...(needsLanguage ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
     ...(needsProfile ? [{ name: "profile", encoding: "utf8", trim: true, minBytes: 4, maxBytes: 7, singleLine: true, rejectNul: true }] : []),
-    { name: "projectDescription", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
+    ...(runner === "claude" ? [] : [
+      { name: "projectDescription", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
+    ]),
   ];
   const argv = [ONBOARDING_SCRIPT, "intake-consent-apply", "--root", root, "--granted"];
   if (needsGitAuthor) argv.push("--git-author-name", INTAKE_GIT_AUTHOR_NAME_PLACEHOLDER, "--git-author-email", INTAKE_GIT_AUTHOR_EMAIL_PLACEHOLDER);
   if (needsLanguage) argv.push("--language", INTAKE_LANGUAGE_PLACEHOLDER);
   if (needsProfile) argv.push("--profile", INTAKE_PROFILE_PLACEHOLDER);
-  argv.push("--text-file", INTAKE_TEXT_FILE, "--activate", "--runner", runner);
+  if (runner !== "claude") argv.push("--text-file", INTAKE_TEXT_FILE);
+  argv.push("--activate", "--runner", runner);
   return {
     kind: "collect-input",
     inputs,
     mutation: false,
     requiresConfirmation: false,
     ...(needsLanguage && initialLanguage !== null ? { reviewedDefaults: { language: { value: initialLanguage, source: "confirmed-initial-answer", requiresConfirmation: true } } } : {}),
-    guidance: `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. ${needsLanguage && initialLanguage !== null ? `The earlier confirmed onboarding language was ${initialLanguage}; present it as a default, but accept a different explicitly confirmed intake language. The later intake answer governs project material, and the CLI reports the difference for audit. ` : ""}If the PO's material already exists in a regular file inside this repository, use existingFileApplyAction directly with that file's repository-relative path and SHA-256; do not copy it to scratch or repeat its contents. If material exists only in chat, write the bytes once to ${INTAKE_TEXT_FILE} and use applyAction. A host turn reference is unavailable until its capture adapter is installed. Replace only typed placeholders with the matching verbatim answers. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
+    guidance: runner === "claude"
+      ? `apply explicit consent and only the still-unresolved typed values listed in inputs. Keep this first consent action separate from material capture. The native UserPromptSubmit hook may have supplied an opaque reference for the current turn; after consent is durably applied, use the following intake-capture action with that exact reference. Do not copy prompt text, transcript paths, or derive a reference. If the reference is unavailable, use existingFileApplyAction only for material already in a regular repository file. ${needsLanguage && initialLanguage !== null ? `The earlier confirmed onboarding language was ${initialLanguage}; present it as a default, but accept a different explicitly confirmed intake language. ` : ""}Replace only typed placeholders with matching answers. Git author fields are omitted when repository-local Git already resolves them.`
+      : `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. ${needsLanguage && initialLanguage !== null ? `The earlier confirmed onboarding language was ${initialLanguage}; present it as a default, but accept a different explicitly confirmed intake language. The later intake answer governs project material, and the CLI reports the difference for audit. ` : ""}If the PO's material already exists in a regular file inside this repository, use existingFileApplyAction directly with that file's repository-relative path and SHA-256; do not copy it to scratch or repeat its contents. If material exists only in chat, write the bytes once to ${INTAKE_TEXT_FILE} and use applyAction. Replace only typed placeholders with the matching verbatim answers. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
     applyAction: commandAction(argv, true, true, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"]),
     existingFileApplyAction: commandAction(
       [...argv.slice(0, argv.indexOf("--text-file")), "--text-file", INTAKE_EXISTING_FILE_PLACEHOLDER,
@@ -2595,6 +2607,24 @@ const INTAKE_MATERIAL_TEXT_MAX_BYTES = 1_000_000;
 // consumer in this file validates that flag; it is descriptive metadata for
 // the caller collecting the value.
 function intakeCaptureAction(root, runner) {
+  if (runner === "claude") return {
+    kind: "collect-input",
+    input: { name: "textTurnRef", encoding: "json", trim: true, minBytes: 1, maxBytes: 8192, singleLine: true, rejectNul: true },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "Consent is already recorded. Supply only the opaque native UserPromptSubmit reference delivered in trusted hook context, then run applyAction. The reader resolves exact host-observed bytes after consent. Never supply a transcript path, paste prompt text as a reference, or use a guessed identifier. If no native reference is available, use existingFileApplyAction only for an existing regular repository file.",
+    applyAction: commandAction(
+      [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", root, "--text-turn-ref", INTAKE_TEXT_TURN_REF_PLACEHOLDER,
+        "--activate", "--runner", runner],
+      true, true, INTAKE_CAPTURE_APPLY_SCHEMA, ["applied"],
+    ),
+    existingFileApplyAction: commandAction(
+      [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", root, "--text-file", INTAKE_EXISTING_FILE_PLACEHOLDER,
+        "--text-file-sha256", INTAKE_EXISTING_FILE_SHA256_PLACEHOLDER, "--activate", "--runner", runner],
+      true, true, INTAKE_CAPTURE_APPLY_SCHEMA, ["applied"],
+    ),
+    expected: { schema: SCHEMA, statuses: ["intake-required"] },
+  };
   return {
     kind: "collect-input",
     input: { name: "text", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
@@ -2618,6 +2648,49 @@ function intakeCaptureAction(root, runner) {
 // required` nextAction offered once at least one material-input chunk is
 // captured but the one bundled design-question round has not been answered
 // yet (checkpoint transactionState "design-questions-pending").
+function intakeTextTurnReferenceFailure(code, message = "native intake text reference is unavailable") {
+  const error = new Error(message);
+  error.code = code;
+  throw error;
+}
+
+/** Resolve only a closed reference published by the trusted Claude hook. */
+function readNativeIntakeTextTurn({ rootDir, textTurnRef }) {
+  let reference = textTurnRef;
+  if (typeof reference === "string") {
+    if (Buffer.byteLength(reference, "utf8") > 8192) intakeTextTurnReferenceFailure("INTAKE-TEXT-TURN-REF-TOO-LARGE");
+    try { reference = JSON.parse(reference); }
+    catch { intakeTextTurnReferenceFailure("INTAKE-TEXT-TURN-REF-MALFORMED"); }
+  }
+  if (reference === null || typeof reference !== "object" || Array.isArray(reference)) {
+    intakeTextTurnReferenceFailure("INTAKE-TEXT-TURN-REF-SHAPE");
+  }
+  let resolved;
+  if (reference.schema === CLAUDE_INITIAL_PROMPT_REFERENCE_SCHEMA) {
+    resolved = readClaudeInitialPromptPointerAfterConsent({ rootDir, sessionId: reference.sessionId, reference });
+  } else if (reference.schema === CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA) {
+    resolved = readClaudeIntakePromptCapture({ rootDir, sessionId: reference.sessionId, reference });
+  } else {
+    intakeTextTurnReferenceFailure("INTAKE-TEXT-TURN-REF-SCHEMA");
+  }
+  if (resolved.status !== "available" || typeof resolved.text !== "string") {
+    intakeTextTurnReferenceFailure(resolved.code ?? "INTAKE-TEXT-TURN-REF-UNAVAILABLE");
+  }
+  return resolved.text;
+}
+
+/** Apply the normal content-addressed intake writer to exact native text. */
+export function applyProjectOnboardingIntakeCapture({
+  rootDir, repositoryCapability = "local", text, textTurnRef, activate = false, deps = {},
+} = {}) {
+  if (textTurnRef !== undefined && textTurnRef !== null) {
+    if (text !== undefined && text !== null) intakeTextTurnReferenceFailure("INTAKE-TEXT-AND-REF-CONFLICT");
+    const resolvedText = readNativeIntakeTextTurn({ rootDir, textTurnRef });
+    return applyOnboardingIntakeCapture({ rootDir, repositoryCapability, text: resolvedText, activate, deps });
+  }
+  return applyOnboardingIntakeCapture({ rootDir, repositoryCapability, text, activate, deps });
+}
+
 function intakeDesignQuestionsAction(root, runner) {
   return {
     kind: "collect-input",
@@ -2953,11 +3026,25 @@ export const PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS = [
  */
 function designToImplementationHandoverAction(root, fs) {
   const authority = persistedPoAuthority(root, fs);
-  if (authority.status !== "observed" || authority.lifecycleStatus !== "approved") return null;
+  const reopenDesignAction = () => {
+    const byToken = "<recovery actor's name>";
+    return {
+      kind: "collect-input",
+      inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+      mutation: false,
+      requiresConfirmation: false,
+      guidance: "The current approval is stale. Collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.",
+      applyAction: commandAction([PO_AUTHORITY_REBIND_WRITER, "reopen-design", "--by", byToken], true, true,
+        "pipeline.project-onboarding.v4", ["ready"]),
+    };
+  };
+  if (authority.status === "drifted" && authority.nextAction === "reopen-design") return reopenDesignAction();
+  if (authority.status !== "observed" || !["approved", "implementing"].includes(authority.lifecycleStatus)) return null;
   // The approved PRD is the sole human decision. Its closed greenfield design
   // package may now be rendered deterministically before implementation; the
   // driver follows this published action and re-enters before it can offer set-phase.
-  const architecture = inspectArchitectureDesign(root, authority.planPath);
+  const architecture = (fs.inspectArchitectureDesign ?? inspectArchitectureDesign)(root, authority.planPath,
+    fs.architectureDesignDeps ?? {});
   if (architecture.ok && architecture.status === "materialization-required") return commandAction(
     [PO_AUTHORITY_REBIND_WRITER, "materialize-architecture"],
     true,
@@ -2965,6 +3052,22 @@ function designToImplementationHandoverAction(root, fs) {
     "pipeline.architecture-design-materialization.v1",
     ["materialized"],
   );
+  if (!architecture.ok) {
+    if (["approved", "implementing"].includes(authority.lifecycleStatus)) {
+      const action = reopenDesignAction();
+      action.guidance = `The approved PRD is immutable and its architecture evidence is invalid (${architecture.code ?? "ARCHITECTURE-DESIGN-INVALID"}). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.`;
+      return action;
+    }
+    return {
+      kind: "architecture-design-required",
+      prdPath: architecture.prdPath ?? authority.planPath,
+      code: architecture.code ?? "ARCHITECTURE-DESIGN-INVALID",
+      guidance: architecture.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED"
+        ? "Complete the architecture design block in this exact PO-bound draft PRD before the one final design-workflow package approval."
+        : "The handover cannot enter implementation until the current PO-bound architecture design and package readback validate; address this exact diagnostic in draft, then inspect again.",
+    };
+  }
+  if (authority.lifecycleStatus === "implementing") return null;
   // NVA-GF-GREENFIELD-UNBORNHEAD-1: set-phase deliberately refuses a fresh
   // project's missing/UNCONFIGURED_VERIFY calibration unless the real command
   // is supplied in the SAME transaction. Publishing the historical bare
@@ -3256,17 +3359,51 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       // PRD/Spec pair that enters implementation.  A generated draft is not
       // exempt: it may be expanded before promotion, and an exemption here
       // previously re-opened the unauthenticated `approve-plan --by` path.
-      const needsAcknowledgement = acknowledgement !== null
+      // Epic/feature approval belongs to the later complete v2 package. The
+      // generated staging draft is not a separate PO decision; bind it as an
+      // unapproved design submission and keep implementation closed until the
+      // final package proof is verified by pipeline-state.mjs.
+      const checkpointProfile = checkpoint.value?.values?.profile ?? null;
+      const finalPackageProfile = new Set(["epic", "feature"]).has(checkpointProfile);
+      const needsAcknowledgement = !finalPackageProfile && acknowledgement !== null
         && acknowledgement.acknowledged === false;
-      if (needsAcknowledgement) {
+      // The generated Spec marker is a technical hash binding, not a PO
+      // decision. Check it independently of the profile-scoped early
+      // acknowledgement so final-package profiles receive the same exact
+      // mechanical repair before bootstrap-bind-plan can report plain text.
+      if (finalPackageProfile || needsAcknowledgement) {
         let markerPlan;
         try {
           markerPlan = (fs.planOnboardingIntakeSpecMarker ?? planOnboardingIntakeSpecMarker)({
             rootDir: root, repositoryCapability: repository.mode, spawn: fs.spawnSync,
             runner, intent,
           });
+          const action = markerPlan?.nextAction;
+          const actionExpected = action?.expected;
+          const actionArgv = action?.argv;
+          const actionIsBoundMechanicalRepair = markerPlan?.status === "repair-required"
+            && SHA256_RE.test(markerPlan.planSha256 ?? "")
+            && action?.kind === "command"
+            && action.executable === process.execPath
+            && action.mutation === true
+            && action.requiresConfirmation === false
+            && action.executionBoundary === "local-process"
+            && action.invocation === "agent-tool-call"
+            && Array.isArray(actionArgv)
+            && actionArgv.every((part) => typeof part === "string")
+            && actionArgv[0] === join(fileURLToPath(new URL("..", import.meta.url)), "scripts", "project-onboarding-v3.mjs")
+            && actionArgv[1] === "intake-spec-marker-apply"
+            && actionArgv.includes(root)
+            && actionArgv.includes(markerPlan.planSha256)
+            && actionArgv.includes("--activate")
+            && actionExpected?.schema === "pipeline.onboarding-intake-spec-marker-apply.v1"
+            && Array.isArray(actionExpected.statuses)
+            && actionExpected.statuses.length === 2
+            && actionExpected.statuses[0] === "applied"
+            && actionExpected.statuses[1] === "already-current";
           if (!markerPlan || !["repair-required", "already-current"].includes(markerPlan.status)
-            || (markerPlan.status === "repair-required" && !markerPlan.nextAction)) {
+            || (markerPlan.status === "repair-required" && !actionIsBoundMechanicalRepair)
+            || (markerPlan.status === "already-current" && markerPlan.nextAction !== null)) {
             throw new Error("invalid marker observation");
           }
         } catch {

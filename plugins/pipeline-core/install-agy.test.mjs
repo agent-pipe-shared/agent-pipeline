@@ -80,6 +80,25 @@ test("Agy installer checks Git source before a managed copy can be bound or refr
   assert.equal(calls, 2);
   assert.deepEqual(verifyAntigravityInstallerSource(input, { observeTopology: () => managed, observeSource: () => ({ status: "rejected" }) }),
     { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE" });
+  const marketplace = "/marketplace/plugins/pipeline-core";
+  const copied = { ...input, sourcePluginRoot: marketplace, attestationSourceRoot: input.sourcePluginRoot, scope: "global" };
+  let copyChecks = 0;
+  const verifyCopy = (_runner, roots) => {
+    copyChecks += 1;
+    assert.deepEqual(roots, { sourcePluginRoot: input.sourcePluginRoot, installedPluginRoot: marketplace });
+    return { status: "ready" };
+  };
+  assert.deepEqual(verifyAntigravityInstallerSource(copied, { observeTopology: () => empty, observeSource: verifyCopy }), { status: "attestable-source" });
+  assert.deepEqual(verifyAntigravityInstallerSource({ ...copied, scope: "workspace" }, { observeTopology: () => empty, observeSource: verifyCopy }), { status: "attestable-source" });
+  assert.equal(copyChecks, 2, "gitless direct copies must be validated too");
+  const rejected = refreshAntigravityInstallation({ configRoot: input.configRoot, workspaceRoot: input.workspaceRoot, approvedSourceRoot: marketplace, attestationSourceRoot: input.sourcePluginRoot, scope: "global", globalChangeApproved: true }, {
+    observeTopology: () => empty,
+    observeSource: () => ({ status: "rejected" }),
+    runCli: () => { throw new Error("source mismatch must refuse before invoking CLI"); },
+    writeInstalledReceipt: () => { throw new Error("source mismatch must never write a receipt"); },
+  });
+  assert.equal(rejected.status, "refused");
+  assert.equal(rejected.reason, "ATR-SOURCE-ATTESTATION-UNAVAILABLE");
 });
 
 test("Agy optional autonomous settings preserve unrelated keys and refuse malformed input", (t) => {
@@ -178,16 +197,20 @@ test("Agy source install writes a receipt readable by the first preflight in an 
   const controller = createGovernanceScopeController({ hostStateRoot: join(base, "scope-state") });
   const plan = controller.planDecision({ rootDir: workspaceRoot, decision: "enroll", by: "Fixture Owner" });
   controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  const marketplaceRoot = join(base, "marketplace", "plugins", "pipeline-core");
+  cpSync(sourcePluginRoot, marketplaceRoot, { recursive: true });
+  assert.equal(existsSync(join(base, "marketplace", ".git")), false);
+  assert.equal(verifyAntigravityInstallerSource({ configRoot, workspaceRoot, sourcePluginRoot: marketplaceRoot, attestationSourceRoot: sourcePluginRoot, scope: "global" }).status, "attestable-source");
   const runCli = (argv) => {
     if (argv[0] === "--version") return { status: "ok", version: "1.2.12" };
     if (argv[1] === "install") {
-      cpSync(sourcePluginRoot, installedPluginRoot, { recursive: true });
+      cpSync(marketplaceRoot, installedPluginRoot, { recursive: true });
       writeFileSync(join(configRoot, "config", "import_manifest.json"), '{"imports":[{"name":"agent-pipeline-core"}]}\n');
     }
     return { status: "ok" };
   };
   const result = refreshAntigravityInstallation({
-    configRoot, workspaceRoot, approvedSourceRoot: sourcePluginRoot, scope: "global", globalChangeApproved: true,
+    configRoot, workspaceRoot, approvedSourceRoot: marketplaceRoot, attestationSourceRoot: sourcePluginRoot, scope: "global", globalChangeApproved: true,
   }, { runCli });
   assert.equal(result.status, "refreshed", JSON.stringify(result));
   assert.equal(existsSync(join(workspaceRoot, ".git")), false);
@@ -211,6 +234,9 @@ test("Agy source install writes a receipt readable by the first preflight in an 
   assert.equal(preflight.antigravityTopology.loadedKind, "managed-copy");
   assert.equal(preflight.installedPluginAttestation.status, "verified", JSON.stringify(preflight.installedPluginAttestation));
   assert.notEqual(preflight.status, "plugin-attestation-required");
+  writeFileSync(join(marketplaceRoot, "hooks", "antigravity-pretool-guard.mjs"), "// changed marketplace copy\n");
+  assert.equal(verifyAntigravityInstallerSource({ configRoot, workspaceRoot, sourcePluginRoot: marketplaceRoot, attestationSourceRoot: sourcePluginRoot, scope: "global" }).status, "rejected",
+    "a copy changed after approval must not inherit the Git source identity");
 });
 
 function fixture(t) {

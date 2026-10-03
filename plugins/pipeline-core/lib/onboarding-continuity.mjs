@@ -58,6 +58,8 @@ import { resolveOnboardingPrivateState, resolveOnboardingIntakeScope } from "./c
 import {observeGovernanceScope} from "./governance-scope.mjs";
 import {validateRetirementJournal} from "./enrollment-retirement-coordinator.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
+import { applyBoundDesignLineEndings, planBoundDesignLineEndings } from "./bound-design-line-endings.mjs";
+import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton } from "./design-authoring.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -4256,13 +4258,10 @@ function handoverContent(goal, featureId, prdPath, specPath) {
     "",
     "Review the goal and establish the initial PRD and technical specification.",
     "",
-    "This section is kept in sync by `pipeline-state.mjs` after every",
-    "phase/approval-changing command (`syncStateMdNextAction`). Treat",
-    "`project/pipeline-state.json` (or `pipeline-state.mjs continuity-status`) as",
-    "the authoritative fallback only if this project predates that mechanism, or",
-    "if the sync itself could not apply (a hand-edited section with no",
-    "recognizable `## Next action` heading, or a calibration-configured handover",
-    "path other than this file).",
+    "This tracked handover is a design snapshot. Run `pipeline-state inspect`",
+    "for the current typed next action; canonical pipeline state owns lifecycle",
+    "authority. Git-backed runtime transitions publish an advisory private",
+    "handover projection without rewriting this tracked file.",
     "",
   ].join("\n");
 }
@@ -4302,13 +4301,10 @@ function promotionHandoverContent({ featureId, prdPath, specPath, designInputPat
     "Implementation writes stay refused until the plan is approved and the phase is",
     "switched to `implementation`.",
     "",
-    "This section is kept in sync by `pipeline-state.mjs` after every",
-    "phase/approval-changing command (`syncStateMdNextAction`). Treat",
-    "`project/pipeline-state.json` (or `pipeline-state.mjs continuity-status`) as",
-    "the authoritative fallback only if this project predates that mechanism, or",
-    "if the sync itself could not apply (a hand-edited section with no",
-    "recognizable `## Next action` heading, or a calibration-configured handover",
-    "path other than this file).",
+    "This tracked handover is a design snapshot. Run `pipeline-state inspect`",
+    "for the current typed next action; canonical pipeline state owns lifecycle",
+    "authority. Git-backed runtime transitions publish an advisory private",
+    "handover projection without rewriting this tracked file.",
     "",
   ].join("\n");
 }
@@ -4328,9 +4324,9 @@ const NEXT_ACTION_BODY_BY_STATUS = {
     "switched to `implementation`.",
   ],
   "awaiting-approval": [
-    "The plan has been submitted and is awaiting PO approval:",
-    "`pipeline-state approve-plan --by <name>`. Implementation writes stay refused",
-    "until the plan is approved.",
+    "The submitted plan is immutable. Run `pipeline-state inspect` and follow",
+    "its typed next action. Feature and epic designs complete Advisor and readiness",
+    "before one final PO approval; implementation stays refused until approval.",
   ],
   approved: [
     "The plan is approved. Switch the feature to implementation with",
@@ -5118,7 +5114,7 @@ function promotionInput({ profile, featureId, planPath, prdPath, specPath, desig
 // this function (checkMarkers left at its true default) -- after the digest
 // comparison, so a caller cannot use reconstruction's skipped admission to
 // slip a marker-less PRD past this function altogether.
-function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
+function promotionArtifacts(root, input, { checkMarkers = true, checkAcknowledgement = true } = {}) {
   const prd = observeOptionalProjectFile(root, input.prdPath, "promotion PRD");
   const spec = observeOptionalProjectFile(root, input.specPath, "promotion specification");
   const designInput = observeOptionalProjectFile(root, input.designInputPath, "promotion design input");
@@ -5185,7 +5181,7 @@ function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
     // generator exemption at the authority boundary.  The policy-selected
     // acknowledgement always certifies the exact PRD/Spec pair that becomes
     // bindable authority.
-    if (acknowledgementMarkers.length !== 1) {
+    if (checkAcknowledgement && acknowledgementMarkers.length !== 1) {
       fail(
         "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
         "The promoted PRD must carry the PO's plan acknowledgement marker exactly once, as"
@@ -5485,8 +5481,13 @@ function buildCoordinatorSourcedPromotionPlan({
   // above never reaches here, and applyOnboardingBootstrapBind's own
   // allowAppliedReplay: true reconstruction already skips marker admission
   // entirely (checkMarkers false), exactly as before this change.
+  // Epic/feature onboarding defers the PO decision until the complete v2
+  // design-workflow package has Advisor and readiness evidence. Requiring a
+  // separately signed PRD marker here would create a second PO approval before
+  // the design course. Mini/legacy profiles retain the established marker.
   const checkMarkers = !allowAppliedReplay;
-  const authority = promotionArtifacts(observed.root, input, { checkMarkers });
+  const checkAcknowledgement = !new Set(["epic", "feature"]).has(input.profile);
+  const authority = promotionArtifacts(observed.root, input, { checkMarkers, checkAcknowledgement });
   const featureId = input.featureId;
   // NVA-R1-LANGWIRE: a coordinator-sourced binding has no kickoff predecessor to
   // inherit an operator-facing default from (plan.kickoff === null; unlike the
@@ -5524,7 +5525,7 @@ function buildCoordinatorSourcedPromotionPlan({
   const acknowledgement = observeBootstrapBindAcknowledgement({
     rootDir: observed.root, repositoryCapability, spawn,
   });
-  if (acknowledgement.acknowledged === true) {
+  if (acknowledgement.acknowledged === true && !new Set(["epic", "feature"]).has(input.profile)) {
     next.bootstrapAcknowledgementRequired = true;
   }
   const valid = validateContinuityState(next.continuity, featureId);
@@ -6820,6 +6821,8 @@ function buildIntakePrdContent(checkpoint, featureId, chunks, specSha256) {
     "yet -- it must be authored and reviewed before the plan is submitted for",
     "PO approval (pipeline-state submit-plan).",
     "",
+    renderArchitectureDesignSkeleton().trimEnd(),
+    "",
   ].join("\n");
 }
 
@@ -6845,6 +6848,8 @@ function buildIntakeSpecContent(checkpoint, featureId, chunks) {
     "Binding (bootstrap-bind-apply, step 5) does not require this to exist",
     "yet -- it must be authored and reviewed before the plan is submitted for",
     "PO approval (pipeline-state submit-plan).",
+    "",
+    renderDesignTraceabilitySkeleton().trimEnd(),
     "",
   ].join("\n");
 }
@@ -7012,9 +7017,33 @@ export function applyOnboardingIntakeGenerate({
 } = {}) {
   if (activate !== true) fail("INTAKE-GENERATE-ACTIVATION-REQUIRED", "intake staging generation requires explicit activation");
   const spawn = deps.spawn ?? defaultGitSpawn;
-  const plan = buildOnboardingIntakeGeneratePlan({ rootDir, repositoryCapability, spawn });
+  let plan = buildOnboardingIntakeGeneratePlan({ rootDir, repositoryCapability, spawn });
   if (!SHA256_RE.test(expectedPlanSha256 ?? "") || plan.planSha256 !== expectedPlanSha256) {
     fail("INTAKE-GENERATE-PLAN-DIGEST", "intake staging generation plan digest does not match");
+  }
+  // Normalize the exact target paths before the authoritative plan is
+  // re-derived and its generated-document hashes are consumed by the writer.
+  // This is deliberately local to an activated apply; read-only planning and
+  // inspection never changes repository configuration.
+  const lineEndingRequest = {
+    projectDir: plan.root,
+    filePaths: Object.values(plan.targets).map((target) => target.path),
+  };
+  // Tests with an injected Git/process dependency may provide the matching
+  // preparer seam. The CLI has no flag or environment route to this seam; its
+  // default path always plans and applies the real repo-local Git setting.
+  const lineEndingApplied = typeof deps.prepareBoundDesignLineEndings === "function"
+    ? deps.prepareBoundDesignLineEndings(lineEndingRequest)
+    : (() => {
+      const lineEndingPlan = planBoundDesignLineEndings(lineEndingRequest);
+      if (!lineEndingPlan.ok) return lineEndingPlan;
+      return applyBoundDesignLineEndings(lineEndingPlan);
+    })();
+  if (!lineEndingApplied.ok) fail("INTAKE-GENERATE-LINE-ENDINGS-REFUSED",
+    `design document line-ending preparation failed: ${lineEndingApplied.code}`);
+  plan = buildOnboardingIntakeGeneratePlan({ rootDir, repositoryCapability, spawn });
+  if (plan.planSha256 !== expectedPlanSha256) {
+    fail("INTAKE-GENERATE-PLAN-DRIFT", "intake staging plan changed after repository line-ending preparation");
   }
   const stagingDirectory = ensureIntakeDesignDirectory(plan.root, plan.featureId);
   const targets = {
@@ -8374,14 +8403,14 @@ export function applyOnboardingKickoffPromotion({
       const seed = recognisedKickoff(observed, deps.spawn ?? defaultGitSpawn);
       if (seed === null) fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion kickoff seed drifted");
     }
-    // Re-admit marker policy at apply time against the current authority bytes.
-    // There is no pure-generator exemption at this boundary: the acknowledgement
-    // marker must still bind the exact PRD/Spec pair being promoted.
+    // Re-admit marker policy at apply time against the current authority bytes
+    // for mini/legacy profiles. Epic/feature uses the final complete DWP as its
+    // single PO decision and remains unapproved after this mechanical bind.
     const authority = promotionArtifacts(plan.root, {
       profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
       prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path,
       designInputPath: plan.authority.designInput.path,
-    });
+    }, { checkMarkers: !new Set(["epic", "feature"]).has(plan.profile) });
     if (authority.prd.sha256 !== plan.authority.prd.sha256 || authority.spec.sha256 !== plan.authority.spec.sha256
       || authority.designInput.sha256 !== plan.authority.designInput.sha256) {
       fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion authority bytes drifted");

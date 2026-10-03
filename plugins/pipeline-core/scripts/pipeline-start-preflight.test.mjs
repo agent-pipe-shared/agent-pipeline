@@ -110,11 +110,31 @@ test("preflight declares what its status ranges over, in every status", () => {
   assert.equal(unavailable.status, "plugin-identity-unavailable");
   for (const result of [ready, refresh, unavailable]) {
     assert.equal(result.statusScope, STATUS_SCOPE);
-    assert.equal(result.statusScope, "plugin-distribution-identity");
+    assert.equal(result.statusScope, "plugin-distribution-identity-and-mandatory-local-hooks");
   }
   // Structural proof that the two readiness sources are disjoint: the preflight never
   // observes project personalization, so its `ready` can never be an answer about it.
   assert.ok(!JSON.stringify(ready).includes("pipeline.user.yaml"));
+});
+
+test("preflight gates mandatory local hooks and keeps pre-push advisory", () => {
+  const cwd = "/projects/current";
+  const provisioning = (preCommit, commitMsg, prePush = "decline") => ({
+    schema: "pipeline.clone-provisioning-report.v1", status: "provisioning-required", checks: [
+      { id: "pre-commit-hook", status: preCommit },
+      { id: "commit-msg-hook", status: commitMsg },
+      { id: "pre-push-hook", status: prePush },
+    ],
+  });
+  const required = preflight({ cwd, checkCloneProvisioningFn: () => provisioning("install", "install") });
+  assert.equal(required.status, "hook-provisioning-required");
+  assert.equal(required.nextAction.argv[0], join(required.pluginRoot, "scripts", "clone-hook-readiness.mjs"));
+  assert.equal(required.nextAction.requiresConfirmation, true);
+  const blocked = preflight({ cwd, checkCloneProvisioningFn: () => provisioning("foreign-owner", "current") });
+  assert.equal(blocked.status, "hook-provisioning-blocked");
+  assert.equal(blocked.nextAction, null);
+  const optionalPush = preflight({ cwd, checkCloneProvisioningFn: () => provisioning("current", "current", "decline") });
+  assert.equal(optionalPush.status, "ready");
 });
 
 // Deterministic, hermetic default for the new origin/content attestation
@@ -146,6 +166,9 @@ function readyObservation() {
 }
 function preflight(options) {
   return observePipelineStartPreflight({
+    checkCloneProvisioningFn: () => ({ schema: "pipeline.clone-provisioning-report.v1", status: "ready", checks: [
+      { id: "pre-commit-hook", status: "current" }, { id: "commit-msg-hook", status: "current" },
+    ] }),
     observeGovernanceScopeFn: ({ rootDir }) => ({ schema: "pipeline.governance-scope.v1", state: "active", root: rootDir, scopeKey: "a".repeat(64), repositoryKind: "git", provenance: { kind: "isolated-unit-capability", refs: [] }, diagnostics: [], requiresEnforcement: true, hintAllowed: false }),
     observeAntigravityLoadedTopologyFn: ({ loadedPluginRoot }) => ({ schema: "pipeline.antigravity-loaded-topology.v1", status: "current", loadedKind: "direct", loadedPluginRoot, executingGuardAssurance: "not-established-by-topology" }),
 

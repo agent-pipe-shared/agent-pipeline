@@ -1552,14 +1552,27 @@ export function checkSessionHygiene(startPath, fields, options = {}) {
   if (records.some(({ record }) => record.sessionId === fields.sessionId && record.status === "ready" && record.lifecycle === "detached-operational")) {
     reasons.push("owned-temporary-worktree-remains");
   }
-  const canonical = repo.worktrees.map((record) => classifyCanonicalWorktree(repo, record));
+  // A stale Git registration remains a hygiene failure, but must not hide
+  // the owning session\'s independently observed manifest and residue counts.
+  const canonical = [];
+  let missingWorktrees = 0;
+  for (const record of repo.worktrees) {
+    try {
+      canonical.push(classifyCanonicalWorktree(repo, record));
+    } catch (error) {
+      if (!(error instanceof WorktreeLifecycleError) || error.code !== "WT-WORKTREE-MISSING") throw error;
+      missingWorktrees += 1;
+    }
+  }
+  if (missingWorktrees > 0) reasons.push("missing-worktree");
   if (canonical.some((entry) => !entry.canonical)) reasons.push("noncanonical-worktree");
   const receipt = {
     schema: HYGIENE_RECEIPT_SCHEMA,
     sessionSha256: rawSha256(Buffer.from(fields.sessionId)),
     ok: reasons.length === 0,
     counts: {
-      linkedWorktrees: canonical.length,
+      linkedWorktrees: repo.worktrees.length,
+      ...(missingWorktrees === 0 ? {} : { missingWorktrees }),
       noncanonicalWorktrees: canonical.filter((entry) => !entry.canonical).length,
       activeSessionManifests: existsSync(cleanupManifestPath(repo, fields.sessionId)) ? 1 : 0,
       ownedTemporaryResidue: records.filter(({ record }) => record.sessionId === fields.sessionId && record.status === "ready").length,

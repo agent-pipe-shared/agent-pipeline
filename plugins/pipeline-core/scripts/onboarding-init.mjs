@@ -85,6 +85,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
@@ -137,6 +138,9 @@ export const SCHEMA = "pipeline.onboarding-init.v1";
 // a malformed or non-converging chain (a `nextAction` that keeps pointing back at itself)
 // cannot spin forever.
 export const DEFAULT_STEP_CAP = 50;
+// Leave a margin below the normal 120-second tool timeout. A step cap alone
+// cannot bound the time spent in one child process.
+export const DEFAULT_RUN_BUDGET_MS = 90_000;
 
 const ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 const PO_HUMAN_APPROVAL_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url));
@@ -884,8 +888,8 @@ export function applyInitialOnboardingAnswers({
  * process exited non-zero) is folded into a typed `ok: false` result the caller reports
  * rather than crashes on.
  */
-function runOnboardingStep({ executable, argv, run, env = null, projectRoot = null }) {
-  const options = { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024 };
+function runOnboardingStep({ executable, argv, run, env = null, projectRoot = null, timeout }) {
+  const options = { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, timeout, killSignal: "SIGKILL" };
   // Supplying `env` lets callers override what the spawned
   // `project-onboarding-v3.mjs` CLI resolves its homedir against (see that script's own
   // `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` handling), extending across the process
@@ -918,6 +922,9 @@ function runOnboardingStep({ executable, argv, run, env = null, projectRoot = nu
     };
   }
   const result = run(executable, argv, options);
+  if (result?.error?.code === "ETIMEDOUT") {
+    return { ok: false, faultCode: "execution-budget-exhausted", exitCode: result.status ?? null, stderr: "The child exceeded the remaining onboarding budget. Its operation may be partial; re-inspect before any retry." };
+  }
   if (result?.error && !isSuccessfulSpawn(result)) {
     return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? "") };
   }
@@ -1098,9 +1105,13 @@ function normalizeOnboardingDriverOutput(output, root) {
  * whatever machine-plane state happens to live under the real caller's `$HOME`
  * (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess).
  */
-export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null } = {}) {
+export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
   const root = resolve(rootDir);
   const steps = [];
+  if (!Number.isSafeInteger(runBudgetMs) || runBudgetMs < 1) throw new Error("runBudgetMs must be a positive safe integer");
+  const deadline = now() + runBudgetMs;
+  const seenCommandResponses = new Set();
+  const recovery = { kind: "command", executable: "node", argv: buildInspectArgv(root, runner), mutation: false, requiresConfirmation: false, guidance: "Re-inspect durable state before retrying; an interrupted command may have partially applied. Never replay its old mutation blindly." };
   let executable = "node";
   let argv = buildInspectArgv(root, runner);
 
@@ -1123,7 +1134,10 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
   let attemptedAction = null;
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
-    const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root });
+    const remaining = Math.floor(deadline - now());
+    if (remaining < 1) return { schema: SCHEMA, runner, root, outcome: "execution-budget-exhausted", stepCap, stepsExecuted: steps.length, steps, recovery, final: lastAnchorOutput };
+    onStep({ step: stepIndex + 1, stepCap, remainingMs: remaining, isAnchor: isAnchorStep });
+    const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root, timeout: remaining });
     steps.push({
       executable,
       argv,
@@ -1155,6 +1169,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
         stepCap,
         stepsExecuted: steps.length,
         steps,
+        ...(stepResult.faultCode === "execution-budget-exhausted" ? { recovery } : {}),
         error: {
           faultCode: stepResult.faultCode,
           exitCode: stepResult.exitCode,
@@ -1302,6 +1317,11 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
           final: output,
         };
       }
+      // Detect a command chain returning to an identical action and response.
+      // Do not replace inspect progress checks or stop a legitimate changing chain.
+      const responseKey = canonicalJson({ executable, argv, output });
+      if (!wasAnchorStep && seenCommandResponses.has(responseKey)) return { schema: SCHEMA, runner, root, outcome: "no-progress", stepCap, stepsExecuted: steps.length, steps, final: output };
+      if (!wasAnchorStep) seenCommandResponses.add(responseKey);
       executable = nextAction.executable;
       argv = nextAction.argv;
       attemptedAction = {
@@ -1502,7 +1522,9 @@ export function main(args = process.argv.slice(2), {
       return 1;
     }
   }
-  const result = drive({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap, env });
+  const result = drive({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap, env,
+    onStep: ({ step, stepCap, remainingMs, isAnchor }) => writeError(`[onboarding-init] step ${step}/${stepCap}: ${isAnchor ? "inspect" : "published action"}; budget ${remainingMs}ms\n`),
+  });
   if (bootstrap) result.bootstrap = bootstrap;
   if (initialAnswers) result.initialAnswers = initialAnswers;
   const printed = result.outcome === "pending-asks" && Array.isArray(result.pendingAsks)

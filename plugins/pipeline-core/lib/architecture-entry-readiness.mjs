@@ -74,13 +74,18 @@ function physicalJson(root, relativePath, expectedSchema, validShape) {
   }
 }
 
-function proposalAction(root) {
-  const design = inspectArchitectureDesign(root);
+function proposalAction(root, inspectedDesign = null, deps = {}) {
+  const design = inspectedDesign ?? (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(root);
   if (design.ok && design.status === "materialization-required") return {
     kind: "command", executable: "node",
     argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "materialize-architecture"],
     mutation: true, requiresConfirmation: false,
     expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
+  };
+  if (!design.ok && design.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && typeof design.prdPath === "string") return {
+    kind: "architecture-design-required",
+    prdPath: design.prdPath,
+    guidance: "Complete the architecture design block in this exact PO-bound PRD, then present and approve a new final design-workflow package before materialization.",
   };
   let proposal = null;
   try { proposal = generateAdoptionProposal(root); } catch { /* the primary refusal remains authoritative */ }
@@ -260,7 +265,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   const root = resolve(rootDir);
   const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now);
   const design = (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(root, taskScope);
-  const disposition = design.ok && design.status === "materialized"
+  const disposition = design.ok && ["materialization-required", "materialized"].includes(design.status)
     ? { ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority }
     : (deps.checkPlanningAdoptionDisposition ?? checkPlanningAdoptionDisposition)(root, taskScope, now);
   const map = loadMapBundle(root);
@@ -300,27 +305,40 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     baseline,
     adoption: { state: adoption.state, coverageClass: adoption.coverageClass, confidence: adoption.confidence },
   };
+  const readinessFailure = (code, message, failureArtifacts, failureDisposition, fitness = null, nextAction = null) =>
+    failure(root, code, message, failureArtifacts, failureDisposition, fitness,
+      nextAction ?? proposalAction(root, design, deps));
 
   if (existsSync(resolve(root, "architecture/design-materialization.json")) && !design.ok) {
-    return failure(root, design.code, "The architecture design no longer matches its current PO-bound package", artifacts, disposition);
+    return readinessFailure(design.code, "The architecture design no longer matches its current PO-bound package", artifacts, disposition);
+  }
+  if (design.ok && design.status === "materialization-required") {
+    return readinessFailure("ARCHITECTURE-MATERIALIZATION-REQUIRED",
+      "The exact PO-approved architecture design is valid and awaits its fixed-target materialization action",
+      artifacts, disposition);
+  }
+  if (!design.ok && design.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED") {
+    return readinessFailure(design.code,
+      "The final package is approved; its PRD still needs the explicit architecture design block",
+      artifacts, disposition);
   }
   if (!map.ok || !map.indexFileExists || !indexValid) {
-    return failure(root, map.indexFileExists ? "ARCHITECTURE-MAP-INVALID" : "ARCHITECTURE-MAP-MISSING",
+    return readinessFailure(map.indexFileExists ? "ARCHITECTURE-MAP-INVALID" : "ARCHITECTURE-MAP-MISSING",
       map.indexFileExists ? "the physical architecture map is malformed or has invalid module contracts"
         : "the physical architecture map index is missing",
       artifacts, disposition);
   }
   if (fitnessModel.status !== "current") {
-    return failure(root, "ARCHITECTURE-FITNESS-MODEL-INVALID", "the physical architecture fitness model is missing, unreadable, or malformed", artifacts, disposition);
+    return readinessFailure("ARCHITECTURE-FITNESS-MODEL-INVALID", "the physical architecture fitness model is missing, unreadable, or malformed", artifacts, disposition);
   }
   if (baseline.status !== "current") {
-    return failure(root, "ARCHITECTURE-BASELINE-INVALID", "the physical architecture baseline is missing, unreadable, or malformed", artifacts, disposition);
+    return readinessFailure("ARCHITECTURE-BASELINE-INVALID", "the physical architecture baseline is missing, unreadable, or malformed", artifacts, disposition);
   }
   if (!disposition.ok) {
-    return failure(root, "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED", disposition.error ?? "a valid scoped architecture adoption disposition is required", artifacts, disposition);
+    return readinessFailure("ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED", disposition.error ?? "a valid scoped architecture adoption disposition is required", artifacts, disposition);
   }
   if (!reentryPointer.ok) {
-    return failure(root, reentryPointer.code,
+    return readinessFailure(reentryPointer.code,
       "the project-owned AGENTS.md must link to architecture/map/index.md before implementation; preserve its other instructions",
       artifacts, disposition, null, {
         kind: "repair-required",
@@ -337,7 +355,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   const checkpointDebt = inspectCheckpointDebt(root, map, deps);
   artifacts.checkpointDebt = checkpointDebt;
   if (checkpointDebt.status !== "clear") {
-    return failure(root,
+    return readinessFailure(
       checkpointDebt.status === "open" ? "ARCHITECTURE-CHECKPOINT-DEBT-OPEN" : "ARCHITECTURE-CHECKPOINT-DEBT-UNAVAILABLE",
       checkpointDebt.status === "open"
         ? "checkpoint architecture-map staleness debt remains unresolved at the next planning boundary"
@@ -349,7 +367,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     ? (design.ok && design.status === "materialized" ? design.planningSurface : deriveArchitecturePlanningSurface(root))
     : planningSurface;
   if (surface === null) {
-    return failure(root, "ARCHITECTURE-PLAN-SURFACE-MISSING", "the active PO-bound plan has no valid declared implementation surface", artifacts, disposition);
+    return readinessFailure("ARCHITECTURE-PLAN-SURFACE-MISSING", "the active PO-bound plan has no valid declared implementation surface", artifacts, disposition);
   }
   artifacts.decisionApplicability = inspectPlanningDecisionApplicability(root, surface, now, deps);
 
@@ -380,13 +398,13 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       now,
     });
   } catch (error) {
-    return failure(root, "ARCHITECTURE-FITNESS-UNAVAILABLE", `architecture fitness evaluation failed: ${error.message}`, artifacts, disposition);
+    return readinessFailure("ARCHITECTURE-FITNESS-UNAVAILABLE", `architecture fitness evaluation failed: ${error.message}`, artifacts, disposition);
   }
   const fitnessProjection = projectPlanningFitness(fitness, {
     adoptionDisposition: disposition.disposition,
   });
   if (fitnessProjection.malformed) {
-    return failure(root, "ARCHITECTURE-FITNESS-UNAVAILABLE", "planning architecture fitness returned an incomplete or malformed outcome set", artifacts, disposition, {
+    return readinessFailure("ARCHITECTURE-FITNESS-UNAVAILABLE", "planning architecture fitness returned an incomplete or malformed outcome set", artifacts, disposition, {
       overallStatus: fitness.overallStatus,
       blockingOverallStatus: fitnessProjection.blockingOverallStatus,
       reportOnly: [],
@@ -418,7 +436,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     };
   }
   if (!(fitnessProjection.blockingOverallStatus === "pass" || fitnessProjection.blockingOverallStatus === "excepted")) {
-    return failure(root, "ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`, artifacts, disposition, {
+    return readinessFailure("ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`, artifacts, disposition, {
       overallStatus: fitness.overallStatus,
       blockingOverallStatus: fitnessProjection.blockingOverallStatus,
       reportOnly: fitnessProjection.reportOnly,

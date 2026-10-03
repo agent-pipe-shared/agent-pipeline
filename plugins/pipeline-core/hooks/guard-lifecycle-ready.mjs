@@ -6,6 +6,7 @@ import { isPhysicalScratchTarget, isBoundedScratchOnlyWords } from "../lib/physi
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import {
   appendFileSync,
@@ -51,7 +52,7 @@ import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabil
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { HUMAN_PO_SIGNING_COMMANDS } from "../scripts/po-human-approval.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
-import { classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
+import { classifyVerifyCommand, readState as readDesignCourseState } from "../scripts/pipeline-state.mjs";
 import { findResidualHostPath } from "../scripts/capture-evidence.mjs";
 import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
 import {
@@ -75,10 +76,11 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
-import { readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   DEVPLAN_SHELL_DENIAL_CODE,
   devPlanGateVerdict,
+  hooksDisableSettingsWriteFinding,
   rebaseAuthorityAdmissionNotice,
   rebaseAuthorityDisclosure,
   resolveActiveRebaseAuthority,
@@ -100,6 +102,7 @@ import {
 } from "../lib/protected-test-paths.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isAllowedPassiveReadTarget } from "../lib/passive-read-policy.mjs";
+import { readClaudeTaskOutputReadScope } from "../lib/claude-task-output-read-scope.mjs";
 // NVA-BOOTRECEIPT-1: the identity chain and git-common-dir resolution are proven and
 // already keyed on the same agentId/private-state tree by guard-dispatch-budget.mjs --
 // reused here rather than copied, per that dispatch's own briefing.
@@ -159,6 +162,8 @@ const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BOUNDED_PIPELINE_ADDITIONAL_ROOTS = (() => {
   try { return [realpathSync(PLUGIN_ROOT)]; } catch { return [PLUGIN_ROOT]; }
 })();
+
+const MAX_CLAUDE_TASK_OUTPUT_READ_BYTES = 1024 * 1024;
 
 export const BASE_GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -257,6 +262,7 @@ const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup
 const SESSION_CRITIC_FINALIZER_SCRIPT = fileURLToPath(new URL("../scripts/session-critic-finalizer.mjs", import.meta.url));
 const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../scripts/design-course-session.mjs", import.meta.url));
 const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../scripts/settings-allowlist-merge.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
@@ -1705,20 +1711,160 @@ function devPlanShellRefusalHit(command, root, dependencies = {}, toolName = "Ba
   try {
     const extractFn = dependencies.extractShellWriteTargetsFn ?? extractShellWriteTargets;
     const verdictFn = dependencies.devPlanGateVerdictFn ?? devPlanGateVerdict;
-    const targets = extractFn({
+    const extracted = [...extractFn({
       command,
       root,
       toolName,
       platform: dependencies.platform ?? process.platform,
-    });
-    for (const { candidate, lane } of targets) {
-      const result = verdictFn({ filePath: candidate, projectDir: root });
+    })];
+    const targets = toolName === "PowerShell"
+      ? powerShellDevPlanWriteTargets(command, root, extracted)
+      : extracted;
+    const words = toolName === "Bash" ? simpleWords(command, root) : null;
+    const invocation = words !== null
+      ? resolveSanctionedScriptInvocation(command, root, {
+        platform: dependencies.platform ?? process.platform,
+        ...(dependencies.processExecPath === undefined ? {} : { processExecPath: dependencies.processExecPath }),
+      })
+      : null;
+    const canonicalSettingsWriter = toolName === "Bash" && invocation?.script === SETTINGS_ALLOWLIST_MERGE_SCRIPT
+      && isExactObservedRunnerPermissionsRepairAction(command, root, dependencies);
+    const canonicalSettingsPlanner = toolName === "Bash" && invocation?.script === SETTINGS_ALLOWLIST_MERGE_SCRIPT
+      && isExactObservedRunnerPermissionsPlannerAction(command, root, dependencies);
+    const opaqueScript = words === null ? null : opaqueScriptExecutionCandidate(words, root);
+    if (opaqueScript !== null
+      && !(invocation !== null && isSanctionedLifecycleCommand(command, root, dependencies))
+      && !canonicalSettingsWriter && !canonicalSettingsPlanner) {
+      targets.push({ candidate: opaqueScript, lane: "opaque-script-execution", forceLifecycleGate: true });
+    }
+    const npmInit = words !== null
+      && ["npm", "npm.cmd", "npm.exe"].includes(basename(words[0]).toLowerCase())
+      && words[1] === "init";
+    if (npmInit && !targets.some((target) => target.lane === "package-manager-init")) {
+      const args = words.slice(2);
+      const manifestOnlyArgs = args.every((arg) => ["-y", "--yes"].includes(arg));
+      targets.push(manifestOnlyArgs
+        ? { candidate: "package.json", lane: "package-manager-init" }
+        : { candidate: ".pipeline-opaque-package-init", lane: "opaque-package-manager", forceLifecycleGate: true });
+    }
+    if (words !== null) {
+      const packageTarget = opaquePackageManagerCandidate(words);
+      if (packageTarget !== null) targets.push({
+        candidate: packageTarget,
+        lane: "opaque-package-manager",
+        forceLifecycleGate: true,
+      });
+    }
+    for (const { candidate, lane, forceLifecycleGate = false } of targets) {
+      if ((lane === "opaque-interpreter-code" && ["-e", "-D", ".", ".."].includes(candidate))
+        || (lane === "powershell-write-cmdlet" && ["-Path", "-D"].includes(candidate))) {
+        continue;
+      }
+      const settingsWrite = hooksDisableSettingsWriteFinding({
+        filePath: candidate,
+        content: '{"disableAllHooks":true}',
+        projectDir: root,
+        operation: "shell",
+      });
+      if (settingsWrite !== null && !canonicalSettingsWriter) {
+        return {
+          verdict: "block",
+          reason: settingsWrite.reason,
+          feature: null,
+          planPath: null,
+          lifecycleStatus: null,
+          candidate,
+          lane: "governance-hook-settings",
+        };
+      }
+      const result = verdictFn({ filePath: candidate, projectDir: root, ...(forceLifecycleGate ? { forceLifecycleGate: true } : {}) });
       if (result.verdict === "block") return { ...result, candidate, lane };
     }
     return null;
   } catch (error) {
     return { fault: true, error };
   }
+}
+
+function opaqueScriptExecutionCandidate(words, root) {
+  if (!Array.isArray(words) || words.length < 2) return null;
+  const executable = basename(words[0]).toLowerCase();
+  const args = words.slice(1);
+  let script = null;
+  if (["node", "node.exe"].includes(executable)) {
+    const first = args[0] ?? "";
+    if (["--version", "-v", "--help", "-h"].includes(first)) return null;
+    if (first === "--check") return null;
+    if (first === "--test") return args[1] && !args[1].startsWith("-") ? args[1] : ".pipeline-opaque-execution";
+    if (["-e", "--eval", "-p", "--print"].includes(first)) return ".pipeline-opaque-execution";
+    if (!first.startsWith("-")) script = first;
+    else return ".pipeline-opaque-execution";
+  } else if (["python", "python3", "python.exe", "python3.exe"].includes(executable)) {
+    const first = args[0] ?? "";
+    if (["--version", "-V", "--help", "-h"].includes(first)) return null;
+    script = first.startsWith("-") ? ".pipeline-opaque-execution" : first;
+  } else if (["bash", "sh", "dash", "zsh"].includes(executable)) {
+    const first = args[0] ?? "";
+    if (["--version", "--help", "-h"].includes(first)) return null;
+    script = first.startsWith("-") ? ".pipeline-opaque-execution" : first;
+  }
+  if (script === null || script === "") return null;
+  const absolute = resolve(root, script);
+  const rel = relative(root, absolute);
+  const contained = rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+  return contained ? script : ".pipeline-opaque-execution";
+}
+
+function opaquePackageManagerCandidate(words) {
+  if (!Array.isArray(words) || words.length === 0) return null;
+  const executable = basename(words[0]).toLowerCase();
+  const args = words.slice(1);
+  const versionOrHelp = args.length === 1 && ["--version", "-v", "--help", "-h", "version", "help"].includes(args[0]);
+  if (["npm", "npm.cmd", "npm.exe", "pnpm", "pnpm.cmd", "yarn", "yarn.cmd", "pip", "pip3", "pip.exe", "cargo"].includes(executable)) {
+    if (versionOrHelp) return null;
+    const query = (executable.startsWith("npm") && ["ls", "list", "view"].includes(args[0]))
+      || (executable.startsWith("pnpm") && ["list", "ls", "view"].includes(args[0]))
+      || (executable.startsWith("yarn") && ["list", "info", "why"].includes(args[0]))
+      || (executable.startsWith("pip") && ["list", "show"].includes(args[0]))
+      || (executable === "cargo" && args[0] === "--list");
+    if (query && !args.some(arg => ["install", "add", "remove", "uninstall", "update", "upgrade", "exec", "init"].includes(arg))) return null;
+    return "src/.pipeline-opaque-package-operation";
+  }
+  if (["npx", "npx.cmd", "npx.exe"].includes(executable)) {
+    if (versionOrHelp) return null;
+    return "src/.pipeline-opaque-package-operation";
+  }
+  return null;
+}
+
+function powerShellDevPlanWriteTargets(command, root, extracted) {
+  const parsed = parseGuardCommand(command, root, { platform: "win32" });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return extracted;
+  const segment = parsed.segments[0];
+  const executable = basename(segment.executable).toLowerCase();
+  if (!new Set(["set-content", "add-content", "out-file", "clear-content", "remove-item", "new-item"]).has(executable)) {
+    return extracted;
+  }
+  const args = segment.argv;
+  let target = null;
+  const valueFlags = new Set(["-value", "-encoding", "-nonewline", "-force", "-whatif", "-confirm", "-debug", "-verbose"]);
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    const lower = arg.toLowerCase();
+    if (["-path", "-literalpath", "-filepath"].includes(lower)) {
+      if (args[index + 1] === undefined || args[index + 1].startsWith("-")) return extracted;
+      target = args[index + 1];
+      index += 1;
+      continue;
+    }
+    if (valueFlags.has(lower)) {
+      if (["-value", "-encoding"].includes(lower) && args[index + 1] !== undefined) index += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    if (target === null) target = arg;
+  }
+  return target === null ? [] : [{ candidate: target, lane: "powershell-write-cmdlet" }];
 }
 
 /**
@@ -2060,6 +2206,71 @@ function sessionReadScopeRoots(input, dependencies = {}) {
     }
   }
   return roots;
+}
+
+// Current-session background-task output is an exact-file read capability. The
+// native PostToolUse recorder supplies the session/task/tool binding; this guard
+// independently checks that the returned path is the physical, single-link,
+// bounded task file in its authorized directory before using it as a read target.
+function claudeTaskOutputReadScope(path, input, root, dependencies = {}) {
+  const sessionId = input?.session_id;
+  const transcriptPath = input?.transcript_path;
+  if (typeof sessionId !== "string" || sessionId === ""
+    || typeof transcriptPath !== "string" || transcriptPath === ""
+    || typeof path !== "string" || path === "" || !isAbsolute(path) || path.includes("\0")) return null;
+  const reader = dependencies.readClaudeTaskOutputReadScopeFn ?? readClaudeTaskOutputReadScope;
+  let scope;
+  try {
+    scope = reader({ projectDir: root, sessionId, transcriptPath, requestedPath: path });
+  } catch { return null; }
+  if (scope?.status !== "available" || scope.sessionId !== sessionId
+    || typeof scope.taskId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/u.test(scope.taskId)
+    || typeof scope.toolUseId !== "string" || scope.toolUseId === ""
+    || typeof scope.path !== "string" || typeof scope.authorizedTaskDirectory !== "string") return null;
+  try {
+    const candidate = resolve(path);
+    const directory = scope.authorizedTaskDirectory;
+    if (candidate !== path || candidate !== scope.path || !isAbsolute(directory)
+      || resolve(directory) !== directory || dirname(candidate) !== directory
+      || basename(candidate) !== `${scope.taskId}.output`
+      || realpathSync(directory) !== directory || !lstatSync(directory).isDirectory()) return null;
+    const leaf = lstatSync(candidate);
+    const physical = realpathSync(candidate);
+    if (!leaf.isFile() || leaf.isSymbolicLink() || leaf.nlink !== 1
+      || leaf.size < 0 || leaf.size > MAX_CLAUDE_TASK_OUTPUT_READ_BYTES
+      || physical !== candidate) return null;
+    return { path: candidate, taskId: scope.taskId, sessionId, toolUseId: scope.toolUseId };
+  } catch { return null; }
+}
+
+function exactClaudeTaskOutputBashRead(command, root, input, dependencies = {}) {
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  const name = basename(executable).toLowerCase();
+  let requestedPath = null;
+  if (["cat", "head", "tail"].includes(name)) {
+    const args = argv[0] === "--" ? argv.slice(1) : argv;
+    if (args.length !== 1) return false;
+    requestedPath = args[0];
+  } else if (["grep", "rg"].includes(name)) {
+    if (argv.length !== 2) return false;
+    requestedPath = argv[1];
+  } else return false;
+  const scope = claudeTaskOutputReadScope(requestedPath, input, root, dependencies);
+  return scope !== null && isReadOnlyDiagnosticCommand(command, root, [scope.path]);
+}
+
+function exactClaudeTaskOutputPowerShellRead(command, root, input, dependencies = {}) {
+  const parsed = parseGuardCommand(command, root, { platform: "win32" });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  if (basename(executable).toLowerCase() !== "get-content") return false;
+  const args = argv[0]?.toLowerCase() === "-path" ? argv.slice(1) : argv;
+  if (args.length !== 1) return false;
+  return claudeTaskOutputReadScope(args[0], input, root, dependencies) !== null;
 }
 
 /**
@@ -3141,10 +3352,6 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
       && isApprovedSingleCommandReadArg(args[1], root, extraRoots, true)) {
       return true;
     }
-    if (args.length >= 1 && args[0] === "--test") {
-      const rest = args.slice(1);
-      return rest.every((arg) => !arg.startsWith("-") && isApprovedSingleCommandReadArg(arg, root, extraRoots, true));
-    }
     if (args.length >= 1 && (args[0].endsWith(".test.mjs") || args[0].endsWith(".test.js") || args[0].endsWith(".test.cjs"))
       && isApprovedSingleCommandReadArg(args[0], root, extraRoots, true)) {
       return true;
@@ -3791,6 +3998,12 @@ export function isHumanPoSigningCommand(command, root) {
   return args !== null && HUMAN_PO_SIGNING_COMMANDS.includes(args[0]);
 }
 
+function isHumanPoProfileChangeCommand(command, root) {
+  const args = poApprovalArgs(command, root, PIPELINE_STATE_SCRIPT);
+  return args?.[0] === "po-authority-acknowledge-apply"
+    && args.slice(1).some(value => value.startsWith("--profile") || value.startsWith("--reason"));
+}
+
 /**
  * Return just the mutating file operands of an in-place sed invocation.
  *
@@ -4277,6 +4490,23 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
   // function already stripped the first `--runner <claude|codex|antigravity>` pair found anywhere
   // in argv before this loop ever runs -- so the shape matched below is the POST-STRIPPING one,
   // identical to every sibling here.
+  const isClaudeIntakeReference = value => {
+    if (typeof value !== "string" || Buffer.byteLength(value) > 4096) return false;
+    let reference;
+    try { reference = JSON.parse(value); } catch { return false; }
+    if (!reference || typeof reference !== "object" || Array.isArray(reference)) return false;
+    const raw = reference.schema === "pipeline.claude-intake-prompt-reference.v1";
+    const initial = reference.schema === "pipeline.claude-initial-prompt-reference.v1";
+    if (!raw && !initial) return false;
+    const keys = raw ? ["schema", "captureId", "sessionId", "transcriptPathSha256", "promptSha256", "byteLength"]
+      : ["schema", "pointerId", "sessionId", "promptId", "promptSha256", "byteLength"];
+    if (Object.keys(reference).sort().join("\0") !== keys.sort().join("\0")
+      || !/^[A-Za-z0-9_-]{1,128}$/u.test(reference.sessionId ?? "")
+      || !/^[a-f0-9]{64}$/u.test(reference.promptSha256 ?? "")
+      || !Number.isSafeInteger(reference.byteLength) || reference.byteLength < 1 || reference.byteLength > 1000000) return false;
+    return raw ? /^[a-f0-9]{48}$/u.test(reference.captureId ?? "") && /^[a-f0-9]{64}$/u.test(reference.transcriptPathSha256 ?? "")
+      : /^[a-f0-9]{48}$/u.test(reference.pointerId ?? "") && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(reference.promptId ?? "");
+  };
   const MUTATING_ONBOARDING_FLAG_VALIDATORS = {
     "--root": isRootValue,
     "--text": nonEmptyTrimmed,
@@ -4284,6 +4514,8 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
     // inside the project root) is enforced CLI-side in resolveIntakeCaptureText(), where the
     // root is actually resolved; the guard's job here stays the flag SET plus a value SHAPE.
     "--text-file": nonEmptyTrimmedNotFlag,
+    "--text-file-sha256": isHexDigest,
+    "--text-turn-ref": isClaudeIntakeReference,
     "--answers-json": nonEmptyTrimmedNotFlag,
     "--plan-sha256": isHexDigest,
     "--proof": nonEmptyTrimmedNotFlag,
@@ -4553,13 +4785,19 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
   // The historical cwd-relative apply spelling below remains byte-for-byte
   // admitted; the historical root-less plan remains unavailable as before.
   if (args[0] === "po-authority-acknowledge-plan") {
-    return matchFlagSpec(args.slice(1), {
+    const matched = matchFlagSpec(args.slice(1), {
       requiredValue: {
         "--root": (value) => value === root,
         "--by": targetValue,
         "--runner": (value) => VALID_RUNNERS.has(value),
       },
+      optionalValue: {
+        "--profile": (value) => ["epic", "feature", "mini"].includes(value),
+        "--reason": (value) => nonBlankValue(value) && !/[\x00-\x1f\x7f]/u.test(value)
+          && Buffer.byteLength(value, "utf8") <= 2048,
+      },
     });
+    return matched && args.includes("--profile") === args.includes("--reason");
   }
   if (args[0] === "po-authority-acknowledge-apply") {
     const historicalCwdShape = args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
@@ -4591,6 +4829,9 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
 }
 
 function sanctionedPipelineStateArgs(args, root) {
+  // `inspect` is a pure read of the current working tree and intentionally has no
+  // `--root` override; the caller must run it from the repository it is inspecting.
+  if (args[0] === "inspect") return args.length === 1;
   // Closed canonical enrollment routes; the writer owns all CAS, consent and lock checks.
   if (args[0] === "inspect-enrollment-retirement") {
     return exactRoot(args, root, 1) && args.length === 3;
@@ -4655,6 +4896,27 @@ function sanctionedPipelineStateArgs(args, root) {
       && isPhysicalScratchTarget(requestPath, { rootDir: root })
       && args.length === 5;
     return attributedLegacy || bootstrapReceipt || featureRequest;
+  }
+  if (args[0] === "approve-push") {
+    // ADR-0076's committed global chat choice already permits attribution by
+    // the agent. Classify only this existing writer's closed argv; the writer
+    // still owns candidate, destination and approval-record validation.
+    if (!matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--by": (value) => validBy(value) && !value.startsWith("--"),
+        "--remote": (value) => typeof value === "string" && !value.startsWith("--")
+          && /^[A-Za-z0-9._-]{1,80}$/u.test(value),
+        "--destination": (value) => typeof value === "string" && /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(value),
+      },
+    })) return false;
+    try {
+      const approval = readHumanApprovalMode(root, { legacyKind: "push" });
+      return approval?.mode === "chat"
+        && approval?.scope === "global"
+        && approval?.source === USER_SOURCE_PATH;
+    } catch {
+      return false;
+    }
   }
   if (args[0] === "set-phase") {
     const bareTransition = args[1] === "--phase"
@@ -4847,7 +5109,113 @@ function sanctionedOnboardingConsentMarkArgs(args, root) {
   return args.length === 7;
 }
 
+const DESIGN_COURSE_SOURCES = ["input", "prd", "spec", "design", "traceability"];
+const DESIGN_COURSE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const DESIGN_COURSE_SHA = /^[a-f0-9]{64}$/u;
+
+function designCourseRelativePath(value) {
+  return typeof value === "string" && value.length <= 240 && !/[\\:\0]/u.test(value)
+    && value.split("/").every((part) => part && !part.startsWith(".") && part !== "scratch" && part !== "node_modules");
+}
+
+// The coordinator owns content/provenance validation and exclusive output CAS.
+// This guard admits only its exact current course, with physically bound inputs
+// and output names; this is no authority to approve or sign a package.
+function physicalDesignCoursePath(root, path, { required = false, file = true } = {}) {
+  if (!designCourseRelativePath(path)) return false;
+  let current = root;
+  const parts = path.split("/");
+  try {
+    for (let index = 0; index < parts.length; index += 1) {
+      current = join(current, parts[index]);
+      let info;
+      try { info = lstatSync(current); }
+      catch (error) { if (error.code === "ENOENT") return !required; throw error; }
+      if (info.isSymbolicLink() || realpathSync(current) !== current
+        || (index < parts.length - 1 ? !info.isDirectory() : file ? !info.isFile() : !info.isDirectory())) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+function designCourseInputDigest(root, path, digest) {
+  return DESIGN_COURSE_SHA.test(digest ?? "") && physicalDesignCoursePath(root, path, { required: true })
+    && createHash("sha256").update(readFileSync(join(root, path))).digest("hex") === digest;
+}
+
+function sanctionedDesignCourseArgs(args, root) {
+  try {
+    if (!isAbsolute(root) || resolve(root) !== root || realpathSync(root) !== root || !lstatSync(root).isDirectory()) return false;
+    const observed = readDesignCourseState(root);
+    if (observed.status !== "ok") return false;
+    const state = observed.state;
+    const submitted = state.planSubmission;
+    const featureId = state.activeFeature?.id;
+    if (state.planApproved !== false || state.activeFeature?.phase !== "design" || state.activeFeature?.planPath !== submitted?.planPath
+      || !DESIGN_COURSE_ID.test(featureId ?? "") || submitted?.featureId !== featureId
+      || !["feature", "epic"].includes(submitted?.profile)
+      || !designCourseRelativePath(submitted.planPath) || !designCourseRelativePath(submitted.specPath)
+      || !DESIGN_COURSE_SHA.test(submitted.planSha256 ?? "") || !DESIGN_COURSE_SHA.test(submitted.specSha256 ?? "")) return false;
+    if (args[0] === "--inspect") {
+      return args.length === 5 && exactRoot(args, root, 1) && args[3] === "--runner" && VALID_RUNNERS.has(args[4]);
+    }
+    const runV2 = args[0] === "--run-v2";
+    let index = runV2 ? 1 : 0;
+    const take = (flag, check) => {
+      if (args[index] !== flag || typeof args[index + 1] !== "string" || !check(args[index + 1])) return false;
+      index += 2; return true;
+    };
+    let runner; let stage;
+    if (!take("--root", value => value === root) || !take("--runner", value => {
+      runner = value; return VALID_RUNNERS.has(value);
+    })) return false;
+    if (!runV2 && !take("--stage", value => { stage = value; return ["advisor", "readiness"].includes(value); })) return false;
+    const authoringDispatchId = state.continuity?.queueHead?.dispatch?.dispatchId
+      ?? state.continuity?.queueHead?.dispatchId ?? state.continuity?.queueHead?.dispatch?.id;
+    const prefix = `evidence/design-course/${featureId}/${runner}`;
+    if (!DESIGN_COURSE_ID.test(authoringDispatchId ?? "")
+      || !take("--feature-id", value => value === featureId)
+      || !take("--authoring-dispatch-id", value => value === authoringDispatchId)
+      || !take("--profile", value => value === submitted.profile)
+      || !take("--output-prefix", value => value === prefix && physicalDesignCoursePath(root, value))) return false;
+    const directory = dirname(submitted.specPath).split(sep).join("/");
+    const expectedPaths = { input: `${directory}/design-input.md`, prd: submitted.planPath, spec: submitted.specPath,
+      design: `${directory}/design.md`, traceability: `${directory}/traceability.md` };
+    const paths = new Set();
+    for (const name of DESIGN_COURSE_SOURCES) {
+      if (args[index] !== "--source" || args[index + 1] !== name || args[index + 2] !== expectedPaths[name]
+        || paths.has(args[index + 2]) || !designCourseInputDigest(root, args[index + 2], args[index + 3])
+        || (name === "prd" && args[index + 3] !== submitted.planSha256)
+        || (name === "spec" && args[index + 3] !== submitted.specSha256)) return false;
+      paths.add(args[index + 2]); index += 4;
+    }
+    if (stage === "advisor") return args[index] === "--execute" && index + 1 === args.length;
+    if (!take("--readiness-dispatch-id", value => DESIGN_COURSE_ID.test(value) && value !== authoringDispatchId)
+      || !take("--queue-revision", value => /^(0|[1-9][0-9]*)$/u.test(value) && Number.isSafeInteger(Number(value))
+        && Number(value) === state.continuity?.revision)
+      || !take("--receipt", value => value === `${prefix}.readiness.json` && physicalDesignCoursePath(root, value))
+      || !take("--preparation", value => value === `${prefix}.preparation.json`
+        && physicalDesignCoursePath(root, value, { required: !runV2 }))) return false;
+    if (runV2 && !take("--package", value => value === `${prefix}.package.json` && physicalDesignCoursePath(root, value))) return false;
+    if (runner === "codex" && (!take("--session-id", value => /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u.test(value))
+      || !take("--descriptor-sha256", value => DESIGN_COURSE_SHA.test(value)))) return false;
+    if (runV2) {
+      const takeReference = (flag, path) => {
+        if (args[index] !== flag || args[index + 1] !== path || !designCourseInputDigest(root, path, args[index + 2])) return false;
+        index += 3; return true;
+      };
+      if (runner === "codex") {
+        if (!takeReference("--disposition", `${prefix}.disposition.json`)
+          || !takeReference("--revisions", `${prefix}.revisions.json`)) return false;
+      } else if (!takeReference("--exception-rationale", `${prefix}.exception-rationale.txt`)) return false;
+      if (args[index] === "--advisor-result" && !takeReference("--advisor-result", `${prefix}.advisor-result.json`)) return false;
+    }
+    return args[index] === "--execute" && index + 1 === args.length;
+  } catch { return false; }
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
@@ -6064,18 +6432,86 @@ function containedGlobBase(path, root, extraRoots = []) {
   catch { return false; }
 }
 
+function registeredPluginReadScopeRoots(dependencies = {}) {
+  let supplied;
+  try {
+    supplied = dependencies.registeredPluginReadScopeRootsFn
+      ? dependencies.registeredPluginReadScopeRootsFn()
+      : BOUNDED_PIPELINE_ADDITIONAL_ROOTS;
+  } catch { return []; }
+  if (!Array.isArray(supplied) || supplied.length > 1) return [];
+  const roots = [];
+  for (const path of supplied) {
+    try {
+      if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path
+        || realpathSync(path) !== path || lstatSync(path).isSymbolicLink()
+        || !statSync(path).isDirectory()) continue;
+      roots.push(path);
+    } catch {}
+  }
+  return roots;
+}
+
+function isPathWithinRoot(path, root) {
+  const part = relative(root, path);
+  return part === "" || (part !== ".." && !part.startsWith(`..${sep}`) && !isAbsolute(part));
+}
+
+function registeredPluginReadPathStatus(raw, projectRoot, pluginRoots) {
+  let lexical;
+  try { lexical = resolve(passiveCandidate(raw, projectRoot)); }
+  catch { return false; }
+  let matched = false;
+  for (const pluginRoot of pluginRoots) {
+    const lexicalInside = isPathWithinRoot(lexical, pluginRoot);
+    let physical;
+    try { physical = realpathSync(lexical); }
+    catch { return lexicalInside ? false : matched ? true : null; }
+    const physicalInside = isPathWithinRoot(physical, pluginRoot);
+    if (!lexicalInside && !physicalInside) continue;
+    matched = true;
+    if (!lexicalInside || !physicalInside) return false;
+    const excluded = new Set([".git", "auth", "credentials", "secrets", "logs", "sessions", "history"]);
+    const relativeParts = [relative(pluginRoot, lexical), relative(pluginRoot, physical)];
+    if (relativeParts.some(part => part.split(sep).some(segment => excluded.has(segment.toLowerCase())))) return false;
+  }
+  return matched ? true : null;
+}
+
+function isSafeRegisteredPluginDirectory(raw, root, extraRoots, pluginPathStatus) {
+  if (pluginPathStatus !== true || !isAllowedPassiveReadTarget(raw, {
+    rootDir: root, recursive: true, directoryListing: true, additionalRecursiveRoots: extraRoots,
+  })) return false;
+  try { return statSync(passiveCandidate(raw, root)).isDirectory(); }
+  catch { return false; }
+}
+
+function passiveTargetIsFile(raw, root) {
+  try { return statSync(passiveCandidate(raw, root)).isFile(); }
+  catch { return false; }
+}
+
 function readToolScopeVerdict(input, root, dependencies) {
   const toolName = String(input.tool_name);
   const params = input.tool_input ?? {};
-  const sessionRoots = sessionReadScopeRoots(input, dependencies);
+  const pluginRoots = registeredPluginReadScopeRoots(dependencies);
+  const sessionRoots = [...sessionReadScopeRoots(input, dependencies), ...pluginRoots];
   const path = toolName === "Read" ? params.file_path : params.path ?? ".";
   const selector = toolName === "Glob" ? params.pattern : params.glob;
+  const pluginPath = registeredPluginReadPathStatus(path, root, pluginRoots);
+  const taskOutput = toolName === "Read" || toolName === "Grep"
+    ? claudeTaskOutputReadScope(path, input, root, dependencies)
+    : null;
   const targetSafe = (toolName === "Read"
-    ? isAllowedPassiveReadTarget(path, { rootDir: root, recursive: true, additionalRecursiveRoots: sessionRoots })
-    : toolName === "Grep" ? isSafeExactPassiveFile(path, root, sessionRoots)
+    ? pluginPath !== false && (taskOutput !== null
+      || isAllowedPassiveReadTarget(path, { rootDir: root, recursive: true, additionalRecursiveRoots: sessionRoots }))
+      && (pluginPath !== true || passiveTargetIsFile(path, root))
+    : toolName === "Grep" ? pluginPath !== false && (taskOutput !== null
+      || isSafeExactPassiveFile(path, root, sessionRoots)
+      || isSafeRegisteredPluginDirectory(path, root, sessionRoots, pluginPath))
     : containedLiteralReadPath(path, root, dependencies, sessionRoots));
   const selectorSafe = toolName === "Glob"
-    ? containedRelativeGlob(selector)
+    ? pluginPath !== false && containedRelativeGlob(selector)
       && (/[?*]/u.test(selector)
         ? containedGlobBase(path, root, sessionRoots)
         : isAllowedPassiveReadTarget(join(path, selector), {
@@ -6109,8 +6545,28 @@ function powerShellScratchPath(target, root, dependencies, allowScratchRoot = fa
     && isPhysicalIntakeScratchPath(target, root, dependencies, { allowScratchRoot });
 }
 
+// PowerShell requires the call operator for executable paths containing spaces. Admit only
+// that one prefix when the remainder parses as a single literal Node invocation that the
+// existing closed lifecycle argv validator already recognizes. This does not admit PowerShell
+// composition, variables, splatting, or a general-purpose call operator.
+function sanctionedPowerShellNodeCall(command, root) {
+  if (typeof command !== "string" || !/^\s*&\s+/u.test(command)) return false;
+  const body = command.replace(/^\s*&\s+/u, "");
+  if (/[\r\n;$`|<>]/u.test(body)) return false;
+  const parsed = parseGuardCommand(body, root, { platform: "win32" });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  if (!new Set(["node", "node.exe"]).has(basename(executable).toLowerCase()) || argv.length < 1) return false;
+  // The parser returns dequoted argv. Reject PowerShell expansion and wildcard forms while
+  // allowing ordinary literal values such as ops@example.test.
+  if (argv.some((arg) => typeof arg !== "string" || arg === "" || /[\0$`*?\[\]{}]/u.test(arg) || arg.startsWith("@"))) return false;
+  return isSanctionedLifecycleCommand(body, root, { platform: "win32", processExecPath: process.execPath });
+}
+
 function powerShellScopeVerdict(input, root, dependencies) {
   const command = input.tool_input.command ?? input.tool_input.CommandLine;
+  if (sanctionedPowerShellNodeCall(command, root)) return verdict(0);
   // PowerShell interpolation and composition must never be interpreted as a literal path.
   if (/[\r\n;$`@|&<>]/u.test(command)) {
     return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use one literal command.\n");
@@ -6160,6 +6616,19 @@ function powerShellScopeVerdict(input, root, dependencies) {
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use a sanctioned Pipeline action or a contained literal read.\n");
 }
 
+export function isHostOnlyClaudeCaptureInvocation(command, root, toolName = "Bash") {
+  if (typeof command !== "string") return false;
+  const body = toolName === "PowerShell" ? command.replace(/^\s*&\s+/u, "") : command;
+  const parsed = parseGuardCommand(body, root, toolName === "PowerShell" ? {platform:"win32"} : {});
+  if (parsed.parseStatus !== "accepted") return false;
+  const producers = new Set(["claude-task-output-scope-posttool.mjs", "claude-intake-prompt-capture.mjs"]);
+  return parsed.segments.some(segment => {
+    const executable = basename(segment.executable.replaceAll("\\", "/")).toLowerCase();
+    if (!["node", "node.exe"].includes(executable)) return false;
+    return segment.argv.some(word => producers.has(basename(word.replaceAll("\\", "/"))));
+  });
+}
+
 function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
   // PowerShell is wired into the same PreToolUse matcher as Bash and was nevertheless
@@ -6184,6 +6653,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     return blocked();
   }
 
+  // These event observers receive native host input. A ready lifecycle does
+  // not allow an agent to invoke them with self-authored event JSON.
+  if (SHELL_TOOLS.includes(toolName) && isHostOnlyClaudeCaptureInvocation(
+    input.tool_input.command ?? input.tool_input.CommandLine, root, toolName,
+  )) return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-NATIVE-CAPTURE-HOST-ONLY: capture observers run only as native host hooks.\n");
   if (READ_TOOLS.includes(toolName)) return readToolScopeVerdict(input, root, dependencies);
   // A quoted marker in inert physical scratch is evidence, not PO authority.
   // Existing scratch identity rejects aliases and active plugin roots; every
@@ -6212,12 +6686,19 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   if (toolName === "Bash" && isHumanPoSigningCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return externalPoSigningOnly();
   }
+  if (SHELL_TOOLS.includes(toolName) && isHumanPoProfileChangeCommand(
+    input.tool_input.command ?? input.tool_input.CommandLine, root,
+  )) return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-PROFILE-CHANGE-HUMAN-ONLY: profile acknowledgement changes require the existing attended human confirmation outside agent tools.\n");
   // Consumed-capability notices raised by the shell-lane test-path check below, carried onto
   // whatever verdict the remaining checks produce. Declared here rather than folded into
   // `lifts` further down because that array is created after the PowerShell early return, and
   // the test-path shell lane covers PowerShell too.
   const sessionRoots = toolName === "Bash" ? sessionReadScopeRoots(input, dependencies) : [];
   const shellLifts = [];
+  if (toolName === "PowerShell"
+    && exactClaudeTaskOutputPowerShellRead((input.tool_input.command ?? input.tool_input.CommandLine), root, input, dependencies)) {
+    return verdict(0);
+  }
   if (SHELL_TOOLS.includes(toolName)) {
     const gateStrength = gateStrengthShellRefusal((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (gateStrength !== null) return gateStrength;
@@ -6241,9 +6722,22 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     // lifecycle gate's shell lane (GUARD-DEVPLAN-SHELL). Same ordering discipline -- a command
     // already refused on a stricter sibling's ground must not also reach a lane that offers its
     // own lift.
-    const devPlanHit = devPlanShellRefusalHit((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies, toolName, sessionRoots);
+    const shellCommand = (input.tool_input.command ?? input.tool_input.CommandLine);
+    const sanctionedPowerShellLifecycleCall = toolName === "PowerShell"
+      && sanctionedPowerShellNodeCall(shellCommand, root);
+    const devPlanHit = sanctionedPowerShellLifecycleCall
+      ? null
+      : devPlanShellRefusalHit(shellCommand, root, dependencies, toolName, sessionRoots);
     if (devPlanHit !== null && devPlanHit.fault === true) {
       return devPlanShellFaultBlocked(devPlanHit.error);
+    }
+    if (devPlanHit?.lane === "governance-hook-settings") {
+      return verdict(
+        2,
+        "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+          + "PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER: a governed shell command cannot write the project hook settings file; "
+          + "use only the exact observed settings allowlist merge action for approved runner permission changes.\n",
+      );
     }
     if (devPlanHit !== null) {
       // NVA-B-REBWIRE-1: the ONE relief, consulted only once this lane has already decided to
@@ -6336,6 +6830,20 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       if (boundAuthority !== null) {
         return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority));
       }
+      const hooksDisableFinding = hooksDisableSettingsWriteFinding({
+        filePath: requested,
+        content: extractWritePayload(input.tool_input, toolName),
+        projectDir: root,
+        operation: toolName === "Edit" ? "edit" : "write",
+      });
+      if (hooksDisableFinding !== null) {
+        return withLifts(lifts, verdict(
+          2,
+          "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+            + `${hooksDisableFinding.code}: ${hooksDisableFinding.reason}. `
+            + "Use the exact observed settings allowlist merge action for approved runner permission changes.\n",
+        ));
+      }
       const relPath = relative(root, requested).replace(/\\/g, "/");
       if (isEvidenceArtifactPath(relPath)) {
         const payload = extractWritePayload(input.tool_input, toolName);
@@ -6383,7 +6891,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     lifts.push(route.admitted);
   }
   if (toolName === "Bash"
-    && isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots)) {
+    && (isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots)
+      || exactClaudeTaskOutputBashRead((input.tool_input.command ?? input.tool_input.CommandLine), root, input, dependencies))) {
     return withLifts(lifts, verdict(0));
   }
   if (toolName === "Bash"

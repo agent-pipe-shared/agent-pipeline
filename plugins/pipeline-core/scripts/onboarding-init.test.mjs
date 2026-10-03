@@ -29,7 +29,7 @@ import test, { after } from "node:test";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_STEP_CAP, SCHEMA, applyInitialOnboardingAnswers, applyTrustAnchorBootstrap, driveOnboardingInit, main } from "./onboarding-init.mjs";
+import { DEFAULT_RUN_BUDGET_MS, DEFAULT_STEP_CAP, SCHEMA, applyInitialOnboardingAnswers, applyTrustAnchorBootstrap, driveOnboardingInit, main } from "./onboarding-init.mjs";
 import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
@@ -1626,6 +1626,27 @@ test("driveOnboardingInit: accepts a completed WSL child when EPERM accompanies 
 });
 
 test("driveOnboardingInit: nonzero, missing-status, and non-EPERM spawn results remain closed", () => {
+  assert.equal(DEFAULT_RUN_BUDGET_MS, 90_000);
+  const root = freshRoot();
+  try {
+    let tick = 0;
+    let calls = 0;
+    const bounded = driveOnboardingInit({ rootDir: root, runBudgetMs: 10, now: () => tick,
+      run: (executable, argv, options) => {
+        calls += 1;
+        assert.equal(options.timeout, 10);
+        assert.equal(options.killSignal, "SIGKILL");
+        tick = 11;
+        return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: true } });
+      } });
+    assert.equal(bounded.outcome, "execution-budget-exhausted");
+    assert.equal(calls, 1, "expired budget must not execute the next mutation");
+    assert.equal(bounded.recovery.argv[1], "inspect");
+    assert.equal(bounded.recovery.mutation, false);
+    const timedOut = driveOnboardingInit({ rootDir: root, run: () => ({ status: null, error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }) }) });
+    assert.equal(timedOut.error.faultCode, "execution-budget-exhausted");
+    assert.equal(timedOut.recovery.argv[1], "inspect");
+  } finally { dispose(root); }
   for (const [name, result, faultCode, exitCode] of [
     ["nonzero-eperm", {
       status: 1,
@@ -1637,6 +1658,7 @@ test("driveOnboardingInit: nonzero, missing-status, and non-EPERM spawn results 
       stdout: JSON.stringify({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null }),
       stderr: "",
     }, "nonzero-exit", null],
+    ["timed-out-child", { status: null, stdout: "", stderr: "", error: Object.assign(new Error("ETIMEDOUT"), { code: "ETIMEDOUT" }) }, "execution-budget-exhausted", null],
     ["foreign-error-at-zero", {
       status: 0,
       stdout: JSON.stringify({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null }),
@@ -1767,6 +1789,10 @@ test("driveOnboardingInit: a genuinely non-converging chain stops with its own o
     assert.equal(result.stepsExecuted, 3);
     assert.equal(inspectCalls, 2);
     assert.ok(result.stepsExecuted < stepCap);
+    let commandCalls = 0;
+    const directLoop = driveOnboardingInit({ rootDir: root, stepCap, run: () => { commandCalls += 1; return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"] } }); } });
+    assert.equal(directLoop.outcome, "no-progress");
+    assert.equal(commandCalls, 3, "a repeated command response must not consume all 50 steps");
   } finally {
     dispose(root);
   }

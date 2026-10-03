@@ -29,11 +29,11 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
-function decorateInstalledImpl(content, pluginLibDir) {
+function decorateInstalledImpl(content, pluginLibDir, deadline) {
   const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/commit-msg-hook\/runtime-([a-f0-9]{64}))\/lib$/);
   if (!matched) return content;
   const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
-  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256});
+  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256,deadline});
   if (content.split("async function main() {").length !== 2) throw Error("GHA-RENDER-ANCHOR");
   return content.replace("async function main() {", "async function main() {\n  const governanceRoot = await projectRoot();\n  if (!governanceRoot) throw Error(\"GHA-ROOT\");\n  if (!await admitPipelineScope(governanceRoot)) return;") + renderGitHookSnapshotAdmission(runtimeSnapshot);
 }
@@ -194,12 +194,15 @@ async function main() {
   let resolveProjectAuthorityPaths;
   let NEUTRAL_GUARD_CONFIG;
   let LEGACY_GUARD_CONFIG;
+  let evaluateStagedDevPlanPaths;
   try {
     ({ finishedCommitMessageFindings, markerPolicyMode, parseIntegrationTrailerBlock } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "commit-message-policy.mjs")).href));
     ({ verifyQualityPackageIntegrationPreCommit } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
     ({ resolveProjectAuthorityPaths, NEUTRAL_GUARD_CONFIG, LEGACY_GUARD_CONFIG } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "project-authority.mjs")).href));
+    ({ evaluateStagedDevPlanPaths } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "guard-devplan-policy.mjs")).href));
     if (typeof finishedCommitMessageFindings !== "function" || typeof markerPolicyMode !== "function" || typeof resolveProjectAuthorityPaths !== "function"
-      || typeof parseIntegrationTrailerBlock !== "function" || typeof verifyQualityPackageIntegrationPreCommit !== "function") {
+      || typeof parseIntegrationTrailerBlock !== "function" || typeof verifyQualityPackageIntegrationPreCommit !== "function"
+      || typeof evaluateStagedDevPlanPaths !== "function") {
       throw new TypeError("required policy authority is unavailable");
     }
   } catch (error) {
@@ -209,6 +212,91 @@ async function main() {
   const root = await projectRoot();
   if (!root) {
     block(["the repository root could not be resolved; policy evaluation cannot continue."]);
+    return;
+  }
+  let stagedListing;
+  try {
+    stagedListing = spawnSync("git", ["diff", "--cached", "--name-only", "-z", "--no-renames"], {
+      cwd: root,
+      timeout: 10_000,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    });
+  } catch (error) {
+    block(["staged lifecycle paths could not be enumerated (" + (error?.name ?? "Error") + "); commit policy cannot continue."]);
+    return;
+  }
+  if (stagedListing.error || stagedListing.status !== 0 || !Buffer.isBuffer(stagedListing.stdout)) {
+    block(["staged lifecycle paths could not be enumerated (" + (stagedListing.error?.name ?? "GitError") + "); commit policy cannot continue."]);
+    return;
+  }
+  let stagedPaths;
+  try {
+    const encodedPaths = new TextDecoder("utf-8", { fatal: true }).decode(stagedListing.stdout);
+    if (encodedPaths && !encodedPaths.endsWith("\0")) throw new TypeError("unterminated Git path list");
+    stagedPaths = encodedPaths ? encodedPaths.slice(0, -1).split("\0") : [];
+    if (stagedPaths.some((path) => !path)) throw new TypeError("empty Git path");
+  } catch (error) {
+    block(["staged lifecycle paths were malformed (" + (error?.name ?? "Error") + "); commit policy cannot continue."]);
+    return;
+  }
+  const stagedContentByPath = {};
+  const baselineContentByPath = {};
+  const settingsPaths = stagedPaths.filter((path) => /^\\.claude\\/settings(?:\\.[^/]+)?\\.json$/u.test(path));
+  if (settingsPaths.length) {
+    const runGit = (args) => spawnSync("git", args, {
+      cwd: root, timeout: 10_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true,
+    });
+    try {
+      // Pin the base commit before reading any blobs; a worktree file is never a base.
+      const head = runGit(["rev-parse", "--verify", "--quiet", "HEAD"]);
+      if (head.error || !Buffer.isBuffer(head.stdout)) throw new Error("base enumeration failed");
+      const base = new TextDecoder("utf-8", {fatal:true}).decode(head.stdout).trim();
+      if (!((head.status === 0 && /^[a-f0-9]{40,64}$/u.test(base)) || (head.status === 1 && base === ""))) throw new Error("base identity unavailable");
+      const changes = runGit(["diff", "--cached", "--name-status", "-z", "--no-renames"]);
+      if (changes.error || changes.status !== 0 || !Buffer.isBuffer(changes.stdout)) throw new Error("staged statuses unavailable");
+      const encoded = new TextDecoder("utf-8", {fatal:true}).decode(changes.stdout);
+      if (encoded && !encoded.endsWith("\\0")) throw new Error("unterminated status list");
+      const rows = encoded ? encoded.slice(0,-1).split("\\0") : [];
+      if (rows.length % 2 !== 0) throw new Error("malformed status list");
+      const statusByPath = new Map();
+      for (let index=0;index<rows.length;index+=2) {
+        if (!/^[AMDT]$/u.test(rows[index]) || !rows[index+1] || statusByPath.has(rows[index+1])) throw new Error("ambiguous staged status");
+        statusByPath.set(rows[index+1],rows[index]);
+      }
+      const readBlob = (spec) => {
+        const result = runGit(["show",spec]);
+        if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout) || result.stdout.length > 1024*1024) throw new Error("settings blob unavailable");
+        return new TextDecoder("utf-8",{fatal:true}).decode(result.stdout);
+      };
+      for (const path of settingsPaths) {
+        const status = statusByPath.get(path);
+        if (!status) throw new Error("staged path changed during observation");
+        if (!base && status !== "A") throw new Error("unborn base has a non-added settings path");
+        // A/D come from Git's base/index comparison, never from a failed blob read.
+        baselineContentByPath[path] = status === "A" ? null : readBlob(base+":"+path);
+        stagedContentByPath[path] = status === "D" ? null : readBlob(":0:"+path);
+      }
+      const finalHead = runGit(["rev-parse","--verify","--quiet","HEAD"]);
+      if (finalHead.error || finalHead.status !== head.status || !Buffer.isBuffer(finalHead.stdout)
+        || !finalHead.stdout.equals(head.stdout)) throw new Error("base changed during settings observation");
+    } catch (error) {
+      block(["the exact base/index hook settings could not be read ("+(error?.name??"Error")+"); commit policy cannot continue."]);
+      return;
+    }
+  }
+  let stagedLifecycle;
+  try {
+    stagedLifecycle = evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths, stagedContentByPath, baselineContentByPath });
+  } catch (error) {
+    block(["staged lifecycle policy could not produce a verdict (" + (error?.name ?? "Error") + "); commit policy cannot continue."]);
+    return;
+  }
+  if (!stagedLifecycle || stagedLifecycle.ok !== true || stagedLifecycle.code !== "PIPELINE-STAGED-LIFECYCLE-ALLOW") {
+    const findings = Array.isArray(stagedLifecycle?.findings) && stagedLifecycle.findings.length
+      ? stagedLifecycle.findings.map((finding) => String(finding?.code ?? stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE") + (finding?.path ? " (" + finding.path + ")" : ""))
+      : [stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE"];
+    block(["staged lifecycle policy denied or could not verify this commit: " + findings.join(", ") + "."]);
     return;
   }
   let projectConfig = null;
@@ -343,7 +431,7 @@ function atomicWrite(path, content, mode) {
   }
 }
 
-export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } = {}) {
+export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, onProgress, timeBudgetMs } = {}) {
   const plan = planInstall({ rootDir, pluginLibDir });
   if (![
     "ready",
@@ -356,10 +444,10 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } 
   const impl = implPath(plan.commonDir);
   const snapshotState = join(plan.commonDir, "agent-pipeline", "commit-msg-hook");
   mkdirSync(snapshotState, { recursive: true, mode: 0o700 });
-  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState });
+  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState, onProgress, timeBudgetMs });
   pluginLibDir = join(runtimeSnapshot.root, "lib");
   const shimContent = renderShim(impl);
-  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir);
+  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir, runtimeSnapshot.deadline);
   atomicWrite(impl, implContent, 0o600);
   atomicWrite(plan.hookPath, shimContent, 0o755);
   const marker = {
@@ -406,7 +494,9 @@ if (isDirectInvocation(import.meta.url)) {
   const [verb] = process.argv.slice(2);
   const rootDir = process.cwd();
   const result = verb === "--install"
-    ? applyInstall({ rootDir })
+    ? applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
+      console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
+    } })
     : verb === "--remove"
       ? applyRemoval({ rootDir })
       : verb === "--plan-install"

@@ -20,11 +20,12 @@ import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
-import { normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
+import { inspectScratchShellScript, normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
 import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
+import { statePath as pipelineStatePath } from "../scripts/pipeline-state.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
@@ -198,13 +199,17 @@ function readyLifecycleFixture(mode = "chat") {
     const issued = issueLaunchTicket({ rootDir: root, barrierSha256: barrier.rawSha256 });
     consumeRuntimeReadback({ rootDir: root, ticketId: issued.ticketId, token: issued.token, receipt: { schema: "pipeline.codex-project-runtime-readback.v1", barrierSha256: barrier.rawSha256, repositoryFingerprint: barrier.barrier.repositoryFingerprint, sourceSha256: barrier.barrier.sourceSha256, runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256, readerGenerationSha256: sha256("test-agy-readback"), effectiveConfigSha256: sha256("test-agy-config"), validatedAgentsSha256: sha256("test-agy-agents"), ticketId: issued.ticketId, observedAtEpochMs: Date.now() } });
   }
-  const collect = (result, values, material = null) => { assert.ok(result.nextAction?.applyAction, JSON.stringify(result)); const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return invoke(...argv.slice(1)); };
-  collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "feature" }, "AGY test fixture material.\n");
+  const collect = (result, values, material = null) => { assert.equal(result.nextAction?.kind, "collect-input", JSON.stringify(result)); assert.ok(result.nextAction.applyAction, JSON.stringify(result)); const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return invoke(...argv.slice(1)); };
+  // This shared fixture serves adapter routing, repository binding and HGO
+  // policy assertions; none of its consumers asserts Feature design semantics.
+  // Explicitly select mini at the first intake, with no later profile switch.
+  // Feature-specific guard cases below keep their own Feature state fixtures.
+  collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "mini" }, "AGY test fixture material.\n");
   collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "AGY fixture." }]) });
   const generated = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "intake-generate-plan");
   invoke("intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
-  // Generated staging artifacts are always acknowledged by their sole writer
-  // before a bind is eligible, even in this test-only chat setup.
+  // Mini staging still requires the canonical chat acknowledgement before
+  // bind planning. Execute its returned action and re-inspect for the bind.
   follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-acknowledge-chat-apply");
   const bind = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-bind-plan");
   follow(bind, "bootstrap-bind-apply");
@@ -228,7 +233,10 @@ function readyLifecycleFixture(mode = "chat") {
     // without fabricating drift merely to exercise the repair branch.
     assert.equal(permissionsDrift.status, "ready", JSON.stringify(permissionsDrift));
   }
-  assert.equal(invoke("inspect", "--root", root, "--runner", "antigravity").status, "ready");
+  const ready = invoke("inspect", "--root", root, "--runner", "antigravity");
+  assert.equal(ready.status, "ready", JSON.stringify(ready));
+  assert.equal(ready.root, root);
+  assert.equal(ready.runner, "antigravity");
   if (mode === "signature") {
     const sourcePath = join(root, "pipeline.user.yaml");
     const signatureSource = readFileSync(sourcePath, "utf8")
@@ -421,11 +429,71 @@ check("Antigravity run_command falls back to workspacePaths when Cwd is missing"
   const unreadyRoot = unreadyGovernedFixture();
   const inactiveRoot = unregisteredFixture();
   try {
+    // Configure an actual passive Verify test for this consumer fixture. The
+    // existing classifier admits bounded .test.mjs execution; node verify.mjs
+    // remains opaque and must still be refused while this plan is Draft.
+    const verifyCommand = "node checks/verify.test.mjs";
+    const calibrationPath = join(readyRoot, "project", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    writeFileSync(calibrationPath, JSON.stringify({ ...calibration, verify: verifyCommand }, null, 2) + "\n");
+    const stateBefore = readFileSync(pipelineStatePath(readyRoot), "utf8");
+    mkdirSync(join(readyRoot, "checks"), { recursive: true });
+    writeFileSync(join(readyRoot, "checks", "verify.test.mjs"), [
+      'import assert from "node:assert/strict";',
+      'import { existsSync, readFileSync, realpathSync } from "node:fs";',
+      'import { join } from "node:path";',
+      'const root = realpathSync(process.cwd());',
+      'const calibration = JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8"));',
+      `assert.equal(calibration.verify, ${JSON.stringify(verifyCommand)});`,
+      `const state = JSON.parse(readFileSync(${JSON.stringify(pipelineStatePath(readyRoot))}, "utf8"));`,
+      'assert.equal(state.planApproved, false);',
+      'assert.equal(typeof state.activeFeature?.planPath, "string");',
+      'assert.ok(existsSync(join(root, state.activeFeature.planPath)), "the bound plan must exist in the selected project");',
+      'console.log(JSON.stringify({ root, verify: calibration.verify, planApproved: state.planApproved }));',
+      "",
+    ].join("\n"));
+
+    // The real start hint owns this competing root's session barrier. Even a
+    // passive Verify must be denied there, so an allow proves that missing Cwd
+    // selected workspacePaths[0] instead of the daemon cwd or inherited root.
+    const sessionId = "agy-cwd-contract";
+    const fixtureEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+    execFileSync("git", ["init", "-q", unreadyRoot], { env: fixtureEnv });
+    const bootstrap = spawnSync(process.execPath, [startHint], {
+      cwd: unreadyRoot, env: { ...fixtureEnv, CLAUDE_PROJECT_DIR: unreadyRoot },
+      input: JSON.stringify({ invocationNum: 1, sessionId, workspacePaths: [unreadyRoot] }), encoding: "utf8", shell: false,
+    });
+    assert.equal(bootstrap.status, 0, bootstrap.stderr);
+    const bootstrapMarker = join(unreadyRoot, ".git", "agent-pipeline", "run", `session-${sessionId}`, "requires-bootstrap.pending");
+    assert.equal(existsSync(bootstrapMarker), true, `${bootstrap.stderr}\n${bootstrap.stdout}`);
     const res = decision(run({
+      sessionId,
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: verifyCommand } },
+    }, readyRoot, { hookCwd: unreadyRoot, claudeProjectDir: unreadyRoot }));
+    assert.equal(res.decision, "allow", JSON.stringify(res));
+    const verified = spawnSync(process.execPath, ["checks/verify.test.mjs"], { cwd: readyRoot, encoding: "utf8", shell: false });
+    assert.equal(verified.status, 0, verified.stderr);
+    assert.deepEqual(JSON.parse(verified.stdout), { root: realpathSync(readyRoot), verify: verifyCommand, planApproved: false });
+    for (const Cwd of [unreadyRoot, relative(readyRoot, unreadyRoot)]) {
+      const blocked = decision(run({
+        sessionId,
+        workspacePaths: [readyRoot, unreadyRoot],
+        toolCall: { name: "run_command", args: { CommandLine: verifyCommand, Cwd } },
+      }, readyRoot, { hookCwd: readyRoot }));
+      assert.equal(blocked.decision, "deny");
+      assert.match(blocked.reason, /Mandatory Session Bootstrap/);
+    }
+    assert.equal(existsSync(bootstrapMarker), true);
+    const opaque = decision(run({
+      sessionId,
       workspacePaths: [readyRoot, unreadyRoot],
       toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
-    }, readyRoot, { hookCwd: unreadyRoot }));
-    assert.equal(res.decision, "allow");
+    }, readyRoot, { hookCwd: unreadyRoot, claudeProjectDir: unreadyRoot }));
+    assert.equal(opaque.decision, "deny");
+    assert.match(opaque.reason, /GUARD-DEVPLAN-SHELL/);
+    assert.match(opaque.reason, /opaque-script-execution/);
+    assert.equal(readFileSync(pipelineStatePath(readyRoot), "utf8"), stateBefore);
 
     const admission = (runner, input) => nativeHookGovernanceAdmission({ runner, rawInput: JSON.stringify(input) });
     assert.equal(admission("antigravity", {
@@ -741,9 +809,13 @@ check("Antigravity pretool guard admits approve-push when external cryptographic
 check("Antigravity honors the explicit global chat attribution route for plan and push approval", () => {
   const root = readyLifecycleFixture("chat");
   try {
+    // The consumer fixture has no local CLI. Use the adapter's physical
+    // installed script so this tests the sanctioned global-chat route.
+    const pipelineStateCli = realpathSync(join(pluginRoot, "scripts", "pipeline-state.mjs"));
+    const commandPrefix = ["node", pipelineStateCli].map((value) => JSON.stringify(value)).join(" ");
     for (const command of [
-      "node plugins/pipeline-core/scripts/pipeline-state.mjs approve-plan --by 'PO chat acknowledgement'",
-      "node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by 'PO chat acknowledgement' --remote origin --destination refs/heads/main",
+      `${commandPrefix} approve-plan --by 'PO chat acknowledgement'`,
+      `${commandPrefix} approve-push --by 'PO chat acknowledgement' --remote origin --destination refs/heads/main`,
     ]) {
       const res = decision(run({
         toolCall: { name: "run_command", args: { CommandLine: command } },
@@ -1284,6 +1356,23 @@ check("Antigravity pretool guard allows a plain bash script invocation, not inli
 
   assert.equal(res.decision, "allow");
   rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity scratch script inspection blocks Git indirection and keeps safe scripts usable", () => {
+  const root = mkdtempSync(join(process.cwd(), "scratch/agy-report-hotfixes-20261003-script-check-"));
+  const scratch = join(root, "scratch");
+  mkdirSync(scratch, { recursive: true });
+  writeFileSync(join(scratch, "unsafe.sh"), "#!/bin/sh\ngit reset --hard\n");
+  writeFileSync(join(scratch, "safe.sh"), "#!/bin/sh\nprintf 'hello\\n'\n");
+  mkdirSync(join(scratch, "nested"), { recursive: true });
+  writeFileSync(join(scratch, "nested", "unsafe.sh"), "#!/bin/sh\ngit push --force\n");
+  try {
+    assert.equal(inspectScratchShellScript("bash scratch/unsafe.sh", root).status, "contains-git");
+    assert.equal(inspectScratchShellScript("bash scratch/nested/unsafe.sh", root).status, "contains-git");
+    assert.equal(inspectScratchShellScript("bash scratch/safe.sh", root).status, "safe-script");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 check("Antigravity pretool guard blocks inline bash --login -c execution, a flag before -c (containment, delta-4 F4)", () => {

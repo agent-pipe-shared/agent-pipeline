@@ -27,6 +27,7 @@ import {
   canonicalBranchTarget,
   canonicalDetachedTarget,
   checkSessionHygiene,
+  classifyCanonicalWorktree,
   cleanupSession,
   createBranchWorktree,
   createDetachedWorktree,
@@ -504,6 +505,72 @@ check("D0-07 hygiene reports only redacted classifications and rejects noncanoni
   assert.equal(receipt.ok, false);
   assert(receipt.reasons.includes("noncanonical-worktree"));
   assert.equal(JSON.stringify(receipt).includes(fixture), false);
+});
+
+
+check("D0-07 missing Git registration preserves session counts and independent noncanonical findings", () => {
+  const { fixture, primary, head } = repoFixture();
+  const session = { sessionId: "session-hygiene-missing", ownerNonce: "owner-hygiene-missing-0001" };
+  const owned = createDetachedWorktree(primary, "hygiene-owned", head, session);
+  branch(primary, "feat/hygiene-missing");
+  const missing = join(fixture, "missing-registration");
+  git(primary, ["worktree", "add", missing, "feat/hygiene-missing"]);
+  // Remove only this disposable fixture directory; retain Git's registration.
+  rmSync(missing, { recursive: true, force: true });
+  const missingRecord = discoverRepository(primary).worktrees.find((record) => record.path === missing);
+  assert(missingRecord);
+  assertLifecycleError(() => classifyCanonicalWorktree(discoverRepository(primary), missingRecord), "WT-WORKTREE-MISSING");
+
+  const registeredBefore = git(primary, ["worktree", "list", "--porcelain"]).stdout;
+  const receipt = checkSessionHygiene(primary, session);
+  assert.equal(receipt.ok, false);
+  assert(receipt.reasons.includes("missing-worktree"));
+  assert(receipt.reasons.includes("session-manifest-not-drained"));
+  assert(receipt.reasons.includes("owned-temporary-worktree-remains"));
+  assert.equal(receipt.reasons.includes("noncanonical-worktree"), false);
+  assert.equal(receipt.counts.linkedWorktrees, 3);
+  assert.equal(receipt.counts.missingWorktrees, 1);
+  assert.equal(receipt.counts.noncanonicalWorktrees, 0);
+  assert.equal(receipt.counts.activeSessionManifests, 1);
+  assert.equal(receipt.counts.ownedTemporaryResidue, 1);
+
+  const unbound = checkSessionHygiene(primary, { sessionId: "session-hygiene-unrelated" });
+  assert.equal(unbound.ok, false);
+  assert(unbound.reasons.includes("missing-worktree"));
+  assert.equal(unbound.counts.activeSessionManifests, 0);
+  assert.equal(unbound.counts.ownedTemporaryResidue, 0);
+  assert.equal(git(primary, ["worktree", "list", "--porcelain"]).stdout, registeredBefore);
+  assert.equal(existsSync(owned.physicalPath), true);
+  assert.equal(JSON.stringify(receipt).includes(fixture), false);
+  assert.equal(JSON.stringify(receipt).includes(session.ownerNonce), false);
+
+  branch(primary, "feat/hygiene-noncanonical");
+  const noncanonical = join(fixture, "existing-noncanonical");
+  git(primary, ["worktree", "add", noncanonical, "feat/hygiene-noncanonical"]);
+  const mixed = checkSessionHygiene(primary, session);
+  assert.equal(mixed.ok, false);
+  assert(mixed.reasons.includes("missing-worktree"));
+  assert(mixed.reasons.includes("noncanonical-worktree"));
+  assert.equal(mixed.counts.linkedWorktrees, 4);
+  assert.equal(mixed.counts.missingWorktrees, 1);
+  assert.equal(mixed.counts.noncanonicalWorktrees, 1);
+  assert.equal(mixed.counts.activeSessionManifests, 1);
+  assert.equal(mixed.counts.ownedTemporaryResidue, 1);
+  assert.equal(existsSync(noncanonical), true);
+});
+
+check("D0-07 hygiene still throws an unsafe canonical-path error", () => {
+  const { fixture, primary } = repoFixture();
+  branch(primary, "feat/hygiene-unsafe");
+  const existing = join(primary, "unsafe-registration");
+  git(primary, ["worktree", "add", existing, "feat/hygiene-unsafe"]);
+  mkdirSync(join(primary, "branch"));
+  linkFixtureDirectory(fixture, join(primary, "branch", "feat"));
+  assertLifecycleError(
+    () => checkSessionHygiene(primary, { sessionId: "session-hygiene-unsafe" }),
+    "WT-SYMLINK-PARENT",
+  );
+  assert.equal(existsSync(existing), true);
 });
 
 // NVA-HYGFIX-1 repro: a worktree whose ONLY unversioned/modified paths are the

@@ -248,6 +248,58 @@ function hasOnboardingParentRecorder(source, suitePath, bindings) {
   return /const receipt = receiver\.close\(code, signal\);\s*coverage = receipt\.classes;\s*for \(const result of receipt\.results\) recorder\.dispose\(result\.id, result\.disposition\);/u.test(shardBody);
 }
 
+function closedCompletionRegistration(source, start) {
+  const callTail = source.slice(start);
+  const open = callTail.indexOf("(");
+  if (open === -1) return null;
+  const close = matchingClose(callTail, open, "(", ")");
+  if (close === -1) return null;
+  const argument = callTail.slice(open + 1, close).trim();
+  if (!argument.startsWith("{") || !argument.endsWith("}")) return null;
+  let properties;
+  try { properties = topLevelElements(argument.slice(1, -1)); } catch { return null; }
+  // Only the registration envelope is closed; actual case bodies may spread.
+  const keys = properties.map((property) => /^\s*([A-Za-z_$][\w$]*)\s*(?::|$)/u.exec(maskNonCode(property))?.[1] ?? null);
+  return keys.length === 3 && [...keys].sort().join("\0") === ["cases", "fd", "maxBytes"].sort().join("\0")
+    ? { end: start + close + 1 }
+    : null;
+}
+
+function hasDirectInvocationRegistration(source, suitePath, masked) {
+  // This is one existing entry contract, not a general conditional allowance.
+  // Resolve the real named import to the shipped helper and forbid aliases,
+  // alternate references or shadow bindings before trusting that exact guard.
+  const imports = [...source.matchAll(/^\s*import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']\s*;?/gmu)]
+    .filter((match) => /\bisDirectInvocation\b/u.test(match[1])
+      && braceDepthAt(masked, match.index) === 0
+      && /^\s*import\b/u.test(masked.slice(match.index, match.index + match[0].length)));
+  if (imports.length !== 1 || imports[0][1].trim() !== "isDirectInvocation"
+    || !imports[0][2].startsWith(".")
+    || posix.normalize(posix.join(posix.dirname(suitePath), imports[0][2])) !== "plugins/pipeline-core/lib/entrypoint.mjs"
+    || [...masked.matchAll(/\bisDirectInvocation\b/gu)].length !== 2
+    || [...masked.matchAll(/\bregisterTestCaseCompletion\b/gu)].length !== 2) return false;
+  const guards = topLevelMatches(masked, /^\s*if\s*\(\s*isDirectInvocation\s*\(\s*import\.meta\.url\s*\)\s*\)\s*\{/gmu);
+  if (guards.length !== 1) return false;
+  const guard = guards[0];
+  const prefix = masked.slice(0, guard.index);
+  // A complete preceding statement excludes unbraced, multiline outer
+  // conditions; brace depth alone cannot establish that this is the entry.
+  if (!/[;}]/u.test(prefix.trimEnd().slice(-1))) return false;
+  if (topLevelMatches(prefix, /(?<![\w$.])(?:throw\b|process\s*\.\s*(?:exit|abort|reallyExit)\s*\()/gu).length) return false;
+  if (topLevelMatches(prefix, /(?<![\w$.])process\s*\[[^\]]*\]\s*\(/gu).length) return false;
+  const previousLine = prefix.trimEnd().split("\n").at(-1)?.trim() ?? "";
+  if (/^(?:(?:if|for|while|with)\s*\([^)]*\)|else)\s*$/u.test(previousLine)) return false;
+  const open = masked.indexOf("{", guard.index);
+  const close = matchingClose(source, open, "{", "}", true);
+  if (close === -1 || /^\s*else\b/u.test(masked.slice(close + 1))) return false;
+  const body = source.slice(open + 1, close);
+  const bodyCode = maskNonCode(body, true);
+  const calls = topLevelMatches(bodyCode, /^\s*registerTestCaseCompletion\s*\(/gmu);
+  if (calls.length !== 1 || bodyCode.slice(0, calls[0].index).trim() !== "") return false;
+  const registration = closedCompletionRegistration(body, calls[0].index);
+  return registration !== null && /^\s*;?\s*$/u.test(bodyCode.slice(registration.end));
+}
+
 function hasRequiredProtocol(source, suitePath) {
   const helperImports = [...source.matchAll(/^\s*import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']\s*;?/gmu)]
     .filter((match) => match[2].endsWith("test-case-completion.mjs"));
@@ -260,6 +312,7 @@ function hasRequiredProtocol(source, suitePath) {
     || bindings.some((binding) => /\bas\s+registerTestCaseCompletion$/u.test(binding))) return false;
   const masked = maskNonCode(source, true);
   const calls = topLevelMatches(masked, /^\s*registerTestCaseCompletion\s*\(/gmu);
+  if (calls.length === 0) return hasDirectInvocationRegistration(source, suitePath, masked);
   if (calls.length !== 1) return false;
   const prefix = masked.slice(0, calls[0].index);
   // A direct top-level registration is the narrow normal-startup shape. Obvious
@@ -267,19 +320,7 @@ function hasRequiredProtocol(source, suitePath) {
   if (topLevelMatches(prefix, /^\s*(?:throw\b|process\.exit\s*\()/gmu).length) return false;
   const previousLine = prefix.trimEnd().split("\n").at(-1)?.trim() ?? "";
   if (/^(?:(?:if|for|while|with)\s*\([^)]*\)|else)\s*$/u.test(previousLine)) return false;
-  const callTail = source.slice(calls[0].index);
-  const open = callTail.indexOf("(");
-  if (open === -1) return false;
-  const close = matchingClose(callTail, open, "(", ")");
-  if (close === -1) return false;
-  const argument = callTail.slice(open + 1, close).trim();
-  if (!argument.startsWith("{") || !argument.endsWith("}") || maskNonCode(argument).includes("...")) return false;
-  let properties;
-  try { properties = topLevelElements(argument.slice(1, -1)); } catch { return false; }
-  // Object shorthand has the same closed own-key shape as explicit properties.
-  // Methods, spreads, duplicate keys and caller-held configuration objects stay out.
-  const keys = properties.map((property) => /^\s*([A-Za-z_$][\w$]*)\s*(?::|$)/u.exec(maskNonCode(property))?.[1] ?? null);
-  return keys.length === 3 && [...keys].sort().join("\0") === ["cases", "fd", "maxBytes"].sort().join("\0");
+  return closedCompletionRegistration(source, calls[0].index) !== null;
 }
 
 function hasVerifyCaseCompletionPolicy(element) {

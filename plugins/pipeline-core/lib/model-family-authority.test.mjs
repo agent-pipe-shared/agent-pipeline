@@ -171,6 +171,18 @@ completionCases.push({ id: "MFA" + String(completionCases.length + 1).padStart(3
   assert.deepEqual(Object.keys(failure).sort(), ["code", "ok", "retryable"]);
   assert.equal(failure.ok, false);
   assert.equal(typeof failure.retryable, "boolean");
+  // Null may describe explicit first adoption only when the authenticated old
+  // slot is absent, even if a fresh synthetic signature binds the altered row.
+  const nullProjection = structuredClone(target.projection); nullProjection[0].historicModelId = null;
+  const nullBundle = structuredClone(target.bundle);
+  nullBundle.subject.migration.familyProjectionSha256 = digest(nullProjection);
+  const nullSubjectSha256 = digest(nullBundle.subject);
+  nullBundle.approvalIntent.value = { ...nullBundle.approvalIntent.value,
+    specSha256: nullSubjectSha256, subjectSha256: nullSubjectSha256 };
+  nullBundle.approvalIntent.sha256 = sha(canonical(nullBundle.approvalIntent.value));
+  nullBundle.proof.intentSha256 = nullBundle.approvalIntent.sha256;
+  nullBundle.proof.signatureBase64 = sign(null, Buffer.from(nullBundle.approvalIntent.sha256), privateKey).toString("base64");
+  assert.equal(verify({ ...predecessor, migrationProjection: nullProjection }, trustAnchors, nullBundle).ok, false);
 } });
 
 completionCases.push({ id: "MFA" + String(completionCases.length + 1).padStart(3, "0"), name: "authority rejects duplicated normalized identities, effort or source drift, floors, and unapproved additions", run: () => {

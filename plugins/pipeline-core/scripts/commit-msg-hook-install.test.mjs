@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { test } from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -18,8 +19,19 @@ import {
   planDecline,
   planRemoval,
 } from "./commit-msg-hook-install.mjs";
+const completionCases = [];
+function test(name, optionsOrRun, possibleRun) {
+  const options = typeof optionsOrRun === "function" ? {} : optionsOrRun ?? {};
+  const run = typeof optionsOrRun === "function" ? optionsOrRun : possibleRun;
+  if (typeof name !== "string" || typeof run !== "function") throw new TypeError("invalid callback registration");
+  const entry = { id: "CMI" + String(completionCases.length + 1).padStart(3, "0"), name, run };
+  if (options.skip === true) entry.mode = "skip";
+  completionCases.push(entry);
+}
 
-const PLUGIN_LIB_DIR = join(fileURLToPath(new URL("..", import.meta.url)), "lib");
+
+const PLUGIN_LIB_DIR = process.env.PIPELINE_CORE_TEST_PLUGIN_LIB_DIR
+  ?? join(fileURLToPath(new URL("..", import.meta.url)), "lib");
 
 function enrollFixture(dir) {
   const controller = createGovernanceScopeController({hostStateRoot:join(dir, '.git', 'fixture-host-state')});
@@ -207,6 +219,43 @@ test("install, managed upgrade and removal preserve ownership checks", () => {
   assert.equal(planRemoval({ rootDir: dir }).status, "nothing-to-remove");
 });
 
+test("commit hook blocks unapproved staged implementation paths but still permits documentation", () => {
+  const { dir, git } = freshRepo("staged-lifecycle");
+  install(dir);
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  mkdirSync(join(dir, "src"), { recursive: true });
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n");
+  writeFileSync(join(dir, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "fixture", planPath: ".claude/plans/p.md", phase: "design" },
+    planApproved: false,
+  })}\n`);
+  writeFileSync(join(dir, "src", "game.js"), "export const value = 1;\n");
+  writeFileSync(join(dir, "docs", "notes.md"), "ordinary documentation remains allowed\n");
+  const commitWithStagedMessage = (message) => {
+    const path = join(dir, "message.txt");
+    writeFileSync(path, message);
+    return git("commit", "-F", path);
+  };
+  assert.equal(git("add", ".claude/pipeline.yaml", ".claude/pipeline-state.json", "src/game.js").status, 0);
+  const denied = commitWithStagedMessage("feat: blocked implementation\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.notEqual(denied.status, 0);
+  assert.match(denied.stderr, /GUARD-DEVPLAN-LIFECYCLE/);
+
+  assert.equal(git("reset", "-q").status, 0);
+  assert.equal(git("add", ".claude/pipeline.yaml", ".claude/pipeline-state.json", "docs/notes.md").status, 0);
+  const allowed = git("commit", "-m", "docs: ordinary documentation\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.equal(allowed.status, 0, allowed.stderr);
+
+  writeFileSync(join(dir, ".claude", "settings.json"), `${JSON.stringify({ disableAllHooks: true })}\n`);
+  assert.equal(git("add", ".claude/settings.json").status, 0);
+  writeFileSync(join(dir, ".claude", "settings.json"), `${JSON.stringify({ disableAllHooks: false })}\n`);
+  const stagedSettings = commitWithStagedMessage("fix: reject staged hook disablement\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.notEqual(stagedSettings.status, 0);
+  assert.match(stagedSettings.stderr, /PIPELINE-HOOKS-DISABLE-FORBIDDEN/);
+});
+
 test("upgrade and removal refuse a modified managed hook", () => {
   const { dir } = freshRepo("modified");
   const installed = install(dir);
@@ -248,9 +297,11 @@ test("generated hook fails closed when its install-bound policy module is unavai
   rmSync(join(absentLibDir, 'commit-message-policy.mjs'));
   const installed = applyInstall({ rootDir: dir, pluginLibDir: absentLibDir });
   assert.equal(installed.status, "installed");
+  const marker = JSON.parse(readFileSync(installed.markerPath, "utf8"));
+  assert.equal(existsSync(join(marker.pluginLibDir, "commit-message-policy.mjs")), false, "the installed snapshot preserves the missing policy module");
   const result = commitWithMessage(dir, git, "feat: cannot be evaluated\n");
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /policy could not be loaded/);
+  assert.match(result.stderr, /policy could not be loaded|faulted before producing a verdict/);
 });
 
 test("decline marker has the same reversible, non-overwriting contract as the other hook installers", () => {
@@ -268,3 +319,48 @@ test("decline marker has the same reversible, non-overwriting contract as the ot
   assert.equal(installed.status, "installed", "a decline must not make installation permanently impossible");
   assert.equal(planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "ready-to-upgrade");
 });
+
+
+test("installed hook permits first permissions settings but rejects new hook authority", () => {
+  const {dir,git}=freshRepo("first-permissions-settings");
+  install(dir);mkdirSync(join(dir,".claude"),{recursive:true});
+  const settings=join(dir,".claude","settings.local.json");
+  writeFileSync(settings,JSON.stringify({permissions:{allow:["Bash(node --version)"]}}));
+  assert.equal(git("add","--force",".claude/settings.local.json").status,0);
+  const initial=git("commit","-m","chore: first permissions\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.equal(initial.status,0,initial.stderr);
+  writeFileSync(settings,JSON.stringify({hooks:{PreToolUse:[]},permissions:{allow:[]}}));
+  assert.equal(git("add","--force",".claude/settings.local.json").status,0);
+  const changed=git("commit","-m","chore: changed hook authority\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.notEqual(changed.status,0);
+  assert.match(changed.stderr,/PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN/u);
+});
+
+test("installed hook compares settings hooks against Git base and exact staged deletions", () => {
+  const {dir,git}=freshRepo("base-hook-projection");mkdirSync(join(dir,".claude"),{recursive:true});
+  const settings=join(dir,".claude","settings.json");
+  const baseline={hooks:{PreToolUse:[{matcher:"Write",hooks:[{type:"command",command:"node guard.mjs"}]}]},permissions:{allow:[]}};
+  writeFileSync(settings,JSON.stringify(baseline));assert.equal(git("add",".claude/settings.json").status,0);
+  assert.equal(git("commit","-m","chore: fixture base").status,0);
+  install(dir);
+  writeFileSync(settings,JSON.stringify({permissions:{allow:[]}}));assert.equal(git("add",".claude/settings.json").status,0);
+  // Restore the worktree after staging; the hook must still reject the index removal.
+  writeFileSync(settings,JSON.stringify(baseline));
+  const removed=git("commit","-m","chore: removed hooks\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.notEqual(removed.status,0);assert.match(removed.stderr,/PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN/u);
+  assert.equal(git("reset","-q","HEAD","--",".claude/settings.json").status,0);
+  assert.equal(git("rm","--cached",".claude/settings.json").status,0);
+  const deleted=git("commit","-m","chore: deleted settings\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.notEqual(deleted.status,0);assert.match(deleted.stderr,/PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN/u);
+  assert.equal(git("reset","-q","HEAD","--",".claude/settings.json").status,0);
+  writeFileSync(settings,JSON.stringify({...baseline,permissions:{allow:["Read"]}}));
+  assert.equal(git("add",".claude/settings.json").status,0);
+  const ordinary=git("commit","-m","chore: permissions update\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.equal(ordinary.status,0,ordinary.stderr);
+});
+
+if (completionCases.length !== 22) throw new Error("case completion count drift: expected 22, got " + completionCases.length);
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });

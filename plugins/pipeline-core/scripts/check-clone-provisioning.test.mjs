@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assessPushHookBackstop, checkCloneProvisioning, projectHookProvisioning } from "./check-clone-provisioning.mjs";
+import { applyMandatoryHookGate, assessMandatoryHookReadiness, assessPushHookBackstop, checkCloneProvisioning, projectHookProvisioning } from "./check-clone-provisioning.mjs";
 
 test("checkCloneProvisioning returns well-formed report against current root", () => {
   const report = checkCloneProvisioning(process.cwd());
@@ -47,4 +47,22 @@ test("blocking push is backed only by a current generated pre-push hook", () => 
   const ready = assessPushHookBackstop("/repo", { load, project: () => ({ status: "current", repairAction: null }) });
   assert.equal(ready.backed, true);
   assert.equal(ready.code, null);
+});
+
+test("mandatory readiness covers pre-commit and commit-msg while preserving the optional push boundary", () => {
+  const report = (preCommit, commitMsg, prePush = "decline") => ({ checks: [
+    { id: "pre-commit-hook", status: preCommit },
+    { id: "commit-msg-hook", status: commitMsg },
+    { id: "pre-push-hook", status: prePush },
+  ] });
+  assert.equal(assessMandatoryHookReadiness(report("current", "current")).status, "ready");
+  assert.equal(assessMandatoryHookReadiness(report("install", "install")).status, "provisioning-required");
+  assert.equal(assessMandatoryHookReadiness(report("foreign-owner", "current")).status, "blocked");
+  assert.equal(assessMandatoryHookReadiness(report("unresolved", "unresolved")).status, "unresolved");
+  assert.equal(assessMandatoryHookReadiness(report("current", "current", "decline")).status, "ready",
+    "pre-push remains outside mandatory readiness");
+  assert.equal(applyMandatoryHookGate("ready", { status: "provisioning-required" }), "hook-provisioning-required");
+  assert.equal(applyMandatoryHookGate("ready", { status: "blocked" }), "hook-provisioning-blocked");
+  assert.equal(applyMandatoryHookGate("plugin-attestation-required", { status: "provisioning-required" }), "plugin-attestation-required",
+    "a stronger existing preflight reason remains visible");
 });

@@ -1254,6 +1254,292 @@
         ],
         "maxBytes": 4096
       }
+    },
+    {
+      "name": "claude-task-output-read-scope-tests",
+      "file": "plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CTOS001",
+          "CTOS002",
+          "CTOS003",
+          "CTOS004"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Exact PostToolUse-bound task output reads remain private, physical, and restricted to the authorized single output",
+      "nonOverlapNote": "Distinct from host scope production and workspace file authority"
+    },
+    {
+      "name": "claude-task-output-scope-posttool-tests",
+      "file": "plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CTPH001",
+          "CTPH002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Native PostToolUse results create only immutable exact task-output read scopes",
+      "nonOverlapNote": "Distinct from passive reader enforcement and agent-controlled output text"
+    },
+    {
+      "name": "audit-pack-tests",
+      "file": "plugins/pipeline-core/scripts/audit-pack.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AUDPK001",
+          "AUDPK002",
+          "AUDPK003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Offline audit packs bind a candidate and verified public evidence without exporting private local authority",
+      "nonOverlapNote": "Audit packaging does not publish or create approval proof"
+    },
+    {
+      "name": "clone-hook-readiness-tests",
+      "file": "plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CHR001"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Clone readiness refuses non-repositories before Git initialization or hook writes",
+      "nonOverlapNote": "Readiness diagnosis is distinct from installation and activation"
+    },
+    {
+      "name": "design-authoring-tests",
+      "file": "plugins/pipeline-core/lib/design-authoring.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DAU001",
+          "DAU002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Design authoring creates visibly draft material and compact, digest-bound readback",
+      "nonOverlapNote": "Authoring helpers do not grant architecture approval or implementation authority"
+    },
+    {
+      "name": "install-snapshot-progress-tests",
+      "file": "plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ISP001",
+          "ISP002",
+          "ISP003",
+          "ISP004"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Hook installation snapshots report bounded progress and abort safely on source drift",
+      "nonOverlapNote": "Progress and snapshot integrity checks do not change hook ownership rules"
+    },
+    {
+      "name": "model-family-approval-request-tests",
+      "file": "plugins/pipeline-core/scripts/model-family-approval-request.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MFA001",
+          "MFA002",
+          "MFA003",
+          "MFA004",
+          "MFA005",
+          "MFA006",
+          "MFA007",
+          "MFA008",
+          "MFA009",
+          "MFA010"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Model-family approval requests bind available routes and preserve fail-closed proof verification",
+      "nonOverlapNote": "Request preview is separate from human signature and activation"
+    },
+    {
+      "name": "claude-intake-prompt-capture-tests",
+      "file": "plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CIP001",
+          "CIP002",
+          "CIP003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Claude prompt references disclose only consented, bounded native capture text",
+      "nonOverlapNote": "Private capture readers do not broaden transcript or task-output path access"
+    },
+    {
+      "name": "claude-intake-prompt-hook-tests",
+      "file": "plugins/pipeline-core/hooks/claude-intake-prompt-capture.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CIH001",
+          "CIH002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "UserPromptSubmit capture emits only opaque references and keeps pre-consent content private",
+      "nonOverlapNote": "The hook producer does not itself approve or apply captured intake"
+    },
+    {
+      "name": "bound-design-line-endings-tests",
+      "file": "plugins/pipeline-core/lib/bound-design-line-endings.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "BDL001",
+          "BDL002",
+          "BDL003",
+          "BDL004"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Line-ending remediation is bound to the exact repository and preserves signed LF checkout bytes",
+      "nonOverlapNote": "The helper does not rewrite design content or project-wide configuration"
+    },
+    {
+      "name": "claude-native-capture-entry-tests",
+      "file": "plugins/pipeline-core/hooks/claude-native-capture-entry.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NCE001",
+          "NCE002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Agent-invoked native capture producers are denied while passive reads remain unchanged",
+      "nonOverlapNote": "Entry denial is separate from native host hook provenance"
+    },
+    {
+      "name": "runtime-handover-projection-tests",
+      "file": "plugins/pipeline-core/lib/runtime-handover-projection.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RHP001",
+          "RHP002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Runtime handover projection binds current Git state without rewriting tracked bytes",
+      "nonOverlapNote": "Projection authority does not alter or attest handover content"
+    },
+    {
+      "name": "runtime-handover-writer-tests",
+      "file": "plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RHW001",
+          "RHW002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Runtime handover writer preserves tracked state and refuses lifecycle drift",
+      "nonOverlapNote": "Private projection does not overwrite operator-authored handover material"
+    },
+    {
+      "name": "claude-intake-reference-admission-tests",
+      "file": "plugins/pipeline-core/hooks/claude-intake-reference-admission.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CIR001",
+          "CIR002"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Native intake references are admitted only at the published shared argv boundary",
+      "nonOverlapNote": "Reference admission does not grant consent or resolve arbitrary paths"
+    },
+    {
+      "name": "design-workflow-package-builder-tests",
+      "file": "plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DWPB001",
+          "DWPB002",
+          "DWPB003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "V2 design workflow packages are built from canonically verified preparation and readiness evidence",
+      "nonOverlapNote": "Package creation does not request PO approval or grant implementation authority"
+    },
+    {
+      "name": "design-course-coordinator-tests",
+      "file": "plugins/pipeline-core/scripts/design-course-coordinator.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "K19001"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Course inspection reports runner readiness and typed native Advisor unavailability",
+      "nonOverlapNote": "Inspection remains read-only and grants no implementation authority"
+    },
+    {
+      "name": "design-course-session-tests",
+      "file": "plugins/pipeline-core/scripts/design-course-session.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "K3C001",
+          "K3C002",
+          "K3C003",
+          "K3C004",
+          "K3C005",
+          "K3C006"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Design-course stages preserve canonical Advisor routing and signed-package authority boundaries",
+      "nonOverlapNote": "Course session helpers do not grant implementation authority or PO approval"
+    },
+    {
+      "name": "design-course-command-admission-tests",
+      "file": "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "K3G001",
+          "K3G002",
+          "K3G003",
+          "K3G004",
+          "K3G005",
+          "K3G006",
+          "K3G007",
+          "K3G008",
+          "K3G009",
+          "K3G010",
+          "K3G011",
+          "K3G012",
+          "K3G013",
+          "K3G014",
+          "K3G015",
+          "K3G016",
+          "K3G017"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Design-course guard admission binds exact current feature, sources and dispatch; agent profile-change apply and stale or malformed producer commands fail closed",
+      "nonOverlapNote": "Command admission exercises the guard boundary independently of coordinator execution and does not grant PO approval or implementation authority"
     }
   ]
 }

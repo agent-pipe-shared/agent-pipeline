@@ -6915,6 +6915,113 @@ function bashWithTranscript(command, transcriptPath) {
   return { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath };
 }
 
+test("registered plugin diagnostic scope admits bounded reads but rejects private paths and aliases", () => {
+  const { projectDir } = readScopeFixture();
+  const pluginRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-registered-plugin-read-"));
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-registered-plugin-outside-"));
+  const publicFile = join(pluginRoot, "hooks", "diagnostic.mjs");
+  const gitFile = join(pluginRoot, ".git", "config");
+  const secretFile = join(pluginRoot, "secrets", "private-note.md");
+  const outsideFile = join(outside, "public.md");
+  const movingLink = join(pluginRoot, "hooks", "moving.mjs");
+  const outsideAlias = join(outside, "plugin-alias");
+  mkdirSync(dirname(publicFile), { recursive: true });
+  mkdirSync(dirname(gitFile), { recursive: true });
+  mkdirSync(dirname(secretFile), { recursive: true });
+  writeFileSync(publicFile, "export const diagnostic = true;\n");
+  writeFileSync(gitFile, "[remote origin]\n");
+  writeFileSync(secretFile, "private\n");
+  writeFileSync(outsideFile, "outside\n");
+  const deps = {
+    projectDir,
+    registeredPluginReadScopeRootsFn: () => [realpathSync(pluginRoot)],
+  };
+  const read = file => evaluateLifecycleReadyGuard({ tool_name: "Read", tool_input: { file_path: file } }, deps);
+  const grep = path => evaluateLifecycleReadyGuard({ tool_name: "Grep", tool_input: { path } }, deps);
+  const glob = (path, pattern = "*.mjs") => evaluateLifecycleReadyGuard({ tool_name: "Glob", tool_input: { path, pattern } }, deps);
+  try {
+    assert.equal(read(publicFile).exitCode, 0);
+    assert.equal(grep(publicFile).exitCode, 0);
+    assert.equal(grep(pluginRoot).exitCode, 0);
+    assert.equal(glob(pluginRoot).exitCode, 0);
+    assert.equal(read(gitFile).exitCode, 2);
+    assert.equal(grep(secretFile).exitCode, 2);
+    assert.equal(glob(join(pluginRoot, ".git"), "config").exitCode, 2);
+    symlinkSync(publicFile, movingLink);
+    assert.equal(read(movingLink).exitCode, 0);
+    rmSync(movingLink);
+    symlinkSync(outsideFile, movingLink);
+    assert.equal(read(movingLink).exitCode, 2);
+    symlinkSync(pluginRoot, outsideAlias);
+    assert.equal(grep(outsideAlias).exitCode, 2);
+    const symlinkRoot = join(outside, "registered-root-alias");
+    symlinkSync(pluginRoot, symlinkRoot);
+    const aliasedRootDeps = { ...deps, registeredPluginReadScopeRootsFn: () => [symlinkRoot] };
+    assert.equal(evaluateLifecycleReadyGuard({ tool_name: "Grep", tool_input: { path: symlinkRoot } }, aliasedRootDeps).exitCode, 2);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(pluginRoot, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("Claude task output is an exact session-bound passive read file, never a directory or executable scope", () => {
+  const { projectDir, outside } = readScopeFixture();
+  const taskDirectory = mkdtempSync(join("/var/tmp", "guard-lifecycle-task-output-"));
+  const taskId = "task_123";
+  const sessionId = "session_current";
+  const toolUseId = "toolu_123";
+  const transcriptPath = join(outside, "session.jsonl");
+  const taskOutputPath = join(taskDirectory, `${taskId}.output`);
+  const siblingPath = join(taskDirectory, "other.output");
+  writeFileSync(transcriptPath, "{}\n");
+  writeFileSync(taskOutputPath, "bounded task result\n");
+  writeFileSync(siblingPath, "another task result\n");
+  const readClaudeTaskOutputReadScopeFn = ({ sessionId: requestedSession, requestedPath }) => (
+    requestedSession === sessionId && requestedPath === taskOutputPath
+      ? {
+        status: "available", path: taskOutputPath, taskId, sessionId,
+        toolUseId, authorizedTaskDirectory: taskDirectory,
+      }
+      : { status: "absent", code: "CLAUDE-TASK-OUTPUT-SCOPE-ABSENT" }
+  );
+  const dependencies = { projectDir, ...hgoReadyDeps(), readClaudeTaskOutputReadScopeFn };
+  const event = (toolName, toolInput, requestedSession = sessionId) => ({
+    tool_name: toolName, tool_input: toolInput, session_id: requestedSession, transcript_path: transcriptPath,
+  });
+  try {
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("Grep", { path: taskOutputPath, pattern: "result" }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: siblingPath }), dependencies).exitCode, 2,
+      "a sibling task's output has no capability");
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }, "another_session"), dependencies).exitCode, 2,
+      "the task binding is current-session-specific");
+    assert.equal(evaluateLifecycleReadyGuard(event("Glob", { path: taskDirectory, pattern: "*.output" }), dependencies).exitCode, 2,
+      "task output authorization never grants directory or Glob scope");
+    assert.equal(evaluateLifecycleReadyGuard(event("Bash", { command: `cat ${taskOutputPath}` }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("Bash", { command: `cat ${taskOutputPath} ${siblingPath}` }), dependencies).exitCode, 2,
+      "the exact shell route cannot add sibling output paths");
+    assert.equal(isReadOnlyDiagnosticCommand(`node ${taskOutputPath}`, projectDir), false,
+      "the output is never an executable-input read root");
+    assert.equal(evaluateLifecycleReadyGuard(event("PowerShell", { command: `Get-Content -Path ${taskOutputPath}` }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("PowerShell", { command: `Get-Content ${taskDirectory}` }), dependencies).exitCode, 2);
+
+    const alias = join(taskDirectory, "alias.output");
+    symlinkSync(taskOutputPath, alias);
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: alias }), dependencies).exitCode, 2,
+      "a symlink alias is not the recorded physical task file");
+    const hardlink = join(taskDirectory, "hardlink.output");
+    linkSync(taskOutputPath, hardlink);
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }), dependencies).exitCode, 2,
+      "a multiply-linked task output is not a private exact file");
+    rmSync(hardlink);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+    rmSync(taskDirectory, { recursive: true, force: true });
+  }
+});
+
 test("standalone head and tail accept only bounded counts and passive file operands", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   const missing = join(outside, "missing-report.md");
@@ -7823,6 +7930,15 @@ function devPlanShellRun(path, command, toolName = "Bash") {
 test("DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted", () => {
   const path = devPlanShellFixture();
   try {
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    writeFileSync(join(path, "scratch", "probe.mjs"),
+      "import { writeFileSync } from 'node:fs';\nwriteFileSync('game.js', 'script side effect');\n");
+    writeFileSync(join(path, "scratch", "probe.test.mjs"),
+      "import { writeFileSync } from 'node:fs';\nwriteFileSync('game.js', 'test side effect');\n");
+    writeFileSync(join(path, "scratch", "probe.py"),
+      "from pathlib import Path\nPath('game.js').write_text('python side effect')\n");
+    writeFileSync(join(path, "scratch", "probe.sh"),
+      "printf shell-side-effect > game.js\n");
     for (const command of [
       `printf x > ${DEVPLANSHELL_TARGET}`,
       `printf x >> ${DEVPLANSHELL_TARGET}`,
@@ -7832,10 +7948,22 @@ test("DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while r
       `tee ${DEVPLANSHELL_TARGET}`,
       `sed -i s/a/b/ ${DEVPLANSHELL_TARGET}`,
       `node -e "require('fs').writeFileSync('${DEVPLANSHELL_TARGET}','x')"`,
+      `node scratch/probe.mjs`,
+      `node --test scratch/probe.test.mjs`,
+      `python scratch/probe.py`,
+      `bash scratch/probe.sh`,
+      `npm init -y`,
+      `npm install`,
+      `npx prettier --version`,
+      `pip install example-package`,
     ]) {
       const result = devPlanShellRun(path, command);
       assert.equal(result.exitCode, 2, `admitted a shell write: ${command}`);
       assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+      if (command.includes("node -e")) {
+        assert.match(result.stderr, new RegExp(`File: ${DEVPLANSHELL_TARGET.replaceAll("/", "\\/")}`, "u"), command);
+        assert.doesNotMatch(result.stderr, /File: (?:-e|\.)\n/u, command);
+      }
     }
     mkdirSync(dirname(join(path, DEVPLANSHELL_TARGET)), { recursive: true });
     writeFileSync(join(path, DEVPLANSHELL_TARGET), "// benign passive-read fixture\n");
@@ -7849,6 +7977,106 @@ test("DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while r
       const result = devPlanShellRun(path, command);
       assert.equal(result.exitCode, 0, `refused a read/unrelated command: ${command} -- ${result.stderr}`);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("DEVPLANSHELL-5: indirect script/package writes and the hook-disable setting are covered independently of the Claude harness", () => {
+  const path = devPlanShellFixture();
+  const settingsPath = join(path, ".claude", "settings.json");
+  const hooks = { PreToolUse: [{ matcher: "Write", hooks: [{ command: "node guard.mjs" }] }] };
+  try {
+    mkdirSync(dirname(settingsPath), { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify({ hooks, permissions: { allow: [] } }));
+    const directWrite = evaluateLifecycleReadyGuard({
+      tool_name: "Write",
+      tool_input: { file_path: settingsPath, content: '{"disableAllHooks":true}\n' },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(directWrite.exitCode, 2);
+    assert.match(directWrite.stderr, /PIPELINE-HOOKS-DISABLE-FORBIDDEN/u);
+
+    const replacesHooks = evaluateLifecycleReadyGuard({
+      tool_name: "Write",
+      tool_input: { file_path: settingsPath, content: JSON.stringify({ permissions: { allow: ["Bash"] } }) },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(replacesHooks.exitCode, 2);
+    assert.match(replacesHooks.stderr, /PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN/u);
+
+    const partialEdit = evaluateLifecycleReadyGuard({
+      tool_name: "Edit",
+      tool_input: { file_path: settingsPath, old_string: '"hooks"', new_string: '"hooks":null' },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(partialEdit.exitCode, 2);
+    assert.match(partialEdit.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u);
+
+    for (const command of [
+      `cp scratch/settings.json .claude/settings.json`,
+      `node -e "require('fs').writeFileSync('.claude/settings.json','{\\\"disableAllHooks\\\":true}')"`,
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u, command);
+    }
+
+    const powershellDisable = devPlanShellRun(
+      path,
+      `Set-Content -Path .claude/settings.json -Value '{"disableAllHooks":true}'`,
+      "PowerShell",
+    );
+    assert.equal(powershellDisable.exitCode, 2);
+    assert.match(powershellDisable.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u);
+
+    const powershellEmailValue = devPlanShellRun(
+      path,
+      `Set-Content -Path src/app.js -Value 'ops@example.test'`,
+      "PowerShell",
+    );
+    assert.equal(powershellEmailValue.exitCode, 2);
+    assert.match(powershellEmailValue.stderr, /File: src\/app\.js/u);
+    assert.doesNotMatch(powershellEmailValue.stderr, /File: (?:-Path|ops@example\.test)/u);
+
+    const quotedPowerShellPath = devPlanShellRun(
+      path,
+      `Set-Content -Path 'src/with spaces.js' -Value 'ops@example.test'`,
+      "PowerShell",
+    );
+    assert.equal(quotedPowerShellPath.exitCode, 2);
+    assert.match(quotedPowerShellPath.stderr, /File: src\/with spaces\.js/u);
+    assert.doesNotMatch(quotedPowerShellPath.stderr, /File: (?:-Path|ops@example\.test)/u);
+
+    const inlineSettings = devPlanShellRun(
+      path,
+      `node -e "require('fs').writeFileSync('.claude/settings.json','{\\\"disableAllHooks\\\":true}')"`,
+    );
+    assert.equal(inlineSettings.exitCode, 2);
+    assert.match(inlineSettings.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u);
+    assert.doesNotMatch(inlineSettings.stderr, /File: (?:-e|\.)\n/u);
+
+    const unchanged = evaluateLifecycleReadyGuard({
+      tool_name: "Write",
+      tool_input: { file_path: settingsPath, content: JSON.stringify({ hooks, permissions: { allow: ["Bash"] }, disableAllHooks: false }) },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(unchanged.exitCode, 0, unchanged.stderr);
+    assert.equal(devPlanShellRun(path, "node --test scratch/example.test.mjs").exitCode, 2);
+    assert.equal(devPlanShellRun(path, "node --check scratch/probe.test.mjs").exitCode, 0);
+    assert.equal(devPlanShellRun(path, "npm --version").exitCode, 0);
+    assert.equal(devPlanShellRun(path, "npx --version").exitCode, 0);
+    assert.equal(devPlanShellRun(path, "pip list").exitCode, 0);
+
+    const onboardingNode = process.execPath.replaceAll("\\", "/");
+    const onboardingScript = ONBOARDING_SCRIPT.replaceAll("\\", "/");
+    const powershellConsent = `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`;
+    assert.equal(devPlanShellRun(path, powershellConsent, "PowerShell").exitCode, 0, powershellConsent);
+    const stateScript = PIPELINE_STATE_SCRIPT.replaceAll("\\", "/");
+    const powershellInspect = `& '${onboardingNode}' '${stateScript}' inspect`;
+    const powershellInspectResult = devPlanShellRun(path, powershellInspect, "PowerShell");
+    assert.equal(powershellInspectResult.exitCode, 0, `${powershellInspect}: ${powershellInspectResult.stderr}`);
+    for (const rejected of [
+      `${powershellConsent}; Remove-Item game.js`,
+      `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email $env:EMAIL --activate`,
+      `& @node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`,
+      `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate & Remove-Item game.js`,
+      `& '${onboardingNode}' '${stateScript}' inspect --root '${path}'`,
+    ]) assert.equal(devPlanShellRun(path, rejected, "PowerShell").exitCode, 2, rejected);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

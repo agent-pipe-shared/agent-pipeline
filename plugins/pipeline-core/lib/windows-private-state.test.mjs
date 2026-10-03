@@ -6,20 +6,48 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   assessWindowsPrivatePath,
+  assessWindowsPrivatePaths,
+  evaluateWindowsPrivatePathBatch,
   evaluateWindowsPrivateState,
   hardenWindowsPrivateDirectory,
   sanitizeChildEnvironment,
 } from "./windows-private-state.mjs";
 import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { PrivateBoundaryError, assureWindowsPrivateDirectories } from "./private-boundary.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
 
-let passed = 0;
-function check(name, fn) { fn(); passed += 1; process.stdout.write(`PASS WPS${String(passed).padStart(2, "0")} ${name}\n`); }
+const completionCases = [];
+function check(name, run) {
+  const entry = { id: "WPS" + String(completionCases.length + 1).padStart(3, "0"), name, run };
+  if (name.startsWith("invoke()") && process.platform !== "win32") entry.mode = "skip";
+  completionCases.push(entry);
+}
 const secure = () => ({ currentOwner: "DESKTOP\\agent", owner: "DESKTOP\\agent", reparsePoint: false, principals: ["DESKTOP\\agent"] });
 check("accepts only the concrete owner with no reparse point", () => assert.equal(evaluateWindowsPrivateState(secure()).status, "secure"));
 check("rejects SYSTEM and Administrators as implicit exceptions", () => { for (const principal of ["SYSTEM", "BUILTIN\\Administrators", "Everyone", "DESKTOP\\other"]) { const value = secure(); value.principals.push(principal); assert.equal(evaluateWindowsPrivateState(value).status, "insecure"); } });
 check("rejects owner drift and reparse points", () => { const owner = secure(); owner.owner = "SYSTEM"; assert.equal(evaluateWindowsPrivateState(owner).status, "insecure"); const link = secure(); link.reparsePoint = true; assert.equal(evaluateWindowsPrivateState(link).status, "insecure"); });
 check("keeps malformed observations unavailable", () => { assert.equal(evaluateWindowsPrivateState(null).status, "unavailable"); assert.equal(evaluateWindowsPrivateState({}).status, "unavailable"); });
+check("batched Windows observations preserve exact per-path owner and ACL policy", () => {
+  const paths = ["C:/fixture/one", "C:/fixture/two"];
+  const observations = [
+    { path: paths[0], ...secure() },
+    { path: paths[1], ...secure(), principals: ["DESKTOP\\agent", "BUILTIN\\Users"] },
+  ];
+  assert.deepEqual(evaluateWindowsPrivatePathBatch(paths, observations).map((row) => row.status), ["secure", "insecure"]);
+});
+check("batched Windows observations fail closed on reordered, missing, and malformed rows", () => {
+  const paths = ["C:/fixture/one", "C:/fixture/two"];
+  const first = { path: paths[0], ...secure() };
+  const second = { path: paths[1], ...secure() };
+  assert.deepEqual(evaluateWindowsPrivatePathBatch(paths, [second, first]).map((row) => row.status), ["unavailable", "unavailable"]);
+  assert.deepEqual(evaluateWindowsPrivatePathBatch(paths, [first]).map((row) => row.status), ["unavailable", "unavailable"]);
+  assert.deepEqual(evaluateWindowsPrivatePathBatch(paths, [first, { path: paths[1], error: true }]).map((row) => row.status), ["secure", "unavailable"]);
+});
+check("rejects malformed or oversized path batches before starting PowerShell", () => {
+  assert.equal(assessWindowsPrivatePaths(["", "valid"]).every((row) => row.status === "unavailable"), true);
+  assert.equal(assessWindowsPrivatePaths(Array(4097).fill("C:/fixture/path")).length, 4097);
+});
 check("accepts only the documented completed WSL EPERM shape", () => {
   const eperm = Object.assign(new Error("spawnSync git EPERM"), { code: "EPERM" });
   assert.equal(isSuccessfulSpawn({ status: 0, error: eperm, stdout: "ready\n" }), true);
@@ -108,11 +136,18 @@ check("invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN
     assert.equal(
       assessed.status,
       "secure",
-      `assessWindowsPrivatePath must not depend on the calling shell's own PSModulePath: ${JSON.stringify(assessed)}`,
+      "assessWindowsPrivatePath must not depend on the calling shell's own PSModulePath: " + JSON.stringify(assessed),
     );
+    const batch = assessWindowsPrivatePaths([target, probeRoot], { environment: pollutedEnvironment });
+    assert.deepEqual(batch.map((row) => row.status), ["secure", "secure"]);
   } finally {
     rmSync(probeRoot, { recursive: true, force: true });
     rmSync(brokenModuleParent, { recursive: true, force: true });
   }
 });
-process.stdout.write(`${passed}/${passed} checks passed.\n`);
+
+if (completionCases.length !== 13) throw new Error("case completion count drift: expected 13, got " + completionCases.length);
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });

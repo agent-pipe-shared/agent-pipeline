@@ -48,7 +48,7 @@ import {
   listActiveSessionDescriptors,
 } from "../lib/worktree-lifecycle.mjs";
 import { planInstall } from "./pre-push-hook-install.mjs";
-import { checkCloneProvisioning } from "./check-clone-provisioning.mjs";
+import { applyMandatoryHookGate, assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 import {
   DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
@@ -139,7 +139,7 @@ export const SCHEMA = "pipeline.start-preflight.v1";
  * missing, and had no basis to choose. Naming the scope makes the two statements reconcilable
  * by construction; `setup-check.mjs`'s `reconcileSetupObservation` refuses an undeclared one.
  */
-export const STATUS_SCOPE = "plugin-distribution-identity";
+export const STATUS_SCOPE = "plugin-distribution-identity-and-mandatory-local-hooks";
 export const CONCURRENT_SESSION_WARNING_SCHEMA = "pipeline.concurrent-session-warning.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
 const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
@@ -1042,6 +1042,7 @@ export function observePipelineStartPreflight({
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
   observeArchitectureAdoptionOrientationFn = observeArchitectureAdoptionOrientation,
   inspectEffectiveArchitectureDecisionsFn = inspectArchitectureDecisionContinuity,
+  checkCloneProvisioningFn = checkCloneProvisioning,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
   resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
   antigravityPluginRegistries = () => [
@@ -1521,9 +1522,12 @@ export function observePipelineStartPreflight({
       taskScopeResolved: false,
     };
   }
+  const cloneProvisioning = checkCloneProvisioningFn(cwd);
+  const mandatoryHookReadiness = assessMandatoryHookReadiness(cloneProvisioning);
+  const resultStatus = applyMandatoryHookGate(status, mandatoryHookReadiness);
   const result = {
     schema: SCHEMA,
-    status,
+    status: resultStatus,
     statusScope: STATUS_SCOPE,
     version,
     installedVersion,
@@ -1540,7 +1544,19 @@ export function observePipelineStartPreflight({
     },
     effectiveDecisions,
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
-    nextAction: status === "antigravity-topology-refresh-required"
+    nextAction: resultStatus === "hook-provisioning-required"
+      ? {
+          kind: "command",
+          executable: process.execPath,
+          argv: [resolve(pluginRoot, "scripts/clone-hook-readiness.mjs"), "--root", resolve(cwd), "--apply"],
+          mutation: true,
+          requiresConfirmation: true,
+          executionBoundary,
+          expected: { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" },
+        }
+      : resultStatus === "hook-provisioning-blocked"
+      ? null
+      : resultStatus === "antigravity-topology-refresh-required"
       ? { kind: "command", executable: "node", argv: [resolve(antigravityTopology?.sourcePluginRoot ?? pluginRoot, "install-agy.mjs")], mutation: true, requiresConfirmation: true, executionBoundary: "host", expected: { schema: "pipeline.antigravity-refresh-result.v1", status: "refreshed" } }
       : status === "plugin-attestation-required"
       ? installedPluginAttestation.setupAction ?? null
@@ -1628,10 +1644,10 @@ export function observePipelineStartPreflight({
     // `status` or the exit code.
     ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHookUnseenRemotePush: unseenRemotePush } : {}),
   };
-  const cloneProvisioning = checkCloneProvisioning(cwd);
   return {
     ...result,
     cloneProvisioning,
+    mandatoryHookReadiness,
     // This measures the exact normal-bootstrap envelope emitted before the
     // self-describing receipt. The receipt is retained in the same typed
     // preflight readback; no cached or static skill-size surrogate is used.

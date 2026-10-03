@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readState, statePhaseProjectionMarker } from "./pipeline-state.mjs";
+import { readRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
 
 export const STATE_PHASE_CHECK_SCHEMA = "pipeline.state-phase-consistency.v1";
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -26,19 +27,23 @@ export function checkStatePhaseConsistency({ rootDir, handoverPath = "docs/state
   const root = resolve(rootDir);
   const observeState = dependencies.readState ?? readState;
   const readHandover = dependencies.readFileSync ?? readFileSync;
-  let handover;
-  try {
-    handover = readHandover(resolve(root, handoverPath), "utf8");
-  } catch {
-    return { schema: STATE_PHASE_CHECK_SCHEMA, status: "blocked", reasons: ["documentation-unavailable"], phase: null, featureId: null };
-  }
   const observed = observeState(root);
   if (observed.status !== "ok") {
     return { schema: STATE_PHASE_CHECK_SCHEMA, status: "blocked", reasons: [`state-${observed.status}`], phase: null, featureId: null };
   }
   const marker = statePhaseProjectionMarker(observed.state);
-  const reasons = handover.includes(marker) ? [] : ["state-phase-projection-mismatch"];
+  const projection = (dependencies.readRuntimeNextAction ?? readRuntimeNextAction)({ rootDir: root, state: observed.state });
   const feature = observed.state?.activeFeature ?? null;
+  if (projection.status === "available") {
+    const matches = projection.sectionText.split("\n").filter(line => line.startsWith("**Lifecycle phase:**"));
+    const reasons = matches.length === 1 && matches[0] === marker ? [] : ["state-phase-projection-mismatch"];
+    return { schema: STATE_PHASE_CHECK_SCHEMA, status: reasons.length ? "blocked" : "consistent",
+      reasons, phase: feature?.phase ?? null, featureId: feature?.id ?? null, projection: "private-current-state" };
+  }
+  let handover;
+  try { handover = readHandover(resolve(root, handoverPath), "utf8"); }
+  catch { return { schema: STATE_PHASE_CHECK_SCHEMA, status: "blocked", reasons: ["documentation-unavailable"], phase: feature?.phase ?? null, featureId: feature?.id ?? null }; }
+  const reasons = handover.includes(marker) ? [] : ["state-phase-projection-mismatch"];
   return {
     schema: STATE_PHASE_CHECK_SCHEMA,
     status: reasons.length === 0 ? "consistent" : "blocked",

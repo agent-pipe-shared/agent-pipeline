@@ -11,9 +11,9 @@
  * the real nested-process apply transactions.
  */
 import assert from "node:assert/strict";
-import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -22,7 +22,7 @@ import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { main as settingsAllowlistMergeCli } from "./settings-allowlist-merge.mjs";
-import { run as pipelineStateCli } from "./pipeline-state.mjs";
+import { readState as readPipelineState, run as pipelineStateCli } from "./pipeline-state.mjs";
 import {
   applyInitialOnboardingAnswers,
   applyTrustAnchorBootstrap,
@@ -35,7 +35,7 @@ import {
   planProjectOnboardingKickoffV4,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "../lib/project-onboarding-v3.mjs";
-import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
+import { derivePoGateRepositoryFingerprint, PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import {
   consumeRuntimeReadback,
   issueLaunchTicket,
@@ -48,11 +48,19 @@ import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs"
 import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
-import { observeOnboardingBootstrapPlanApproval } from "../lib/onboarding-continuity.mjs";
+import { buildAdvisoryEvidenceBundle } from "../lib/advisory-lifecycle-v2.mjs";
+import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
+import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
+import { registeredRouting, RUNNER_PROFILES_V3_REGISTRY_SHA256, validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
+import { designReadinessReportSha256, designReadinessRunnerSelectionSha256, validateDesignReadinessModelOutput, verifyDesignReadinessHostExecution } from "../lib/design-readiness-host-evidence.mjs";
+import { createDesignReadinessRunnerHostStore } from "../lib/design-readiness-runner-host-store.mjs";
+import { buildRunnerDesignReadinessPrompt } from "../lib/runner-readiness-request.mjs";
+import { observeOnboardingBootstrapPlanApproval, readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput } from "../lib/onboarding-continuity.mjs";
 import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
+import { renderArchitectureDesignSkeleton } from "../lib/design-authoring.mjs";
 // This fixture exercises historical v1 admission, not v2 initial provenance.
 import { coordinateLegacyDesignAdvisory as coordinateDesignAdvisory } from "../lib/design-advisory-coordinator.mjs";
-import { checkPlanningAdoptionDisposition, resolveAdoptionState } from "./architecture-adoption.mjs";
 import {
   CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
   CODEX_HOST_REPOSITORY_INIT_INTENT,
@@ -88,6 +96,7 @@ let fixtureMachinePlane = freshFixtureMachinePlane();
 // remains runnable from source checkouts and installed Linux, macOS and
 // Windows plugin caches alike.
 function root() { return mkdtempSync(join(tmpdir(), "pipeline onboarding e2e with spaces-")); }
+function hostVisibleFixtureRoot() { return mkdtempSync(join(homedir(), "pipeline onboarding external inventory-")); }
 function greenfieldRoot() {
   const candidates = [...new Set([tmpdir(), process.env.TMPDIR, process.env.TMP, process.env.TEMP, "/var/tmp", "/dev/shm"].filter(Boolean))];
   for (const candidate of candidates) {
@@ -107,6 +116,16 @@ function greenfieldRoot() {
   throw new Error("no writable temporary parent without an existing Git control is available for the greenfield contract");
 }
 function dispose(path) { rmSync(path, { recursive: true, force: true }); }
+function stripGeneratedArchitectureTemplate(content, { required = false } = {}) {
+  const template = renderArchitectureDesignSkeleton().trimEnd();
+  const count = content.split(template).length - 1;
+  assert.ok(count === 0 || count === 1, "generated PRD must contain at most one exact reserved architecture template");
+  if (required) assert.equal(count, 1, "greenfield intake generation must include the reserved architecture template");
+  const stripped = count === 1 ? content.replace(template, "") : content;
+  assert.doesNotMatch(stripped, /```pipeline-architecture-design[\s\S]*?```/u,
+    "removing the reserved template must leave no architecture block or alter unrelated PRD content");
+  return stripped;
+}
 function cliGit(command, args, options = {}) {
   if (command !== "git") return { status: 1, stderr: "unexpected program" };
   const gitArgs = [...args];
@@ -168,7 +187,7 @@ function cliGit(command, args, options = {}) {
   if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
   return { status: 1, stderr: "unexpected git arguments" };
 }
-function run(script, args, cwd) {
+function run(script, args, cwd, overrides = {}) {
   let stdout = "";
   const main = script === onboarding
     ? onboardingCli
@@ -201,6 +220,7 @@ function run(script, args, cwd) {
       // reader intentionally owns its native Git spawn, which is outside this
       // onboarding CLI fixture's injected Git boundary.
       planSessionCleanupRecovery: () => ({ status: "not-needed" }),
+      ...overrides,
     },
   });
   return { status, stdout, json: stdout ? JSON.parse(stdout) : null };
@@ -211,7 +231,7 @@ function publicDriverRun(path, invocations, designWorkflowDeps = {}) {
     invocations.push({ executable, argv: [...argv] });
     const [script, ...args] = argv;
     if (script === onboarding) {
-      const result = run(onboarding, args, path);
+      const result = run(onboarding, args, path, designWorkflowDeps);
       return { status: result.status, stdout: result.stdout, stderr: "" };
     }
     if (typeof script === "string" && script.split(/[\\/]/u).at(-1) === "pipeline-state.mjs") {
@@ -756,9 +776,162 @@ test("ready roots recover a missing manifest and a governed V3 registry checkout
   } finally { dispose(path); }
 });
 
-test("in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary", async () => {
+test("in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary", async (testContext) => {
   const fixtures = [];
-  const runners = ["codex"];
+  const runners = ["codex", "claude", "antigravity"];
+  const fixtureGit = (cwd, argv) => {
+    const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
+    const result = spawnSync("git", argv, { cwd, env: gitEnv, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024 });
+    assert.equal(result.error ?? null, null, `${JSON.stringify(argv)}: ${result.error?.code ?? ""} ${result.error?.message ?? ""}`);
+    assert.equal(result.signal, null);
+    assert.equal(result.status, 0, `${JSON.stringify(argv)}: ${result.stderr}`);
+    return result.stdout;
+  };
+  const candidateAtHead = (cwd) => {
+    const candidate = { commit: fixtureGit(cwd, ["rev-parse", "HEAD"]).trim(), tree: fixtureGit(cwd, ["rev-parse", "HEAD^{tree}"]).trim() };
+    assert.match(candidate.commit, /^[a-f0-9]{40}$/u);
+    assert.match(candidate.tree, /^[a-f0-9]{40}$/u);
+    return candidate;
+  };
+  const commitFixturePaths = (cwd, paths, subject, dispatch) => {
+    assert.ok(paths.length > 0);
+    const hooks = ["pre-commit", "commit-msg"].map((name) => {
+      const path = join(cwd, ".git", "hooks", name);
+      assert.equal(existsSync(path), true, `${name}: the real generated Git hook must be installed`);
+      return { path, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") };
+    });
+    fixtureGit(cwd, ["add", "--", ...paths]);
+    fixtureGit(cwd, ["-c", "user.name=Greenfield E2E PO", "-c", "user.email=greenfield-e2e@example.invalid",
+      "commit", "-m", subject, "--trailer", "AI-Assisted: true", "--trailer", `Dispatch: ${dispatch} (elephant)`]);
+    for (const hook of hooks) assert.equal(createHash("sha256").update(readFileSync(hook.path)).digest("hex"), hook.sha256,
+      "successful fixture commits preserve the enforcing generated hooks");
+    return candidateAtHead(cwd);
+  };
+  const bindFixtureReadiness = (cwd, runner, designFixture) => {
+    const packageFile = join(cwd, designFixture.packagePath);
+    const designPackage = JSON.parse(readFileSync(packageFile, "utf8"));
+    const originalReadiness = JSON.parse(readFileSync(join(cwd, designPackage.readiness.path), "utf8"));
+    const candidate = candidateAtHead(cwd);
+    assert.deepEqual(candidate, designPackage.candidate);
+    // The v1 package admits a separate review runner. This local report-only
+    // child is a fixture host producer, never a native provider consultation.
+    // Codex's declined export decision remains unchanged throughout the test.
+    const requestedReviewRunner = runner === "codex" ? "claude" : runner;
+    const requestedRoute = resolveV3DutyRoute({ rootDir: cwd, dutyId: "readiness", runner: requestedReviewRunner, candidateCommit: candidate.commit });
+    testContext.diagnostic(`${runner}: exact requested readiness route ${JSON.stringify({
+      authoringRunner: runner, requestedRunner: requestedReviewRunner, route: requestedRoute,
+      registeredCell: registeredRouting().duties.readiness[requestedReviewRunner], registrySha256: RUNNER_PROFILES_V3_REGISTRY_SHA256,
+      reasonFieldPresent: Object.hasOwn(requestedRoute, "reason"),
+      explanation: "The resolver returns the frozen registered candidate-bound duty cell state; it does not probe a live provider." })}`);
+    let resolvedRoute = requestedRoute;
+    if (runner === "antigravity") {
+      assert.equal(requestedRoute.state, "unavailable");
+      assert.equal(registeredRouting().duties.readiness.antigravity.state, "unavailable");
+      const committedPolicy = fixtureGit(cwd, ["show", `${candidate.commit}:pipeline.user.yaml`]);
+      assert.equal(sha256(committedPolicy), requestedRoute.sourceSha256);
+      const policy = parseYaml(committedPolicy);
+      assert.equal(validatePipelineUserV3(policy).ok, true);
+      const spoofedPolicy = JSON.parse(JSON.stringify(policy));
+      spoofedPolicy.routing.duties.readiness.antigravity.state = "default";
+      const spoof = validatePipelineUserV3(spoofedPolicy);
+      assert.equal(spoof.ok, false, "an unavailable duty cannot be promoted by fixture source edits");
+      assert.ok(spoof.errors.some((error) => error.code === "frozen_mapping"
+        && error.path === "$.routing.duties.readiness.antigravity.state"), JSON.stringify(spoof));
+      // Historical v1 permits an independently selected readiness runner.
+      // Assign its existing Claude route to this local report-only fixture,
+      // as for Codex above; AGY's registered route remains unavailable.
+      resolvedRoute = resolveV3DutyRoute({ rootDir: cwd, dutyId: "readiness", runner: "claude", candidateCommit: candidate.commit });
+    }
+    const reviewRunner = resolvedRoute.runner;
+    assert.equal(resolvedRoute.state, "default");
+    assert.equal(resolvedRoute.sourceSha256, requestedRoute.sourceSha256);
+    assert.equal(resolvedRoute.candidateCommit, candidate.commit);
+    assert.equal(reviewRunner, "claude");
+    testContext.diagnostic(`${runner}: assigned local readiness host ${JSON.stringify({ authoringRunner: runner,
+      reviewRunner, route: resolvedRoute, assignment: runner === "antigravity"
+        ? "independent-v1-Claude-host; AGY-route-unavailable" : "existing-v1-local-host",
+      nativeProviderAvailabilityClaim: false })}`);
+    const route = Object.fromEntries(["model", "effort", "sourceSha256", "candidateCommit"].map((key) => [key, resolvedRoute[key]]));
+    const sources = designPackage.sources;
+    for (const source of Object.values(sources)) {
+      assert.equal(fixtureGit(cwd, ["show", `${candidate.commit}:${source.path}`]), readFileSync(join(cwd, source.path), "utf8"));
+    }
+    const evidenceBundle = buildAdvisoryEvidenceBundle(cwd, Object.values(sources).map((source) => source.path).sort());
+    const prompt = buildRunnerDesignReadinessPrompt({ runner: reviewRunner, dispatchId: originalReadiness.dispatchId,
+      candidate, sources, evidenceBundle, route });
+    const reviewRoot = mkdtempSync(join(tmpdir(), "pipeline-e2e-readiness-host-"));
+    let child;
+    let report;
+    try {
+      const childPath = join(reviewRoot, "report-only-fixture.mjs");
+      writeFileSync(childPath, [
+        "import { readFileSync } from 'node:fs';",
+        "const input = JSON.parse(readFileSync(0, 'utf8'));",
+        "const report = { schema: 'pipeline.design-readiness-receipt.v1', dispatchId: input.dispatchId, runner: input.runner,",
+        "candidate: input.candidate, sources: input.sources, outcome: 'ready-for-po-review', findings: [], unresolvedChoices: [],",
+        "summary: 'Disposable local fixture report for one final PO review; no provider consultation or approval.' };",
+        "process.stdout.write(JSON.stringify(report) + '\\n');",
+      ].join("\n") + "\n");
+      child = spawnSync(process.execPath, [childPath], { cwd: reviewRoot, encoding: "utf8", shell: false,
+        input: JSON.stringify({ dispatchId: originalReadiness.dispatchId, runner: reviewRunner, candidate, sources, prompt }),
+        timeout: 10_000, maxBuffer: 1024 * 1024 });
+      assert.equal(child.error ?? null, null);
+      assert.equal(child.signal, null);
+      assert.equal(child.status, 0, child.stderr);
+      report = JSON.parse(child.stdout);
+      assert.equal(validateDesignReadinessModelOutput(report).valid, true);
+      assert.deepEqual(candidateAtHead(cwd), candidate);
+      for (const source of Object.values(sources)) assert.equal(createHash("sha256").update(readFileSync(join(cwd, source.path))).digest("hex"), source.sha256);
+    } finally {
+      rmSync(reviewRoot, { recursive: true, force: true });
+    }
+    const topology = resolvePoGateRepositoryTopology(cwd);
+    const repoFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: topology.gitCommonDir, primaryRoot: topology.primaryRoot });
+    const receiptId = `drh_${createHash("sha256").update(`${cwd}\0${report.dispatchId}`).digest("hex").slice(0, 32)}`;
+    const record = {
+      schema: "pipeline.design-readiness-runner-host-receipt.v1", receiptId, runner: reviewRunner,
+      repoFingerprint, dispatchId: report.dispatchId, candidate, sources, route,
+      executableSha256: createHash("sha256").update(readFileSync(process.execPath)).digest("hex"),
+      requestSha256: createHash("sha256").update(prompt).digest("hex"),
+      responseSha256: createHash("sha256").update(child.stdout).digest("hex"),
+      dutyReceiptSha256: designReadinessReportSha256(report),
+      child: { started: true, exitCode: child.status, signal: child.signal, stdoutStatus: "complete", writeToolsObserved: false },
+      createdAt: "2026-09-27T10:00:00.000Z",
+    };
+    const store = createDesignReadinessRunnerHostStore({ gitCommonDir: topology.gitCommonDir, repoFingerprint });
+    const saved = store.write(record);
+    const readiness = { ...report, hostExecution: { schema: "pipeline.design-readiness-host-execution.v1", runner: reviewRunner,
+      repoFingerprint, selectionId: receiptId, selectionSha256: designReadinessRunnerSelectionSha256(record),
+      executionReceiptSha256: saved.sha256, dutyReceiptSha256: record.dutyReceiptSha256, route } };
+    const readinessBytes = Buffer.from(canonicalJson(readiness));
+    writeFileSync(join(cwd, designPackage.readiness.path), readinessBytes);
+    designPackage.readiness.sha256 = createHash("sha256").update(readinessBytes).digest("hex");
+    writeFileSync(packageFile, canonicalJson(designPackage));
+    const sourceBytes = Object.fromEntries(Object.entries(sources).map(([name, source]) => [name, { path: source.path, bytes: readFileSync(join(cwd, source.path)) }]));
+    const checked = verifyDesignReadinessHostExecution({ repoRoot: cwd, hostExecution: readiness.hostExecution,
+      readinessReceipt: readiness, candidate, sources, sourceBytes });
+    assert.equal(checked.ok, true, JSON.stringify(checked));
+    assert.equal(checked.assurance, "host-observed-local");
+    if (runner === "antigravity") {
+      const unavailableRoute = Object.fromEntries(["model", "effort", "sourceSha256", "candidateCommit"].map((key) => [key, requestedRoute[key]]));
+      const unavailableHost = { ...readiness.hostExecution, runner: "antigravity", route: unavailableRoute };
+      const refused = verifyDesignReadinessHostExecution({ repoRoot: cwd, hostExecution: unavailableHost,
+        readinessReceipt: { ...readiness, runner: "antigravity", hostExecution: unavailableHost }, candidate, sources, sourceBytes });
+      assert.equal(refused.ok, false);
+      assert.equal(refused.code, "DWP-READINESS-HOST-ROUTE-MISMATCH",
+        "the actual verifier must still reject a claimed AGY host on the unavailable duty");
+      assert.deepEqual(candidateAtHead(cwd), candidate);
+      assert.equal(sha256(fixtureGit(cwd, ["show", `${candidate.commit}:pipeline.user.yaml`])), requestedRoute.sourceSha256);
+      testContext.diagnostic(`${runner}: readiness route negatives ${JSON.stringify({
+        frozenDefaultSpoofRejected: true, unavailableHostCode: refused.code, committedPolicyUnchanged: true })}`);
+    }
+    testContext.diagnostic(`${runner}: canonical fixture readiness ${JSON.stringify({ reviewRunner, candidate, selectionId: receiptId, assurance: checked.assurance, providerAttestation: false })}`);
+  };
+  const readFixtureState = (cwd) => {
+    const readback = readPipelineState(cwd);
+    assert.equal(readback.status, "ok", JSON.stringify(readback));
+    return readback.state;
+  };
   const materialize = (action, replacements) => {
     assert.equal(typeof action?.executable, "string");
     assert.ok(Array.isArray(action.argv));
@@ -781,6 +954,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
     assert.equal(normalized.status, 0, JSON.stringify({ action, argv, stderr: normalized.stderr, stdout: normalized.stdout }));
     return { argv, json: JSON.parse(normalized.stdout) };
   };
+  const generatedArchitectureDraftSeen = new Set();
   const freshDriver = (cwd, runner, env, signerPrivateKey, beforePlanApproval = null) => {
     const designWorkflowDeps = {};
     const run = publicDriverRun(cwd, [], designWorkflowDeps);
@@ -799,28 +973,77 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const stateScript = driven.steps.at(-1)?.argv?.[0];
       assert.equal(typeof stateScript, "string");
       const submittedArgv = [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"];
+      const preSubmission = run("node", [stateScript, "inspect"]);
+      assert.equal(preSubmission.status, 0, preSubmission.stderr);
+      const preSubmissionResult = JSON.parse(preSubmission.stdout);
+      if (preSubmissionResult.nextAction?.kind === "architecture-design-required") {
+        const beforeRefusal = readFixtureState(cwd);
+        assert.equal(beforeRefusal.planSubmission, undefined, `${runner}: architecture authoring precedes submission`);
+        const prdFile = join(cwd, preSubmissionResult.nextAction.prdPath);
+        const generatedPrd = readFileSync(prdFile, "utf8");
+        assert.match(generatedPrd, /## Captured material input/u,
+          `${runner}: the generated PRD retains the original intake material before authoring`);
+        const technicalSpecDigest = generatedPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
+        assert.match(technicalSpecDigest ?? "", /^[a-f0-9]{64}$/u,
+          `${runner}: generation supplied the bound Spec digest without a fixture-side replacement`);
+        const draftTemplate = renderArchitectureDesignSkeleton().trimEnd();
+        const draftCount = generatedPrd.split(draftTemplate).length - 1;
+        assert.ok(draftCount === 0 || draftCount === 1,
+          `${runner}: generated PRD contains at most one exact reserved architecture template`);
+        if (!generatedArchitectureDraftSeen.has(cwd)) {
+          assert.equal(draftCount, 1, `${runner}: generation publishes the shared architecture draft before authoring`);
+          generatedArchitectureDraftSeen.add(cwd);
+        }
+        const missingArchitecturePrd = stripGeneratedArchitectureTemplate(generatedPrd, { required: draftCount === 1 });
+        assert.match(missingArchitecturePrd, /## Captured material input/u);
+        assert.equal(missingArchitecturePrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], technicalSpecDigest,
+          `${runner}: stripping only the reserved draft template leaves the generated Spec binding untouched`);
+        writeFileSync(prdFile, missingArchitecturePrd);
+        const refusedSubmit = run("node", submittedArgv);
+        assert.equal(refusedSubmit.status, 2, `${runner}: submit-plan rejects a missing architecture block`);
+        assert.match(refusedSubmit.stderr, /ARCHITECTURE-DESIGN-PACKAGE-REQUIRED/u);
+        const afterRefusal = readFixtureState(cwd);
+        assert.equal(afterRefusal.planSubmission, undefined, `${runner}: rejection records no submission`);
+        assert.equal(afterRefusal.planPresentation, undefined, `${runner}: rejection creates no presentation or signature request`);
+        assert.equal(readFileSync(prdFile, "utf8"), missingArchitecturePrd,
+          `${runner}: the failed submission leaves the stripped but otherwise intact generated PRD unchanged`);
+        return { outcome: "unsupported-next-action", final: preSubmissionResult,
+          nextAction: preSubmissionResult.nextAction, pendingAsks: [], stepsExecuted: 0 };
+      }
       const submitted = run("node", submittedArgv);
       assert.equal(submitted.status, 0, submitted.stderr);
-      const submission = JSON.parse(readFileSync(join(cwd, "project", "pipeline-state.json"), "utf8")).planSubmission;
+      const submission = readFixtureState(cwd).planSubmission;
       const designFixture = materializeTestDesignWorkflowPackage({
         root: cwd, featureId: submission.featureId,
         planPath: submission.planPath, specPath: submission.specPath,
+        candidate: candidateAtHead(cwd),
         signerPrivateKey, signerKeyReference: "fixture-po-key",
       });
+      bindFixtureReadiness(cwd, runner, designFixture);
       Object.assign(designWorkflowDeps, designFixture.deps);
+      designWorkflowDeps.gitCandidate = () => ({ ok: true, ...candidateAtHead(cwd) });
+      designWorkflowDeps.verifyDesignReadinessHostExecution = verifyDesignReadinessHostExecution;
+      designWorkflowDeps.inspectArchitectureDesign = (rootDir, scope) => inspectArchitectureDesign(rootDir, scope, {
+        gitCandidate: designWorkflowDeps.gitCandidate,
+        verifyReadinessExecution: designWorkflowDeps.verifyDesignReadinessHostExecution,
+      });
       const bootstrapPolicy = readCriticalHumanProofPolicy(cwd);
       assert.equal(bootstrapPolicy.ok, true);
       designWorkflowDeps.readCriticalHumanProofPolicy = () => bootstrapPolicy;
       const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO", "--design-workflow-package", designFixture.packagePath];
       const presented = run("node", presentedArgv);
       assert.equal(presented.status, 0, presented.stderr);
-      const presentation = JSON.parse(readFileSync(join(cwd, "project", "pipeline-state.json"), "utf8")).planPresentation;
+      const presentation = readFixtureState(cwd).planPresentation;
       designFixture.signRequest(presentation.designWorkflowApprovalRequestPath);
       if (typeof beforePlanApproval === "function") beforePlanApproval({ cwd, presentation, designFixture });
-      const bootstrapApproval = observeOnboardingBootstrapPlanApproval({
-        rootDir: cwd, authority: { planPath: submission.planPath, specPath: submission.specPath },
-      });
-      assert.equal(bootstrapApproval.status, "verified", `${runner}: bootstrap acknowledgement must remain independently verified`);
+      const promotedState = readFixtureState(cwd);
+      assert.equal(promotedState.bootstrapAcknowledgementRequired, undefined,
+        `${runner}: epic/feature must not ask for a second pre-course PO signature`);
+      const stagingPrd = readFileSync(join(cwd, submission.planPath), "utf8");
+      assert.doesNotMatch(stagingPrd, /PO_GATE_PRD_ACKNOWLEDGEMENT/u,
+        `${runner}: the staging document remains an unapproved draft before Advisor/readiness`);
+      assert.equal(existsSync(join(cwd, designFixture.packagePath)), true,
+        `${runner}: the complete reviewed package is the final approval subject`);
       designWorkflowDeps.isattyFn = () => true;
       designWorkflowDeps.readLineFn = () => `approve-${presentation.designWorkflowPackageSha256.slice(0, 12)}`;
       const approvedArgv = [
@@ -832,6 +1055,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const reentered = driveOnboardingInit({ rootDir: cwd, runner, run, env });
       driven = {
         ...reentered,
+        designWorkflowDeps,
         steps: [
           ...driven.steps,
           { executable: "node", argv: submittedArgv, exitCode: submitted.status, faultCode: null },
@@ -851,7 +1075,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       fixtureMachinePlane = freshFixtureMachinePlane();
       const path = greenfieldRoot();
       const home = root();
-      const source = root();
+      const source = hostVisibleFixtureRoot();
       fixtures.push(path, home, source);
       const destination = join(home, "po-authority");
       const existingKey = join(source, "existing-private.pem");
@@ -869,12 +1093,57 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       delete env.CODEX_THREAD_ID;
       delete env.CODEX_SESSION_ID;
 
+      const originalRequest = "Build a locally playable mini HTML game.\nNo external dependencies.\n";
+      const originalBytes = Buffer.from(originalRequest, "utf8");
+      const originalSha256 = sha256(originalBytes);
+      const originalFile = join(path, "scratch", "onboarding-intake.txt");
+      const assertCapturedOriginal = () => {
+        const held = readOnboardingIntakeCheckpoint({ rootDir: path });
+        assert.equal(held.status, "present", `${runner}: original material needs a canonical checkpoint`);
+        assert.equal(held.value.root, path);
+        assert.equal(held.value.consent?.granted, true, `${runner}: description capture requires explicit prior consent`);
+        assert.equal(new Date(held.value.consent.at).toISOString(), held.value.consent.at);
+        assert.equal(held.value.materialInput.length, 1, `${runner}: the first description is captured once`);
+        const entry = held.value.materialInput[0];
+        assert.equal(entry.sha256, originalSha256);
+        assert.equal(entry.byteLength, originalBytes.length);
+        assert.equal(entry.evidencePath, `intake-checkpoint-evidence/${originalSha256}.txt`);
+        assert.ok(Date.parse(entry.receivedAt) >= Date.parse(held.value.consent.at));
+        const evidenceFile = join(held.paths.directory, entry.evidencePath);
+        const evidenceInfo = lstatSync(evidenceFile);
+        assert.equal(evidenceInfo.isFile() && !evidenceInfo.isSymbolicLink(), true);
+        assert.deepEqual(readFileSync(evidenceFile), originalBytes);
+        const material = readOnboardingIntakeMaterialInput({ rootDir: path });
+        assert.equal(material.status, "present");
+        assert.equal(material.chunks.length, 1);
+        assert.deepEqual(material.chunks[0], { sha256: originalSha256, byteLength: originalBytes.length,
+          receivedAt: entry.receivedAt, text: originalRequest });
+        assert.deepEqual(readFileSync(originalFile), originalBytes, `${runner}: the supplied source remains byte-exact`);
+        assert.equal(held.value.values.language, "en");
+        assert.equal(held.value.values.profile, "feature");
+        return held;
+      };
+      const assertConsentInputs = (action) => {
+        const held = readOnboardingIntakeCheckpoint({ rootDir: path });
+        assert.equal(held.status === "absent" || held.value.consent === null, true,
+          `${runner}: this returned action requests consent before capturing material`);
+        assert.equal(held.status === "absent" || held.value.materialInput.length === 0, true);
+        const argv = action.applyAction.argv;
+        assert.equal(argv[1], "intake-consent-apply");
+        assert.equal(argv.includes("--granted"), true);
+        assert.equal(argv.includes("--text-file"), runner !== "claude");
+        assert.equal(argv.includes("--text-turn-ref"), false);
+        assert.deepEqual(action.inputs.map((input) => input.name), runner === "claude"
+          ? ["language", "profile"]
+          : ["language", "profile", "projectDescription"]);
+      };
+
       let first = freshDriver(path, runner, env, privateKey);
       if (runner === "codex" && first.outcome === "collect-input") {
         assert.deepEqual(first.collectInput.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "language", "profile", "projectDescription"]);
         assert.equal(first.collectInput.applyAction.argv.includes("scratch/onboarding-intake.txt"), true);
         mkdirSync(join(path, "scratch"), { recursive: true });
-        writeFileSync(join(path, "scratch", "onboarding-intake.txt"), "Build a locally playable mini HTML game.\nNo external dependencies.\n");
+        writeFileSync(originalFile, originalBytes);
         const firstIntake = invokeAction(first.collectInput.applyAction, new Map([
           ["<PO_INTAKE_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
           ["<PO_INTAKE_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
@@ -882,6 +1151,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
           ["<PO_INTAKE_PROFILE>", "feature"],
         ]), path, env);
         assert.equal(firstIntake.json.status, "applied", JSON.stringify(firstIntake.json));
+        assertCapturedOriginal();
         first = freshDriver(path, runner, env, privateKey);
       }
       assert.equal(first.outcome, "pending-asks", `${runner}: ${JSON.stringify(first)}`);
@@ -960,7 +1230,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         // remaining intake request directly rather than wrapping it as a
         // second author-related pending-asks envelope.
         assert.equal(anchored.json.outcome, "collect-input", `${runner}: ${JSON.stringify(anchored.json)}`);
-        assert.deepEqual(anchored.json.collectInput?.inputs?.map((input) => input.name), ["language", "profile", "projectDescription"]);
+        assertConsentInputs(anchored.json.collectInput);
       }
 
       let intake = freshDriver(path, runner, env, privateKey);
@@ -969,16 +1239,71 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         // Codex's portable-seed route reaches the explicit intake-consent
         // action before initial-answer collection; the description was
         // already supplied through that returned action above.
+        assertCapturedOriginal();
       } else {
-        assert.deepEqual(intake.collectInput.inputs.map((input) => input.name), ["language", "profile", "projectDescription"]);
+        assertConsentInputs(intake.collectInput);
         assert.equal(intake.collectInput.applyAction.argv.includes("--git-author-name"), false);
-        mkdirSync(join(path, "scratch"), { recursive: true });
-        writeFileSync(join(path, "scratch", "onboarding-intake.txt"), "Build a locally playable mini HTML game.\nNo external dependencies.\n");
-        invokeAction(intake.collectInput.applyAction, new Map([
+        if (runner !== "claude") {
+          mkdirSync(join(path, "scratch"), { recursive: true });
+          writeFileSync(originalFile, originalBytes);
+        }
+        const consented = invokeAction(intake.collectInput.applyAction, new Map([
           ["<PO_INTAKE_LANGUAGE>", "en"],
           ["<PO_INTAKE_PROFILE>", "feature"],
         ]), path, env);
+        assert.equal(consented.json.status, "applied", JSON.stringify(consented.json));
+        if (runner === "claude") {
+          const consent = readOnboardingIntakeCheckpoint({ rootDir: path });
+          assert.equal(consent.status, "present");
+          assert.equal(consent.value.consent?.granted, true);
+          assert.equal(consent.value.transactionState, "collecting");
+          assert.deepEqual(consent.value.materialInput, [],
+            "claude: a consent-only action must not satisfy description readiness");
+          const captureAsk = freshDriver(path, runner, env, privateKey);
+          assert.equal(captureAsk.outcome, "collect-input", JSON.stringify(captureAsk));
+          assert.equal(captureAsk.collectInput.input.name, "textTurnRef");
+          assert.equal(captureAsk.collectInput.applyAction.argv.includes("--text-turn-ref"), true);
+          // This fixture has no trusted native event reference. Supply the
+          // still-required explicit description once through the returned
+          // regular-file fallback, preserving source bytes and their digest.
+          mkdirSync(join(path, "scratch"), { recursive: true });
+          assert.equal(existsSync(originalFile), false);
+          writeFileSync(originalFile, originalBytes);
+          assert.equal(lstatSync(originalFile).isFile(), true);
+          const captureAction = captureAsk.collectInput.existingFileApplyAction;
+          assert.equal(captureAction.argv[1], "intake-capture-apply");
+          assert.equal(captureAction.argv.includes("--text-turn-ref"), false);
+          assert.equal(captureAction.argv.includes("--text-file-sha256"), true);
+          const captured = invokeAction(captureAction, new Map([
+            ["<existing-repository-file>", "scratch/onboarding-intake.txt"],
+            ["<sha256-of-existing-file>", originalSha256],
+          ]), path, env);
+          assert.equal(captured.json.schema, "pipeline.onboarding-intake-capture-apply.v1");
+          assert.equal(captured.json.root, path);
+          assert.equal(captured.json.mutated, true);
+          assert.deepEqual(captured.json.evidence, { sha256: originalSha256, byteLength: originalBytes.length, wrote: true });
+          assert.deepEqual(captured.json.checkpoint, readOnboardingIntakeCheckpoint({ rootDir: path }).value);
+        }
+        assertCapturedOriginal();
       }
+      const heldOriginal = assertCapturedOriginal();
+      assert.equal(heldOriginal.value.transactionState, "design-questions-pending");
+      testContext.diagnostic(`${runner}: verified original intake ${JSON.stringify({ sha256: originalSha256,
+        byteLength: originalBytes.length, consentGranted: true, captureRoute: runner === "claude"
+          ? "returned-existing-file-after-separate-consent" : "returned-consent-with-explicit-description", nativeReference: false })}`);
+
+      // Capture the greenfield request before its first commit can make the
+      // repository appear populated. Snapshot only bootstrap support, before
+      // Feature activation, through both installed enforcing Git hooks.
+      const bootstrapState = readPipelineState(path);
+      assert.equal(bootstrapState.state?.activeFeature?.id ?? null, null,
+        `${runner}: the bootstrap snapshot precedes Feature activation`);
+      assert.equal(existsSync(join(path, "game.js")), false);
+      const bootstrapPaths = fixtureGit(path, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"])
+        .split("\0").filter(Boolean);
+      const bootstrapCandidate = commitFixturePaths(path, [...new Set(bootstrapPaths)],
+        "test: snapshot greenfield onboarding support", "stage-0");
+      testContext.diagnostic(`${runner}: real hooked bootstrap candidate ${JSON.stringify(bootstrapCandidate)}`);
 
       intake = freshDriver(path, runner, env, privateKey);
       assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
@@ -991,14 +1316,71 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         ["<PO_INTAKE_DESIGN_ANSWERS_JSON>", answers],
       ]), path, env);
 
-      const designStop = freshDriver(path, runner, env, privateKey);
-      assert.equal(designStop.outcome, "unsupported-next-action", JSON.stringify(designStop));
-      assert.equal(designStop.final.nextAction.kind, "architecture-design-required");
-      assert.equal(existsSync(join(path, "architecture/baseline.json")), false);
-      const prdPath = designStop.final.nextAction.prdPath;
-      assert.equal(typeof prdPath, "string", "the remediation names its exact generated PRD");
+      // Applying the answers leaves initialization on the returned driver
+      // chain. Advance that chain to its explicit architecture authoring stop
+      // before observing the state and generated PRD it actually materializes.
+      const architectureAuthoring = freshDriver(path, runner, env, privateKey);
+      assert.equal(architectureAuthoring.outcome, "unsupported-next-action",
+        `${runner}: the returned driver stops for architecture authoring ${JSON.stringify(architectureAuthoring)}`);
+      const architectureAuthoringAction = architectureAuthoring.final?.nextAction;
+      assert.deepEqual({ kind: architectureAuthoringAction?.kind, code: architectureAuthoringAction?.code },
+        { kind: "repair-required", code: "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE" },
+        `${runner}: returned architecture authoring readback ${JSON.stringify(architectureAuthoring)}`);
+      assert.equal(architectureAuthoring.final.status, "draft");
+      assert.equal(architectureAuthoring.final.planApproved, false);
+      assert.deepEqual(architectureAuthoring.final.lifecycle,
+        { ok: true, code: "PLAN-LIFECYCLE-CURRENT", status: "draft" },
+        `${runner}: the unfinished architecture draft is anchored to the current lifecycle`);
+      assert.equal(architectureAuthoring.steps.some((step) => ["submit-plan", "present-plan", "approve-plan"].includes(step.argv[1])), false,
+        `${runner}: authoring is reached without an early submission, presentation or PO signature`);
+      const architectureInspectStep = architectureAuthoring.steps.at(-1);
+      assert.equal(architectureInspectStep?.argv?.[1], "inspect");
+      const stateScript = architectureInspectStep.argv[0];
+      assert.equal(stateScript.endsWith("pipeline-state.mjs"), true);
+      const stateDriver = publicDriverRun(path, []);
+      const beforeArchitectureSubmission = readFixtureState(path);
+      assert.equal(beforeArchitectureSubmission.planSubmission, undefined,
+        `${runner}: architecture is authored before plan submission`);
+      assert.equal(beforeArchitectureSubmission.planPresentation, undefined,
+        `${runner}: architecture authoring creates no presentation or signature request`);
+      const prdPath = beforeArchitectureSubmission.activeFeature?.planPath;
+      assert.equal(typeof prdPath, "string", "the initialized design state names its exact generated PRD");
+      assert.equal(prdPath, architectureAuthoring.final.activeFeature?.planPath,
+        `${runner}: the canonical state names the PRD anchored by the returned authoring readback`);
       const prdFile = join(path, prdPath);
       assert.equal(existsSync(prdFile), true, "the named generated PRD exists before it may be edited");
+      const generatedPrdBeforeRefusal = readFileSync(prdFile, "utf8");
+      assert.match(generatedPrdBeforeRefusal, /## Captured material input/u,
+        `${runner}: the pre-submit refusal fixture retains the original intake material`);
+      const refusalSpecDigest = generatedPrdBeforeRefusal.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
+      assert.match(refusalSpecDigest ?? "", /^[a-f0-9]{64}$/u,
+        `${runner}: the generated PRD already carries its Spec binding`);
+      const untouchedDraftSubmit = stateDriver(architectureInspectStep.executable,
+        [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"]);
+      assert.equal(untouchedDraftSubmit.status, 2,
+        `${runner}: submit-plan rejects the untouched reserved architecture draft`);
+      assert.match(untouchedDraftSubmit.stderr, /ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE/u);
+      const afterUntouchedDraftSubmission = readFixtureState(path);
+      assert.equal(afterUntouchedDraftSubmission.planSubmission, undefined,
+        `${runner}: the untouched draft rejection records no submission`);
+      assert.equal(afterUntouchedDraftSubmission.planPresentation, undefined,
+        `${runner}: the untouched draft rejection creates no presentation or signature request`);
+      assert.equal(readFileSync(prdFile, "utf8"), generatedPrdBeforeRefusal,
+        `${runner}: rejection leaves the generated architecture draft unchanged`);
+      const missingArchitecturePrd = stripGeneratedArchitectureTemplate(generatedPrdBeforeRefusal, { required: true });
+      assert.equal(missingArchitecturePrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], refusalSpecDigest,
+        `${runner}: removing only the reserved draft leaves the generated Spec digest intact`);
+      writeFileSync(prdFile, missingArchitecturePrd);
+      const refusedSubmit = stateDriver(architectureInspectStep.executable,
+        [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"]);
+      assert.equal(refusedSubmit.status, 2, `${runner}: submit-plan refuses the now-missing architecture block`);
+      assert.match(refusedSubmit.stderr, /ARCHITECTURE-DESIGN-PACKAGE-REQUIRED/u);
+      const afterRefusedSubmission = readFixtureState(path);
+      assert.equal(afterRefusedSubmission.planSubmission, undefined, `${runner}: refusal records no submission`);
+      assert.equal(afterRefusedSubmission.planPresentation, undefined, `${runner}: refusal creates no presentation or signature request`);
+      assert.equal(readFileSync(prdFile, "utf8"), missingArchitecturePrd,
+        `${runner}: refusal leaves the stripped but otherwise intact PRD unchanged`);
+      assert.equal(existsSync(join(path, "architecture/baseline.json")), false);
       const contract = "docs/game-contract.md";
       const verification = "tests/game.test.mjs";
       mkdirSync(join(path, "docs"), { recursive: true });
@@ -1017,13 +1399,45 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
           allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true, rejectDuplicatedFacades: true, minStatementsPerModule: 1 } },
         baseline: { schema: "pipeline.architecture-baseline.v1", baselineRevision: 1, acceptedViolations: [],
           ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } };
-      writeFileSync(prdFile, readFileSync(prdFile, "utf8") + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
-      const signatureRequest = freshDriver(path, runner, env, privateKey);
-      assert.equal(signatureRequest.outcome, "external-operator", `${runner}: ${JSON.stringify(signatureRequest)}`);
-      assert.equal(signatureRequest.final.status, "signature-required");
-      assert.equal(signatureRequest.externalOperator.action.argv[1], "sign-intent");
-      assert.equal(typeof signatureRequest.externalOperator.action.copyCommand?.posix, "string");
-      assert.equal(typeof signatureRequest.externalOperator.action.copyCommand?.powershell, "string");
+      const generatedPrdBeforeAuthoring = readFileSync(prdFile, "utf8");
+      const generatedSpecDigest = generatedPrdBeforeAuthoring.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
+      assert.match(generatedSpecDigest ?? "", /^[a-f0-9]{64}$/u,
+        `${runner}: final authoring starts from the generated PRD's existing Spec binding`);
+      assert.match(generatedPrdBeforeAuthoring, /## Captured material input/u,
+        `${runner}: authoring preserves the complete original intake section`);
+      const authoringBase = stripGeneratedArchitectureTemplate(generatedPrdBeforeAuthoring);
+      assert.match(authoringBase, /## Captured material input/u);
+      assert.equal(authoringBase.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], generatedSpecDigest,
+        `${runner}: authoring does not replace the generated Spec hash with a fixture constant`);
+      const authoredArchitectureBlock = "```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n";
+      writeFileSync(prdFile, authoringBase + "\n" + authoredArchitectureBlock);
+      const authoredPrd = readFileSync(prdFile, "utf8");
+      assert.equal((authoredPrd.match(/```pipeline-architecture-design/gu) ?? []).length, 1,
+        `${runner}: the authored PRD replaces the reserved draft with exactly one architecture block`);
+      assert.doesNotMatch(authoredPrd, /DRAFT TEMPLATE|REPLACE:/u,
+        `${runner}: final authoring removes the reserved template markers before approval`);
+      assert.equal(authoredPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], generatedSpecDigest);
+      const sourceBase = dirname(prdPath);
+      const featureId = beforeArchitectureSubmission.activeFeature.id;
+      const fixtureSources = [
+        [`${sourceBase}/design-input.md`, `Original request for ${featureId}.\n`],
+        [`${sourceBase}/design.md`, `Revised design for ${featureId}.\n`],
+        [`${sourceBase}/traceability.md`, `Requirements for ${featureId} are mapped.\n`],
+      ];
+      for (const [relativePath, bytes] of fixtureSources) writeFileSync(join(path, relativePath), bytes);
+      const designSourcePaths = [fixtureSources[0][0], prdPath, `${sourceBase}/spec.md`, fixtureSources[1][0], fixtureSources[2][0]];
+      const beforeSourceCommit = readFixtureState(path);
+      assert.equal(beforeSourceCommit.planApproved, false);
+      assert.equal(beforeSourceCommit.planSubmission, undefined);
+      assert.equal(beforeSourceCommit.planPresentation, undefined);
+      assert.equal(existsSync(join(path, "game.js")), false);
+      const designCandidate = commitFixturePaths(path, designSourcePaths,
+        "test: commit authored greenfield design sources", "stage-0");
+      for (const relativePath of designSourcePaths) {
+        assert.equal(fixtureGit(path, ["show", `${designCandidate.commit}:${relativePath}`]), readFileSync(join(path, relativePath), "utf8"),
+          `${runner}: each source is present byte-for-byte in the real design candidate`);
+      }
+      testContext.diagnostic(`${runner}: real hooked five-source design candidate ${JSON.stringify(designCandidate)}`);
       const productProbe = () => {
         const verdict = devPlanGateVerdict({ filePath: "game.js", projectDir: path });
         return {
@@ -1031,36 +1445,24 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
           stderr: verdict.reason ?? "",
         };
       };
-      const signatureIntent = signatureRequest.externalOperator.expected.intentSha256;
-      const publicKeyPem = createPublicKey(privateKey).export({ format: "pem", type: "spki" });
-      writeFileSync(join(path, signatureRequest.final.proofPath), `${JSON.stringify({
-        schema: "pipeline.po-approval-proof.v1",
-        intentSha256: signatureIntent,
-        keyReference: "fixture-po-key",
-        publicKey: publicKeyPem,
-        signatureBase64: sign(null, Buffer.from(signatureIntent, "utf8"), privateKey).toString("base64"),
-      })}\n`);
 
-      // Re-enter only through the public driver. It observes the proof,
-      // executes the exact acknowledgement/bind actions, and submits and
-      // presents the plan before this independent legacy advisory diagnostic.
-      // A declined Codex export keeps the legacy receipt unavailable; it does
-      // not revoke the separately signed and approved design-workflow package.
+      // Complete the authored package through the public driver. The late
+      // legacy advisory diagnostic below is independent and cannot revoke
+      // the separately signed final design-workflow approval.
       const preApproval = freshDriver(path, runner, env, privateKey, () => {
         assert.equal(productProbe().status, 2,
-          `${runner}: implementation is blocked after presentation and signed request, before approve-plan`);
+          `${runner}: implementation is blocked before the single final approve-plan transition`);
       });
-      const preState = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
-      assert.equal(preApproval.outcome, "ready", `${runner}: the signed design-workflow package must complete before the legacy advisory diagnostic`);
+      const preState = readFixtureState(path);
+      assert.equal(preApproval.outcome, "ready", `${runner}: the final design-workflow approval must complete the lifecycle ${JSON.stringify(preApproval)}`);
       assert.equal(preState.planApproved, true);
       assert.equal(preState.activeFeature.phase, "implementation");
       assert.equal(preState.planApproval?.schema, "pipeline.plan-approval.v7");
       assert.equal(preState.planApproval?.poGateAuthority?.planPath, preState.activeFeature.planPath);
       assert.match(preState.planPresentation?.designWorkflowPackageSha256 ?? "", /^[a-f0-9]{64}$/u);
-      const stagedDesign = spawnSync("git", ["add", "--", "."], { cwd: path, encoding: "utf8" });
-      assert.equal(stagedDesign.status, 0, stagedDesign.stderr);
-      const committedDesign = spawnSync("git", ["-c", "user.name=Greenfield E2E PO", "-c", "user.email=greenfield-e2e@example.invalid", "commit", "-m", "test: bind greenfield design package\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)"], { cwd: path, encoding: "utf8" });
-      assert.equal(committedDesign.status, 0, committedDesign.stderr);
+      assert.deepEqual(candidateAtHead(path), designCandidate,
+        `${runner}: final approval remains bound to the committed five-source candidate`);
+      testContext.diagnostic(`${runner}: real lifecycle gate after final approval ${JSON.stringify(productProbe())}`);
 
       let advisoryBridgeCalls = 0;
       const advisory = await coordinateDesignAdvisory({
@@ -1097,7 +1499,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         assert.equal(privateReceipt.answerSha256, null);
         assert.equal(privateRoute.childStarted, false);
         assert.equal(privateRoute.attemptCount, 0);
-        const afterLegacyDiagnostic = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+        const afterLegacyDiagnostic = readFixtureState(path);
         assert.deepEqual(afterLegacyDiagnostic.planApproval, preState.planApproval,
           `${runner}: the late legacy diagnostic cannot revoke or replace the already-approved design package`);
         assert.equal(afterLegacyDiagnostic.planApproved, preState.planApproved);
@@ -1128,26 +1530,43 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       `${runner}: the Epic/Feature approval must consume its signed design-workflow request without a bootstrap receipt`);
       assert.equal(planSteps.some((argv) => argv[1] === "approve-plan" && argv.includes("--by")), false,
         `${runner}: signature mode must not regress to the legacy --by approval route`);
-      const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+      assert.equal(planSteps.filter((argv) => argv[1] === "approve-plan").length, 1,
+        `${runner}: the authored design package receives exactly one downstream PO signature transition`);
+      const state = readFixtureState(path);
       assert.equal(state.planApproved, true, `${runner}: the receipt must complete the one approved transition`);
       assert.equal(state.activeFeature.phase, "implementation");
-      assert.equal(checkPlanningAdoptionDisposition(path, state.activeFeature.planPath).ok, true);
-      assert.equal(resolveAdoptionState(path).state, "approved-scoped");
+      const inspectApprovedDesign = () => inspectArchitectureDesign(path, state.activeFeature.planPath, {
+        gitCandidate: preApproval.designWorkflowDeps.gitCandidate,
+        verifyReadinessExecution: preApproval.designWorkflowDeps.verifyDesignReadinessHostExecution,
+      });
+      const approvedDesign = inspectApprovedDesign();
+      assert.equal(approvedDesign.ok, true, JSON.stringify(approvedDesign));
+      assert.equal(approvedDesign.disposition, "approved-scoped");
       assert.ok(planSteps.some(argv => argv[1] === "materialize-architecture"));
       assert.equal(existsSync(join(path, "architecture/design-materialization.json")), true);
+      testContext.diagnostic(`${runner}: returned-action architecture authoring and one signed final design approval passed`);
       assert.equal(existsSync(join(path, "architecture/adoption-state.json")), false,
         "The explicit disposition belongs to the approved PRD; no second approval is fabricated");
       const activePrd = join(path, state.activeFeature.planPath);
       const approvedBytes = readFileSync(activePrd, "utf8");
       writeFileSync(activePrd, approvedBytes + "\nUnapproved architecture change.\n");
-      assert.equal(inspectArchitectureDesign(path).ok, false, "PRD drift revokes architecture authority immediately");
+      assert.equal(inspectApprovedDesign().ok, false, "PRD drift revokes architecture authority immediately");
+      const staleApprovedInspect = run(onboarding, ["inspect", "--root", path, "--runner", runner], path,
+        preApproval.designWorkflowDeps);
+      assert.equal(staleApprovedInspect.status, 0, staleApprovedInspect.stdout);
+      assert.ok(staleApprovedInspect.json.nextAction, JSON.stringify(staleApprovedInspect.json));
+      assert.equal(staleApprovedInspect.json.nextAction.kind, "collect-input");
+      assert.ok(staleApprovedInspect.json.nextAction.applyAction.argv.includes("reopen-design"),
+        `${runner}: invalid already-approved architecture must be explicitly reopened before PRD edits`);
+      assert.equal(readFixtureState(path).planApproved, true,
+        `${runner}: read-only stale-design guidance does not silently revoke the approval`);
       writeFileSync(activePrd, approvedBytes);
       const receiptPath = join(path, "architecture/design-materialization.json");
       const receiptBytes = readFileSync(receiptPath, "utf8");
       writeFileSync(receiptPath, receiptBytes.replace('"designSha256": "', '"designSha256": "changed-'));
-      assert.equal(inspectArchitectureDesign(path).code, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+      assert.equal(inspectApprovedDesign().code, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
       writeFileSync(receiptPath, receiptBytes);
-      const deferredDesign = inspectArchitectureDesign(path);
+      const deferredDesign = inspectApprovedDesign();
       assert.equal(deferredDesign.status, "materialized");
       assert.ok(deferredDesign.pendingPhysicalSurfaces.includes("game.js"),
         `${runner}: approved design authority must leave the uncreated implementation surface pending`);
@@ -1186,7 +1605,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const admitted = productProbe();
       assert.equal(admitted.status, 0, `${runner}: ${admitted.stderr}`);
       writeFileSync(join(path, "game.js"), "export const playable = true;\n");
-      const completedDesign = inspectArchitectureDesign(path);
+      const completedDesign = inspectApprovedDesign();
       assert.equal(completedDesign.status, "materialized");
       assert.equal(completedDesign.pendingPhysicalSurfaces.includes("game.js"), false,
         `${runner}: entry readiness resumes after the implementation file is physically present`);

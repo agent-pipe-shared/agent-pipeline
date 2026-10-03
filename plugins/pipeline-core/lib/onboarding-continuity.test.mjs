@@ -2869,7 +2869,7 @@ check("promote apply independently refuses a PRD that lost its technical Spec ma
   writeFileSync(path, readFileSync(path, "utf8").split("\n")
     .filter((line) => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
   assert.throws(() => applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }),
-    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING");
+    (error) => error?.code === "KICKOFF-PROMOTION-CAS-DRIFT");
 });
 
 check("promotion admits a PRD carrying both correct po-gate markers exactly as before", () => {
@@ -3146,10 +3146,12 @@ check("nextActionSection: draft (no submission yet) renders submit-plan", () => 
   assert.doesNotMatch(text, /approve-plan/);
 });
 
-check("nextActionSection: awaiting-approval (submitted, not yet approved) renders approve-plan", () => {
+check("nextActionSection: awaiting-approval points at the canonical typed inspection action", () => {
   const submission = nextActionSubmissionFixture();
   const text = nextActionSection(nextActionStateFixture({ planSubmission: submission }));
-  assert.match(text, /pipeline-state approve-plan --by/);
+  assert.match(text, /pipeline-state inspect/);
+  assert.doesNotMatch(text, /approve-plan --by/);
+  assert.match(text, /Advisor and readiness/);
   assert.doesNotMatch(text, /submit-plan/);
 });
 
@@ -3891,9 +3893,9 @@ check("intake checkpoint: a preimage that changes between the two observations i
 // error paths, and idempotent no-op/regeneration coverage for the
 // plan/apply pair, plus the SSc.2-mandated crash-injection matrix.
 
-function readyToGenerateRoot(name, text = "requirement material one") {
+function readyToGenerateRoot(name, text = "requirement material one", profile = "feature") {
   const root = fixture(name, { neutral: true });
-  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile: "feature", activate: true });
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile, activate: true });
   applyOnboardingIntakeCapture({ rootDir: root, text, activate: true });
   applyOnboardingIntakeDesignQuestions({
     rootDir: root,
@@ -3915,17 +3917,30 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
   assert.equal(plan.targets.prd.path, `specs/${plan.featureId}/prd_${plan.featureId}.md`);
   assert.equal(plan.targets.spec.path, `specs/${plan.featureId}/spec.md`);
 
+  const configuredCrlf = spawnSync("git", ["config", "--local", "core.autocrlf", "true"], {
+    cwd: root, encoding: "utf8", shell: false,
+  });
+  assert.equal(configuredCrlf.status, 0, configuredCrlf.stderr);
+
   const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
   assert.equal(applied.schema, INTAKE_GENERATE_APPLY_SCHEMA);
   assert.equal(applied.mutated, true);
   assert.equal(applied.featureId, plan.featureId);
   assert.equal(applied.checkpoint.transactionState, "generated");
   assert.equal(applied.checkpoint.generated.designInputSha256, plan.targets.designInput.afterSha256);
+  const localAutocrlf = spawnSync("git", ["config", "--local", "--get", "core.autocrlf"], {
+    cwd: root, encoding: "utf8", shell: false,
+  });
+  assert.equal(localAutocrlf.status, 0, localAutocrlf.stderr);
+  assert.equal(localAutocrlf.stdout.trim(), "false",
+    "generation prepares only the disposable repository's effective autocrlf value before publishing bound bytes");
 
   for (const key of ["designInput", "prd", "spec"]) {
     const absolute = join(root, plan.targets[key].path);
     assert.equal(existsSync(absolute), true);
     assert.equal(digest(readFileSync(absolute, "utf8")), plan.targets[key].afterSha256);
+    assert.equal(readFileSync(absolute, "utf8").includes("\r"), false,
+      `${key}: generated design bytes remain LF after repository-local preparation`);
     assert.equal(applied.targets[key].wrote, true);
     assert.equal(readFileSync(absolute, "utf8").includes("this staging file is NOT yet bound as project authority"), false,
       `${key}: canonical generated artifacts must not claim they are pre-authority staging files`);
@@ -4307,18 +4322,25 @@ function bootstrapBindReadyRoot(name) {
 // landed). Proves the fix: the freshly generated PRD now already carries
 // BOTH mechanical markers with the correct values.
 //
-check("planOnboardingBootstrapBind: a fresh intake-generated staging PRD carries valid mechanical markers but still requires the policy-selected acknowledgement", () => {
-  const root = readyToGenerateRoot("bootstrap-bind-ac1-markers");
-  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
-  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
-  const prdText = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
-  assert.equal(prdText.startsWith(
-    `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${generatePlan.targets.spec.afterSha256} -->\n`,
-  ), true, prdText);
-  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
-    () => planOnboardingBootstrapBind({ rootDir: root }));
+check("planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement", () => {
+  for (const profile of ["mini", "feature", "epic"]) {
+    const root = readyToGenerateRoot("bootstrap-bind-ac1-markers-" + profile, "requirement material one", profile);
+    const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+    applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+    const prdPath = join(root, generatePlan.targets.prd.path);
+    const prdText = readFileSync(prdPath, "utf8");
+    assert.equal(prdText.startsWith("<!-- po-language: en -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n"), true);
+    if (profile === "mini") {
+      expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING", () => planOnboardingBootstrapBind({ rootDir: root }));
+    } else {
+      const plan = planOnboardingBootstrapBind({ rootDir: root });
+      assert.equal(plan.targets.state.value.planApproved, false);
+      assert.equal(plan.targets.state.value.bootstrapAcknowledgementRequired, undefined);
+      writeFileSync(prdPath, prdText.split("\n").filter(line => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
+      expectKickoffError("KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING", () => planOnboardingBootstrapBind({ rootDir: root }));
+    }
+  }
 });
-
 check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor", () => {
   const { root, featureId } = bootstrapBindReadyRoot("happy");
   const plan = planOnboardingBootstrapBind({ rootDir: root });
@@ -4423,8 +4445,8 @@ check("a coordinator-sourced binding satisfies the PO plan gate's current contra
 // A generated coordinator draft is never exempt from the configured human
 // acknowledgement.  This helper makes both states explicit: markerless stays
 // bind-blocked; acknowledged goes through the dedicated receipt writer.
-function bootstrapBindPureGeneratorRoot(name, { acknowledged = false } = {}) {
-  const root = readyToGenerateRoot(`bootstrap-bind-pure-${name}`);
+function bootstrapBindPureGeneratorRoot(name, { acknowledged = false, profile = "feature" } = {}) {
+  const root = readyToGenerateRoot(`bootstrap-bind-pure-${name}`, "requirement material one", profile);
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
   if (acknowledged) {
@@ -4440,7 +4462,7 @@ function bootstrapBindPureGeneratorRoot(name, { acknowledged = false } = {}) {
 }
 
 check("planOnboardingBootstrapBind: a marker-less generated PRD is refused even before a hand edit", () => {
-  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("one-byte-edit");
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("one-byte-edit", { profile: "mini" });
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
   const original = readFileSync(prdAbsolute, "utf8");
   assert.equal(original.includes("po-plan-acknowledged"), false, "fixture must start marker-less");
@@ -4493,7 +4515,7 @@ check("applyOnboardingBootstrapBind: consent withdrawal after an acknowledged pl
 });
 
 check("planOnboardingBootstrapBind: the same pure-generator staging PRD is refused when the checkpoint's recorded consent is absent (NVA-R2-STAGINGACKTESTS)", () => {
-  const { root } = bootstrapBindPureGeneratorRoot("no-consent");
+  const { root } = bootstrapBindPureGeneratorRoot("no-consent", { profile: "mini" });
   const paths = resolveIntakeCheckpointPaths({ rootDir: root });
   const checkpoint = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
   checkpoint.consent = null;

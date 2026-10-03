@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Explicit architecture content in the PO-approved design, never inferred from a repository. */
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
+import { readDesignWorkflowPackageFromRepository } from "./design-workflow-package.mjs";
+import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
+import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
@@ -51,6 +55,11 @@ export function parseArchitectureDesign(prd) {
   const blocks = [...prd.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
   requireValue(blocks.length === 1, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED");
   const input = JSON.parse(blocks[0][1]);
+  // Generated templates are authoring aids, never a finished design for approval.
+  const containsPlaceholder = value => typeof value === "string" ? value.startsWith("REPLACE:")
+    : Array.isArray(value) ? value.some(containsPlaceholder)
+    : value && typeof value === "object" ? Object.values(value).some(containsPlaceholder) : false;
+  requireValue(!prd.includes("<!-- DRAFT TEMPLATE:") && !containsPlaceholder(input), "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE");
   requireValue(input && typeof input === "object" && !Array.isArray(input)
     && ["schema", "repositoryKind", "disposition", "modules", "implementationSurface", "fitnessModel"]
       .every(key => Object.hasOwn(input, key))
@@ -150,13 +159,39 @@ export function architectureDesignTargets(input) {
   return targets;
 }
 
-/** Read-only authority projection: no adoption record or second PO decision is fabricated. */
-export function inspectArchitectureDesign(rootDir, taskScope = null) {
+/** Read-only pre-presentation check for a fresh scaffold. It binds the bytes
+ * to the submitted PRD digest and never treats the scaffold itself as design
+ * approval or as a materialized architecture map. */
+export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlanSha256 } = {}) {
   const root = resolve(rootDir);
+  try {
+    const prdBytes = readFileSync(physical(root, planPath));
+    if (hash(prdBytes) !== expectedPlanSha256) return { ok: false, code: "ARCHITECTURE-DESIGN-PRD-DIGEST-STALE", prdPath: planPath };
+    const scaffold = initialGreenfieldMapTargets("fresh");
+    // This additional pre-submit check applies to the new greenfield scaffold,
+    // not historical repositories that never had that scaffold. Partial or
+    // unreadable scaffold state still fails closed through the physical reader.
+    if (scaffold.every(target => !existsSync(join(root, target.path)))) return { ok: true, required: false };
+    if (!scaffold.every(target => bytes(root, target.path) === target.bytes)) return { ok: true, required: false };
+    try {
+      return { ok: true, required: true, design: parseArchitectureDesign(prdBytes.toString("utf8")), prdPath: planPath };
+    } catch (error) {
+      return { ok: false, required: true, code: error.message, prdPath: planPath };
+    }
+  } catch (error) {
+    return { ok: false, code: error?.message ?? "ARCHITECTURE-DESIGN-PRD-UNAVAILABLE", prdPath: planPath };
+  }
+}
+
+/** Read-only authority projection: no adoption record or second PO decision is fabricated. */
+export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) {
+  const root = resolve(rootDir);
+  let prdPath = null;
   try {
     const state = JSON.parse(bytes(root, "project/pipeline-state.json"));
     const authority = state.planApproval?.poGateAuthority;
     requireValue(authority?.planPath && authority?.specPath, "ARCHITECTURE-DESIGN-APPROVAL-REQUIRED");
+    prdPath = authority.planPath;
     const prd = bytes(root, authority.planPath);
     const spec = bytes(root, authority.specPath);
     const observation = { planSha256: hash(prd), specSha256: hash(spec) };
@@ -169,9 +204,11 @@ export function inspectArchitectureDesign(rootDir, taskScope = null) {
     "ARCHITECTURE-DESIGN-CONTINUITY-STALE");
     const verified = validatePoGateAuthorityForRepository({ repoRoot: root,
       expectedPlanSha256: observation.planSha256, expectedSpecSha256: observation.specSha256 });
-    requireValue(verified.ok, verified.code);
-    requireValue(Object.entries(authority).every(([key, value]) => verified.value[key] === value),
-      "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE");
+    const bootstrapAcknowledgementValid = verified.ok
+      && Object.entries(authority).every(([key, value]) => verified.value[key] === value);
+    const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
+    requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
+      finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
     const input = parseArchitectureDesign(prd);
     requireValue(covers(input.disposition.scope, authority.planPath)
       && covers(input.disposition.scope, "architecture/map/index.md")
@@ -208,8 +245,70 @@ export function inspectArchitectureDesign(rootDir, taskScope = null) {
     return { ok: true, status: "materialization-required", input, targets, receipt, scope: input.disposition.scope };
   } catch (error) {
     return { ok: false, status: "design-required", code: error.message,
+      ...(error.message === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && prdPath ? { prdPath } : {}),
       ...(error.field ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
   }
+}
+
+function verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps = {}) {
+  try {
+    if (state.planApproved !== true || !["epic", "feature"].includes(state.planSubmission?.profile)
+      || state.planSubmission.featureId !== state.activeFeature?.id) return { ok: false, code: "DWP-FINAL-APPROVAL-STATE" };
+    const presentation = state.planPresentation;
+    const approval = state.planApproval;
+    const workflowApproval = approval?.designWorkflowApproval;
+    const packagePath = approval?.designWorkflowPackagePath;
+    const packageSha256 = approval?.designWorkflowPackageSha256;
+    if (typeof packagePath !== "string" || typeof packageSha256 !== "string"
+      || presentation?.designWorkflowPackagePath !== packagePath
+      || presentation?.designWorkflowPackageSha256 !== packageSha256
+      || workflowApproval?.packageSha256 !== packageSha256
+      || !["chat", "signature"].includes(workflowApproval?.mode)) return { ok: false, code: "DWP-FINAL-APPROVAL-PRESENTATION" };
+    const readCandidate = () => {
+      if (typeof deps.gitCandidate === "function") {
+        const candidate = deps.gitCandidate();
+        return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
+      }
+      const run = (args) => execFileSync("git", args, { cwd: root, encoding: "utf8", timeout: 10_000, shell: false,
+        stdio: ["ignore", "pipe", "pipe"] }).trim();
+      try { return { commit: run(["rev-parse", "HEAD"]), tree: run(["rev-parse", "HEAD^{tree}"]) }; }
+      catch {
+        // A genuinely uninitialized greenfield root has no HEAD yet. The
+        // package candidate may seed the canonical reader only after the
+        // exact package bytes match both the presented digest and the
+        // approval record; final signature verification still follows below.
+        const packageBytes = Buffer.from(bytes(root, packagePath), "utf8");
+        if (hash(packageBytes) !== packageSha256) return null;
+        const candidate = JSON.parse(packageBytes.toString("utf8"))?.candidate;
+        if (!candidate || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.commit ?? "")
+          || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.tree ?? "")) return null;
+        return { commit: candidate.commit, tree: candidate.tree };
+      }
+    };
+    const packageRead = readDesignWorkflowPackageFromRepository({
+      repoRoot: root, packagePath, readCandidate, requireCurrentCandidate: false,
+      ...(deps.trustedAdvisorExecutablePath ? { trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath } : {}),
+      ...(typeof deps.verifyReadinessExecution === "function" ? { verifyReadinessExecution: deps.verifyReadinessExecution } : {}),
+    });
+    if (!packageRead.ok) return { ok: false, code: packageRead.code ?? "DWP-FINAL-PACKAGE-INVALID" };
+    if (packageRead.packageSha256 !== packageSha256
+      || packageRead.workflowPackage.featureId !== state.activeFeature.id
+      || packageRead.workflowPackage.sources.prd.path !== authority.planPath
+      || packageRead.workflowPackage.sources.prd.sha256 !== observation.planSha256
+      || packageRead.workflowPackage.sources.spec.path !== authority.specPath
+      || packageRead.workflowPackage.sources.spec.sha256 !== observation.specSha256) return { ok: false, code: "DWP-FINAL-PACKAGE-SOURCE-BINDING" };
+    if (workflowApproval.mode === "chat") return { ok: true };
+    const policy = readCriticalHumanProofPolicy(root);
+    if (!policy?.ok) return { ok: false, code: policy?.code ?? "DWP-FINAL-PROOF-POLICY" };
+    const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+    const signature = verifyStoredDesignWorkflowPackageSignature({
+      repoRoot: root, packagePath, packageSha256, featureId: state.activeFeature.id,
+      planPath: authority.planPath, planSha256: observation.planSha256,
+      specPath: authority.specPath, specSha256: observation.specSha256,
+      approval: workflowApproval, anchors, readCandidate,
+    });
+    return signature.ok === true ? { ok: true } : { ok: false, code: signature.code ?? "DWP-FINAL-SIGNATURE-INVALID" };
+  } catch (error) { return { ok: false, code: error?.message ?? "DWP-FINAL-APPROVAL-ERROR" }; }
 }
 
 function assertLock(root, lock) {
@@ -282,23 +381,33 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
 }
 
 /** Fixed target writer; caller must hold the sanctioned lifecycle writer's project lock. */
-export function materializeArchitectureDesign(rootDir, { lock } = {}) {
+export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } = {}) {
   const root = resolve(rootDir);
   try {
     assertLock(root, lock);
     const stateBytes = bytes(root, "project/pipeline-state.json");
-    const inspected = inspectArchitectureDesign(root);
+    const inspected = inspectArchitectureDesign(root, null, inspectDeps);
     if (!inspected.ok || inspected.status === "materialized") return inspected;
-    const authority = JSON.parse(stateBytes).planApproval.poGateAuthority;
+    const state = JSON.parse(stateBytes);
+    const authority = state.planApproval.poGateAuthority;
     const targets = [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }];
     const result = publishArchitectureDesignTargets({ rootDir: root, lock, targets, validateAuthority: () => {
       if (bytes(root, "project/pipeline-state.json") !== stateBytes) return false;
+      const planSha256 = hash(bytes(root, authority.planPath));
+      const specSha256 = hash(bytes(root, authority.specPath));
+      if (planSha256 !== inspected.receipt.planSha256 || specSha256 !== inspected.receipt.specSha256) return false;
+      // Greenfield projects now carry the one final DWP decision after design,
+      // Advisor and readiness have been reviewed. Preserve the historical
+      // acknowledgement route when it is valid, while recognizing that exact
+      // final DWP approval as a complete source-bound authority in the same CAS.
       const checked = validatePoGateAuthorityForRepository({ repoRoot: root,
         expectedPlanSha256: inspected.receipt.planSha256, expectedSpecSha256: inspected.receipt.specSha256 });
-      return checked.ok && Object.entries(authority).every(([key, value]) => checked.value[key] === value)
-        && hash(bytes(root, authority.planPath)) === inspected.receipt.planSha256
-        && hash(bytes(root, authority.specPath)) === inspected.receipt.specSha256;
+      const bootstrapAcknowledgementValid = checked.ok
+        && Object.entries(authority).every(([key, value]) => checked.value[key] === value);
+      const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority,
+        { planSha256, specSha256 }, inspectDeps);
+      return bootstrapAcknowledgementValid || finalWorkflowApproval.ok;
     } });
-    return result.ok ? inspectArchitectureDesign(root) : result;
+    return result.ok ? inspectArchitectureDesign(root, null, inspectDeps) : result;
   } catch (error) { return { ok: false, status: "blocked", code: error.message }; }
 }

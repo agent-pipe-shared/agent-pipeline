@@ -44,11 +44,11 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { inspectGitHookSourceSnapshot, publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
-function decorateInstalledImpl(content, pluginLibDir) {
+function decorateInstalledImpl(content, pluginLibDir, deadline) {
   const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/pre-push-hook\/runtime-([a-f0-9]{64}))\/lib$/);
   if (!matched) return content;
   const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
-  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256});
+  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256,deadline});
   if (content.split("  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);").length !== 2) throw Error("GHA-RENDER-ANCHOR");
   return content.replace("  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);", "  if (!await admitPipelineScope(projectRoot)) return;\n  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);") + renderGitHookSnapshotAdmission(runtimeSnapshot);
 }
@@ -139,9 +139,9 @@ function renderMarker(marker) {
   return `${JSON.stringify(marker, null, 2)}\n`;
 }
 
-function expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt }) {
+function expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt, deadline }) {
   const impl = implPath(commonDir);
-  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir);
+  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir, deadline);
   const shimContent = renderShim(impl);
   const marker = {
     schema: MARKER_SCHEMA,
@@ -631,7 +631,7 @@ export function applyDecline({ rootDir } = {}) {
 
 /** Writes the hook, its impl file, and the install marker. Refuses (never overwrites) a
  * hook this installer did not write -- see `planInstall` above for the exact check. */
-export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } = {}) {
+export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, onProgress, timeBudgetMs } = {}) {
   const plan = planInstall({ rootDir, pluginLibDir });
   if (plan.status === "repository-unresolved") return { status: "repository-unresolved" };
   if (plan.status === "foreign-hook-present") return { status: "refused-foreign-hook", hookPath: plan.hookPath, detail: plan.detail };
@@ -639,12 +639,13 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } 
   const { hookPath, commonDir } = plan;
   const snapshotState = join(commonDir, "agent-pipeline", "pre-push-hook");
   mkdirSync(snapshotState, { recursive: true, mode: 0o700 });
-  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState });
+  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState, onProgress, timeBudgetMs });
   pluginLibDir = join(runtimeSnapshot.root, "lib");
   const artifacts = expectedArtifacts({
     hookPath,
     commonDir,
     pluginLibDir,
+    deadline: runtimeSnapshot.deadline,
     installedAt: new Date().toISOString(),
   });
   const { impl, implContent, shimContent, marker } = artifacts;
@@ -698,7 +699,9 @@ if (isDirectInvocation(import.meta.url)) {
   const rootDir = process.cwd();
   if (verb === "--install") {
     try {
-      const result = applyInstall({ rootDir });
+      const result = applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
+        console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
+      } });
       console.log(JSON.stringify(result, null, 2));
       process.exit(result.status === "installed" ? 0 : 1);
     } catch (error) {

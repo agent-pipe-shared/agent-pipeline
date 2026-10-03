@@ -30,6 +30,7 @@
         "guard:plugins/pipeline-core/hooks/guard-slicing.mjs:guard-slicing",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
         "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
@@ -49,7 +50,11 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\""
+        "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:UserPromptSubmit::node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-intake-prompt-capture.mjs\"",
+        "verify-phase:harness/scripts/verify.mjs:claude-native-capture-entry-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-task-output-read-scope-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-task-output-scope-posttool-tests"
       ],
       "runners": [
         "antigravity",
@@ -365,6 +370,7 @@
         "verify-phase:harness/scripts/verify.mjs:design-advisory-coordinator-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:design-advisory-enforcement-tests",
         "verify-phase:harness/scripts/verify.mjs:design-advisory-transaction-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-course-command-admission-tests",
         "verify-phase:harness/scripts/verify.mjs:design-workflow-package-tests",
         "verify-phase:harness/scripts/verify.mjs:design-workflow-package-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:design-workflow-signing-default-tests",
@@ -825,6 +831,7 @@
       "testEvidence": [
         "harness/scripts/check-doc-contracts.test.mjs",
         "harness/scripts/self-verify-selection.test.mjs",
+        "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
         "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
         "plugins/pipeline-core/lib/consumer-baseline-verify.test.mjs",
         "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
@@ -1101,6 +1108,7 @@
         "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity",
         "verify-phase:harness/scripts/verify.mjs:check-runner-manifest-parity",
         "verify-phase:harness/scripts/verify.mjs:install-agy-tests",
+        "verify-phase:harness/scripts/verify.mjs:install-snapshot-progress-tests",
         "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-host-tests",
         "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-tests"
       ],
@@ -1228,7 +1236,10 @@
         "skill:plugins/pipeline-core/skills/critic-review/SKILL.md:critic-review",
         "skill:plugins/pipeline-core/skills/github-issue-operations/SKILL.md:github-issue-operations",
         "skill:plugins/pipeline-core/skills/pipeline-start/SKILL.md:pipeline-start",
-        "skill:plugins/pipeline-core/skills/reader-review/SKILL.md:reader-review"
+        "skill:plugins/pipeline-core/skills/reader-review/SKILL.md:reader-review",
+        "verify-phase:harness/scripts/verify.mjs:claude-intake-prompt-capture-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-intake-prompt-hook-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-intake-reference-admission-tests"
       ],
       "runners": [
         "antigravity",
@@ -1296,7 +1307,9 @@
       "status": "shipped",
       "surfaceIds": [
         "setup:setup.mjs:setup",
-        "verify-phase:harness/scripts/verify.mjs:antigravity-start-hint-tests"
+        "verify-phase:harness/scripts/verify.mjs:antigravity-start-hint-tests",
+        "verify-phase:harness/scripts/verify.mjs:bound-design-line-endings-tests",
+        "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-tests"
       ],
       "runners": [
         "antigravity",
@@ -1920,6 +1933,7 @@
       "surfaceIds": [
         "verify-phase:harness/scripts/verify.mjs:audit-bundle-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:audit-bundle-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:audit-pack-tests",
         "verify-phase:harness/scripts/verify.mjs:capture-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-viewer-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-export-adapter-tests",
@@ -1995,7 +2009,9 @@
       "status": "optional",
       "surfaceIds": [
         "verify-phase:harness/scripts/verify.mjs:change-control-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:change-control-core-tests"
+        "verify-phase:harness/scripts/verify.mjs:change-control-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-authoring-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-course-session-tests"
       ],
       "runners": [
         "host-only"
@@ -2252,7 +2268,10 @@
         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-course-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-package-builder-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-signed-integration-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-approval-request-tests",
         "verify-phase:harness/scripts/verify.mjs:quality-package-windows-path-tests",
         "verify-phase:harness/scripts/verify.mjs:signed-quality-package-tests"
       ],
@@ -2379,7 +2398,9 @@
         "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
         "verify-phase:harness/scripts/verify.mjs:resume-consumption-check",
         "verify-phase:harness/scripts/verify.mjs:resume-hint-scripts-tests",
-        "verify-phase:harness/scripts/verify.mjs:resume-hint-tests"
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-handover-writer-tests"
       ],
       "runners": [
         "runner-neutral"

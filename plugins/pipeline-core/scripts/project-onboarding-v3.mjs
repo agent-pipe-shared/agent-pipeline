@@ -16,7 +16,15 @@ import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-p
 import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
 import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
 import { resolveActiveRunner } from "./pipeline-start-preflight.mjs";
-import { readIntakeMaterialReference, unavailableChatTurnReference } from "../lib/intake-material-reference.mjs";
+import { readIntakeMaterialReference } from "../lib/intake-material-reference.mjs";
+import {
+  CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA,
+  readClaudeIntakePromptCapture,
+} from "../lib/claude-intake-prompt-capture.mjs";
+import {
+  CLAUDE_INITIAL_PROMPT_REFERENCE_SCHEMA,
+  readClaudeInitialPromptPointerAfterConsent,
+} from "../lib/claude-initial-prompt-pointer.mjs";
 import {
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeCapture,
@@ -134,7 +142,27 @@ function resolveIntakeCaptureText(options) {
     conflict.code = "INTAKE-CAPTURE-TEXT-AMBIGUOUS";
     throw conflict;
   }
-  if (options.textTurnRef !== undefined) unavailableChatTurnReference();
+  if (options.textTurnRef !== undefined) {
+    let reference;
+    try { reference = JSON.parse(options.textTurnRef); }
+    catch { throw Object.assign(new Error("--text-turn-ref requires one closed Claude prompt reference JSON object"), { code: "INTAKE-CHAT-TURN-REFERENCE-INVALID" }); }
+    if (reference === null || typeof reference !== "object" || Array.isArray(reference)) {
+      throw Object.assign(new Error("--text-turn-ref requires one closed Claude prompt reference JSON object"), { code: "INTAKE-CHAT-TURN-REFERENCE-INVALID" });
+    }
+    let resolved;
+    if (reference.schema === CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA) {
+      resolved = readClaudeIntakePromptCapture({ rootDir: options.root, sessionId: reference.sessionId, reference });
+    } else if (reference.schema === CLAUDE_INITIAL_PROMPT_REFERENCE_SCHEMA) {
+      resolved = readClaudeInitialPromptPointerAfterConsent({ rootDir: options.root, sessionId: reference.sessionId, reference });
+    } else {
+      throw Object.assign(new Error("--text-turn-ref is not a recognized Claude prompt reference"), { code: "INTAKE-CHAT-TURN-REFERENCE-INVALID" });
+    }
+    if (resolved?.status !== "available" || typeof resolved.text !== "string") {
+      const code = typeof resolved?.code === "string" ? resolved.code : "INTAKE-CHAT-TURN-REFERENCE-UNAVAILABLE";
+      throw Object.assign(new Error(code), { code });
+    }
+    return resolved.text;
+  }
   if (options.textFileSha256 !== undefined && options.textFile === undefined) {
     throw Object.assign(new Error("--text-file-sha256 requires --text-file"), { code: "INTAKE-CAPTURE-TEXT-FILE-DIGEST-WITHOUT-FILE" });
   }
@@ -320,6 +348,8 @@ function usage() {
     "       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]",
+    "       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate",
   ].join("\n");
 }
@@ -373,6 +403,7 @@ function parse(args) {
     else if (arg === "--text-turn-ref") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--text-turn-ref requires one host turn reference" }; output.textTurnRef = value; index += 1; }
     else if (arg === "--answers-json") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-json requires a JSON array or no-open-questions disposition" }; output.answersJson = value; index += 1; }
     else if (arg === "--summary") output.summary = true;
+    else if (arg === "--verbose") output.verbose = true;
     else if (arg === "--request-create-git") output.requestCreateGit = true;
     else if (arg === "--activate") output.activate = true;
     else if (arg === "--help" || arg === "-h") output.help = true;
@@ -380,7 +411,15 @@ function parse(args) {
   }
   if (!output.help && !output.command) return { error: "one command is required" };
   if (!output.help && !output.root) return { error: "--root is required" };
+  if ([output.text, output.textFile, output.textTurnRef].filter((value) => value !== undefined).length > 1) {
+    return { error: "accepts exactly one of --text, --text-file, or --text-turn-ref" };
+  }
+  if ([output.text, output.textFile, output.textTurnRef].filter((value) => value !== undefined).length > 1) {
+    return { error: "accepts exactly one of --text, --text-file, or --text-turn-ref" };
+  }
   if (output.summary && output.command !== "intake-generate-plan") return { error: "--summary is only valid for intake-generate-plan" };
+  if (output.verbose && output.command !== "intake-generate-plan") return { error: "--verbose is only valid for intake-generate-plan" };
+  if (output.summary && output.verbose) return { error: "--summary and --verbose cannot be used together" };
   if (output.command?.startsWith("adopt-remote-") && (!output.remote || !output.ref)) return { error: "adopt-remote requires --remote and --ref" };
   if (output.command === "adopt-remote-apply" && !output.planSha256) return { error: "adopt-remote apply requires --plan-sha256" };
   if (output.command === "intake-spec-marker-apply" && !output.planSha256) return { error: "intake-spec-marker-apply requires --plan-sha256" };
@@ -691,7 +730,7 @@ function withUnbornHeadDispatchDeferral({ root, intent, deps }) {
   };
 }
 export function summarizeOnboardingIntakeGeneratePlan(plan, { runner, intent } = {}) {
-  const fullArgv = [fileURLToPath(import.meta.url), "intake-generate-plan", "--root", plan.root];
+  const fullArgv = [fileURLToPath(import.meta.url), "intake-generate-plan", "--root", plan.root, "--verbose"];
   if (intent) fullArgv.push("--intent", intent);
   if (runner) fullArgv.push("--runner", runner);
   return {
@@ -838,7 +877,7 @@ export function main(args = process.argv.slice(2), {
       runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps,
     });
     else if (options.command === "intake-consent-apply") {
-      output = applyOnboardingIntakeConsent({
+      const consentArgs = {
         rootDir: options.root,
         repositoryCapability,
         granted: options.granted === true,
@@ -846,13 +885,29 @@ export function main(args = process.argv.slice(2), {
           ? { name: options.gitAuthorName, email: options.gitAuthorEmail } : null,
         language: options.language ?? null,
         profile: options.profile ?? null,
+        activate: options.activate,
+        deps,
+      };
+      if (options.textTurnRef !== undefined) {
+        // A Claude reference is consumed only after the canonical consent write/readback.
+        // The reference readers bind to that checkpoint and never accept a transcript path.
+        const consent = applyOnboardingIntakeConsent({ ...consentArgs, text: null });
+        const text = resolveIntakeCaptureText(options);
+        const capture = applyOnboardingIntakeCapture({
+          rootDir: options.root, repositoryCapability, text, activate: options.activate, deps,
+        });
+        output = {
+          ...consent,
+          mutated: consent.mutated || capture.mutated,
+          checkpoint: capture.checkpoint,
+          capture: { mutated: capture.mutated, evidence: capture.evidence },
+        };
+      } else {
         // NVA-V10B-INTAKEONEROUND: optional -- resolveIntakeCaptureText() returns undefined when
         // neither --text nor --text-file was supplied, and applyOnboardingIntakeConsent treats
         // that identically to omitting `text` altogether (behaviour/shape unchanged).
-        text: resolveIntakeCaptureText(options) ?? null,
-        activate: options.activate,
-        deps,
-      });
+        output = applyOnboardingIntakeConsent({ ...consentArgs, text: resolveIntakeCaptureText(options) ?? null });
+      }
       const languageAudit = laterIntakeLanguageAudit(options.root, repositoryCapability, output.checkpoint?.values?.language);
       if (languageAudit !== null) output = { ...output, languageAudit };
       let languageProjection;
@@ -882,9 +937,9 @@ export function main(args = process.argv.slice(2), {
     }
     else if (options.command === "intake-generate-plan") {
       const fullPlan = planOnboardingIntakeGenerate({ rootDir: options.root, repositoryCapability, deps });
-      output = options.summary
-        ? summarizeOnboardingIntakeGeneratePlan(fullPlan, { runner: options.runner, intent: options.intent })
-        : fullPlan;
+      output = options.verbose
+        ? fullPlan
+        : summarizeOnboardingIntakeGeneratePlan(fullPlan, { runner: options.runner, intent: options.intent });
     }
     else if (options.command === "intake-generate-apply") output = applyOnboardingIntakeGenerate({
       rootDir: options.root, repositoryCapability, expectedPlanSha256: options.planSha256, activate: options.activate, deps,

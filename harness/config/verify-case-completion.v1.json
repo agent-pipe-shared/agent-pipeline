@@ -74,6 +74,11 @@
       "disposition": "required"
     },
     {
+      "name": "audit-pack-tests",
+      "path": "plugins/pipeline-core/scripts/audit-pack.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "bootstrap-payload-budget-tests",
       "path": "plugins/pipeline-core/lib/bootstrap-payload-budget.test.mjs",
       "disposition": "required"
@@ -81,6 +86,11 @@
     {
       "name": "bootstrap-payload-measure-cli-tests",
       "path": "plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "bound-design-line-endings-tests",
+      "path": "plugins/pipeline-core/lib/bound-design-line-endings.test.mjs",
       "disposition": "required"
     },
     {
@@ -134,6 +144,41 @@
       "path": "plugins/pipeline-core/scripts/claude-goal-host.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "claude-intake-prompt-capture-tests",
+      "path": "plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "claude-intake-prompt-hook-tests",
+      "path": "plugins/pipeline-core/hooks/claude-intake-prompt-capture.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "claude-intake-reference-admission-tests",
+      "path": "plugins/pipeline-core/hooks/claude-intake-reference-admission.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "claude-native-capture-entry-tests",
+      "path": "plugins/pipeline-core/hooks/claude-native-capture-entry.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "claude-task-output-read-scope-tests",
+      "path": "plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "claude-task-output-scope-posttool-tests",
+      "path": "plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "clone-hook-readiness-tests",
+      "path": "plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "codex-advisor-execution-tests",
@@ -239,6 +284,11 @@
     {
       "name": "commit-message-policy-tests",
       "path": "plugins/pipeline-core/lib/commit-message-policy.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "commit-msg-hook-install-tests",
+      "path": "plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs",
       "disposition": "required"
     },
     {
@@ -379,8 +429,33 @@
       "disposition": "required"
     },
     {
+      "name": "design-authoring-tests",
+      "path": "plugins/pipeline-core/lib/design-authoring.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "design-course-command-admission-tests",
+      "path": "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "design-course-coordinator-tests",
+      "path": "plugins/pipeline-core/scripts/design-course-coordinator.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "design-course-session-tests",
+      "path": "plugins/pipeline-core/scripts/design-course-session.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "design-readiness-course-e2e-tests",
       "path": "plugins/pipeline-core/scripts/design-readiness-course.e2e.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "design-workflow-package-builder-tests",
+      "path": "plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs",
       "disposition": "required"
     },
     {
@@ -606,6 +681,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "install-snapshot-progress-tests",
+      "path": "plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "installed-plugin-attestation-host-tests",
       "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
       "disposition": "required"
@@ -684,6 +764,11 @@
     {
       "name": "model-family-antigravity-adapter-tests",
       "path": "plugins/pipeline-core/lib/model-family-antigravity-adapter.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-family-approval-request-tests",
+      "path": "plugins/pipeline-core/scripts/model-family-approval-request.test.mjs",
       "disposition": "required"
     },
     {
@@ -1267,6 +1352,16 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "runtime-handover-projection-tests",
+      "path": "plugins/pipeline-core/lib/runtime-handover-projection.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "runtime-handover-writer-tests",
+      "path": "plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "runtime-projection-removal-tests",
       "path": "plugins/pipeline-core/lib/runtime-projection-removal.test.mjs",
       "disposition": "required"
@@ -1491,8 +1586,7 @@
     {
       "name": "windows-private-state-tests",
       "path": "plugins/pipeline-core/lib/windows-private-state.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "workflow-runner-boundary-tests",

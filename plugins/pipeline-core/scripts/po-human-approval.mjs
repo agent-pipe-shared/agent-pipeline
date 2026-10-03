@@ -48,6 +48,7 @@ import {
 } from "../lib/design-workflow-approval.mjs";
 import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
 import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
+import { MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA, describeModelFamilyApprovalRequest } from "./model-family-approval-request.mjs";
 
 // NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
 // already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
@@ -1617,6 +1618,8 @@ function executeHumanApproval(args, dependencies = {}) {
     const portableCriticExport = describePortableCriticExportRequest(scratchRequestRecord, intentSha256);
     const designWorkflowApproval = describeDesignWorkflowApprovalRequest(scratchRequestRecord, intentSha256, repository);
     const inheritedSources = describeArchitectureInheritedSourcesRequest(scratchRequestRecord, intentSha256, repository);
+    const modelFamilyApproval = scratchRequestRecord?.schema === MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA
+      ? describeModelFamilyApprovalRequest(scratchRequestRecord, { rootDir: repository }) : null;
     // A scratch request which claims the bootstrap-acknowledgement schema is
     // never a generic, opaque `sign-intent` request. In particular, do not
     // fall through to the generic GMW/HGO disclosure route when its action
@@ -1633,6 +1636,9 @@ function executeHumanApproval(args, dependencies = {}) {
     }
     if (scratchRequestRecord?.schema === DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA && designWorkflowApproval === null) {
       fail("the design-workflow approval request does not bind a current, complete package and its exact sources");
+    }
+    if (scratchRequestRecord?.schema === MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA && modelFamilyApproval === null) {
+      fail("the model-family request does not bind the current candidate, exact v1 predecessor, complete mapping, and adapter-contract bytes");
     }
     if (scratchRequestRecord?.schema === "pipeline.organization-architecture-config-request.v1" && inheritedSources === null) {
       fail("the inherited architecture-source request does not bind its exact registry and intent digest");
@@ -1654,7 +1660,7 @@ function executeHumanApproval(args, dependencies = {}) {
         fail("the portable Critic export request is not bound to a current consumed private Critic review");
       }
     }
-    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport ?? designWorkflowApproval ?? inheritedSources
+    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport ?? designWorkflowApproval ?? inheritedSources ?? modelFamilyApproval
       ?? describeGmw({ rootDir: repository, intentSha256 });
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });

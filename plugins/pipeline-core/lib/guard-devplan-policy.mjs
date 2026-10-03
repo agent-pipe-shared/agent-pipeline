@@ -301,7 +301,7 @@ function normalize(p) {
  *   multi-line message text `guard-devplan.mjs` has always emitted to stderr for a
  *   BLOCKED/WARN outcome; absent for a plain "allow".
  */
-export function devPlanGateVerdict({ filePath, projectDir }) {
+export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = false }) {
   if (typeof filePath !== "string" || filePath === "") return { verdict: "allow" };
 
   // ---- resolve absolute file_path against the project root (C1 fix) ----------------
@@ -321,8 +321,8 @@ export function devPlanGateVerdict({ filePath, projectDir }) {
   const normalizedPath = normalize(relPath);
 
   // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
-  if (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath)) return { verdict: "allow" };
-  if (isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
+  if (!forceLifecycleGate && (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath))) return { verdict: "allow" };
+  if (!forceLifecycleGate && isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
 
   // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
   const manifestResult = loadManifest(projectDir);
@@ -432,9 +432,11 @@ export function devPlanGateVerdict({ filePath, projectDir }) {
     .map(normalize);
   const touchesAuthority = authoritativePaths.some((path) => normalizedPath === path);
   const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
-  const isExempt = isDraftAuthority
+  const isExempt = !forceLifecycleGate && (
+    isDraftAuthority
     || (!touchesAuthority
-      && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))));
+      && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))))
+  );
   if (isExempt) return { verdict: "allow" };
 
   // ---- verdict --------------------------------------------------------------------------
@@ -459,6 +461,208 @@ export function devPlanGateVerdict({ filePath, projectDir }) {
     planPath: typeof activeFeature.planPath === "string" ? activeFeature.planPath : null,
     lifecycleStatus: lifecycle.status ?? "invalid",
   };
+}
+
+const STAGED_PATH_MAX_BYTES = 16 * 1024;
+
+function isHookSettingsPath(path) {
+  return typeof path === "string" && /^\.claude\/settings[^/]*\.json$/iu.test(path);
+}
+
+function stagedRelativePath(value) {
+  if (typeof value !== "string" || value === "" || value.includes("\0")) return null;
+  const slashed = value.replace(/\\/gu, "/");
+  if (slashed.startsWith("/") || /^[A-Za-z]:\//u.test(slashed)) return null;
+  const parts = slashed.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
+  const normalized = posix.normalize(slashed);
+  if (normalized === "." || normalized.startsWith("../") || normalized === "..") return null;
+  return normalized;
+}
+
+function containsDisableAllHooksTrue(value) {
+  const pending = [value];
+  let visited = 0;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === null || typeof current !== "object") continue;
+    visited += 1;
+    if (visited > 4096) return { valid: false };
+    for (const [key, child] of Object.entries(current)) {
+      if (key === "disableAllHooks" && child === true) return { valid: true, disabled: true };
+      if (child !== null && typeof child === "object") pending.push(child);
+    }
+  }
+  return { valid: true, disabled: false };
+}
+
+function canonicalJson(value, depth = 0, budget = { visited: 0 }) {
+  budget.visited += 1;
+  if (budget.visited > 4096 || depth > 64) throw new Error("settings structure exceeds inspection bound");
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(item => canonicalJson(item, depth + 1, budget)).join(",")}]`;
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(value[key], depth + 1, budget)}`).join(",")}}`;
+}
+
+function hookSettingsAuthorityProjection(value) {
+  const rows = [];
+  const pending = [{ value, path: "" }];
+  let visited = 0;
+  while (pending.length > 0) {
+    const item = pending.pop();
+    if (item.value === null || typeof item.value !== "object") continue;
+    visited += 1;
+    if (visited > 4096) throw new Error("settings structure exceeds inspection bound");
+    for (const key of Object.keys(item.value).sort()) {
+      const child = item.value[key];
+      const path = item.path ? `${item.path}.${key}` : key;
+      if (key === "hooks" || (key === "disableAllHooks" && child === true)) rows.push([path, canonicalJson(child)]);
+      if (child !== null && typeof child === "object") pending.push({ value: child, path });
+    }
+  }
+  rows.sort((left, right) => left[0].localeCompare(right[0]));
+  return JSON.stringify(rows);
+}
+
+function readCurrentSettingsContent(absolutePath) {
+  try {
+    const metadata = lstatSync(absolutePath);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > STAGED_PATH_MAX_BYTES) return { ok: false };
+    return { ok: true, content: readFileSync(absolutePath, "utf8") };
+  } catch (error) {
+    return error?.code === "ENOENT" ? { ok: true, content: null } : { ok: false };
+  }
+}
+
+/** Protect hook authority in project settings while allowing unrelated setting edits. */
+export function hooksDisableSettingsWriteFinding({ filePath, content, projectDir, operation = "shell", existingContent } = {}) {
+  if (typeof filePath !== "string" || filePath === "" || typeof projectDir !== "string" || projectDir === "") return null;
+  const absolute = isAbsolute(filePath) ? resolve(filePath) : resolve(projectDir, filePath);
+  const relativePath = relative(resolve(projectDir), absolute).replace(/\\/gu, "/");
+  if (!isHookSettingsPath(relativePath)) return null;
+  if (operation === "shell") {
+    return { code: "PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER", reason: "hook settings must be changed through the canonical owned settings writer" };
+  }
+  if (operation === "edit") {
+    return { code: "PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER", reason: "partial edits cannot prove the existing hook configuration is preserved" };
+  }
+  if (operation !== "write" || typeof content !== "string" || Buffer.byteLength(content, "utf8") > STAGED_PATH_MAX_BYTES) {
+    return { code: "PIPELINE-HOOKS-SETTINGS-UNAVAILABLE", reason: "the proposed hook-settings content exceeds the inspection bound" };
+  }
+  const existing = existingContent === undefined ? readCurrentSettingsContent(absolute) : { ok: true, content: existingContent };
+  if (!existing.ok || (existing.content !== null
+    && (typeof existing.content !== "string" || Buffer.byteLength(existing.content, "utf8") > STAGED_PATH_MAX_BYTES))) {
+    return { code: "PIPELINE-HOOKS-SETTINGS-UNAVAILABLE", reason: "the current hook-settings file cannot be safely inspected" };
+  }
+  try {
+    const proposed = JSON.parse(content);
+    const prior = existing.content === null ? {} : JSON.parse(existing.content);
+    if (proposed === null || typeof proposed !== "object" || Array.isArray(proposed)
+      || prior === null || typeof prior !== "object" || Array.isArray(prior)) throw new Error("settings are not objects");
+    const disabled = containsDisableAllHooksTrue(proposed);
+    if (!disabled.valid) throw new Error("settings exceed inspection bound");
+    if (disabled.disabled) return { code: "PIPELINE-HOOKS-DISABLE-FORBIDDEN", reason: "a governed session cannot set disableAllHooks to true" };
+    if (hookSettingsAuthorityProjection(prior) !== hookSettingsAuthorityProjection(proposed)) {
+      return { code: "PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN", reason: "hook registration and disable state must be changed through the canonical owned settings writer" };
+    }
+  } catch {
+    return { code: "PIPELINE-HOOKS-SETTINGS-UNAVAILABLE", reason: "hook-settings JSON could not be safely compared" };
+  }
+  return null;
+}
+
+/**
+ * Rechecks the exact paths already staged in Git against the same per-path
+ * lifecycle policy used by Edit/Write and shell lanes. The commit boundary calls
+ * this after it obtains `git diff --cached --name-only -z --no-renames`; it does
+ * not require PO approval for an otherwise allowed commit. The single settings
+ * special case prevents a staged Claude project setting from turning off all
+ * hooks before the next governed tool call.
+ */
+export function evaluateStagedDevPlanPaths({
+  projectDir,
+  stagedPaths,
+  stagedContentByPath = {},
+  baselineContentByPath = {},
+  devPlanGateVerdictFn = devPlanGateVerdict,
+} = {}) {
+  const unavailable = (code, detail) => ({
+    ok: false,
+    code: "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE",
+    findings: [{ code, detail }],
+  });
+  if (typeof projectDir !== "string" || projectDir === "" || !Array.isArray(stagedPaths)
+    || stagedContentByPath === null || typeof stagedContentByPath !== "object" || Array.isArray(stagedContentByPath)
+    || baselineContentByPath === null || typeof baselineContentByPath !== "object" || Array.isArray(baselineContentByPath)
+    || typeof devPlanGateVerdictFn !== "function") {
+    return unavailable("PIPELINE-STAGED-INPUT-INVALID", "the staged-path observation has an invalid shape");
+  }
+
+  const findings = [];
+  const seen = new Set();
+  for (const rawPath of stagedPaths) {
+    const path = stagedRelativePath(rawPath);
+    if (path === null) return unavailable("PIPELINE-STAGED-PATH-INVALID", "Git returned a non-canonical staged path");
+    if (seen.has(path)) continue;
+    seen.add(path);
+
+    if (isHookSettingsPath(path)) {
+      const content = stagedContentByPath[path];
+      if (!Object.hasOwn(baselineContentByPath, path)) {
+        return unavailable("PIPELINE-STAGED-BASELINE-UNAVAILABLE", "the base hook-settings blob was not supplied for comparison");
+      }
+      const baseline = baselineContentByPath[path];
+      if (baseline !== null && (typeof baseline !== "string" || Buffer.byteLength(baseline, "utf8") > STAGED_PATH_MAX_BYTES)) {
+        return unavailable("PIPELINE-STAGED-BASELINE-INVALID", "the base hook-settings blob exceeds the inspection bound");
+      }
+      if (content !== null && (typeof content !== "string" || Buffer.byteLength(content, "utf8") > STAGED_PATH_MAX_BYTES)) {
+        return unavailable("PIPELINE-STAGED-CONTENT-UNAVAILABLE", "the staged hook-settings blob exceeds the inspection bound");
+      }
+      let prior = {}, proposed = {};
+      try {
+        if (baseline !== null) prior = JSON.parse(baseline);
+        if (content !== null) proposed = JSON.parse(content);
+        for (const parsed of [prior, proposed]) {
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("settings are not objects");
+        }
+        const observed = containsDisableAllHooksTrue(proposed);
+        if (!observed.valid) throw new Error("settings exceed inspection bound");
+        if (observed.disabled || hookSettingsAuthorityProjection(prior) !== hookSettingsAuthorityProjection(proposed)) {
+          findings.push({
+            code: observed.disabled ? "PIPELINE-HOOKS-DISABLE-FORBIDDEN" : "PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN",
+            path,
+            reason: observed.disabled
+              ? "a governed commit cannot set disableAllHooks to true"
+              : "a governed commit cannot alter hook registration or disable state outside the canonical settings writer",
+          });
+        }
+      } catch {
+        return unavailable("PIPELINE-STAGED-SETTINGS-INVALID", "the base or staged hook-settings JSON could not be safely compared");
+      }
+    }
+
+    let result;
+    try { result = devPlanGateVerdictFn({ filePath: path, projectDir }); }
+    catch { return unavailable("PIPELINE-STAGED-POLICY-FAILED", "the lifecycle policy could not evaluate a staged path"); }
+    if (result === null || typeof result !== "object" || !["allow", "block", "warn"].includes(result.verdict)) {
+      return unavailable("PIPELINE-STAGED-POLICY-INVALID", "the lifecycle policy returned an invalid result");
+    }
+    if (result.verdict === "block") {
+      findings.push({
+        code: "GUARD-DEVPLAN-LIFECYCLE",
+        path,
+        reason: typeof result.reason === "string" ? result.reason : "the staged path is not authorized by the current lifecycle",
+        lifecycleStatus: result.lifecycleStatus ?? null,
+      });
+    }
+  }
+
+  if (findings.some((finding) => finding.code === "PIPELINE-HOOKS-DISABLE-FORBIDDEN"
+    || finding.code === "PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN"
+    || finding.code === "GUARD-DEVPLAN-LIFECYCLE")) {
+    return { ok: false, code: "PIPELINE-STAGED-LIFECYCLE-BLOCKED", findings };
+  }
+  return { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings };
 }
 
 // ---- rebase authority: the dev-plan gate's ONE relief, and its disclosure ----------------

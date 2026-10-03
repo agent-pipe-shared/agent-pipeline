@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -106,8 +107,171 @@ function git(root, args) {
 check("VCR01", "the repository registry covers all arrays and pins the observed required-descriptor counts", () => {
   const result = checkVerifyCaseCompletion({ root: REPO_ROOT });
   assert.equal(result.ok, true, result.findings.join("\n"));
-  assert.equal(result.vulnerableCount, 266);
-  assert.equal(result.registryCount, 273);
+  // Immutable R8 baseline: 266 classified identities, registry 273. The
+  // complete set diff adds the 17 declarative suites below plus existing CMI,
+  // whose real-callback adapter removes its multi-node:test exclusion. No
+  // parent classified identity is removed. Windows remains counted (delta 0).
+  // The exact baseline identity digest prevents an offsetting removal/addition
+  // from satisfying the count; exact delta decisions pin the unchanged classifier.
+  const baselineVulnerableCount = 266;
+  const newlyCounted = [
+    [
+      "audit-pack-tests",
+      "plugins/pipeline-core/scripts/audit-pack.test.mjs",
+      "top-level-assertions",
+      33
+    ],
+    [
+      "bound-design-line-endings-tests",
+      "plugins/pipeline-core/lib/bound-design-line-endings.test.mjs",
+      "top-level-assertions",
+      22
+    ],
+    [
+      "claude-intake-prompt-capture-tests",
+      "plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs",
+      "top-level-assertions",
+      48
+    ],
+    [
+      "claude-intake-prompt-hook-tests",
+      "plugins/pipeline-core/hooks/claude-intake-prompt-capture.test.mjs",
+      "top-level-assertions",
+      25
+    ],
+    [
+      "claude-intake-reference-admission-tests",
+      "plugins/pipeline-core/hooks/claude-intake-reference-admission.test.mjs",
+      "top-level-assertions",
+      6
+    ],
+    [
+      "claude-native-capture-entry-tests",
+      "plugins/pipeline-core/hooks/claude-native-capture-entry.test.mjs",
+      "top-level-assertions",
+      9
+    ],
+    [
+      "claude-task-output-read-scope-tests",
+      "plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs",
+      "top-level-assertions",
+      20
+    ],
+    [
+      "claude-task-output-scope-posttool-tests",
+      "plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs",
+      "top-level-assertions",
+      9
+    ],
+    [
+      "clone-hook-readiness-tests",
+      "plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs",
+      "top-level-assertions",
+      11
+    ],
+    [
+      "commit-msg-hook-install-tests",
+      "plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs",
+      "top-level-assertions",
+      96
+    ],
+    [
+      "design-authoring-tests",
+      "plugins/pipeline-core/lib/design-authoring.test.mjs",
+      "top-level-assertions",
+      12
+    ],
+    [
+      "design-course-command-admission-tests",
+      "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "top-level-assertions",
+      65
+    ],
+    [
+      "design-course-coordinator-tests",
+      "plugins/pipeline-core/scripts/design-course-coordinator.test.mjs",
+      "top-level-assertions",
+      9
+    ],
+    [
+      "design-course-session-tests",
+      "plugins/pipeline-core/scripts/design-course-session.test.mjs",
+      "top-level-assertions",
+      49
+    ],
+    [
+      "design-workflow-package-builder-tests",
+      "plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs",
+      "top-level-assertions",
+      28
+    ],
+    [
+      "install-snapshot-progress-tests",
+      "plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs",
+      "top-level-assertions",
+      17
+    ],
+    [
+      "model-family-approval-request-tests",
+      "plugins/pipeline-core/scripts/model-family-approval-request.test.mjs",
+      "top-level-assertions",
+      35
+    ],
+    [
+      "runtime-handover-projection-tests",
+      "plugins/pipeline-core/lib/runtime-handover-projection.test.mjs",
+      "top-level-assertions",
+      8
+    ],
+    [
+      "runtime-handover-writer-tests",
+      "plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs",
+      "top-level-assertions",
+      14
+    ]
+  ];
+  const registry = JSON.parse(readFileSync(join(REPO_ROOT, DEFAULT_REGISTRY), "utf8"));
+  const classified = registry.entries.flatMap((entry) => {
+    const decision = classifyVulnerableSuite(readFileSync(join(REPO_ROOT, entry.path), "utf8"));
+    return decision === null ? [] : [[entry.name, entry.path, decision.classification, decision.sites]];
+  }).sort((left, right) => left[0].localeCompare(right[0]));
+  const addedNames = new Set(newlyCounted.map((entry) => entry[0]));
+  assert.deepEqual(classified.filter((entry) => addedNames.has(entry[0])), newlyCounted);
+  const retainedIdentities = classified.filter((entry) => !addedNames.has(entry[0]))
+    .map(([name, path]) => [name, path]);
+  assert.equal(retainedIdentities.length, baselineVulnerableCount);
+  assert.equal(createHash("sha256").update(JSON.stringify(retainedIdentities)).digest("hex"),
+    "e7fa11eb9b8a508827f777ca5263573bc68c48675817a9f55aac67fd6b3a68d7",
+    "the complete R8 classified identity set must remain present");
+  assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length);
+  assert.equal(classified.length, result.vulnerableCount,
+    "all classified Verify registrations must have a completion-registry row");
+  assert.equal(result.registryCount, 292);
+  const retainedR5Identities = classified.filter((entry) => entry[0] !== "design-course-command-admission-tests").map(([suite, path]) => [suite, path]);
+  assert.equal(retainedR5Identities.length, 284);
+  assert.equal(createHash("sha256").update(JSON.stringify(retainedR5Identities)).digest("hex"),
+    "6c3831697a81eaf09de71bec3f4c682757415800029cf5589f8c4fc04232389b", "the complete R5 classified identity set must remain present");
+  for (const name of [
+    "commit-msg-hook-install-tests",
+    "claude-task-output-read-scope-tests",
+    "claude-task-output-scope-posttool-tests",
+    "audit-pack-tests",
+    "clone-hook-readiness-tests",
+    "design-authoring-tests",
+    "install-snapshot-progress-tests",
+    "model-family-approval-request-tests",
+    "claude-intake-prompt-capture-tests",
+    "claude-intake-prompt-hook-tests",
+    "bound-design-line-endings-tests",
+    "claude-native-capture-entry-tests",
+    "runtime-handover-projection-tests",
+    "runtime-handover-writer-tests",
+    "claude-intake-reference-admission-tests",
+    "design-workflow-package-builder-tests",
+    "design-course-command-admission-tests",
+    "design-course-coordinator-tests",
+    "design-course-session-tests",
+  ]) assert.equal(registry.entries.find((entry) => entry.name === name)?.disposition, "required", name);
 });
 
 check("VCR02", "the closed classifier distinguishes vulnerable and separately registered cases", () => {
@@ -274,6 +438,76 @@ registerTestCaseCompletion({ cases: [], fd: 3, maxBytes: 4096 });
     assert.equal(result.ok, false);
     assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"));
   }
+  const registrationStart = REQUIRED.indexOf("\nregisterTestCaseCompletion(") + 1;
+  assert.ok(registrationStart > 0);
+  const direct = REQUIRED.slice(0, registrationStart)
+    + `${IMPORT_KEYWORD} { isDirectInvocation } from "./entrypoint.mjs";\n`
+    + "if (isDirectInvocation(import.meta.url)) {\n"
+    + REQUIRED.slice(registrationStart) + "}\n";
+  const context = fixture();
+  const suitePath = "plugins/pipeline-core/lib/required.test.mjs";
+  write(context.root, suitePath, direct);
+  const admitted = checkVerifyCaseCompletion({ root: context.root });
+  assert.equal(admitted.ok, true, admitted.findings.join("\n"));
+  write(context.root, "plugins/pipeline-core/lib/entrypoint.mjs", readFileSync(join(REPO_ROOT, "plugins/pipeline-core/lib/entrypoint.mjs"), "utf8"));
+  write(context.root, "plugins/pipeline-core/lib/test-case-completion.mjs", readFileSync(join(REPO_ROOT, "plugins/pipeline-core/lib/test-case-completion.mjs"), "utf8"));
+  const actual = spawnSync(process.execPath, [join(context.root, suitePath)], {
+    cwd: context.root, stdio: ["ignore", "pipe", "pipe", "pipe"], timeout: 10000,
+    env: { ...process.env, PIPELINE_VERIFY_CASE_COMPLETION_FD: "3" },
+  });
+  assert.equal(actual.status, 0, actual.stderr?.toString());
+  const receipt = parseVerifyCaseCompletion(actual.output[3], { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["case-one"], maxBytes: 4096 });
+  assert.deepEqual(receipt.counts, { pass: 1, fail: 0, skip: 0, todo: 0 });
+  write(context.root, "import-only.mjs", `await ${IMPORT_KEYWORD}(new URL("./${suitePath}", import.meta.url));\n`);
+  const imported = spawnSync(process.execPath, [join(context.root, "import-only.mjs")], {
+    cwd: context.root, stdio: ["ignore", "pipe", "pipe", "pipe"], timeout: 10000,
+    env: { ...process.env, PIPELINE_VERIFY_CASE_COMPLETION_FD: "3" },
+  });
+  assert.equal(imported.status, 0, imported.stderr?.toString());
+  assert.equal(imported.output[3].length, 0, "importing a trusted guarded suite registers zero callbacks");
+  assert.equal(imported.stdout.length, 0, "importing a guarded suite runs no node:test callbacks");
+  const mutations = [
+    ["foreign entrypoint", source => source.replace('from "./entrypoint.mjs"', 'from "./fixtures/entrypoint.mjs"')],
+    ["helper alias", source => source.replace("{ isDirectInvocation }", "{ isDirectInvocation as direct }").replace("if (isDirectInvocation(", "if (direct(")],
+    ["same-name alias", source => source.replace("{ isDirectInvocation }", "{ isDirectInvocation as isDirectInvocation }")],
+    ["additional helper binding", source => source.replace("{ isDirectInvocation }", "{ isDirectInvocation, unrelated }")],
+    ["duplicate helper import", source => source.replace("if (isDirectInvocation(", `${IMPORT_KEYWORD} { isDirectInvocation } from "./entrypoint.mjs";\nif (isDirectInvocation(`)],
+    ["shadow declaration", source => source.replace("if (isDirectInvocation(", "const isDirectInvocation = () => true;\nif (isDirectInvocation(")],
+    ["shadow parameter", source => source.replace("if (isDirectInvocation(", "function dormant(isDirectInvocation) {}\nif (isDirectInvocation(")],
+    ["helper reassignment", source => source.replace("if (isDirectInvocation(", "isDirectInvocation = () => true;\nif (isDirectInvocation(")],
+    ["false guard", source => source.replace("if (isDirectInvocation(import.meta.url))", "if (false)")],
+    ["constant true guard", source => source.replace("if (isDirectInvocation(import.meta.url))", "if (true)")],
+    ["arbitrary condition", source => source.replace("if (isDirectInvocation(import.meta.url))", "if (runtimeChoice)")],
+    ["dynamic cached guard", source => source.replace("if (isDirectInvocation(import.meta.url))", "const direct = isDirectInvocation(import.meta.url);\nif (direct)")],
+    ["extra boolean condition", source => source.replace("if (isDirectInvocation(import.meta.url))", "if (isDirectInvocation(import.meta.url) && false)")],
+    ["false outer guard", source => source.replace("if (isDirectInvocation(import.meta.url))", "if (false)\nif (isDirectInvocation(import.meta.url))")],
+    ["multiline false outer guard", source => source.replace("if (isDirectInvocation(import.meta.url))", "if (\n false\n)\nif (isDirectInvocation(import.meta.url))")],
+    ["multiline dynamic outer guard", source => source.replace("if (isDirectInvocation(import.meta.url))", "if (\n runtimeChoice\n)\nif (isDirectInvocation(import.meta.url))")],
+    ["multiline loop guard", source => source.replace("if (isDirectInvocation(import.meta.url))", "while (\n false\n)\nif (isDirectInvocation(import.meta.url))")],
+    ["dormant nested block", source => source.replace("if (isDirectInvocation(import.meta.url))", "function dormant() {\nif (isDirectInvocation(import.meta.url))") + "}\n"],
+    ["different URL argument", source => source.replace("isDirectInvocation(import.meta.url)", 'isDirectInvocation("file:///unrelated.mjs")')],
+    ["explicit argv override", source => source.replace("isDirectInvocation(import.meta.url)", "isDirectInvocation(import.meta.url, process.argv[1])")],
+    ["earlier exit", source => source.replace("if (isDirectInvocation(", "process.exit(0);\nif (isDirectInvocation(")],
+    ["earlier spaced exit", source => source.replace("if (isDirectInvocation(", "const value = 1; process . exit (0);\nif (isDirectInvocation(")],
+    ["earlier computed exit", source => source.replace("if (isDirectInvocation(", 'process["exit"](0);\nif (isDirectInvocation(')],
+    ["earlier throw", source => source.replace("if (isDirectInvocation(", 'throw new Error("stop");\nif (isDirectInvocation(')],
+    ["exit inside block", source => source.replace("registerTestCaseCompletion({", "process.exit(0);\nregisterTestCaseCompletion({")],
+    ["duplicate registration", source => source.replace("}\n", "registerTestCaseCompletion({ cases: [], fd: 3, maxBytes: 4096 });\n}\n")],
+    ["nested registration", source => source.replace("registerTestCaseCompletion({", "if (runtimeChoice) { registerTestCaseCompletion({").replace("});\n}\n", "}); }\n}\n")],
+    ["statement after registration", source => source.replace("});\n}\n", "});\nprocess.exit(0);\n}\n")],
+    ["else branch", source => source + "else { process.exit(0); }\n"],
+    ["open object", source => source.replace("maxBytes: 4096,", "maxBytes: 4096, extra: true,")],
+    ["duplicate key", source => source.replace("maxBytes: 4096,", "maxBytes: 4096, fd: 3,")],
+    ["configuration spread", source => source.replace("maxBytes: 4096,", "maxBytes: 4096, ...configuration,")],
+  ];
+  for (const [name, mutate] of mutations) {
+    const impostor = mutate(direct);
+    assert.notEqual(impostor, direct, name);
+    write(context.root, suitePath, impostor);
+    const result = checkVerifyCaseCompletion({ root: context.root });
+    assert.equal(result.ok, false, name);
+    assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"), name);
+  }
 });
 
 check("VCR09", "required cannot alias a recorder or use an open registration configuration", () => {
@@ -288,6 +522,23 @@ registerTestCaseCompletion({ cases: [], fd: 3, maxBytes: 4096, extra: true });
 const configuration = { cases: [], fd: 3, maxBytes: 4096 };
 registerTestCaseCompletion(configuration);
 `,
+    `import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const configuration = { cases: [], fd: 3, maxBytes: 4096 };
+registerTestCaseCompletion({ ...configuration });
+`,
+    `import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const configuration = {};
+registerTestCaseCompletion({ cases: [], fd: 3, maxBytes: 4096, ...configuration });
+`,
+    `import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+registerTestCaseCompletion({ cases: [], cases: [], fd: 3, maxBytes: 4096 });
+`,
+    `import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+registerTestCaseCompletion({ ["cases"]: [], fd: 3, maxBytes: 4096 });
+`,
+    `import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+registerTestCaseCompletion({ cases() {}, fd: 3, maxBytes: 4096 });
+`,
   ]) {
     const context = fixture();
     write(context.root, "plugins/pipeline-core/lib/required.test.mjs", impostor);
@@ -295,6 +546,15 @@ registerTestCaseCompletion(configuration);
     assert.equal(result.ok, false);
     assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"));
   }
+  const context = fixture();
+  const nestedSpread = REQUIRED.replace(
+    "run: () => { assert.equal(1, 1); }",
+    "run: () => { const original = { stable: true }; const copy = { ...original }; assert.deepEqual(copy, original); }",
+  );
+  assert.notEqual(nestedSpread, REQUIRED, "the regression must exercise an actual spread inside the case body");
+  write(context.root, "plugins/pipeline-core/lib/required.test.mjs", nestedSpread);
+  const accepted = checkVerifyCaseCompletion({ root: context.root });
+  assert.equal(accepted.ok, true, accepted.findings.join("\n"));
   const onboardingPath = "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs";
   const actualSource = readFileSync(join(REPO_ROOT, onboardingPath), "utf8");
   function onboardingFixture(source, path = onboardingPath) {

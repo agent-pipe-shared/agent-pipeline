@@ -98,7 +98,7 @@ export function isStillDefault(parsed) {
 /**
  * What this hook is able to observe -- deliberately narrow: one file, at one moment.
  * `pipeline-start-preflight` declares its own, DIFFERENT scope in its `statusScope` field
- * (`plugin-distribution-identity`); the two readiness sources are disjoint and neither is
+ * (`plugin-distribution-identity-and-mandatory-local-hooks`); the two readiness sources are disjoint and neither is
  * derived from the other. `reconcileSetupObservation` below turns that from a matter of
  * wording into something a test can check.
  */

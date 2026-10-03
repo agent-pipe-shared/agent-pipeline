@@ -337,7 +337,13 @@ export function prepareObservation(untrustedInput, { publicRepository } = {}) {
   });
 }
 
-async function readInput(argv, readFileFn) {
+async function readStdin(readStream = process.stdin) {
+  const chunks = [];
+  for await (const chunk of readStream) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function readInput(argv, readFileFn, readStdinFn) {
   if (argv.length === 1 && argv[0] === "--schema") return { printSchema: true };
   let publicRepository;
   let inputPath;
@@ -351,16 +357,17 @@ async function readInput(argv, readFileFn) {
       throw new TypeError("usage: observation-intake.mjs [--repository owner/repo] [INPUT.json] | --schema");
     }
   }
-  const bytes = inputPath ? await readFileFn(inputPath, "utf8") : await readFileFn(0, "utf8");
+  const bytes = inputPath ? await readFileFn(inputPath, "utf8") : await readStdinFn();
   return { input: JSON.parse(bytes), publicRepository };
 }
 
 export async function runCli(argv, {
   readFileFn = readFile,
+  readStdinFn = readStdin,
   writeStdout = (value) => process.stdout.write(value),
 } = {}) {
   try {
-    const command = await readInput(argv, readFileFn);
+    const command = await readInput(argv, readFileFn, readStdinFn);
     if (command.printSchema) {
       writeStdout(serialized(INPUT_SCHEMA));
       return 0;

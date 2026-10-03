@@ -196,7 +196,16 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
     if (!locatorValid(locator, binding)) throw new Error("IPA-HOST-LOCATOR");
     if (normalized.provider === "antigravity") {
       const topology = observeAntigravityLoadedTopology({ loadedPluginRoot: normalized.installedPluginRoot, configRoot: antigravityConfigRoot, workspaceRoot: antigravityWorkspaceRoot });
-      if (topology.status !== "current" || topology.sourcePluginRoot !== locator.sourcePluginRoot) throw new Error("IPA-HOST-LOCATOR-SOURCE");
+      if (topology.status !== "current") throw new Error("IPA-HOST-LOCATOR-SOURCE");
+      if (topology.sourcePluginRoot !== locator.sourcePluginRoot) {
+        // A registered marketplace mirror and managed copy may both derive from
+        // the same approved Git source. Revalidate the physical registered copy,
+        // then verify the loaded copy against that source below. No gitless root
+        // gains origin authority from its registry name or manifest alone.
+        const registryCopy = observe({ sourcePluginRoot: locator.sourcePluginRoot, installedPluginRoot: topology.sourcePluginRoot });
+        if (registryCopy?.status !== "ready" || registryCopy.plugin.name !== normalized.plugin.name
+          || registryCopy.plugin.version !== normalized.plugin.version) throw new Error("IPA-HOST-LOCATOR-SOURCE");
+      }
     }
     if (["antigravity", "claude"].includes(normalized.provider)) {
       if (realpathSync(normalized.registryInstalledPluginRoot) !== realpathSync(normalized.installedPluginRoot)) throw new Error("IPA-HOST-LOCATOR-INSTALLED");

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+import { sha256Canonical } from "../lib/review-economy.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -149,7 +150,7 @@ function cliRequest(fx, overrides = {}) {
   };
 }
 
-test("task record reference binds uppercase delivered-v3 bytes in an immutable descendant candidate", () => {
+test("private task snapshot binds uppercase delivered-v3 bytes without exporting record prose", () => {
   const fx = fixture({ taskId: "ALF-HISTORICAL-01" });
   try {
     assert.equal(isSafeTaskId(fx.taskId), true);
@@ -159,11 +160,24 @@ test("task record reference binds uppercase delivered-v3 bytes in an immutable d
     const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
     assert.equal(readback.packet.candidate.commit, fx.candidate);
     assert.notEqual(readback.packet.candidate.commit, fx.historicalCandidate);
-    const reference = readback.packet.references.find(({ path }) => path === fx.recordPath);
-    assert.deepEqual(reference?.kind, "evidence");
-    assert.equal(reference.candidateBlobOid, git(fx.root, ["rev-parse", `${fx.candidate}:${fx.recordPath}`]));
+    assert.equal(readback.packet.references.some(({ path }) => path === fx.recordPath), false);
+    const privateBinding = readback.packet.coordinatorOnly.localDispatchEvidence;
     const exactRecordBytes = readFileSync(join(fx.root, fx.recordPath));
-    assert.equal(createHash("sha256").update(fx.recordBytes).digest("hex"), createHash("sha256").update(exactRecordBytes).digest("hex"));
+    const recordSha256 = createHash("sha256").update(exactRecordBytes).digest("hex");
+    assert.equal(createHash("sha256").update(fx.recordBytes).digest("hex"), recordSha256);
+    assert.deepEqual(privateBinding, {
+      schema: "pipeline.local-dispatch-evidence.v1",
+      taskId: fx.taskId,
+      recordPath: fx.recordPath,
+      recordSha256,
+      sourceCandidateCommit: fx.historicalCandidate,
+      reviewCandidateCommit: fx.candidate,
+      snapshotId: sha256Canonical({
+        schema: "pipeline.local-dispatch-evidence.v1", taskId: fx.taskId,
+        recordPath: fx.recordPath, recordSha256,
+        sourceCandidateCommit: fx.historicalCandidate, reviewCandidateCommit: fx.candidate,
+      }),
+    });
     assert.equal(JSON.parse(exactRecordBytes).candidateCommit, fx.historicalCandidate);
     assert.deepEqual(request.preflightInput.evidencePaths, ["evidence/verify.json"]);
   } finally { cleanup(fx); }
@@ -205,9 +219,9 @@ test("prelaunch admission creates one claimed, digest-bound packet before the ve
     const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
     assert.equal(readback.admission.sessionId, request.sessionId);
     assert.equal(readback.packet.candidate.commit, fx.candidate);
-    const recordReference = readback.packet.references.find(({ path }) => path === fx.recordPath);
-    assert.equal(recordReference?.kind, "evidence");
-    assert.equal(recordReference.candidateBlobOid, git(fx.root, ["rev-parse", `${fx.candidate}:${fx.recordPath}`]));
+    assert.equal(readback.packet.references.some(({ path }) => path === fx.recordPath), false);
+    assert.equal(readback.packet.coordinatorOnly.localDispatchEvidence.recordSha256,
+      createHash("sha256").update(readFileSync(join(fx.root, fx.recordPath))).digest("hex"));
     assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CPP-OVERWRITE");
   } finally { cleanup(fx); }
 });
@@ -424,9 +438,9 @@ test("findings emit REVIEW_FINDINGS and a root-authored record keeps its real em
     });
     const controlRoot = join(fx.root, git(fx.root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
     const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
-    const recordReference = readback.packet.references.find(({ path }) => path === fx.recordPath);
-    assert.equal(recordReference?.kind, "evidence");
-    assert.equal(recordReference.candidateBlobOid, git(fx.root, ["rev-parse", `${fx.candidate}:${fx.recordPath}`]));
+    assert.equal(readback.packet.references.some(({ path }) => path === fx.recordPath), false);
+    assert.equal(readback.packet.coordinatorOnly.localDispatchEvidence.recordSha256,
+      createHash("sha256").update(readFileSync(join(fx.root, fx.recordPath))).digest("hex"));
     const result = finalizeSessionCriticReview(request);
     assert.equal(result.event.reasonCode, "REVIEW_FINDINGS");
     assert.equal(result.receipt.reviewRange.base, fx.base);

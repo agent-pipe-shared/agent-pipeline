@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -302,14 +303,14 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged 
     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
     const disposed = records.filter((record) => record.event === "DISPOSED");
     assert.equal(records[0].event, "DECLARED");
-    assert.equal(records[0].caseCount, 10);
-    assert.equal(disposed.length, 10);
+    assert.equal(records[0].caseCount, 12);
+    assert.equal(disposed.length, 12);
     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
     assert.equal(disposed.find((record) => record.id === "CPP09")?.disposition, "pass");
     assert.equal(disposed.find((record) => record.id === "CPP10")?.disposition, "pass");
-    assert.deepEqual(records.at(-1).counts, { pass: 9, fail: 1, skip: 0, todo: 0 });
-    assert.equal(records.at(-1).declaredCount, 10);
-    assert.equal(records.at(-1).disposedCount, 10);
+    assert.deepEqual(records.at(-1).counts, { pass: 11, fail: 1, skip: 0, todo: 0 });
+    assert.equal(records.at(-1).declaredCount, 12);
+    assert.equal(records.at(-1).disposedCount, 12);
   }
 });
 
@@ -352,7 +353,53 @@ check("binds one exclusive prelaunch session admission to its claimed packet and
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 10, "the complete candidate packet corpus must be registered before execution begins");
+check("signed import anchor creates a distinct non-authoring packet without a dispatch-record reference", () => {
+  const f = fixture();
+  try {
+    const intentSha256 = "a".repeat(64);
+    const taskId = `signed-import-${intentSha256}`;
+    const request = { ...options(f, "f".repeat(32)), taskId,
+      signedQualityImportAnchor: {
+        schema: "pipeline.signed-quality-import-review-anchor.v1", intentSha256,
+        integrationCommit: f.base, baseCommit: f.base, candidateCommit: f.candidate, taskId,
+      } };
+    const result = prepareCandidatePacket(request, {
+      now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 21),
+      evaluateSignedQualityImportReviewAdmissionFn: ({ root, anchor }) => {
+        assert.equal(root, f.root);
+        assert.deepEqual(anchor, request.signedQualityImportAnchor);
+        return { ok: true, code: "signed-quality-import-review-admitted", authorityKind: "signed-quality-import" };
+      },
+    });
+    assert.equal(result.packet.coordinatorOnly.signedQualityImportAnchor.taskId, taskId);
+    assert.equal(result.packet.references.some(({ path }) => path === `evidence/dispatch-record-${taskId}.json`), false);
+    assert.equal(result.packet.bindings.coordinatorOnlySha256,
+      createHash("sha256").update(`${JSON.stringify(result.packet.coordinatorOnly, null, 2)}\n`).digest("hex"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("signed import anchor rejects candidate drift and canonical verifier denial", () => {
+  const f = fixture();
+  try {
+    const intentSha256 = "b".repeat(64);
+    const taskId = `signed-import-${intentSha256}`;
+    const request = { ...options(f, "a".repeat(32)), taskId,
+      signedQualityImportAnchor: {
+        schema: "pipeline.signed-quality-import-review-anchor.v1", intentSha256,
+        integrationCommit: f.base, baseCommit: f.base, candidateCommit: "0".repeat(40), taskId,
+      } };
+    assert.throws(() => prepareCandidatePacket(request, { evaluateSignedQualityImportReviewAdmissionFn: () => {
+      assert.fail("candidate mismatch must be rejected before signed package verification");
+    } }), expectCode("CPP-COORDINATOR-BINDING"));
+    request.signedQualityImportAnchor.candidateCommit = f.candidate;
+    assert.throws(() => prepareCandidatePacket(request, { evaluateSignedQualityImportReviewAdmissionFn: () => ({
+      ok: false, code: "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID", findings: ["wrong intent"],
+    }) }), expectCode("CPP-REVIEW-ADMISSION"));
+    assert.equal(existsSync(join(f.control, request.packetId)), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 12, "the complete candidate packet corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,9 @@ import {
 } from "./observation-intake.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./observation-intake.mjs", import.meta.url));
+const PLUGIN_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const SKILL_PATH = join(PLUGIN_ROOT, "skills", "capture-observation", "SKILL.md");
+const PACKAGED_INTAKE_SCRIPT = join(PLUGIN_ROOT, "skills", "capture-observation", "scripts", "observation-intake.mjs");
 const REPO_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 function repoFile(path) {
@@ -58,6 +61,22 @@ function validInput(overrides = {}) {
 }
 
 const PUBLIC_REPOSITORY = "agent-pipe-shared/agent-pipeline";
+
+test("packaged skill entry runs from a consumer working directory and returns the local canonical preview", () => {
+  const skill = readFileSync(SKILL_PATH, "utf8");
+  const entry = 'node "${PIPELINE_PLUGIN_ROOT}/skills/capture-observation/scripts/observation-intake.mjs"';
+  assert.ok(skill.includes(entry), "skill must invoke the intake helper through the installed plugin root");
+  assert.ok(existsSync(PACKAGED_INTAKE_SCRIPT), "the installed plugin package must contain the documented helper");
+  assert.equal(SCRIPT, PACKAGED_INTAKE_SCRIPT, "test import and documented installed path must identify one packaged helper");
+  const input = validInput();
+  const child = spawnSync(process.execPath, [PACKAGED_INTAKE_SCRIPT, "--repository", PUBLIC_REPOSITORY], {
+    cwd: REPO_ROOT, input: JSON.stringify(input), encoding: "utf8", maxBuffer: 1024 * 1024,
+  });
+  assert.equal(child.error, undefined, child.error?.message);
+  assert.equal(child.signal, null);
+  assert.equal(child.status, 0, `${child.stderr}${child.stdout}`);
+  assert.deepEqual(JSON.parse(child.stdout), prepareObservation(input, { publicRepository: PUBLIC_REPOSITORY }));
+});
 
 test("closed input schema rejects additional top-level and environment fields", () => {
   const extraTop = prepareObservation({ ...validInput(), rawLogs: "not allowed" });
@@ -251,7 +270,7 @@ test("structured source links reject query, fragment, encoding, and noncanonical
 test("CLI binds repository-reference validation to the resolved public target", async () => {
   let stdout = "";
   const exitCode = await runCli(["--repository", PUBLIC_REPOSITORY], {
-    readFileFn: async () => JSON.stringify(validInput({
+    readStdinFn: async () => JSON.stringify(validInput({
       sourceBacklogLinks: ["https://github.com/agent-pipe-shared/agent-pipeline/issues/12"],
     })),
     writeStdout: (value) => {
@@ -368,7 +387,7 @@ test("repository intake routes security privately and disables blank issues", ()
 
 test("governance keeps the Issue canonical and backlog promotion explicit", () => {
   const governance = repoFile("docs/observation-intake.md");
-  const skill = repoFile("plugins/pipeline-core/skills/capture-observation/SKILL.md");
+  const skill = readFileSync(SKILL_PATH, "utf8");
   const backlog = repoFile("backlog/README.md");
 
   assert.match(governance, /GitHub Issues are the repository-global, branch-independent single source of\s+truth/);

@@ -4842,7 +4842,7 @@ test("a coordinator-sourced bind whose generated PRD's po-language marker is edi
     const barrier = initializeRestartRequiredRoot(path, localDeps);
     clearRuntimeBarrier(path, barrier);
 
-    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--profile", "feature", "--language", "en", "--activate", "--runner", "codex"]);
+    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--profile", "mini", "--language", "en", "--activate", "--runner", "codex"]);
     assert.equal(consented.code, 0, stderr);
     const captured = invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]);
     assert.equal(captured.code, 0, stderr);
@@ -9077,7 +9077,7 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
 
     // Consent recorded, no material captured yet: still intake-required, but
     // nextAction switches to intake-capture-apply.
-    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--activate", "--runner", "codex"]);
+    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--language", "en", "--profile", "feature", "--activate", "--runner", "codex"]);
     assert.equal(consented.code, 0, stderr);
     const afterConsent = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(afterConsent.status, "intake-required");
@@ -9144,9 +9144,15 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     // real spawnSync fails against it). A CLI-level regression in this exact
     // wiring is separately covered by project-onboarding-v3-argv-closure.test.mjs.
     const genPlan = planOnboardingIntakeGenerate({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    assert.match(genPlan.targets.prd.content, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u,
+      "the generated PRD carries the architecture authoring aid before its content digest is bound");
+    assert.match(genPlan.targets.spec.content, /## Acceptance criteria[\s\S]*## Traceability/u,
+      "the generated Spec carries acceptance and traceability sections before its content digest is bound");
+    assert.equal(digest(genPlan.targets.prd.content), genPlan.targets.prd.afterSha256);
+    assert.equal(digest(genPlan.targets.spec.content), genPlan.targets.spec.afterSha256);
     const genApplied = applyOnboardingIntakeGenerate({
       rootDir: path, repositoryCapability: "local", expectedPlanSha256: genPlan.planSha256, activate: true,
-      deps: { spawn: fakeGit },
+      deps: { spawn: fakeGit, prepareBoundDesignLineEndings: () => ({ ok: true, code: "FIXTURE-LINE-ENDINGS-READY" }) },
     });
     assert.equal(genApplied.checkpoint.transactionState, "generated");
     const afterGenerate = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
@@ -9154,6 +9160,34 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterGenerate.continuity.status, "absent-pristine");
     assert.equal(afterGenerate.nextAction.kind, "command");
     assert.equal(afterGenerate.nextAction.argv[1], "bootstrap-bind-plan");
+
+    // Final-package profiles skip the early PO acknowledgement, but the
+    // generated PRD's technical Spec digest still has to be repaired before
+    // bind. Exercise the exact later re-entry boundary that previously
+    // surfaced the CLI's plain usage text to the JSON-only onboarding driver.
+    const generatedSpec = join(path, genApplied.targets.spec.path);
+    writeFileSync(generatedSpec, `${readFileSync(generatedSpec, "utf8")}\nAgent-authored design detail.\n`);
+    const repairRequired = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(repairRequired.status, "bootstrap-binding-required");
+    assert.equal(repairRequired.nextAction.kind, "command");
+    assert.equal(repairRequired.nextAction.executable, process.execPath);
+    assert.equal(repairRequired.nextAction.argv[1], "intake-spec-marker-apply");
+    assert.equal(repairRequired.nextAction.requiresConfirmation, false,
+      "the technical digest repair is mechanical and does not add a PO decision");
+    assert.equal(repairRequired.nextAction.expected.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
+    assert.deepEqual(repairRequired.nextAction.expected.statuses, ["applied", "already-current"]);
+    assert.ok(repairRequired.nextAction.argv.includes("--plan-sha256"));
+    assert.ok(repairRequired.nextAction.argv.includes("--activate"));
+    const markerRepairSha = repairRequired.nextAction.argv[
+      repairRequired.nextAction.argv.indexOf("--plan-sha256") + 1
+    ];
+    const markerRepair = invoke(["intake-spec-marker-apply", "--root", path,
+      "--plan-sha256", markerRepairSha, "--activate", "--runner", "codex"]);
+    assert.equal(markerRepair.code, 0, stderr);
+    assert.equal(markerRepair.result.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
+    const afterMarkerRepair = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(afterMarkerRepair.nextAction.kind, "command");
+    assert.equal(afterMarkerRepair.nextAction.argv[1], "bootstrap-bind-plan");
   } finally { dispose(path); }
 });
 
@@ -9628,7 +9662,7 @@ test("chat acknowledgement consumes the one in-chat PO decision without a second
     assert.equal(applyProjectOnboardingV3(portable, {rootDir: path, activate: true, deps: fakeDeps}).status, "applied");
     const intakeDeps = { ...fakeDeps, spawn: fakeGit };
     const consent = onboardingCli([
-      "intake-consent-apply", "--root", path, "--granted", "--profile", "feature", "--language", "en", "--activate", "--runner", "codex",
+      "intake-consent-apply", "--root", path, "--granted", "--profile", "mini", "--language", "en", "--activate", "--runner", "codex",
     ], { deps: intakeDeps, write: () => {}, writeError: () => {} });
     assert.equal(consent, 0);
     const capture = onboardingCli([

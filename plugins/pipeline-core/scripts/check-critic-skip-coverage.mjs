@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Per-dispatch Critic disposition enforcement for dispatch-record v3. */
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { sha256Canonical } from "../lib/review-economy.mjs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
@@ -15,6 +17,7 @@ import { parseStrictJson } from "../lib/governance-event.mjs";
 import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
 import { parseIntegrationTrailerBlock } from "../lib/commit-message-policy.mjs";
 import { verifyQualityPackageIntegrationPostCommit } from "../lib/signed-quality-package.mjs";
+import { checkRunnerManifestParity } from "./check-runner-manifest-parity.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -28,6 +31,12 @@ export const DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH = "evidence/abandoned-v3-d
 const ABANDONED_V3_TASKS = ["ALF-ADOPTION-PROOF", "ALF-RECOVERY-PLAN"];
 const ABANDONED_V3_OBSERVATION_SCHEMA = "pipeline.abandoned-v3-dispatch-recovery-observation.v1";
 const SHA256 = /^[a-f0-9]{64}$/u;
+const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+const RUNNER_MANIFESTS = Object.freeze([
+  { runner: "codex", path: "plugins/pipeline-core/.codex-plugin/plugin.json" },
+  { runner: "claude", path: "plugins/pipeline-core/.claude-plugin/plugin.json" },
+  { runner: "antigravity", path: "plugins/pipeline-core/plugin.json" },
+]);
 
 function physicalRegularFile(root, path, label) {
   let absolute;
@@ -60,6 +69,7 @@ function digestMatches(bytes, expected, label) {
   const actual = createHash("sha256").update(bytes).digest("hex");
   return actual === expected ? null : `${label}: SHA-256 digest mismatch`;
 }
+const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function readGit(root, args, options = {}) {
   const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
@@ -193,6 +203,192 @@ function verifyCandidateDescendsFromRecord(root, recordCandidate, reviewCandidat
   }
 }
 
+function gitBlobBytes(root, commit, path) {
+  return execFileSync("git", ["-C", root, "show", `${commit}:${path}`], {
+    encoding: "buffer", maxBuffer: 2 * 1024 * 1024,
+    env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key))),
+  });
+}
+
+function signedImportFailure(code, details = null) {
+  const error = new Error(code);
+  error.code = code;
+  error.details = details;
+  throw error;
+}
+
+function manifestValue(bytes, label) {
+  let value;
+  try { value = JSON.parse(bytes.toString("utf8")); }
+  catch { signedImportFailure("signed-import-manifest-json", { path: label }); }
+  if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.version !== "string") {
+    signedImportFailure("signed-import-manifest-shape", { path: label });
+  }
+  return value;
+}
+
+function validateStampOnlyRange(root, integrationCommit, candidateCommit) {
+  const objectFormat = readGit(root, ["rev-parse", "--show-object-format"]);
+  const oidLength = objectFormat === "sha1" ? 40 : objectFormat === "sha256" ? 64 : 0;
+  if (![integrationCommit, candidateCommit].every((oid) => oid.length === oidLength && OID.test(oid))) {
+    signedImportFailure("signed-import-oid");
+  }
+  if (readGit(root, ["cat-file", "-t", integrationCommit]) !== "commit"
+    || readGit(root, ["cat-file", "-t", candidateCommit]) !== "commit") signedImportFailure("signed-import-commit");
+  const ancestor = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", integrationCommit, candidateCommit], {
+    encoding: "utf8", env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key))),
+  });
+  if (ancestor.status !== 0) signedImportFailure("signed-import-candidate-ancestry");
+
+  const integrationParents = readGit(root, ["rev-list", "--parents", "-n", "1", integrationCommit]).split(/\s+/u);
+  if (integrationParents.length !== 2) signedImportFailure("signed-import-parent");
+  const baseCommit = integrationParents[1];
+  const candidateParentLine = readGit(root, ["rev-list", "--parents", "-n", "1", candidateCommit]).split(/\s+/u);
+  const rangeCommits = readGit(root, ["rev-list", "--reverse", `${integrationCommit}..${candidateCommit}`]).split("\n").filter(Boolean);
+  if (rangeCommits.length > 32 || rangeCommits.some((oid) => !OID.test(oid))) signedImportFailure("signed-import-range-bound");
+  const allowedPaths = new Set(RUNNER_MANIFESTS.map(({ path }) => path));
+  const changedPaths = readGit(root, ["diff", "--name-only", "-z", integrationCommit, candidateCommit, "--"])
+    .split("\0").filter(Boolean).sort();
+  if (changedPaths.some((path) => !allowedPaths.has(path))) signedImportFailure("signed-import-nonversion-path", { changedPaths });
+
+  let priorCommit = integrationCommit;
+  for (const commit of rangeCommits) {
+    const parents = readGit(root, ["rev-list", "--parents", "-n", "1", commit]).split(/\s+/u);
+    if (parents.length !== 2 || parents[1] !== priorCommit) signedImportFailure("signed-import-linear-range");
+    const changedAtCommit = readGit(root, ["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit])
+      .split("\0").filter(Boolean).sort();
+    if (changedAtCommit.length === 0 || changedAtCommit.some((path) => !allowedPaths.has(path))) {
+      signedImportFailure("signed-import-nonversion-commit", { commit, changedPaths: changedAtCommit });
+    }
+    for (const path of changedAtCommit) {
+      const beforeRaw = gitBlobBytes(root, priorCommit, path);
+      const afterRaw = gitBlobBytes(root, commit, path);
+      const before = manifestValue(beforeRaw, path);
+      const after = manifestValue(afterRaw, path);
+      const token = JSON.stringify(before.version);
+      const first = beforeRaw.indexOf(token);
+      if (first < 0 || beforeRaw.indexOf(token, first + token.length) >= 0
+        || !Buffer.from(beforeRaw.toString("utf8").replace(token, JSON.stringify(after.version))).equals(afterRaw)) {
+        signedImportFailure("signed-import-nonversion-manifest-change", { commit, path });
+      }
+      const entry = RUNNER_MANIFESTS.find((item) => item.path === path);
+      const version = new RegExp(`^0\\.7\\.0\\+${entry.runner}\\.([0-9]{14})\\.${integrationCommit.slice(0, 8)}$`, "u").exec(after.version);
+      if (!version) signedImportFailure("signed-import-version-binding", { commit, path });
+    }
+    priorCommit = commit;
+  }
+  if (candidateParentLine.length !== 2 && candidateCommit !== integrationCommit) signedImportFailure("signed-import-candidate-parent");
+
+  const candidateManifests = RUNNER_MANIFESTS.map(({ runner, path }) => {
+    const bytes = gitBlobBytes(root, candidateCommit, path);
+    const value = manifestValue(bytes, path);
+    return { runner, path, bytes, value };
+  });
+  const tempRoot = mkdtempSync(join(tmpdir(), "pipeline-critic-runner-parity-"));
+  try {
+    if (realpathSync(tempRoot) !== tempRoot || lstatSync(tempRoot).isSymbolicLink()) signedImportFailure("signed-import-parity-temp");
+    for (const { path, bytes } of candidateManifests) {
+      const relativePath = path.slice("plugins/pipeline-core/".length);
+      const target = join(tempRoot, relativePath);
+      mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+      writeFileSync(target, bytes, { mode: 0o600, flag: "wx" });
+    }
+    const parity = checkRunnerManifestParity(tempRoot);
+    if (!parity.ok || parity.baseVersion !== "0.7.0") signedImportFailure("signed-import-manifest-parity", parity);
+  } finally {
+    const info = lstatSync(tempRoot);
+    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(tempRoot) !== tempRoot) signedImportFailure("signed-import-parity-temp");
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+
+  if (rangeCommits.length > 0) {
+    const stampedVersions = candidateManifests.map(({ runner, value, path }) => {
+      const match = new RegExp(`^0\\.7\\.0\\+${runner}\\.([0-9]{14})\\.${integrationCommit.slice(0, 8)}$`, "u").exec(value.version);
+      if (!match) signedImportFailure("signed-import-version-binding", { path });
+      return { timestamp: match[1], version: value.version };
+    });
+    if (new Set(stampedVersions.map(({ timestamp }) => timestamp)).size !== 1) signedImportFailure("signed-import-version-timestamp");
+  }
+  return { baseCommit, integrationCommit, candidateCommit, rangeCommits, changedPaths, candidateManifests };
+}
+
+/** Create a private, content-bound reference from the trusted local dispatch reader. */
+export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit } = {}) {
+  if (typeof root !== "string" || typeof taskId !== "string" || typeof reviewCandidateCommit !== "string"
+    || !/^[a-f0-9]{40}$/u.test(reviewCandidateCommit)) throw new TypeError("local dispatch evidence input is invalid");
+  const scan = walkDispatchRecords(root);
+  if (scan.findings.length > 0) throw new Error("local dispatch evidence source is unreadable");
+  const matches = scan.records.filter(({ record }) => record?.taskId === taskId);
+  if (matches.length !== 1) throw new Error("local dispatch evidence requires one exact source record");
+  const entry = matches[0];
+  const record = entry.record;
+  const v3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA;
+  const v4 = record?.schema === DISPATCH_RECORD_SCHEMA;
+  if (!v3 && !v4) throw new Error("local dispatch evidence source is not a required authored delivery");
+  try { (v3 ? validatePreviousDispatchRecord : validateDispatchRecord)(record); }
+  catch { throw new Error("local dispatch evidence source is not a required authored delivery"); }
+  if (criticDisposition(record) !== "required"
+    || !/^[a-f0-9]{40}$/u.test(record.candidateCommit ?? "")) {
+    throw new Error("local dispatch evidence source is not a required authored delivery");
+  }
+  const admission = evaluateReviewAdmission({ root, taskId, candidateCommit: reviewCandidateCommit });
+  if (!admission.ok || admission.targetRecordCandidateCommit !== record.candidateCommit) {
+    throw new Error("local dispatch evidence candidate is not admitted for this task");
+  }
+  const binding = {
+    schema: "pipeline.local-dispatch-evidence.v1",
+    taskId,
+    recordPath: entry.path,
+    recordSha256: entry.sha256,
+    sourceCandidateCommit: record.candidateCommit,
+    reviewCandidateCommit,
+  };
+  return Object.freeze({ ...binding, snapshotId: sha256Canonical(binding) });
+}
+
+/** Admit a signed source import as its own review target without fabricating a dispatch row. */
+export function evaluateSignedQualityImportReviewAdmission({ root, anchor } = {}) {
+  try {
+    const anchorKeys = ["schema", "intentSha256", "integrationCommit", "baseCommit", "candidateCommit", "taskId"];
+    if (typeof root !== "string" || !anchor || typeof anchor !== "object" || Array.isArray(anchor)
+      || Object.keys(anchor).length !== anchorKeys.length || anchorKeys.some((key) => !Object.hasOwn(anchor, key))
+      || anchor.schema !== "pipeline.signed-quality-import-review-anchor.v1"
+      || !SHA256.test(anchor.intentSha256 ?? "") || !OID.test(anchor.integrationCommit ?? "")
+      || !OID.test(anchor.baseCommit ?? "") || !OID.test(anchor.candidateCommit ?? "")
+      || anchor.taskId !== `signed-import-${anchor.intentSha256}`) {
+      signedImportFailure("signed-import-anchor-shape");
+    }
+    const range = validateStampOnlyRange(root, anchor.integrationCommit, anchor.candidateCommit);
+    if (range.baseCommit !== anchor.baseCommit) signedImportFailure("signed-import-base-mismatch");
+    const signed = verifyQualityPackageIntegrationPostCommit({ repoRoot: root,
+      commitSha: anchor.integrationCommit, intentSha256: anchor.intentSha256 });
+    if (!signed?.ok || signed.code !== "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED"
+      || signed.intentSha256 !== anchor.intentSha256) signedImportFailure("signed-import-not-authorized");
+    const coverage = evaluateRepositoryCriticSkipCoverage({ root });
+    if (!coverage.ok) return { ok: false, code: "signed-import-ordinary-coverage-pending",
+      authorityKind: "signed-quality-import", anchor, ordinaryCoverage: coverage,
+      findings: coverage.readFindings };
+    const tree = readGit(root, ["rev-parse", `${anchor.candidateCommit}^{tree}`]);
+    return {
+      ok: true,
+      code: "signed-quality-import-review-admitted",
+      authorityKind: "signed-quality-import",
+      anchor,
+      reviewCandidate: { commit: anchor.candidateCommit, tree },
+      candidateRange: { baseCommit: range.baseCommit, integrationCommit: range.integrationCommit,
+        candidateCommit: range.candidateCommit, commits: range.rangeCommits, changedPaths: range.changedPaths },
+      ordinaryCoverage: { ok: coverage.ok, applicableRecordCount: coverage.applicableRecordCount,
+        requiredRecordCount: coverage.requiredRecordCount, criticEvidenceRecordCount: coverage.criticEvidenceRecordCount,
+        skipRecordCount: coverage.skipRecordCount, legacyRecordCount: coverage.legacyRecordCount,
+        administrativelyRetiredRecordCount: coverage.administrativelyRetiredRecordCount },
+      targetRecordCount: 0,
+    };
+  } catch (error) {
+    return { ok: false, code: error?.code ?? "signed-import-invalid", details: error?.details ?? null,
+      authorityKind: "signed-quality-import", findings: [error?.code ?? "signed-import-invalid"] };
+  }
+}
+
 /**
  * Load the append-only reconciliation index for old terminal records which
  * truthfully produced no commit. The index is intentionally a byte binding:
@@ -312,6 +508,46 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
       || bound?.critic?.candidate?.commit !== addendum.reviewCandidateCommit
       || bound.criticReceiptSha256 !== addendum.criticReceiptSha256) {
       return "Critic addendum does not match a passed, consumed, task-bound Critic receipt";
+    }
+    const localDispatchEvidence = bound.packet.coordinatorOnly?.localDispatchEvidence;
+    if (localDispatchEvidence !== undefined) {
+      try {
+        exactObject(localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256",
+          "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"], "private local dispatch evidence");
+      } catch {
+        return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
+      }
+      const binding = {
+        schema: localDispatchEvidence.schema,
+        taskId: localDispatchEvidence.taskId,
+        recordPath: localDispatchEvidence.recordPath,
+        recordSha256: localDispatchEvidence.recordSha256,
+        sourceCandidateCommit: localDispatchEvidence.sourceCandidateCommit,
+        reviewCandidateCommit: localDispatchEvidence.reviewCandidateCommit,
+      };
+      const packetCandidate = bound.packet.candidate?.commit;
+      const expectedPath = `evidence/dispatch-record-${addendum.taskId}.json`;
+      let sourceRecord;
+      try { sourceRecord = parseStrictJson(recordBytes); }
+      catch { return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record"; }
+      if (localDispatchEvidence.schema !== "pipeline.local-dispatch-evidence.v1"
+        || localDispatchEvidence.taskId !== addendum.taskId
+        || sourceRecord?.taskId !== addendum.taskId
+        || localDispatchEvidence.recordPath !== expectedPath
+        || localDispatchEvidence.recordSha256 !== digest(recordBytes)
+        || localDispatchEvidence.sourceCandidateCommit !== addendum.candidateCommit
+        || localDispatchEvidence.sourceCandidateCommit !== sourceRecord?.candidateCommit
+        || localDispatchEvidence.reviewCandidateCommit !== addendum.reviewCandidateCommit
+        || localDispatchEvidence.reviewCandidateCommit !== packetCandidate
+        || localDispatchEvidence.snapshotId !== sha256Canonical(binding)
+        || bound.packet.request?.taskId !== addendum.taskId
+        || !Array.isArray(bound.packet.references)
+        || bound.packet.references.some((reference) => reference?.path === expectedPath)) {
+        return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
+      }
+      gitRead(["merge-base", "--is-ancestor", localDispatchEvidence.sourceCandidateCommit,
+        localDispatchEvidence.reviewCandidateCommit]);
+      return null;
     }
     const blobOid = gitRead(["rev-parse", "--verify", `${addendum.reviewCandidateCommit}:${addendum.recordPath}`]);
     if (!bound.packet.references?.some((reference) => reference.kind === "evidence"

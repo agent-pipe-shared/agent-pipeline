@@ -4,8 +4,8 @@
 /** Translate provider-neutral guard exits into Antigravity PreToolUse decisions. */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, read, realpathSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, read, readFileSync, realpathSync, rmSync } from "node:fs";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -325,6 +325,45 @@ export function isBootstrapReadCommand(value, {
   catch { return false; }
 }
 
+/** Inspect a scratch shell script before its contents can bypass the literal
+ * `git` command selector below. A script containing any Git invocation is
+ * routed through the user's next direct Git command, where the lifecycle and
+ * destructive-operation guards receive the real argv. */
+export function inspectScratchShellScript(command, projectRoot, {
+  readFileSyncFn = readFileSync,
+  realpathSyncFn = realpathSync,
+} = {}) {
+  if (typeof command !== "string" || typeof projectRoot !== "string") return { status: "not-scratch-script" };
+  const parsed = parseGuardCommand(command, projectRoot);
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1 || parsed.operators.length !== 0) {
+    return { status: "not-scratch-script" };
+  }
+  const { executable, argv } = parsed.segments[0];
+  const shell = executable.split(/[\\/]/u).at(-1)?.toLowerCase();
+  if (!new Set(["sh", "bash", "zsh", "dash"]).has(shell)) return { status: "not-scratch-script" };
+  const scriptArg = argv.find((value) => typeof value === "string"
+    && /(?:^|[\\/])scratch[\\/](?:[^\\/]+[\\/])*[^\\/]+\.(?:sh|bash)$/iu.test(value));
+  if (!scriptArg) return { status: "not-scratch-script" };
+  const scratchRoot = resolve(projectRoot, "scratch");
+  const candidate = resolve(projectRoot, scriptArg);
+  const rel = relative(scratchRoot, candidate);
+  if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { status: "outside-scratch" };
+  try {
+    const physicalScratch = realpathSyncFn(scratchRoot);
+    const physicalScript = realpathSyncFn(candidate);
+    const physicalRel = relative(physicalScratch, physicalScript);
+    if (physicalRel === ".." || physicalRel.startsWith(`..${sep}`) || isAbsolute(physicalRel)) {
+      return { status: "outside-scratch" };
+    }
+    const source = readFileSyncFn(physicalScript, "utf8");
+    return /\bgit(?:\.exe)?\b/iu.test(source)
+      ? { status: "contains-git" }
+      : { status: "safe-script" };
+  } catch (error) {
+    return error?.code === "ENOENT" ? { status: "missing-script" } : { status: "unreadable-script" };
+  }
+}
+
 export async function runAntigravityPreToolGuard(rawInput) {
   const scopeAdmission = nativeHookGovernanceAdmission({ runner: "antigravity", rawInput });
   if (!scopeAdmission.requiresEnforcement) {
@@ -394,6 +433,13 @@ export async function runAntigravityPreToolGuard(rawInput) {
 
   const lifecycleGoverned = observeGovernanceScope({ rootDir: projectRoot }).requiresEnforcement;
 
+  if (toolName === "Bash") {
+    const script = inspectScratchShellScript(command, projectRoot);
+    if (["contains-git", "outside-scratch", "unreadable-script"].includes(script.status)) {
+      deny("BLOCKED (Hardening Layer): Scratch shell scripts that contain or conceal Git operations cannot bypass the direct Git guards. Run the Git command directly so lifecycle and destructive-operation policy can inspect its argv.");
+    }
+  }
+
   // --- Antigravity Hardening Layer: critic dispatch contamination + inline exec containment ---
   if (toolName === "Task") {
     // D3 fix: inspect EVERY subagent entry in the raw envelope, not only index 0 -- a
@@ -456,7 +502,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
   const hookSessionId = nativeHookSessionId(input, {});
 
   // Methodological Enforcement (Hard Block):
-  const sessionBootstrapMarker = join(projectRoot, ".git", "agent-pipeline", "run", `session-${hookSessionId}`, "requires-bootstrap.lock");
+  const sessionBootstrapMarker = join(projectRoot, ".git", "agent-pipeline", "run", `session-${hookSessionId}`, "requires-bootstrap.pending");
   const isBootstrap = isBootstrapReadCommand(command);
 
   if (existsSync(sessionBootstrapMarker)) {

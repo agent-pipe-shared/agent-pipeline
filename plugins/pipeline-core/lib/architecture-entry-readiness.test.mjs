@@ -48,6 +48,47 @@ test("malformed physical map blocks even with an authorized adoption disposition
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("approved design materialization action wins before an invalid scaffold-map diagnostic", () => {
+  const root = fixture();
+  let inspections = 0;
+  let adoptionReads = 0;
+  try {
+    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: {
+      inspectArchitectureDesign: () => {
+        inspections += 1;
+        return { ok: true, status: "materialization-required", disposition: "approved-scoped", scope: ["architecture/"] };
+      },
+      checkPlanningAdoptionDisposition: () => { adoptionReads += 1; return { ok: false }; },
+    } });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.code, "ARCHITECTURE-MATERIALIZATION-REQUIRED");
+    assert.deepEqual(result.nextAction, {
+      kind: "command", executable: "node",
+      argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "materialize-architecture"],
+      mutation: true, requiresConfirmation: false,
+      expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
+    });
+    assert.equal(inspections, 1, "the approved design inspection is reused for the action");
+    assert.equal(adoptionReads, 0, "unmaterialized design does not fall through to a secondary adoption read");
+    assert.equal(result.artifacts.map.status, "missing", "the scaffold map is not treated as materialized");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("missing design block preserves its exact PRD action before scaffold-map validation", () => {
+  const root = fixture();
+  const prdPath = "specs/feature/prd.md";
+  try {
+    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: {
+      inspectArchitectureDesign: () => ({ ok: false, status: "design-required",
+        code: "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", prdPath }),
+    } });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED");
+    assert.equal(result.nextAction.kind, "architecture-design-required");
+    assert.equal(result.nextAction.prdPath, prdPath);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
   const root = fixture();
   try {

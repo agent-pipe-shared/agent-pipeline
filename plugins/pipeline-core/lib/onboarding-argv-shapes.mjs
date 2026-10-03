@@ -47,7 +47,7 @@ export const MUTATING_ONBOARDING_ARGV_SHAPES = Object.freeze({
     required: Object.freeze(["--granted", "--activate"]),
     requiredValue: Object.freeze(["--root"]),
     requiredValueOneOf: Object.freeze([]),
-    optionalValue: Object.freeze(["--git-author-name", "--git-author-email", "--language", "--profile", "--text", "--text-file"]),
+    optionalValue: Object.freeze(["--git-author-name", "--git-author-email", "--language", "--profile", "--text", "--text-file", "--text-file-sha256"]),
   }),
   // NVA-INTAKEARGV-1: `--text-file` is not a convenience alias. The captured value is the
   // PO's own material design input -- `intakeCaptureAction()` declares it `singleLine:
@@ -59,8 +59,8 @@ export const MUTATING_ONBOARDING_ARGV_SHAPES = Object.freeze({
   "intake-capture-apply": Object.freeze({
     required: Object.freeze(["--activate"]),
     requiredValue: Object.freeze(["--root"]),
-    requiredValueOneOf: Object.freeze(["--text", "--text-file"]),
-    optionalValue: Object.freeze([]),
+    requiredValueOneOf: Object.freeze(["--text", "--text-file", "--text-turn-ref"]),
+    optionalValue: Object.freeze(["--text-file-sha256"]),
   }),
   "intake-design-questions-apply": Object.freeze({
     required: Object.freeze(["--activate"]),

@@ -77,6 +77,17 @@ const HARDEN_DIRECTORY_SCRIPT = [
   "Set-Acl -LiteralPath $p -AclObject $a",
 ].join(";");
 
+const OBSERVE_BATCH_SCRIPT = [
+  "$ErrorActionPreference='Stop'",
+  "$utf8=[Text.UTF8Encoding]::new($false);[Console]::OutputEncoding=$utf8;$OutputEncoding=$utf8",
+  "$payload=[Console]::In.ReadToEnd().Trim()",
+  "$json=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload))",
+  "$paths=ConvertFrom-Json -InputObject $json",
+  "$rows=[System.Collections.Generic.List[object]]::new()",
+  "foreach($p in @($paths)){try{$i=Get-Item -LiteralPath $p -Force;$a=Get-Acl -LiteralPath $p;$me=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name;$principals=@($a.Access | ForEach-Object { $_.IdentityReference.Value });$rows.Add([pscustomobject]@{path=[string]$p;currentOwner=$me;owner=$a.Owner;reparsePoint=[bool]($i.Attributes -band [IO.FileAttributes]::ReparsePoint);principals=$principals})}catch{$rows.Add([pscustomobject]@{path=[string]$p;error=$true})}}",
+  "ConvertTo-Json -InputObject @($rows.ToArray()) -Compress -Depth 5",
+].join(";");
+
 /**
  * Strip `PSModulePath` (any casing -- Windows env vars are case-insensitive,
  * plain JS objects are not) from a copy of `environment` so the spawned fixed
@@ -130,6 +141,74 @@ export function assessWindowsPrivatePath(path, options = {}) {
   const { status, reason, observation } = observeWindowsPrivatePath(path, options);
   if (status) return { status, reason };
   return evaluateWindowsPrivateState(observation);
+}
+
+/** Evaluate exact per-path observations returned by the bounded native batch reader. */
+export function evaluateWindowsPrivatePathBatch(paths, observations) {
+  if (!Array.isArray(paths) || !Array.isArray(observations) || paths.length !== observations.length) {
+    return (Array.isArray(paths) ? paths : []).map(() => unavailable("native Windows DACL batch is incomplete"));
+  }
+  return paths.map((path, index) => {
+    const row = observations[index];
+    const keys = ["currentOwner", "owner", "path", "principals", "reparsePoint"];
+    if (typeof path !== "string" || !row || typeof row !== "object" || Array.isArray(row) || row.path !== path || row.error === true
+      || Object.keys(row).length !== keys.length || keys.some((key) => !Object.hasOwn(row, key))) {
+      return unavailable("native Windows DACL batch is malformed");
+    }
+    const observation = parseObservation(JSON.stringify(row));
+    return observation === null ? unavailable("native Windows DACL output is malformed") : evaluateWindowsPrivateState(observation);
+  });
+}
+
+/**
+ * Assess every physical path with one fixed PowerShell process per bounded chunk.
+ * Paths travel on stdin as JSON; no caller path is interpolated into a command.
+ */
+export function assessWindowsPrivatePaths(paths, options = {}) {
+  if (!Array.isArray(paths) || paths.length > 4096
+    || paths.some((path) => typeof path !== "string" || path.length === 0 || path.length > 32768)) {
+    return (Array.isArray(paths) ? paths : []).map(() => unavailable("private path batch is invalid"));
+  }
+  const batchSize = Number.isInteger(options.batchSize) ? Math.max(1, Math.min(64, options.batchSize)) : 64;
+  const results = [];
+  for (let offset = 0; offset < paths.length; offset += batchSize) {
+    const batch = paths.slice(offset, offset + batchSize);
+    const executable = fixedPowerShell();
+    if (executable === null) {
+      results.push(...batch.map(() => unavailable("fixed Windows PowerShell is unavailable")));
+      continue;
+    }
+    const run = options.run ?? spawnSync;
+    const timeout = options.timeoutForBatch ? options.timeoutForBatch() : options.timeout ?? 7_000;
+    if (timeout <= 0) {
+      results.push(...batch.map(() => unavailable("native Windows DACL time budget expired")));
+      continue;
+    }
+    const native = run(executable, [
+      "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", OBSERVE_BATCH_SCRIPT,
+    ], {
+      input: Buffer.from(JSON.stringify(batch), "utf8").toString("base64") + "\n",
+      encoding: "utf8",
+      timeout,
+      maxBuffer: 4 * 1024 * 1024,
+      shell: false,
+      windowsHide: true,
+      env: sanitizeChildEnvironment(options.environment ?? process.env),
+    });
+    if (!isSuccessfulSpawn(native)) {
+      results.push(...batch.map(() => unavailable("native Windows DACL batch failed")));
+      continue;
+    }
+    let rows;
+    try {
+      rows = JSON.parse(String(native.stdout).trim());
+      if (!Array.isArray(rows)) rows = [rows];
+    } catch {
+      rows = [];
+    }
+    results.push(...evaluateWindowsPrivatePathBatch(batch, rows));
+  }
+  return results;
 }
 
 /**

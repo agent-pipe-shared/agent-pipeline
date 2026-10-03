@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
+import { armAntigravityBootstrapSession } from './antigravity-bootstrap-lock.mjs';
 import { resolvePluginManifestVersion } from '../scripts/pipeline-start-preflight.mjs';
 import { nativeHookSessionId } from '../lib/native-hook-failure-memory.mjs';
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -126,11 +127,10 @@ function main() {
     // written as `null`, which the observer treats exactly like a lock with
     // no version field at all.
     const version = resolvePluginManifestVersion(PLUGIN_ROOT, 'antigravity');
-    writeFileSync(
-      join(sessionDir, 'requires-bootstrap.lock'),
-      `${JSON.stringify({ locked: true, version })}\n`,
-      'utf8',
-    );
+    // Keep the hook-authored proof lock for preflight and a separate one-shot
+    // barrier for the guard. An allowed bootstrap read consumes only the
+    // barrier; repeated ready inference hooks do not re-arm the session.
+    armAntigravityBootstrapSession(sessionDir, version);
   } catch (e) {
     reportFailure('bootstrap-lock-not-written', e);
     return;

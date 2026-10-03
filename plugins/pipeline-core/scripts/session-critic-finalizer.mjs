@@ -21,6 +21,7 @@ import {
 } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {
   SESSION_PACKET_BINDING_SCHEMA,
   canonicalJson,
@@ -40,6 +41,7 @@ export const SESSION_CRITIC_RECEIPT_SCHEMA = "pipeline.session-critic-receipt.v1
 export const SESSION_CRITIC_FINALIZE_RESULT_SCHEMA = "pipeline.session-critic-finalization.v1";
 export const SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA = "pipeline.session-critic-finalization-request.v1";
 export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finalization-error.v1";
+export const SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
 export const SESSION_CRITIC_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 const CLI_HELP = [
   "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
@@ -157,7 +159,8 @@ function readBoundedJson(root, path, code) {
   }
 }
 function validateCliRequest(value) {
-  if (!exact(value, REQUEST_KEYS) || value.schema !== SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA
+  const hasSignedImportAnchor = record(value) && Object.hasOwn(value, "signedQualityImportAnchor");
+  if (!exact(value, hasSignedImportAnchor ? [...REQUEST_KEYS, "signedQualityImportAnchor"] : REQUEST_KEYS) || value.schema !== SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA
     || !isSafeTaskId(value.taskId) || !SAFE_ID.test(value.projectId ?? "")
     || !SAFE_ID.test(value.sessionId ?? "") || !PACKET_ID.test(value.packetId ?? "")
     || !["T0", "T1", "T2", "T3"].includes(value.trigger)
@@ -170,6 +173,13 @@ function validateCliRequest(value) {
     || !(value.event === null || (exact(value.event, EVENT_KEYS)
       && typeof value.event.eventOutPath === "string"
       && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST");
+  if (hasSignedImportAnchor) {
+    const anchor = value.signedQualityImportAnchor;
+    if (!exact(anchor, ["schema", "intentSha256", "integrationCommit"])
+      || anchor.schema !== SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA || !SHA256.test(anchor.intentSha256 ?? "")
+      || !OID.test(anchor.integrationCommit ?? "")
+      || value.taskId !== `signed-import-${anchor.intentSha256}`) fail("SCF-IMPORT-ANCHOR");
+  }
   return value;
 }
 function assertVerdict(verdict) {
@@ -189,13 +199,23 @@ function candidateFor(preflight) {
     tree: preflight.candidate.tree,
   };
 }
-function referencesFor(preflight, taskId) {
+function referencesFor(preflight, taskId, signedQualityImportAnchor = undefined) {
   if (!isSafeTaskId(taskId)) fail("SCF-TASK");
   return [
     { kind: "spec", path: preflight.spec.path },
     ...preflight.guardrails.map(({ path }) => ({ kind: "guardrail", path })),
-    { kind: "evidence", path: `evidence/dispatch-record-${taskId}.json` },
   ].filter((entry, index, all) => all.findIndex((candidate) => candidate.kind === entry.kind && candidate.path === entry.path) === index);
+}
+function signedImportAnchorFor(preflight, requestAnchor, taskId) {
+  if (requestAnchor === undefined) return undefined;
+  if (!exact(requestAnchor, ["schema", "intentSha256", "integrationCommit"])
+    || requestAnchor.schema !== SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA || !SHA256.test(requestAnchor.intentSha256 ?? "")
+    || !OID.test(requestAnchor.integrationCommit ?? "") || taskId !== `signed-import-${requestAnchor.intentSha256}`) fail("SCF-IMPORT-ANCHOR");
+  const baseCommit = candidateFor(preflight).base;
+  if (typeof baseCommit !== "string" || !OID.test(baseCommit) || !OID.test(preflight.candidate.commit)) fail("SCF-IMPORT-ANCHOR");
+  return Object.freeze({ schema: SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA,
+    intentSha256: requestAnchor.intentSha256, integrationCommit: requestAnchor.integrationCommit,
+    baseCommit, candidateCommit: preflight.candidate.commit, taskId });
 }
 function courseDigestsFor(preflight) {
   const course = preflight.coordinatorOnly.courseAdmission;
@@ -243,6 +263,7 @@ export function admitSessionCriticReview(options, deps = {}) {
   const packetId = options.packetId;
   if (!PACKET_ID.test(packetId ?? "")) fail("SCF-PACKET-ID");
   const preflightSha256 = sha256(canonicalJson(preflight));
+  const signedImportAnchor = signedImportAnchorFor(preflight, options.signedQualityImportAnchor, options.taskId);
   const modelRole = selectedSessionCriticModelRole(root, options.trigger ?? "T1", options.route, deps);
   const route = routeFor(modelRole === null ? options.route
     : { ...options.route, modelTier: modelRole.modelId }, preflightSha256);
@@ -258,7 +279,8 @@ export function admitSessionCriticReview(options, deps = {}) {
     rulesetOid: preflight.dispatch.reviewerInput.rulesetSha,
     trigger: options.trigger ?? "T1",
     route,
-    references: referencesFor(preflight, options.taskId),
+    references: referencesFor(preflight, options.taskId, signedImportAnchor),
+    ...(signedImportAnchor === undefined ? {} : { signedQualityImportAnchor: signedImportAnchor }),
     evidencePaths: options.preflightInput.evidencePaths,
     sessionBinding: {
       schema: SESSION_PACKET_BINDING_SCHEMA,
@@ -371,7 +393,23 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     admitted = (deps.inspectClaimedSessionAdmissionFn ?? inspectClaimedSessionAdmission)({ controlRoot, packetId }, deps.packetDependencies);
   } catch { fail("SCF-PRELAUNCH-ADMISSION"); }
   const packet = admitted.packet;
-  const expectedReferences = referencesFor(preflight, options.taskId).sort((left, right) => {
+  const signedImportAnchor = signedImportAnchorFor(preflight, options.signedQualityImportAnchor, options.taskId);
+  if (packet.candidate.base !== candidateFor(preflight).base
+    || packet.candidate.commit !== preflight.candidate.commit
+    || packet.candidate.tree !== preflight.candidate.tree) fail("SCF-PRELAUNCH-BINDING");
+  if (signedImportAnchor !== undefined) {
+    const authority = (deps.evaluateSignedQualityImportReviewAdmissionFn ?? evaluateSignedQualityImportReviewAdmission)({ root, anchor: signedImportAnchor });
+    if (!authority?.ok || authority.code !== "signed-quality-import-review-admitted") fail("SCF-IMPORT-ANCHOR");
+  } else {
+    let currentLocalBinding;
+    try {
+      currentLocalBinding = (deps.createLocalDispatchEvidenceBindingFn ?? createLocalDispatchEvidenceBinding)({
+        root, taskId: options.taskId, reviewCandidateCommit: preflight.candidate.commit,
+      });
+    } catch { fail("SCF-LOCAL-DISPATCH-EVIDENCE"); }
+    if (canonicalJson(currentLocalBinding) !== canonicalJson(packet.coordinatorOnly?.localDispatchEvidence)) fail("SCF-LOCAL-DISPATCH-EVIDENCE");
+  }
+  const expectedReferences = referencesFor(preflight, options.taskId, signedImportAnchor).sort((left, right) => {
     const a = `${left.kind}:${left.path}`;
     const b = `${right.kind}:${right.path}`;
     return a < b ? -1 : a > b ? 1 : 0;
@@ -382,6 +420,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     || admitted.admission.courseSourceSha256 !== expectedCourse.courseSourceSha256
     || admitted.admission.courseDecisionSha256 !== expectedCourse.courseDecisionSha256
     || packet.request.taskId !== options.taskId || packet.request.projectId !== options.projectId
+    || canonicalJson(packet.coordinatorOnly?.signedQualityImportAnchor ?? null) !== canonicalJson(signedImportAnchor ?? null)
     || packet.request.trigger !== (options.trigger ?? "T1")
     || packet.request.sessionBinding?.sessionId !== id
     || packet.candidate.base !== candidateFor(preflight).base
@@ -462,6 +501,7 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
       packetId: request.packetId,
       trigger: request.trigger,
       route: request.route,
+      ...(request.signedQualityImportAnchor === undefined ? {} : { signedQualityImportAnchor: request.signedQualityImportAnchor }),
       ...(request.event === null ? {} : {
         eventOutPath: request.event.eventOutPath,
         featureId: request.event.featureId ?? { state: "not-applicable" },

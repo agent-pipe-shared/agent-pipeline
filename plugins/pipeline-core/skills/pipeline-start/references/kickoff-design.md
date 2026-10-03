@@ -35,6 +35,23 @@ whether anything else in that diff has real security surface. A scaffolding
 file riding along with ordinary feature code forces that heavier tier onto
 work that needed only the standard review.
 
+Before the first scaffolding commit, prepare a Conventional Commit message
+file in ignored `scratch/`. A bootstrap message can use:
+
+```text
+chore(pipeline): initialize project scaffolding
+
+Dispatch: stage-0 (elephant)
+AI-Assisted: true
+```
+
+Keep these two trailers together at the end of the message. Provider
+`Co-Authored-By` trailers are refused. Later dispatched work uses its actual
+dispatch attribution. Run ordinary `git commit --file <message-file>`
+through the installed hooks. A commit creates no plan approval; implementation
+paths still require the approved lifecycle, and protected authority changes
+retain their exact integration authorization.
+
 Neither `kickoff apply` nor `kickoff promote apply` (`applyOnboardingKickoff`/
 `applyOnboardingKickoffPromotion`, `lib/onboarding-continuity.mjs`) ever
 touches Git — by design, the same as the onboarding transaction referenced

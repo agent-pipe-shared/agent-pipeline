@@ -200,14 +200,20 @@ export function updateAutonomousSettings({ targetFile }) {
 }
 
 export function refreshAntigravityInstallation(options, dependencies = {}) {
-  const host = createAntigravityRefreshHost({ ...options, ...dependencies, writeInstalledReceipt: dependencies.writeInstalledReceipt ?? writeLocalDevelopmentInstalledPluginReceipt });
+  const receiptSourceRoot = options.attestationSourceRoot ?? options.approvedSourceRoot;
+  if (receiptSourceRoot !== options.approvedSourceRoot) {
+    const checked = verifyAntigravityInstallerSource({ configRoot: options.configRoot, workspaceRoot: options.workspaceRoot, sourcePluginRoot: options.approvedSourceRoot, attestationSourceRoot: receiptSourceRoot, scope: options.scope }, dependencies);
+    if (checked.status === "rejected") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: checked.reason, completed: [] };
+  }
+  const receiptWriter = dependencies.writeInstalledReceipt ?? writeLocalDevelopmentInstalledPluginReceipt;
+  const host = createAntigravityRefreshHost({ ...options, ...dependencies, writeInstalledReceipt: input => receiptWriter({ ...input, sourcePluginRoot: receiptSourceRoot }) });
   const plan = host.prepare();
   if (plan.status !== "prepared") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: plan.reason, completed: [] };
   return host.apply(plan);
 }
 
 /** Check that any copy which may execute can receive a source-bound receipt. */
-export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, sourcePluginRoot, scope }, {
+export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, sourcePluginRoot, scope, attestationSourceRoot = sourcePluginRoot }, {
   observeTopology = observeAntigravityPluginTopology,
   observeSource = observeRunnerPublicCoreIdentity,
 } = {}) {
@@ -215,8 +221,11 @@ export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, so
   if (topology.source.status !== "observed" || topology.managed.status === "unavailable") {
     return { status: "rejected", reason: "ATR-SOURCE-UNVERIFIABLE" };
   }
-  if (scope === "workspace" && topology.managed.candidates.length === 0) return { status: "direct-root" };
-  const source = observeSource("antigravity", { sourcePluginRoot, installedPluginRoot: sourcePluginRoot });
+  if (scope === "workspace" && topology.managed.candidates.length === 0 && attestationSourceRoot === sourcePluginRoot) return { status: "direct-root" };
+  // A selected gitless marketplace copy must match the approved clean Git source.
+  // The observer checks the entire physical copy; a manifest/hash assertion supplied
+  // by the copy itself is never treated as Git provenance.
+  const source = observeSource("antigravity", { sourcePluginRoot: attestationSourceRoot, installedPluginRoot: sourcePluginRoot });
   return source?.status === "ready"
     ? { status: "attestable-source" }
     : { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE" };
@@ -265,9 +274,10 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     try {
       const configRoot = join(homedir(), ".gemini");
       if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
-      const sourceCheck = verifyAntigravityInstallerSource({ configRoot, workspaceRoot: process.cwd(), sourcePluginRoot: corePluginPath, scope: answer.trim() === "2" ? "global" : "workspace" });
+      const attestationSourceRoot = useMarketplace ? SCRIPT_DIR : corePluginPath;
+      const sourceCheck = verifyAntigravityInstallerSource({ configRoot, workspaceRoot: process.cwd(), sourcePluginRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace" });
       if (sourceCheck.status === "rejected") throw new Error(`${sourceCheck.reason}: run this installer from an approved clean Git source checkout`);
-      const result = refreshAntigravityInstallation({ configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() });
+      const result = refreshAntigravityInstallation({ configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() });
       console.log(JSON.stringify(result));
       if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");
     } catch (error) {
@@ -278,12 +288,9 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     }
 
     if (useMarketplace) {
-      // Antigravity registers and loads this exact directory.  Unlike a
-      // separate cache copy, the registered physical root is the explicit
-      // operator-selected development source and preflight verifies that
-      // exact non-symlinked binding.  Do not manufacture a second source
-      // locator or require a receipt for this direct-root topology.
-      console.log("Direct local marketplace root selected; registry binding is the provenance boundary.");
+      // Keep the selected physical marketplace registration. Managed copies carry
+      // a receipt back to the approved Git checkout, after exact copy readback.
+      console.log("Local marketplace copy verified against the approved Git checkout; exact selected root remains registered.");
     }
 
     console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);

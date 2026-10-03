@@ -21,6 +21,9 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { main as onboardingCli } from "./project-onboarding-v3.mjs";
+import { captureClaudeIntakePrompt } from "../lib/claude-intake-prompt-capture.mjs";
+import { captureClaudeInitialPromptPointer } from "../lib/claude-initial-prompt-pointer.mjs";
+import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
 
 function freshDir(prefix) {
   return mkdtempSync(join(tmpdir(), `project-onboarding-argv-${prefix}-`));
@@ -124,6 +127,41 @@ function commitGlobalHumanApproval(root, mode) {
   assert.equal(committed.status, 0, committed.stderr);
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function prepareUnconsentedInitialPromptCheckpoint(root) {
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
+  const observed = readOnboardingIntakeCheckpoint({ rootDir: root });
+  const value = { ...observed.value, consent: null, updatedAt: observed.value.createdAt, revision: 0 };
+  delete value.contentSha256;
+  value.contentSha256 = createHash("sha256").update(Buffer.from(canonicalJson(value), "utf8")).digest("hex");
+  writeFileSync(observed.paths.checkpoint, `${JSON.stringify(value)}\n`, { mode: 0o600 });
+  return observed;
+}
+
+function prepareGeneratePlanFixture(root) {
+  const consent = invoke(["intake-consent-apply", "--root", root, "--granted",
+    "--git-author-name", "Plan Fixture", "--git-author-email", "plan@example.invalid",
+    "--language", "en", "--profile", "feature", "--activate", "--runner", "claude"]);
+  assert.equal(consent.status, 0, consent.output);
+  const capture = invoke(["intake-capture-apply", "--root", root, "--text", "Build a local keyboard game.",
+    "--activate", "--runner", "claude"]);
+  assert.equal(capture.status, 0, capture.output);
+  const answers = JSON.stringify([
+    { question: "What is the primary goal?", answer: "Ship a keyboard-playable local game." },
+    { question: "How is it verified?", answer: "Run the repository verify script." },
+  ]);
+  const answered = invoke(["intake-design-questions-apply", "--root", root, "--answers-json", answers,
+    "--activate", "--runner", "claude"]);
+  assert.equal(answered.status, 0, answered.output);
+}
+
 test("project-onboarding-v3 accepts a digest-bound existing project file without a scratch copy", () => {
   const dir = neutralGitFixture("intake-reference");
   try {
@@ -140,19 +178,113 @@ test("project-onboarding-v3 accepts a digest-bound existing project file without
     assert.equal(captured.status, 0, captured.output);
     const checkpoint = JSON.parse(captured.output).checkpoint;
     assert.equal(checkpoint.materialInput[0].sha256, digest);
-    const unsupported = invoke(["intake-capture-apply", "--root", dir,
-      "--text-turn-ref", "host:current-user-turn", "--activate", "--runner", "claude"]);
-    assert.equal(unsupported.status, 2, unsupported.output);
-    assert.match(unsupported.output, /INTAKE-CHAT-TURN-CAPTURE-UNAVAILABLE/u);
+    const malformed = invoke(["intake-consent-apply", "--root", dir, "--granted", "--activate",
+      "--text-turn-ref", "{not-json", "--runner", "claude"]);
+    assert.equal(malformed.status, 2, malformed.output);
+    assert.match(malformed.output, /INTAKE-CHAT-TURN-REFERENCE-INVALID/u);
+    assert.equal(readOnboardingIntakeCheckpoint({ rootDir: dir }).value.consent.granted, true,
+      "the canonical consent transition occurs before parsing or consuming a turn reference");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("project-onboarding-v3 CLI: generated intake cannot bypass its acknowledgement before bootstrap binding", () => {
-  const dir = neutralGitFixture("bootstrap-bind-e2e");
+test("project-onboarding-v3 resolves only canonical Claude prompt references after consent", () => {
+  const dir = neutralGitFixture("claude-turn-reference");
+  let captureDir;
+  try {
+    const initial = prepareUnconsentedInitialPromptCheckpoint(dir);
+    const initialPrompt = "## First prompt\nKeep this private until consent.\n";
+    const transcriptPath = join(dir, "host-session", "first.jsonl");
+    const initialEvent = {
+      hook_event_name: "UserPromptSubmit", session_id: "cli-session-initial",
+      prompt_id: "550e8400-e29b-41d4-a716-446655440010", transcript_path: transcriptPath,
+      cwd: dir, prompt: initialPrompt,
+    };
+    const pointer = captureClaudeInitialPromptPointer(initialEvent);
+    assert.equal(pointer.status, "available");
+    mkdirSync(join(dir, "host-session"), { recursive: true });
+    writeFileSync(transcriptPath, `${JSON.stringify({
+      type: "user", uuid: "650e8400-e29b-41d4-a716-446655440010", sessionId: initialEvent.session_id,
+      timestamp: "2026-10-02T12:00:00.000Z", version: "2.1.196",
+      message: { role: "user", content: [{ type: "text", text: initialPrompt }] },
+    })}\n`);
+
+    const consented = invoke(["intake-consent-apply", "--root", dir, "--granted",
+      "--git-author-name", "Turn Fixture", "--git-author-email", "turn@example.invalid",
+      "--language", "en", "--profile", "feature", "--text-turn-ref", JSON.stringify(pointer.reference),
+      "--activate", "--runner", "claude"]);
+    assert.equal(consented.status, 0, consented.output);
+    assert.equal(JSON.parse(consented.output).capture.evidence.sha256,
+      createHash("sha256").update(initialPrompt).digest("hex"));
+
+    captureDir = neutralGitFixture("claude-turn-capture");
+    const captureConsent = invoke(["intake-consent-apply", "--root", captureDir, "--granted",
+      "--git-author-name", "Capture Fixture", "--git-author-email", "capture@example.invalid",
+      "--language", "en", "--profile", "feature", "--activate", "--runner", "claude"]);
+    assert.equal(captureConsent.status, 0, captureConsent.output);
+    const capturePrompt = "## Follow-up input\nUse the native prompt capture reference.\n";
+    const captureEvent = {
+      hook_event_name: "UserPromptSubmit", session_id: "cli-session-capture",
+      transcript_path: join(captureDir, "host-session", "capture.jsonl"), cwd: captureDir, prompt: capturePrompt,
+    };
+    const capturedReference = captureClaudeIntakePrompt(captureEvent);
+    assert.equal(capturedReference.status, "available");
+    const wrongRootReference = invoke(["intake-capture-apply", "--root", captureDir, "--text-turn-ref",
+      JSON.stringify({ ...capturedReference.reference, transcriptPath: "/outside/claimed.jsonl" }),
+      "--activate", "--runner", "claude"]);
+    assert.equal(wrongRootReference.status, 2, wrongRootReference.output);
+    assert.match(wrongRootReference.output, /CLAUDE-INTAKE-REFERENCE-SHAPE/u);
+    assert.equal(readOnboardingIntakeCheckpoint({ rootDir: captureDir }).value.materialInput.length, 0,
+      "a rejected extra path field adds no capture bytes");
+
+    const captured = invoke(["intake-capture-apply", "--root", captureDir, "--text-turn-ref",
+      JSON.stringify(capturedReference.reference), "--activate", "--runner", "claude"]);
+    assert.equal(captured.status, 0, captured.output);
+    const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: captureDir }).value;
+    assert.equal(checkpoint.materialInput.length, 1);
+    assert.equal(checkpoint.materialInput[0].sha256, createHash("sha256").update(capturePrompt).digest("hex"));
+    assert.equal(initial.paths.root, dir);
+  } finally {
+    if (captureDir) rmSync(captureDir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("intake-generate-plan defaults to a digest-stable summary and requires --verbose for the full payload", () => {
+  const dir = neutralGitFixture("generate-plan-summary");
+  try {
+    prepareGeneratePlanFixture(dir);
+    const defaultResult = invoke(["intake-generate-plan", "--root", dir, "--runner", "claude"]);
+    const summaryResult = invoke(["intake-generate-plan", "--root", dir, "--runner", "claude", "--summary"]);
+    const verboseResult = invoke(["intake-generate-plan", "--root", dir, "--runner", "claude", "--verbose"]);
+    assert.equal(defaultResult.status, 0, defaultResult.output);
+    assert.equal(summaryResult.status, 0, summaryResult.output);
+    assert.equal(verboseResult.status, 0, verboseResult.output);
+    const summary = JSON.parse(defaultResult.output);
+    assert.deepEqual(JSON.parse(summaryResult.output), summary, "legacy --summary remains an alias for the default");
+    const full = JSON.parse(verboseResult.output);
+    assert.equal(summary.schema, "pipeline.onboarding-intake-generate-plan-summary.v1");
+    assert.equal(full.schema, "pipeline.onboarding-intake-generate-plan.v1");
+    assert.equal(summary.planSha256, full.planSha256);
+    assert.deepEqual(summary.nextAction, full.nextAction);
+    assert.deepEqual(Object.fromEntries(Object.entries(summary.targets).map(([key, target]) => [key, target.afterSha256])),
+      Object.fromEntries(Object.entries(full.targets).map(([key, target]) => [key, target.afterSha256])));
+    assert.equal(summary.fullPlanAction.argv.includes("--verbose"), true);
+    const fullAction = invoke(summary.fullPlanAction.argv.slice(1));
+    assert.equal(fullAction.status, 0, fullAction.output);
+    assert.deepEqual(JSON.parse(fullAction.output), full);
+    const conflict = invoke(["intake-generate-plan", "--root", dir, "--summary", "--verbose"]);
+    assert.equal(conflict.status, 2, conflict.output);
+    assert.match(conflict.output, /--summary and --verbose cannot be used together/u);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("project-onboarding-v3 CLI: mini retains early acknowledgement while feature and epic wait for the final package", () => {
+  for (const profile of ["mini", "feature", "epic"]) {
+  const dir = neutralGitFixture("bootstrap-bind-e2e-" + profile);
   try {
     let result = invoke(["intake-consent-apply", "--root", dir, "--granted",
       "--git-author-name", "Test Author", "--git-author-email", "test@example.com",
-      "--language", "en", "--profile", "feature", "--activate"]);
+      "--language", "en", "--profile", profile, "--activate"]);
     assert.equal(result.status, 0, result.output);
 
     result = invoke(["intake-capture-apply", "--root", dir, "--text", "requirement material one", "--activate"]);
@@ -171,10 +303,18 @@ test("project-onboarding-v3 CLI: generated intake cannot bypass its acknowledgem
     assert.equal(result.status, 0, result.output);
 
     result = invoke(["bootstrap-bind-plan", "--root", dir]);
-    assert.equal(result.status, 2, result.output);
-    assert.match(result.output, /KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING/u);
+    if (profile === "mini") {
+      assert.equal(result.status, 2, result.output);
+      assert.match(result.output, /KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING/u);
+    } else {
+      assert.equal(result.status, 0, result.output);
+      const bindPlan = JSON.parse(result.output);
+      assert.equal(bindPlan.targets.state.value.planApproved, false, "binding the unsigned design must not approve implementation");
+      assert.equal(bindPlan.nextAction.argv.includes("bootstrap-bind-apply"), true);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
   }
 });
 
