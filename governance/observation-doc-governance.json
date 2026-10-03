@@ -120,6 +120,8 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/0.7-alfred-transfer-2026-09-30.md",
+          "docs/0.7-greenfield-resume-2026-10-02.md",
+          "docs/0.7-local-test-handover-2026-10-02.md",
           "docs/artifact-topology.md",
           "docs/audit-bundles-technical.md",
           "docs/bootstrap-step-accounting.md",
