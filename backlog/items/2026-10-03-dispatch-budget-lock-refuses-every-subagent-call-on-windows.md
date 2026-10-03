@@ -37,6 +37,15 @@ generated obligations tell a Goldfish to run the preflight, or which exact
 (backslash) spelling is admitted on Windows (see
 `2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md`).
 
+Addendum (same day): non-Pipeline subagents (`general-purpose`) are also
+refused on their first Write with `GUARD-BOOTSTRAP-RECEIPT-MISSING`. The remedy,
+running the preflight, is a `node` invocation that briefings commonly forbid
+and that the runner's auto-mode classifier may deny. That was observed for the
+first operator-hotfix dispatch, which wrote nothing in 9 tool calls. A retry
+whose briefing mandated the exact preflight as first act succeeded. An operator
+hotfix package for the installed copy was prepared under
+`scratch/hotfix-budget-lock-win32/`; the source fix remains Spec §21.4 R4-4.
+
 ## Acceptance
 
 - The counter lock has a cross-platform owner identity (for example
