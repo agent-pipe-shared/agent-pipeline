@@ -5,7 +5,7 @@
 
 **Release state:** version `0.6.3` · tag `v0.6.3` · commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` · tree `6821503f8f4fd72ed31459cb843d97bf8bfaa049` · status `published`
 
-**Current transfer 2026-10-02:** [Shutdown / Resume](0.7-greenfield-resume-2026-10-02.md): repairs saved, tests partly failing; no new qualified candidate or signature ready.
+**Current recovery 2026-10-03:** [Recovery / repair checkpoint](0.7-recovery-2026-10-03.md): runtime ready; Alfred design/draft; cleanup complete. Product fixes and verification remain open.
 
 **Transfer 2026-09-30:** [Alfred 0.7 feature checkpoint and exact resume notes](0.7-alfred-transfer-2026-09-30.md). This branch transfer is not a qualified release.
 

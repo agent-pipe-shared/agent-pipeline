@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": true,
-  "updatedAt": "2026-09-28T20:15:14.873Z",
+  "planApproved": false,
+  "updatedAt": "2026-10-03T11:29:06.577Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -399,7 +399,7 @@
   "activeFeature": {
     "id": "sprint-alfred-epic",
     "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-    "phase": "implementation",
+    "phase": "design",
     "phaseHistory": [
       {
         "phase": "implementation",
@@ -428,6 +428,10 @@
       {
         "phase": "implementation",
         "at": "2026-09-28T19:32:41.934Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-03T11:29:06.577Z"
       }
     ]
   },
@@ -491,10 +495,10 @@
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-alfred-epic",
-    "invalidatedSubmissionSha256": "2d9e55a353c63ab548fbd80ce39d9346ffa336c0bf0421136485da288e0d7389",
-    "invalidatedApprovalSha256": null,
-    "invalidatedBy": "codex",
-    "invalidatedAt": "2026-09-27T19:19:34.288Z",
+    "invalidatedSubmissionSha256": "825bc9ea882cc9116845eb9d6f2fd4e0e24b259ce7e3612cbbd7b58cf963b5c1",
+    "invalidatedApprovalSha256": "491d2d6fc78b2adbd7ca232c0b33997a090dff24969f3ffd5c041ba01f18bd01",
+    "invalidatedBy": "APS",
+    "invalidatedAt": "2026-10-03T11:29:06.577Z",
     "reason": "reopen-design"
   },
   "planMixedStateRecovery": {
