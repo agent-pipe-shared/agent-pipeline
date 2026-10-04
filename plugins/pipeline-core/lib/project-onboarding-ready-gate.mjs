@@ -198,6 +198,77 @@ function validVerifyCommandInput(value) {
     && value.rejectNul === true;
 }
 
+// ALFRED-W0-4 (backlog 2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes):
+// writer/observer conformance for `nextAction`. designToImplementationHandoverAction()
+// (project-onboarding-v3.mjs) publishes two more closed shapes in the `approved` and
+// `implementing` lifecycle states than this gate used to know -- the deterministic
+// `materialize-architecture` command and the `reopen-design` collect-input/apply pair
+// (architecture evidence invalid or the approval stale). Neither was admitted, so a project in
+// that state was observed as PORG-INVALID-OBSERVATION: a shape verdict, not a not-ready verdict,
+// which carries no lifecycleStatus and therefore reached none of the status-keyed recovery lanes.
+// Both shapes stay as closed as the four above: exact key sets, exact argv, exact flags.
+const REOPEN_DESIGN_ACTOR_PLACEHOLDER = "<recovery actor's name>";
+
+// The producer binds both shapes to its own resolved `../scripts/pipeline-state.mjs`
+// (PO_AUTHORITY_REBIND_WRITER, the same expression as PIPELINE_STATE_SCRIPT above). Pin them to that
+// exact path, as validPlanLifecycleInspectCommand() does -- a basename comparison would admit a
+// same-named script in any other directory as an action the driver is told to execute.
+function validPipelineStateScript(value) {
+  return typeof value === "string" && value === PIPELINE_STATE_SCRIPT;
+}
+
+function validMaterializeArchitectureCommand(value) {
+  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && value.kind === "command"
+    && value.executable === "node"
+    && Array.isArray(value.argv)
+    && value.argv.length === 2
+    && validPipelineStateScript(value.argv[0])
+    && value.argv[1] === "materialize-architecture"
+    && value.mutation === true
+    && value.requiresConfirmation === false
+    && exactKeys(value.expected, ["schema", "statuses"])
+    && value.expected.schema === "pipeline.architecture-design-materialization.v1"
+    && JSON.stringify(value.expected.statuses) === JSON.stringify(["materialized"]);
+}
+
+function validReopenDesignCommand(value) {
+  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && value.kind === "command"
+    && value.executable === "node"
+    && Array.isArray(value.argv)
+    && value.argv.length === 4
+    && validPipelineStateScript(value.argv[0])
+    && JSON.stringify(value.argv.slice(1)) === JSON.stringify(["reopen-design", "--by", REOPEN_DESIGN_ACTOR_PLACEHOLDER])
+    && value.mutation === true
+    && value.requiresConfirmation === true
+    && validReadyExpected(value.expected);
+}
+
+function validReopenDesignActorInput(value) {
+  return exactKeys(value, ["name", "encoding", "trim", "minBytes", "maxBytes", "singleLine", "rejectNul"])
+    && value.name === "by"
+    && value.encoding === "utf8"
+    && value.trim === true
+    && value.minBytes === 1
+    && value.maxBytes === 128
+    && value.singleLine === true
+    && value.rejectNul === true;
+}
+
+function validReopenDesignCollectAction(value) {
+  return exactKeys(value, ["kind", "inputs", "mutation", "requiresConfirmation", "guidance", "applyAction"])
+    && value.kind === "collect-input"
+    && Array.isArray(value.inputs)
+    && value.inputs.length === 1
+    && validReopenDesignActorInput(value.inputs[0])
+    && value.mutation === false
+    && value.requiresConfirmation === false
+    && typeof value.guidance === "string"
+    && value.guidance.length > 0
+    && validReopenDesignCommand(value.applyAction);
+}
+
 function validRunnerPermissionsPlanner(value, root) {
   return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
     && value.kind === "command"
@@ -215,6 +286,8 @@ function validReadyNextAction(value, root) {
   if (value === null) return true;
   if (validPlanLifecycleInspectCommand(value)) return true;
   if (validImplementationHandoverCommand(value)) return true;
+  if (validMaterializeArchitectureCommand(value)) return true;
+  if (validReopenDesignCollectAction(value)) return true;
   return exactKeys(value, [
     "kind", "input", "mutation", "requiresConfirmation", "guidance", "applyAction", "expected",
   ])

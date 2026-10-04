@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -471,6 +471,201 @@ test("the unconfigured-verify handover exception is exact about its input and pl
       }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ALFRED-W0-4 (backlog 2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes):
+// the `approved` and `implementing` lifecycle states publish two more closed nextAction shapes than the
+// gate used to know -- the deterministic `materialize-architecture` command and the `reopen-design`
+// collect-input/apply pair (designToImplementationHandoverAction() in project-onboarding-v3.mjs). A gate that
+// does not know a shape the producer emits turns a recoverable lifecycle state into PORG-INVALID-OBSERVATION,
+// a SHAPE verdict that carries no lifecycleStatus and so reaches none of the status-keyed recovery lanes.
+// The fixtures below are the producer's literals (that function is module-private); the conformance test
+// pins them against the producer's source text so a drifting producer fails here, loudly, not in the field.
+const REOPEN_DESIGN_ACTOR_PLACEHOLDER = "<recovery actor's name>";
+const REOPEN_STALE_GUIDANCE = "The current approval is stale. Collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.";
+const REOPEN_INVALID_EVIDENCE_GUIDANCE = "The approved PRD is immutable and its architecture evidence is invalid (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.";
+const FOREIGN_PLUGIN_SCRIPTS = join(tmpdir(), "foreign-plugin", "scripts");
+
+function materializeArchitectureAction() {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [PIPELINE_STATE_SCRIPT, "materialize-architecture"],
+    mutation: true,
+    requiresConfirmation: false,
+    expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
+  };
+}
+
+function reopenDesignAction(guidance = REOPEN_STALE_GUIDANCE) {
+  return {
+    kind: "collect-input",
+    inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+    mutation: false,
+    requiresConfirmation: false,
+    guidance,
+    applyAction: {
+      kind: "command",
+      executable: "node",
+      argv: [PIPELINE_STATE_SCRIPT, "reopen-design", "--by", REOPEN_DESIGN_ACTOR_PLACEHOLDER],
+      mutation: true,
+      requiresConfirmation: true,
+      expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
+    },
+  };
+}
+
+// What the producer publishes per lifecycle status (v3 :3041 stale approval, :3048 materialization required,
+// :3055-3060 invalid architecture evidence; the last two only in `approved` / `implementing`).
+const NEW_SHAPE_PRODUCER_CASES = [
+  { lifecycleStatus: "approved", name: "materialization required", build: materializeArchitectureAction },
+  { lifecycleStatus: "approved", name: "architecture evidence invalid", build: () => reopenDesignAction(REOPEN_INVALID_EVIDENCE_GUIDANCE) },
+  { lifecycleStatus: "approved", name: "stale approval", build: () => reopenDesignAction() },
+  { lifecycleStatus: "implementing", name: "materialization required", build: materializeArchitectureAction },
+  { lifecycleStatus: "implementing", name: "architecture evidence invalid", build: () => reopenDesignAction(REOPEN_INVALID_EVIDENCE_GUIDANCE) },
+];
+
+function assertInvalidObservation(nextAction, label) {
+  const path = root();
+  try {
+    const observed = readyResultWithPushApprovalKeys(path, "session", "claude");
+    observed.nextAction = nextAction;
+    assert.throws(() => requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "claude",
+      inspect: () => observed,
+    }), (error) => error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-INVALID-OBSERVATION"
+      && error.lifecycleStatus === null, label);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+}
+
+test("the materialize-architecture and reopen-design shapes the producer publishes in approved and implementing are admitted", () => {
+  const path = root();
+  try {
+    for (const { lifecycleStatus, name, build } of NEW_SHAPE_PRODUCER_CASES) {
+      for (const runner of ["claude", "codex", "antigravity"]) {
+        const observed = readyResultWithPushApprovalKeys(path, "session", runner);
+        observed.nextAction = build();
+        const result = requireProjectOnboardingReady({
+          rootDir: path,
+          intent: "session",
+          runner,
+          inspect: () => observed,
+        });
+        assert.deepEqual(result, {
+          schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
+          status: "ready",
+          intent: "session",
+        }, `${lifecycleStatus} / ${name} / ${runner}`);
+      }
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("the new-shape fixtures mirror the literals the producer publishes (drift of project-onboarding-v3.mjs fails here)", () => {
+  const producer = readFileSync(fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url)), "utf8");
+  for (const literal of [
+    `const PO_AUTHORITY_REBIND_WRITER = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));`,
+    `const byToken = "${REOPEN_DESIGN_ACTOR_PLACEHOLDER}";`,
+    `inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],`,
+    `[PO_AUTHORITY_REBIND_WRITER, "reopen-design", "--by", byToken], true, true,`,
+    `"pipeline.project-onboarding.v4", ["ready"]),`,
+    `[PO_AUTHORITY_REBIND_WRITER, "materialize-architecture"],`,
+    `"pipeline.architecture-design-materialization.v1",`,
+    `["materialized"],`,
+    REOPEN_STALE_GUIDANCE,
+    REOPEN_INVALID_EVIDENCE_GUIDANCE.replace(" (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED)", " (${architecture.code ?? \"ARCHITECTURE-DESIGN-INVALID\"})"),
+  ]) {
+    assert.ok(producer.includes(literal), `the producer no longer contains the literal this suite mirrors: ${literal.slice(0, 90)}`);
+  }
+});
+
+test("the materialize-architecture exception is exact about its keys, argv, flags and expected result", () => {
+  const mutations = [
+    ["extra key", (a) => { a.pendingAsks = []; }],
+    ["missing key", (a) => { delete a.expected; }],
+    ["extra argv", (a) => { a.argv.push("--force"); }],
+    ["wrong flag instead of the subcommand", (a) => { a.argv[1] = "--materialize-architecture"; }],
+    ["other subcommand", (a) => { a.argv[1] = "approve-plan"; }],
+    ["missing subcommand", (a) => { a.argv = [a.argv[0]]; }],
+    ["non-node executable", (a) => { a.executable = "bash"; }],
+    ["execPath instead of node", (a) => { a.executable = process.execPath; }],
+    ["wrong script basename", (a) => { a.argv[0] = join(FOREIGN_PLUGIN_SCRIPTS, "not-pipeline-state.mjs"); }],
+    ["same basename in a foreign directory", (a) => { a.argv[0] = join(FOREIGN_PLUGIN_SCRIPTS, "pipeline-state.mjs"); }],
+    ["non-string script", (a) => { a.argv[0] = null; }],
+    ["mutation false", (a) => { a.mutation = false; }],
+    ["confirmation required", (a) => { a.requiresConfirmation = true; }],
+    ["other expected schema", (a) => { a.expected.schema = "pipeline.other.v1"; }],
+    ["extra expected status", (a) => { a.expected.statuses = ["materialized", "ready"]; }],
+    ["empty expected statuses", (a) => { a.expected.statuses = []; }],
+    ["extra expected key", (a) => { a.expected.extra = true; }],
+    ["collect-input kind", (a) => { a.kind = "collect-input"; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const action = materializeArchitectureAction();
+    mutate(action);
+    assertInvalidObservation(action, `materialize-architecture: ${label}`);
+  }
+});
+
+test("the reopen-design exception is exact about its input, placeholder-bound apply argv, flags and confirmation", () => {
+  const mutations = [
+    ["extra key on the collect action", (a) => { a.unexpected = true; }],
+    ["top-level expected on the collect action", (a) => { a.expected = { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] }; }],
+    ["extra key on the apply action", (a) => { a.applyAction.unexpected = true; }],
+    ["missing apply action", (a) => { delete a.applyAction; }],
+    ["empty guidance", (a) => { a.guidance = ""; }],
+    ["non-string guidance", (a) => { a.guidance = null; }],
+    ["collect action mutating", (a) => { a.mutation = true; }],
+    ["collect action requiring confirmation", (a) => { a.requiresConfirmation = true; }],
+    ["no inputs", (a) => { a.inputs = []; }],
+    ["two inputs", (a) => { a.inputs.push({ ...a.inputs[0], name: "extra" }); }],
+    ["input name", (a) => { a.inputs[0].name = "verifyCommand"; }],
+    ["input upper bound", (a) => { a.inputs[0].maxBytes = 4096; }],
+    ["input lower bound", (a) => { a.inputs[0].minBytes = 0; }],
+    ["input trim", (a) => { a.inputs[0].trim = false; }],
+    ["input extra key", (a) => { a.inputs[0].unexpected = true; }],
+    ["apply subcommand", (a) => { a.applyAction.argv[1] = "set-phase"; }],
+    ["apply wrong flag", (a) => { a.applyAction.argv[2] = "--actor"; }],
+    ["apply forced flag", (a) => { a.applyAction.argv[2] = "--force"; }],
+    ["apply extra argv", (a) => { a.applyAction.argv.push("--phase", "implementation"); }],
+    ["apply without the placeholder", (a) => { a.applyAction.argv.pop(); }],
+    ["apply with a concrete actor in place of the placeholder", (a) => { a.applyAction.argv[3] = "po"; }],
+    ["apply with a reworded placeholder", (a) => { a.applyAction.argv[3] = "<recovery actor>"; }],
+    ["apply with a padded placeholder", (a) => { a.applyAction.argv[3] = `${REOPEN_DESIGN_ACTOR_PLACEHOLDER} `; }],
+    ["apply with an empty actor", (a) => { a.applyAction.argv[3] = ""; }],
+    ["apply wrong script basename", (a) => { a.applyAction.argv[0] = join(FOREIGN_PLUGIN_SCRIPTS, "not-pipeline-state.mjs"); }],
+    ["apply same basename in a foreign directory", (a) => { a.applyAction.argv[0] = join(FOREIGN_PLUGIN_SCRIPTS, "pipeline-state.mjs"); }],
+    ["apply non-node executable", (a) => { a.applyAction.executable = "bash"; }],
+    ["apply not mutating", (a) => { a.applyAction.mutation = false; }],
+    ["apply without confirmation", (a) => { a.applyAction.requiresConfirmation = false; }],
+    ["apply other expected schema", (a) => { a.applyAction.expected.schema = "pipeline.other.v1"; }],
+    ["apply other expected statuses", (a) => { a.applyAction.expected.statuses = ["partial"]; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const action = reopenDesignAction();
+    mutate(action);
+    assertInvalidObservation(action, `reopen-design: ${label}`);
+  }
+});
+
+test("the new shapes are bound to the plugin's own resolved pipeline-state.mjs, not to a basename in any directory", () => {
+  const foreign = [
+    join(FOREIGN_PLUGIN_SCRIPTS, "pipeline-state.mjs"),
+    "/other/pipeline-state.mjs",
+    "pipeline-state.mjs",
+    "./scripts/pipeline-state.mjs",
+  ];
+  for (const script of foreign) {
+    const materialize = materializeArchitectureAction();
+    materialize.argv[0] = script;
+    assertInvalidObservation(materialize, `materialize-architecture via ${script}`);
+    const reopen = reopenDesignAction();
+    reopen.applyAction.argv[0] = script;
+    assertInvalidObservation(reopen, `reopen-design via ${script}`);
+  }
 });
 
 // NVA-T-READYKEYS DoD 2: a genuinely unexpected extra key beyond the thirteen still fails
