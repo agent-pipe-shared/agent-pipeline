@@ -219,3 +219,53 @@ test("source drift during the child run prevents publishing a readiness receipt"
   await assert.rejects(() => runRunnerDesignReadinessBootstrap(bootstrapArgs(fx), deps), /differs from the selected Git candidate/u);
   assert.throws(() => readFileSync(join(fx.root, fx.receiptPath)), { code: "ENOENT" });
 });
+
+// ---------- Operator hotfix 7: the Claude --json-schema argument carries no top-level $schema/$id ----------
+// Defect (pre-hotfix): buildRunnerReadinessArgs passed the readiness model-output schema to `claude --json-schema` unchanged, including its
+// top-level `$schema` and `$id` metadata, which the Claude CLI schema argument does not accept (the run failed before producing output).
+// The Claude argument now omits exactly those two top-level keys; the caller's schema object is not mutated and every other argv entry,
+// the Antigravity argv and the argument validation are unchanged.
+import { buildRunnerReadinessArgs } from "./runner-design-readiness-bootstrap.mjs";
+import { designReadinessModelOutputSchema } from "../lib/design-readiness-host-evidence.mjs";
+
+const HF7_OID = "a".repeat(40);
+const hf7Schema = () => designReadinessModelOutputSchema({ runner: "claude", dispatchId: "dispatch-1", candidate: { commit: HF7_OID, tree: HF7_OID }, sources: { input: { path: "a.md", sha256: "b".repeat(64) } } });
+const hf7Request = (runner, schema) => ({ runner, model: "m-test", effort: "medium", prompt: "p", schema });
+const hf7FlagValue = (argv) => argv[argv.indexOf("--json-schema") + 1];
+
+test("hotfix 7: claude --json-schema parses to the input schema minus the top-level $schema/$id, and the input schema is not mutated", () => {
+  const schema = hf7Schema();
+  assert.equal(typeof schema.$schema, "string", "precondition: the producer carries the metadata");
+  assert.equal(typeof schema.$id, "string", "precondition: the producer carries the metadata");
+  const snapshot = structuredClone(schema);
+  const sent = JSON.parse(hf7FlagValue(buildRunnerReadinessArgs(hf7Request("claude", schema))));
+  assert.equal(Object.hasOwn(sent, "$schema"), false, "pre-hotfix the sent schema still carried $schema");
+  assert.equal(Object.hasOwn(sent, "$id"), false, "pre-hotfix the sent schema still carried $id");
+  const expected = structuredClone(snapshot);
+  delete expected.$schema;
+  delete expected.$id;
+  assert.deepEqual(sent, expected, "only the two top-level metadata keys are removed");
+  assert.deepEqual(schema, snapshot, "the caller's schema object is untouched");
+});
+
+test("hotfix 7: claude argv differs from the antigravity/plain shape only in the --json-schema value, and a schema without the metadata is passed through byte for byte", () => {
+  const schema = hf7Schema();
+  const argv = buildRunnerReadinessArgs(hf7Request("claude", schema));
+  const flag = argv.indexOf("--json-schema") + 1;
+  assert.ok(flag > 0);
+  assert.equal(argv[flag], JSON.stringify(Object.fromEntries(Object.entries(schema).filter(([key]) => key !== "$schema" && key !== "$id"))));
+  assert.deepEqual([argv[0], argv.includes("--print")], ["--print", true]);
+  const plain = hf7Schema();
+  delete plain.$schema;
+  delete plain.$id;
+  assert.equal(hf7FlagValue(buildRunnerReadinessArgs(hf7Request("claude", plain))), JSON.stringify(plain));
+});
+
+test("hotfix 7: antigravity still carries the full schema and the argument validation is unchanged", () => {
+  const schema = hf7Schema();
+  const argv = buildRunnerReadinessArgs(hf7Request("antigravity", schema));
+  assert.deepEqual(JSON.parse(hf7FlagValue(argv)), schema);
+  for (const bad of [{ ...hf7Request("claude", schema), runner: "other" }, { ...hf7Request("claude", schema), model: "" }, { ...hf7Request("claude", schema), schema: null }]) {
+    assert.throws(() => buildRunnerReadinessArgs(bad), /readiness runner invocation is invalid/u);
+  }
+});
