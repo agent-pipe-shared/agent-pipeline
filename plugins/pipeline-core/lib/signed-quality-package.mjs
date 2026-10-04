@@ -58,6 +58,36 @@ const own = (value, keys) => value !== null && typeof value === "object" && !Arr
 const digest = (value) => createHash("sha256").update(value, "utf8").digest("hex");
 const fail = (code) => ({ ok: false, code });
 
+/**
+ * Operator hotfix 11: compare physical identities, not spellings. Git for Windows reports `D:/Dev/repo`
+ * while Node's resolve() spells the same directory `D:\Dev\repo` (drive/folder case may differ too), so a
+ * string comparison of a Git-reported path with a Node-resolved path can never succeed on win32. Both sides
+ * go through realpath; case is folded on win32 only (NTFS is case-insensitive, while a case-sensitive POSIX
+ * filesystem must keep distinguishing /a/B from /a/b). Fails closed on any error or non-absolute input.
+ */
+export function gitReportedPathIsSamePhysicalPath(gitReportedPath, nodePath) {
+  try {
+    if (typeof gitReportedPath !== "string" || gitReportedPath === "" || !isAbsolute(gitReportedPath)) return false;
+    const identity = (path) => (process.platform === "win32" ? realpathSync(resolve(path)).toLocaleLowerCase("en-US") : realpathSync(resolve(path)));
+    return identity(gitReportedPath) === identity(nodePath);
+  } catch { return false; }
+}
+
+/**
+ * Operator hotfix 11 (part 2): the POSIX mode-bit privacy term of the receipt checks applies only where the platform has mode
+ * bits (Spec 21.4 platform parity, register K3-10). Node reports every regular file on native Windows as mode 0o666 whatever
+ * mode was requested at creation, so `mode & 0o077` can never be 0 there and every receipt this module wrote itself would be
+ * refused. Only this one term is skipped on win32; every other receipt check stays exactly as it was (regular file, no symlink,
+ * nlink 1, size bounds, name and schema, the proof verified against the committed trust policy, the staged-index binding).
+ * Windows privacy of the receipt directory relies on the user-profile and `.git` ACLs (documented in the hotfix README), and the
+ * receipt's authority never rested on file privacy: it is re-verified by signature and index equality on every read.
+ * `platform` is injectable for tests only; every production call site uses the default.
+ */
+export function receiptModeBitsRefused(mode, platform = process.platform) {
+  if (platform === "win32") return false;
+  return !Number.isInteger(mode) || (mode & 0o077) !== 0;
+}
+
 function runGit(root, args, input = undefined) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
   if (result.error || result.status !== 0) throw new Error(`QUALITY-PACKAGE-GIT-${args[0]}`);
@@ -130,7 +160,7 @@ function committedTrustPolicy(root, proof) {
   // Presence, regular blob mode, index and worktree equality are independently
   // established. Authority is selected from HEAD bytes, never a caller's path.
   try {
-    if (realpathSync(root) !== root || runGit(root, ["rev-parse", "--show-toplevel"]).trim() !== root) return null;
+    if (realpathSync(root) !== root || !gitReportedPathIsSamePhysicalPath(runGit(root, ["rev-parse", "--show-toplevel"]).trim(), root)) return null;
     const path = join(root, QUALITY_PACKAGE_POLICY_PATH);
     if (!physicalQualityPackageFile(path, root, 32768)) return null;
     const entry = runGit(root, ["ls-tree", "HEAD", "--", QUALITY_PACKAGE_POLICY_PATH]).trim();
@@ -182,7 +212,7 @@ function safeAuthorizationDirectory(path) {
 function matchingExistingReceipt(target, receipt) {
   try {
     const stat = lstatSync(target);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.mode & 0o077) return false;
+    if (!stat.isFile() || stat.isSymbolicLink() || receiptModeBitsRefused(stat.mode)) return false;
     const existing = JSON.parse(readFileSync(target, "utf8"));
     return canonical(existing) === canonical(receipt);
   } catch { return false; }
@@ -221,7 +251,7 @@ export function verifyQualityPackageCommitAuthorization({ repoRoot } = {}) {
   try { names = readdirSync(directory).filter((name) => /^[a-f0-9]{64}\.json$/u.test(name)).sort(); } catch { return fail("QUALITY-PACKAGE-COMMIT-ABSENT"); }
   for (const name of names) {
     let receipt;
-    try { const stat = lstatSync(join(directory, name)); if (!stat.isFile() || stat.isSymbolicLink() || stat.mode & 0o077) continue; receipt = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
+    try { const stat = lstatSync(join(directory, name)); if (!stat.isFile() || stat.isSymbolicLink() || receiptModeBitsRefused(stat.mode)) continue; receipt = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
     if (!own(receipt, ["schema", "packageIntent", "proof"]) || receipt.schema !== QUALITY_PACKAGE_COMMIT_AUTHORIZATION_SCHEMA) continue;
     const paths = validatePackage(receipt.packageIntent);
     if (!paths || name !== `${receipt.packageIntent.intentSha256}.json` || paths.includes("project/critical-human-proof.json")) continue;
@@ -255,7 +285,7 @@ function readExactAuthorization(root, intentSha256) {
   catch (error) {
     return fail(error?.code === "ENOENT" ? "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-ABSENT" : "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
   }
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0 || stat.size === 0 || stat.size > 16 * 1024 * 1024) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || receiptModeBitsRefused(stat.mode) || stat.size === 0 || stat.size > 16 * 1024 * 1024) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
   try {
     const receipt = JSON.parse(readFileSync(target, "utf8"));
     if (!own(receipt, ["schema", "packageIntent", "proof"]) || receipt.schema !== QUALITY_PACKAGE_COMMIT_AUTHORIZATION_SCHEMA) return fail("QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
