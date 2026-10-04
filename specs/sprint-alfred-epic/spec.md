@@ -1470,6 +1470,14 @@ Contract:
     result bound to the dispatch (§17). Where a runner has no such route, the
     preflight reports `unavailable` with a reason code, and presentation and
     close are refused. They are never silently downgraded.
+  - A runner-native subagent (for example a Claude `Agent` dispatch) counts as a
+    host-observed child only when the runner's hook layer itself records its
+    dispatch start, enforces read-only effects on every tool call (write tools
+    and write-capable shell lanes refused for the role), and records its
+    terminal result bound to the dispatch id; a model-authored claim of any of
+    these facts does not count. The preflight names the mechanism used
+    (`cli-child` or `hook-observed-subagent`), and a role whose runner offers
+    neither is `unavailable`.
   - A fallback Advisor dispatch is recorded in a dispatch→result record that
     binds the template digest, the exact sent prompt digest, the native
     subagent id and the result digest (closes K3-6). The fallback Advisor runs
@@ -1550,7 +1558,10 @@ Acceptance cases:
 - R4-2: A fallback Advisor result is accepted with the label. A fallback result
   offered as readiness, Critic or plan-verifier evidence is refused by the
   package/close validator. A fallback Advisor's Write is refused. A result
-  whose binding equals the implementor dispatch is refused.
+  whose binding equals the implementor dispatch is refused. A Claude Critic
+  subagent result is accepted as Critic evidence only with the hook-recorded
+  start, per-call read-only enforcement and terminal binding; a result missing
+  any of them, or a role call that reached a write tool, is refused.
 - R4-3: Antigravity: the `feature` profile reaches readiness and Critic through
   host-observed children; a subagent completes Read and Write after its
   bootstrap step; a resumed session after more than 30 minutes is observed as
