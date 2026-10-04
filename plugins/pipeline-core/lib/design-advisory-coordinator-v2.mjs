@@ -4,7 +4,7 @@ import {resolve} from 'node:path';
 import {resolvePoGateRepositoryTopology,derivePoGateRepositoryFingerprint} from './po-gate-authority.mjs';
 import {loadRunnerProfilesV3Registry} from './runner-profiles-v3.mjs';
 import {SOURCE_NAMES,createInitialAdvisorContext,designAdvisorValueSha256,freezeCourseJson,exactCourseObject} from './design-advisor-course.mjs';
-import {createDesignAdvisorCourseStore} from './design-advisor-course-store.mjs';
+import {createDesignAdvisorCourseStore,readCurrentDesignAdvisorCourseWithInitialContext} from './design-advisor-course-store.mjs';
 import {observeAdvisorCandidate,observeInitialAdvisorSources} from './design-advisor-provenance.mjs';
 import {isCodexAdvisorExecution,getCodexAdvisorExecutionAdmission} from './codex-advisor-execution.mjs';
 import {isNativeInitialAdvisorExecution,nativeInitialAdvisorRunner,nativeInitialAdvisorNoChildRoute} from './native-initial-advisor-execution.mjs';
@@ -71,4 +71,23 @@ export async function coordinateInitialDesignAdvisory({repoRoot,featureId,author
  const report=executed.report,receipt=executed.receipt;if(!report||!receipt)return fail('DAC2-ANSWER-PROJECTION');
  const consultation=freezeCourseJson({courseId:opened.courseId,initialContextSha256:initial.contextSha256,dispatch:input.dispatch,questionSha256:initial.context.questionSha256,evidenceSha256:initial.context.evidenceSha256,receiptSha256:terminal.terminalObservation.advisoryReceipt.sha256,answerSha256:terminal.terminalObservation.answerSha256,reportCanonicalSha256:terminal.terminalObservation.reportCanonicalSha256,proposalSetSha256:terminal.terminalObservation.proposalSetSha256});
  return {ok:true,status:'answered',schema:'pipeline.design-advisory-coordinator-result.v2',initialContext:initial.context,courseBinding,consultation,receipt,receiptBytes:Buffer.from(executed.receiptBytes),report,hostReceipt:executed.hostReceipt,course:terminal,implementationAuthority:false};
+}
+/** Operator hotfix 4: re-derive, with no child, no write and no new cycle, the exact first-run no-child
+ * export inputs of a terminal native (Claude/Antigravity) course from the private store. null = not
+ * applicable (the caller keeps its refusal); a refusal never fabricates bytes the store does not hold. */
+export function rederiveNativeNoChildAdvisory({repoRoot,featureId,authoringDispatchId,sources,runner,existing}={}){
+ if(!['claude','antigravity'].includes(runner)||existing?.status!=='reuse-terminal'||existing.outcome!=='unavailable'||!Array.isArray(existing.attempts)||existing.attempts.length!==0)return null;
+ let topology;try{topology=resolvePoGateRepositoryTopology(resolve(repoRoot));}catch{return fail('DAC2-TOPOLOGY');}
+ const repoFingerprint=derivePoGateRepositoryFingerprint(topology),registry=loadRunnerProfilesV3Registry();
+ const read=readCurrentDesignAdvisorCourseWithInitialContext({gitCommonDir:topology.gitCommonDir,repoFingerprint,featureId,runner,registry});
+ if(read.status!=='reuse-terminal'||read.courseId!==existing.courseId||read.stateSha256!==existing.stateSha256||read.outcome!=='unavailable'||!Array.isArray(read.attempts)||read.attempts.length!==0)return fail('DAC2-REEXPORT-STORE-DRIFT');
+ const initialContext=read.initialContext,o=read.terminalObservation;
+ if(designAdvisorValueSha256(initialContext)!==read.initialContextSha256||!exactCourseObject(o,['courseBinding','outcome','code','childStarted','inputSubmitted','attemptCount'])||!same(o.courseBinding,{courseId:read.courseId,initialContextSha256:read.initialContextSha256,reservationId:read.reservationId})||o.outcome!==read.outcome||o.childStarted!==false||o.inputSubmitted!==false||o.attemptCount!==0)return fail('DAC2-REEXPORT-NOT-NO-CHILD');
+ if(initialContext.featureId!==featureId||initialContext.authoringDispatchId!==authoringDispatchId||!same(initialContext.sources,sources))return fail('DAC2-REEXPORT-SOURCE-DRIFT');
+ if(initialContext.routePolicySha256!==designAdvisorValueSha256(registry))return fail('DAC2-REEXPORT-ROUTE-POLICY');
+ const candidate=observeAdvisorCandidate(resolve(repoRoot));
+ if(candidate.commit!==initialContext.initialCandidate.commit||candidate.tree!==initialContext.initialCandidate.tree)return {...fail('DAC2-REEXPORT-CANDIDATE-DRIFT'),initialCandidate:initialContext.initialCandidate,candidate};
+ const slot=nativeInitialAdvisorNoChildRoute({runner,registry});if(!slot)return fail('DAC2-REGISTERED-SLOT');
+ const courseBinding=freezeCourseJson({courseId:read.courseId,initialContextSha256:read.initialContextSha256,reservationId:read.reservationId,slot:slot.slot,routeStepSha256:slot.routeStepSha256});
+ return {ok:false,status:'unavailable-pending-final-approval',code:o.code,initialContext,courseBinding,course:existing,failureEvidence:freezeCourseJson({schema:'pipeline.design-advisor-failure.v1',courseBinding,outcome:read.outcome,code:o.code,phase:'preparation',childStarted:false,inputSubmitted:false,attemptCount:0,observation:o}),hostReceipt:null,receipt:null,report:null,rederived:true,implementationAuthority:false};
 }

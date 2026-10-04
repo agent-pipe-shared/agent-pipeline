@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Explicit one-course native Advisor entry. Session bootstrap never calls it. */
 import {randomUUID,createHash} from 'node:crypto';
-import {existsSync,lstatSync,realpathSync,writeFileSync,readFileSync} from 'node:fs';
-import {dirname,resolve,join,relative} from 'node:path';
+import {existsSync,lstatSync,mkdirSync,realpathSync,writeFileSync,readFileSync} from 'node:fs';
+import {dirname,resolve,join,relative,sep} from 'node:path';
 import {createNativeCodexDesignAdvisorExecution,inspectCodexInitialAdvisorMetadata} from './codex-design-advisor-host.mjs';
 import {coordinateInitialDesignAdvisory} from '../lib/design-advisory-coordinator-v2.mjs';
 import {advisorPublicPath,ADVISOR_SOURCE_NAMES} from '../lib/codex-advisor-request.mjs';
@@ -20,13 +20,18 @@ export function parseCodexDesignAdvisorArgs(argv){
  if(!args['repo-root']||!id(args['feature-id'])||!id(args['authoring-dispatch-id'])||!['epic','feature'].includes(args.profile)||!oid(args['expected-commit'])||!oid(args['expected-tree'])||!advisorPublicPath(args['output-prefix'])||ADVISOR_SOURCE_NAMES.some(n=>!args.sources[n])||new Set(ADVISOR_SOURCE_NAMES.map(n=>args.sources[n].path)).size!==5)throw Error(USAGE);
  return args;
 }
-export function exportCodexDesignAdvisorArtifacts(root,prefix,result){
+export function exportCodexDesignAdvisorArtifacts(root,prefix,result,{resume=false}={}){
  const artifacts=[['initial',Buffer.from(canonicalJson(result.initialContext))],['course-binding',Buffer.from(canonicalJson(result.courseBinding))]];
  if(result.status==='answered')artifacts.push(['receipt',Buffer.from(result.receiptBytes)],['report',Buffer.from(canonicalJson(result.report))],['consultation',Buffer.from(canonicalJson(result.consultation))]);
  else if(result.status==='unavailable-pending-final-approval'&&result.failureEvidence){artifacts.push(['failure',Buffer.from(canonicalJson(result.failureEvidence))]);if(result.receiptBytes)artifacts.push(['receipt',Buffer.from(result.receiptBytes)]);}
  else throw Error('CADB-PUBLIC-RESULT');
- const targets=artifacts.map(([name,bytes])=>{const ref=prefix+'.'+name+'.json',path=resolve(root,ref);if(!advisorPublicPath(ref)||relative(root,path).startsWith('..')||existsSync(path))throw Error('CADB-PUBLIC-TARGET');let parent=root;for(const p of relative(root,dirname(path)).split('/').filter(Boolean)){parent=join(parent,p);const s=lstatSync(parent);if(!s.isDirectory()||s.isSymbolicLink()||realpathSync(parent)!==parent)throw Error('CADB-PUBLIC-TARGET');}if(bytes.length>65536)throw Error('CADB-PUBLIC-BOUND');return {ref,path,bytes};});
- const refs={};for(let i=0;i<targets.length;i++){const t=targets[i];writeFileSync(t.path,t.bytes,{flag:'wx',mode:0o600});const s=lstatSync(t.path);if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1||realpathSync(t.path)!==t.path||!readFileSync(t.path).equals(t.bytes))throw Error('CADB-PUBLIC-READBACK');refs[artifacts[i][0]]={path:t.ref,sha256:sha(t.bytes)};}return refs;
+ // Hotfix 4: every target is validated before any directory is created or file written. resume (only for a
+ // store re-derived no-child result) admits an existing target solely as a physical, byte-identical file.
+ const present=path=>{try{lstatSync(path);return true;}catch(e){if(e?.code==='ENOENT')return false;throw e;}};
+ const targets=artifacts.map(([name,bytes])=>{const ref=prefix+'.'+name+'.json',path=resolve(root,ref);if(!advisorPublicPath(ref)||relative(root,path).startsWith('..')||(!resume&&existsSync(path)))throw Error('CADB-PUBLIC-TARGET');if(bytes.length>65536)throw Error('CADB-PUBLIC-BOUND');let exists=false;if(resume&&present(path)){const s=lstatSync(path);if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1||realpathSync(path)!==path||!readFileSync(path).equals(bytes))throw Error('CADB-PUBLIC-TARGET');exists=true;}return {ref,path,bytes,exists};});
+ // Output directory: created one platform segment at a time (sep, not '/'); each segment keeps the physical check.
+ for(const t of targets){let parent=root;for(const p of relative(root,dirname(t.path)).split(sep).filter(Boolean)){parent=join(parent,p);try{mkdirSync(parent);}catch(e){if(e?.code!=='EEXIST')throw e;}const s=lstatSync(parent);if(!s.isDirectory()||s.isSymbolicLink()||realpathSync(parent)!==parent)throw Error('CADB-PUBLIC-TARGET');}}
+ const refs={};for(let i=0;i<targets.length;i++){const t=targets[i];if(!t.exists)writeFileSync(t.path,t.bytes,{flag:'wx',mode:0o600});const s=lstatSync(t.path);if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1||realpathSync(t.path)!==t.path||!readFileSync(t.path).equals(t.bytes))throw Error('CADB-PUBLIC-READBACK');refs[artifacts[i][0]]={path:t.ref,sha256:sha(t.bytes)};}return refs;
 }
 export async function runCodexDesignAdvisorBootstrap(argv=process.argv.slice(2),{newCourseParentId=null,observeInitialCourseDecision,familyPorts=null}={}){
  const args=parseCodexDesignAdvisorArgs(argv),root=realpathSync(args['repo-root']);if(root!==resolve(args['repo-root']))throw Error('CADB-PHYSICAL-ROOT');
