@@ -17,14 +17,16 @@ is preserved unchanged.
 
 ## Integrated outcome and existing scope
 
-Deliver one candidate across the established five tracks and eighteen work
-packages. Track A measures enforcement and protects controls, design
-authority and lifecycle evidence. Track B derives rigor and routes legitimate
-work. Track C measures interruptions, dispatch/Verify economics and cadence.
-Track D makes agent-first architecture decisions, standards, fitness and
-adoption usable. Track E freezes shared contracts and qualifies the exact
-candidate. Detailed contracts, schemas and acceptance remain in PRD §§2–7,
-Spec §§3–15 and `acceptance.md`.
+Deliver one candidate across the established five tracks and nineteen work
+packages (A1–A5, B1–B3, C1–C3, D1–D4, E1–E4). Track A measures enforcement and
+protects controls, design authority and lifecycle evidence. Track B derives
+rigor and routes legitimate work. Track C measures interruptions,
+dispatch/Verify economics and cadence. Track D makes agent-first architecture
+decisions, standards, fitness and adoption usable. Track E freezes shared
+contracts, adds the provider-free AGY dispatch spike (E3) and native-runner
+Goldfish host-commit (E4, Spec §8.2), and qualifies the exact candidate.
+Detailed contracts, schemas and acceptance remain in PRD §§2–7, Spec §§3–15
+and `acceptance.md`.
 
 | Track | Integrated responsibility | Detail |
 | --- | --- | --- |
@@ -46,23 +48,30 @@ bypassed; source tests do not prove installed plugin identity.
 ## Recovery-availability amendment
 
 The latest user requirement and sanitized Toolbox handover are indexed in
-`design-input.md` and specified in
+`design-input.md` and specified in Spec §20 and
 [`design/recovery-availability-2026-10-03.md`](design/recovery-availability-2026-10-03.md).
-This is additive proposed design, not a claim that the handover was verified
-live or that recovery source is implemented. Recovery is an implemented epic
-deliverable (Spec §20.3, RV-1…RV-7), owned by the implementation wave for the
+This is additive design, not a claim that the handover was verified live or
+that recovery source is implemented. Recovery is an implemented epic
+deliverable (Spec §20.3, RV-1…RV-11), owned by the implementation wave for the
 remaining Alfred work and sequenced after R4.
 
 Use three levels: evidence-preserving repair for a closed known shape;
 existing GMW/HGO within current authority while verifier and proof remain
-valid; and a proposed attended external source/install route when bootstrap,
-lifecycle or verifier failure prevents safe in-session work. The external
-route is a pinned standalone Node CLI using built-ins only, trusted by an
-attended operator outside the broken runner. It uses detached human Ed25519
-authorization, exact bounded Pipeline code/test paths, owner-private
-preimages, repository/plugin identity, lock/CAS, a journaled per-file atomic
-prefix and exact readback. State, runtime-private evidence, proofs, trust
-anchors and unrelated configuration remain with sanctioned writers.
+valid; and an attended external source/install route, an implemented 0.7.0
+deliverable (PO decision 2026-10-04 #1), when bootstrap, lifecycle or verifier
+failure prevents safe in-session work. The external route is a pinned
+standalone Node CLI using built-ins only, trusted by an attended operator
+outside the broken runner through an operator-selected artifact and public
+signer anchor. It uses detached human Ed25519 authorization, exact bounded
+Pipeline code/test paths, owner-private preimages, repository/plugin identity,
+lock/CAS, a journaled per-file atomic prefix, exact post-image readback and
+forward-only crash recovery. State, runtime-private evidence, proofs, trust
+anchors and unrelated configuration remain with sanctioned writers. Its full
+contract is Spec §20.1 and its acceptance RV-8…RV-11. "There must always be a
+repair route" means no dead end: where safe repair is impossible (unknown
+owner, missing proof/key/trust, ambiguous bytes) the Pipeline returns a typed
+result naming the concrete attended prerequisite, after which the route applies
+(PO decision #15).
 
 Live or ambiguous owners are not reclaimed by age. Source distinguishes V2
 `ownerRuntime: null` (`unavailable`) from V1 field-absent (`unobserved`);
@@ -98,10 +107,13 @@ count:
   one more signed (or chat-confirmed), commit-bound approval; enrollment and
   key setup are one-time acts
 - R4: role-route preflight (a fallback self-dispatch may substitute only the
-  labelled, non-authorizing Advisor duty; readiness, Critic and plan-verifier
-  need host-observed children), Antigravity route defaults, a cross-platform
-  budget lock, the trusted runner-CLI location on Windows, and the readiness
-  child contract
+  labelled, non-authorizing Advisor duty; readiness is a host-observed CLI
+  child, while the Critic and plan-verifier on Claude and Antigravity are
+  hook-observed native subagents whose hook coverage R4 measures, and the role
+  is unavailable until it is), all-or-nothing model-family approval (PO
+  decision 2026-10-04 #2, Spec §21.4, R4-11), Antigravity route defaults, a
+  cross-platform budget lock, the trusted runner-CLI location on Windows, and
+  the readiness child contract
 - R5: a simplified design-course coordinator, one revision cycle on every
   runner, and one trailer contract
 - R6: a multi-runner transcript reader, an audit index and a host-path check
@@ -110,13 +122,23 @@ count:
 design revision cycle on 2026-10-03. Its corrections are applied in the five
 sources themselves: complete register ownership, the counting rule for PO
 decisions, the Advisor-only fallback, fail-closed `scratch/` execution, the
-end-to-end scenario with its host matrix, and recovery ownership. No separate
+end-to-end scenario with its host matrix, and recovery ownership. A second
+revision on 2026-10-04 answers the second independent readiness review the
+same way: an owner and cases for the model-family decision, the external
+recovery route's full contract and acceptance, the Critic/plan-verifier
+mechanism, acceptance for the remaining PO decisions, the work-package count
+(nineteen, with an E4 section in Spec §8.2) and the sequencing. No separate
 document carries them and no separate document carries binding force beyond
-the approved sources. This paragraph is provenance only, not Advisor or readiness evidence.
+the approved sources. This paragraph is provenance only, not Advisor or
+readiness evidence.
 
 **Sequencing.**
 
-1. R1 and R2 come first: they block every runner's design course.
+0. Wave 0: the E1 contract freeze and the verbatim port of the operator
+   hotfixes into the source tree.
+1. R1 and R2 come next: they block every runner's design course. The A1/C1
+   measurement work interleaves after R1, because it needs R1's admission
+   catalogue.
 2. The R4 Windows platform fixes and the route preflight follow, because
    Goldfish dispatch on Windows depends on them.
 3. R3, R5 and R6 then run as parallel slices through one hook-and-commit-policy

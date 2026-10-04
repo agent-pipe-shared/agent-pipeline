@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 9c89f81b4919586da9ed13f442c582cc1519edd9637f0e4d03da4ad2a273de3e -->
+<!-- technical-spec-sha256: 291a212fcda05c53e8e172cdc1a1a899ab19c065e9462aecb73277e180277b47 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -260,7 +260,7 @@ Goldfish/Critic sessions on any supported runner; hosted projects
   produces a typed refusal or recorded push-boundary debt, never a silent
   pass.
 
-## 4. Scope — five tracks, eighteen work packages
+## 4. Scope — five tracks, nineteen work packages (A1–A5, B1–B3, C1–C3, D1–D4, E1–E4)
 
 Track/WP detail, mechanisms, schemas, and file paths: [`spec.md`](spec.md).
 Mapping to issues/backlog: intake docs. Summary:
@@ -592,13 +592,22 @@ named in `spec.md` §12 and `acceptance.md`:
     repair itself.** Keep intrinsic known-shape repair and existing scoped
     GMW/HGO within their current authority; for other refusal classes provide
     an attended external handoff or typed unavailable result with a concrete
-    prerequisite. The external source/install protocol and P1 legacy owner
-    boundary are specified in `spec.md` §20 and
-    `design/recovery-availability-2026-10-03.md`. Recovery is an implemented
-    epic deliverable: it is owned by the implementation wave for the remaining
-    Alfred work, sequenced after R4 (Spec §21.7), and accepted by RV-1…RV-7
-    (Spec §20.3). Implementation, evidence, review and PO disposition remain
-    open.
+    prerequisite. The attended external route is an implemented 0.7.0
+    deliverable (PO decision 2026-10-04 #1): a pinned standalone Node CLI with
+    built-ins only, an operator-selected external artifact and public signer
+    anchor, a detached human Ed25519 authorization bound to repository
+    identity, exact bounded code/test paths and owner-private preimages, a
+    per-file journaled atomic prefix under lock/CAS with exact post-image
+    readback, and forward-only crash recovery; State, runtime-private
+    evidence, proofs, trust anchors and unrelated plugin configuration are
+    excluded. "There must always be a repair route" means no dead end: where
+    safe repair is impossible the result is typed unavailable naming the
+    concrete attended prerequisite (PO decision #15). The full contract and the
+    P1 legacy owner boundary are in `spec.md` §20 (and
+    `design/recovery-availability-2026-10-03.md`). Recovery is owned by the
+    implementation wave for the remaining Alfred work, sequenced after R4
+    (Spec §21.7), and accepted by RV-1…RV-11 (Spec §20.3). Implementation,
+    evidence, review and PO disposition remain open.
 12. **All three runners walk the happy path with two PO decisions per
     feature.** Claude (native Windows and POSIX), Codex and Antigravity
     complete onboarding, design, Advisor, plan approval, implementation and
@@ -622,7 +631,11 @@ named in `spec.md` §12 and `acceptance.md`:
   from the Nova clone base ends.
 - **A-2:** The measured subagent-hook gap is runner-version behavior, not
   spec. *Risk either direction* — A1 makes it a measurement, so the design
-  does not depend on which way it resolves.
+  does not depend on which way it resolves. The Critic and plan-verifier on
+  Claude and Antigravity run as hook-observed native subagents (PO decision
+  2026-10-04 #14), which holds only where the hook layer is measured to fire in
+  subagents (Spec §21.4, R4-12); until measured, the role is `unavailable` and
+  presentation and close are refused.
 - **A-3:** OKF v0.1 remains available and digest-pinnable. *Fallback:* the
   representation contract is pluggable by construction; the pin decision is
   an ADR that can be superseded through D1's own machinery.
@@ -631,10 +644,14 @@ named in `spec.md` §12 and `acceptance.md`:
   remains report-only with explicit evidence debt, never a calibrated PASS.
   The PO decision of 2026-09-13 removes only the fixed calendar wait; evidence
   quality and explicit promotion approval remain required.
-- **A-5:** Epic scale. 18 WPs across 5 tracks is large; the design keeps
-  C2's range-mode tail and parts of B2 explicitly droppable, and every wave
-  ends PO-visible, so scope can be cut at wave boundaries without breaking
-  the integrated outcome. *This is the PRD's honest statement that Alfred is
+- **A-5:** Epic scale. 19 WPs across 5 tracks, the six findings-round
+  workstreams R1–R6 (Spec §21) and the recovery route (Spec §20) are large;
+  the design keeps C2's range-mode tail and parts of B2 explicitly droppable,
+  and every wave ends PO-visible, so scope can be cut at wave boundaries
+  without breaking the integrated outcome. R1–R6 and recovery are not part of
+  the droppable tail: AC-32 makes the findings round complete only when it
+  passes on the host matrix, and recovery is a complete 0.7.0 deliverable (PO
+  decision 2026-10-04 #1). *This is the PRD's honest statement that Alfred is
   a multi-week epic, not a sprint-sized batch.*
 
 ## 9. PO decisions (decided 2026-08-28 at the gate)
@@ -699,8 +716,9 @@ executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
 | External research | `design/external-research.md` → D2 representation pin, D3 deterministic-pass rule, A1 rationale, positioning |
 | 2026-08-27 incidents | `docs/state.md` current section; the two filed items → A4/A5, C1 seed codes |
 | 2026-09-27 three-runner greenfield findings | `design/greenfield-0.7-remediation-2026-09-27.md` → five non-overlapping implementation slices, exact backlog acceptance, host readbacks and candidate evidence |
-| 2026-10-03 recovery request and handover | `design-input.md` and `design/recovery-availability-2026-10-03.md` → proposed recovery levels and P1 archival boundary; handover is reported narrative, not verified live evidence |
+| 2026-10-03 recovery request and handover | `design-input.md` and `design/recovery-availability-2026-10-03.md` → recovery levels, the attended external route (implemented in 0.7.0, PRD §7.11, Spec §20, RV-1…RV-11) and P1 archival boundary; handover is reported narrative, not verified live evidence |
 | 2026-10-03 findings round (PO observations, three-runner greenfield analyses, live bootstrap defects) | `design/greenfield-0.7-findings-round-2026-10-03.md` → source-verified register K1–K9 (77 IDs); PRD §14; Spec §21 R1–R6; complete ID map in `traceability.md` |
+| PO decisions of 2026-10-03 and 2026-10-04 (#1–#15) | `design-input.md` → each decision's owner and acceptance case in the "PO decisions → owner and case" section of `traceability.md` |
 
 The agent submits the 2026-09-27 amendment autonomously after preparing the
 design and required evidence. No separate PO content acknowledgement or
@@ -772,13 +790,15 @@ A sanctioned repository uninstall unregisters mechanics and preserves all source
 This bounded addition responds to the latest recovery requirement preserved
 in `design-input.md`: a repair path must remain available when ordinary
 in-session maintenance cannot safely proceed. It does not replace or reduce
-the existing five-track, eighteen-work-package scope, the 2026-09-27
+the existing five-track, nineteen-work-package scope, the 2026-09-27
 greenfield increment, or the 2026-09-28 activation/topology/uninstall work.
 
 The design has three levels: evidence-preserving repair for a closed known
 shape; existing scoped GMW/HGO only while their verifier and proof remain
-valid; and a proposed attended external route independent of a broken runner
-for verifier/lifecycle failures. The P1 handover is a sanitized narrative,
+valid; and an attended external route independent of a broken runner for
+verifier/lifecycle failures, which is an implemented 0.7.0 deliverable (PO
+decision 2026-10-04 #1) whose full contract is in `spec.md` §20.1. The P1
+handover is a sanitized narrative,
 not verified live output. It does not prove receipt truncation, owner death or
 a source fix or descriptor schema. Source inspection distinguishes V2
 `ownerRuntime: null` (`unavailable`) from V1 field-absent (`unobserved`);
@@ -794,7 +814,7 @@ authority. State, `activeFeature`, proofs, history and resources remain
 unchanged. Details and acceptance cases are in
 `spec.md` §20.
 
-The recovery route is an implemented epic deliverable (Spec §20.3, RV-1…RV-7),
+The recovery route is an implemented epic deliverable (Spec §20.3, RV-1…RV-11),
 owned by the implementation wave for the remaining Alfred work and sequenced
 after R4. Until it is implemented and evidenced, this section is design
 material only: it does not satisfy the PRD/Spec PO gate, enter implementation,
@@ -867,18 +887,29 @@ The complete register-ID-to-owner map, with its count, is `traceability.md`.
   4. Every signature-mode push needs a signature. "Two approvals" counts per
      feature: plan plus the single happy-path push.
 
-**PO decisions (2026-10-04).** Recorded in `design-input.md` (twelve items) and
-reflected in Spec §21: complete recovery route in 0.7.0; all-or-nothing
-model-family activation with fallback to the older selectable release;
+**PO decisions (2026-10-04).** Recorded in `design-input.md` (fifteen items;
+each with its owner and acceptance case in `traceability.md`) and reflected in
+Spec §§18, 20 and 21: complete recovery route in 0.7.0, including the attended
+external route (Spec §20, RV-1…RV-11); all-or-nothing model-family activation
+with fallback to the older selectable release (owner R4, Spec §21.4, R4-11);
 Antigravity readiness/Critic/Advisor enabled without prior measurement, with
 typed failures; unmarked Codex Goldfish dispatches refused unless explicitly
 declined; signing window from hand-over (60 min default); `stage-0 (elephant)`
 as the only Elephant design trailer; re-enrollment as one one-time act;
 Antigravity lock with a labelled compatibility fallback; uninstall refuses
 foreign hooks with a clear code; chat-mode confirmations in session;
-`standing-approved` checkpoint pushes unchanged. Overarching requirement:
+`standing-approved` checkpoint pushes unchanged. The design course is agent-only:
+the PO runs no terminal command, places no file and signs nothing during design
+except the single final approval (Spec §21.0, design-input #16). Overarching requirement:
 every change works for all runners and all platforms in consuming user
-repositories, not only in this source checkout (Spec §21.0).
+repositories, not only in this source checkout (Spec §21.0). Further decisions
+of the same day: a new Advisor course (child of the previous terminal course)
+is explicitly confirmed for the revised design (#13); Critic and plan-verifier
+on Claude and Antigravity run as hook-observed native subagents, with the hook
+coverage in subagents measured and the role `unavailable` until it is (#14,
+Spec §21.4, R4-12); "there must always be a repair route" means no dead end,
+with a typed result naming the concrete attended prerequisite where safe repair
+is impossible (#15, Spec §20.1, RV-11).
 
 **Non-goals.** No weakening of credential-root protection, the independence of
 Critic and Advisor, template-only briefings, or the release/main promotion

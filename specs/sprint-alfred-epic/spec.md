@@ -769,6 +769,34 @@ explicit provider scope, model, sandbox expectation, time limit, no-write
 task, output redaction, and signed/read-back evidence; it is not released by
 this spike.
 
+### 8.2 E4 — native-runner Goldfish host-commit (PO-directed scope extension, 2026-09-27)
+
+**Purpose and boundary.** Claude and Codex direct native Goldfish dispatches may
+opt in to the host-owned commit boundary through separate runner-native start
+and return bindings. The contract below is the Spec home of PRD §4 Track E E4
+and PRD §7.10; its acceptance is AC-25. E4 is local host-observed evidence, not
+provider attestation, and it is independent of E3's fake-executable seam.
+
+**Contract.**
+
+- **Binding.** Each runner-native return correlates to exactly one prelaunch
+  dispatch, candidate, configured model, role and allowed write scope.
+- **Admitted diff.** Only a validated exact final return and its admitted paths
+  can be host-committed; the host commits only the validated returned diff.
+  Ordinary Git hooks stay enabled.
+- **Order.** Exact commit readback, then a private host-observation receipt,
+  then the authored v4 record, which is published last.
+- **Assurance.** The result is local host-observed evidence. A fresh clone
+  without a separately approved signed export remains `UNVERIFIABLE`.
+- **No authority without evidence.** A malformed, ambiguous, interrupted or
+  missing-evidence case, and any unsupported or ambiguous dispatch shape, has no
+  host-commit authority and is never recorded as authored PASS or authored
+  success.
+- **Codex pre-dispatch check.** Host-commit requirements are stated in the
+  briefing template and checked before dispatch; an unmarked Codex Goldfish
+  dispatch is refused before launch unless its briefing states
+  `Host commit: not-requested (reason: …)` (§21.4 Codex bullet, R4-5).
+
 ## 9. Schema registry (new in Alfred)
 
 | Schema id | Owner | Notes |
@@ -1042,7 +1070,7 @@ Every hook and nested Pipeline effect producer checks activation before role/inp
 
 A shared Antigravity topology observer reports bounded physical managed/imported/global/workspace and external Pipeline hook identities with explicit errors. Source fixtures, isolated CLI precedence facts and live executed-source readback are separate assurance classes. A host-owned convergent refresh binds a concrete approved-source/topology plan and preserves unrelated configuration. No global cleanup follows implicitly from a per-project operation.
 
-Uninstall derives ownership/footprint independently from existing authority/projection/hook records and uses a digest-bound resumable journal. Remove owned Git shims before implementation/private state; strip exact owned keys; unregister exact workspace mechanics; persist decline; archive/remove admissible private state last. Foreign/modified/shared-worktree artifacts are preserved or yield explicit conflict. Readback checks executable bindings rather than banning textual plugin references in retained content. Kept digests, local hook-active Git commit/push, fault-boundary resume, re-onboarding and stale-cache-hook fixtures are required.
+Uninstall derives ownership/footprint independently from existing authority/projection/hook records and uses a digest-bound resumable journal. Remove owned Git shims before implementation/private state; strip exact owned keys; unregister exact workspace mechanics; persist decline; archive/remove admissible private state last. Foreign/modified/shared-worktree artifacts are preserved or yield explicit conflict. Readback checks executable bindings rather than banning textual plugin references in retained content. Kept digests, local hook-active Git commit/push, fault-boundary resume, re-onboarding and stale-cache-hook fixtures are required. An uninstall that meets a foreign Git hook (a hook the Pipeline does not own and cannot prove it installed) keeps refusing: it returns the typed code `PU-FOREIGN-HOOK-CONFLICT` with instructions that name the hook, state that nothing was removed for it, and give the attended step the repository owner takes (PO decision 2026-10-04 #9). Acceptance case U-1: a repository with a foreign hook next to Pipeline-owned bindings refuses the uninstall with `PU-FOREIGN-HOOK-CONFLICT` and those instructions; the foreign hook stays byte-for-byte unchanged, every retained document and the Git history are intact, and ordinary Git commit/push still works. The case runs on the win32 and POSIX dialects and in a consumer-layout repository.
 
 The implementation sequence, exclusive ownership and complete acceptance matrix are defined directly in the canonical `design/greenfield-0.7-remediation-2026-09-27.md`, sections Repository activation/source topology/uninstall and Frozen activation design decisions. The additional-scope file is a preparation mirror, not a sixth authority source required for the five-source review. Schema mirrors, static closure and registered probes join the full existing 0.7 candidate checks. Source test success does not qualify an installed runner.
 
@@ -1072,20 +1100,46 @@ result is implied.
    scope while the verifier, repository identity, proof and bounded expiry
    can be validated. This amendment does not expand GMW, lift its kernel, or
    let an in-session verifier authorize its own replacement.
-3. **Attended external recovery (proposed):** independently establish a
-   known-good verifier/source outside the broken runner. The current design
-   specifies a pinned standalone Node CLI using built-ins only, an attended
-   operator-selected external artifact and public signer anchor, configured
-   detached human Ed25519 authorization, owner-private preimages, exact
-   bounded Pipeline code/test paths, lock/CAS and forward recovery. State,
-   runtime-private evidence, proofs, trust anchors and unrelated plugin
-   configuration are excluded and remain with their sanctioned writers.
+3. **Attended external recovery (implemented 0.7.0 deliverable, PO decision
+   2026-10-04 #1):** independently establish a known-good verifier/source
+   outside the broken runner. This level is delivered completely in 0.7.0 and
+   is accepted by RV-8…RV-11 (§20.3). Its contract is stated here in full:
+   - **Tool.** A pinned standalone Node CLI that uses Node built-ins only. It
+     needs no package install, no network and no part of the broken runner,
+     plugin or in-session verifier.
+   - **Trust.** The attended operator selects the external artifact (the
+     known-good source) and the public signer anchor. Trust originates only
+     from that operator-selected anchor, never from the repository under
+     repair, the runner session or a model statement. A wrong repository, a
+     wrong anchor or an altered artifact is refused before any write.
+   - **Authorization.** A detached human Ed25519 authorization bound to the
+     repository identity, the exact bounded set of code and test paths it may
+     write, and the owner-private preimages of those paths. A path outside the
+     signed set is refused.
+   - **Preimages.** Owner-private. Each target's current bytes, or its
+     explicit absence, are bound before any write; a preimage mismatch refuses
+     without mutation.
+   - **Application.** A per-file journaled atomic prefix under lock and CAS.
+     Each file is written atomically and each step is journaled, so an
+     interruption leaves only a recorded prefix. Every written file is read
+     back and compared with its exact signed post-image.
+   - **Crash recovery.** Forward-only. A re-run resumes the journal to the
+     signed post-image or reports typed unavailable; it never rolls back over
+     intervening changes and never leaves a partial, unrecorded state.
+   - **Exclusions.** State, runtime-private evidence, proofs, trust anchors and
+     unrelated plugin configuration are excluded and remain with their
+     sanctioned writers.
 
 Unknown owner, missing proof/key/source trust, ambiguous bytes, or unsupported
 host layout produces typed unavailable with the concrete attended
 prerequisite. No route may report ready, guess that an owner is dead, invent
 proof, or end in an unexplained `nobody` dead end. Lost bytes and secrets are
-not recoverable by inference.
+not recoverable by inference. This is the bounded reading of the requirement
+"there must always be a repair route" (PO decision 2026-10-04 #15): there is
+no dead end; where safe repair is impossible (unknown owner, missing
+proof/key/trust, ambiguous bytes) the Pipeline returns a typed result naming
+the concrete attended prerequisite, after which the route above applies
+(RV-11).
 
 ### 20.2 P1 legacy-owner archival requirements
 
@@ -1135,9 +1189,10 @@ stop conditions.
 Recovery is an implemented epic deliverable, not design-only input. It is owned
 by the implementation wave for the remaining Alfred work (tracks A–E and this
 section) and is sequenced after R4 (§21.7), because its owner observation needs
-the platform sweep. Its acceptance is RV-1…RV-7 below; the proposed recovery
-path is acceptable only after implementation and candidate-bound evidence
-demonstrate:
+the platform sweep. Its acceptance is RV-1…RV-11 below (RV-1…RV-7 cover the P1
+legacy-owner custody and archival; RV-8…RV-11 cover the attended external
+route of §20.1 level 3); the recovery path is acceptable only after
+implementation and candidate-bound evidence demonstrate:
 
 - RV-1: V2 `ownerRuntime: null` is `unavailable`, V1 field-absent is
   `unobserved`, and neither becomes `not-live`; a new native observer reports
@@ -1163,7 +1218,27 @@ demonstrate:
   preserves intervening changes;
 - RV-7: every new refusal path has observed positive/negative fixtures and an
   explicit recovery/handoff disposition; CI wiring detects an unregistered
-  producer, while runtime unknowns return an attended diagnostic handoff.
+  producer, while runtime unknowns return an attended diagnostic handoff;
+- RV-8: the attended external CLI verifies the operator-selected signer
+  anchor and the detached signature before any write. A wrong repository
+  identity, a wrong anchor and an altered external artifact each refuse with a
+  typed code and leave every target byte-for-byte unchanged;
+- RV-9: the CLI applies exactly the signed bounded code/test paths and refuses
+  every other path. A preimage mismatch (bytes or bound absence) refuses
+  without mutation. After a full apply, every written file reads back equal to
+  its signed post-image, and State, runtime-private evidence, proofs, trust
+  anchors and unrelated plugin configuration are unchanged;
+- RV-10: an injected crash at every journal step (before the first file,
+  between files, after a file and before its journal record, after the last
+  file and before the final record) resumes forward on re-run to the signed
+  post-image, or reports typed unavailable. It never leaves a partial,
+  unrecorded state and never rolls back over intervening changes;
+- RV-11: an unknown owner, a missing proof, key or source trust, ambiguous
+  bytes and an unsupported host layout each return typed unavailable that names
+  the concrete attended prerequisite. No fixture ends in a dead end or an
+  unexplained refusal, and after the named prerequisite is supplied the RV-8…RV-10
+  route applies (PO decision 2026-10-04 #15 confirms this bounded reading of
+  "there must always be a repair route").
 
 R1–R5 and B2 from the handover remain reported findings, not accepted backlog
 changes. Resolve P1 first; source-confirm minor items before changing scope.
@@ -1234,6 +1309,18 @@ recovery ceremonies or repeated signatures. The happy path is defined as:
   2026-10-04). Nothing else may ask the PO.
 - The ceremony inventory (§21.3) classifies every PO interaction as
   `per-feature` or `one-time-onboarding`. Any other class fails the test.
+
+**Agent-only design course (PO requirement 2026-10-04, design-input #16).**
+During design — intake, stage-0 authoring, revision cycles after Advisor or
+readiness findings, Advisor, readiness and presentation — the PO runs no
+terminal command, places no file and signs nothing except the single final
+approval. Course producer runs, course evidence writes, authoring and revision
+registration in continuity, and resubmission are agent work through
+catalogue-admitted commands (R1 owns admission incl. K5-8; R5 owns the
+coordinator recording authoring and revisions itself, without a hand-built
+continuity request or an override; R3 owns the absence of intermediate
+signatures). The ceremony inventory (R3-1) counts any request for a PO terminal
+command as a PO interaction.
 
 **Consumer and platform universality (PO requirement 2026-10-04).** Every
 R1–R6 change must work for every supported runner (Claude, Codex,
@@ -1456,12 +1543,16 @@ Contract:
 Acceptance cases:
 
 - R3-1: The ceremony inventory runs per runner and mode (signature, chat) for
-  three scenarios:
+  four scenarios:
   - A: enrolled repository, existing key, one push → per-feature count 2,
     one-time acts 0.
   - B: fresh repository, fresh key, one push → per-feature count 2, one-time
     acts exactly {enrollment consent, key setup / first-use key confirmation}.
   - C: two pushes → per-feature count 3.
+  - D: re-enrollment of a repository with retained Pipeline history, existing
+    key, one push → per-feature count 2, one-time acts exactly one
+    (enrollment consent); the retire and activate steps run without any
+    further prompt (PO decision 2026-10-04 #7).
 
   An interaction in any other class fails the test.
 - R3-2: Run from a fresh clone after onboarding:
@@ -1481,6 +1572,20 @@ Acceptance cases:
   `runner-profile-migration-v3 apply --activate`.
 - R3-7: A release/main promotion still requires the full chain while a
   checkpoint push does not.
+- R3-8: The signing window starts when the signing command is handed over
+  (prepare-for-signature), not at the denial. The default is 60 minutes and the
+  configurable range is 5–120 minutes (a value outside the range is refused).
+  The absolute expiry is inside the signed text, and a signature over an
+  altered expiry does not verify (PO decision 2026-10-04 #5).
+- R3-9: In chat mode a push or plan confirmation given in the session itself is
+  accepted only when it is bound to the exact commit and target text, and the
+  record labels it as chat attribution; no separate terminal code is needed. A
+  confirmation bound to another commit or target, or an unbound one, is
+  refused (PO decision 2026-10-04 #10; ADR-0056).
+- R3-10: In a `standing-approved` project a checkpoint push is admitted
+  without a per-push approval exactly as before, while the same push in
+  signature mode needs a signed commit-bound approval and in chat mode a
+  commit-bound chat confirmation (PO decision 2026-10-04 #11).
 
 ### 21.4 R4 — Runner parity, platform parity and role routes
 
@@ -1510,6 +1615,19 @@ Contract:
     these facts does not count. The preflight names the mechanism used
     (`cli-child` or `hook-observed-subagent`), and a role whose runner offers
     neither is `unavailable`.
+  - **Mechanism per role (PO decision 2026-10-04 #14).** On Claude and
+    Antigravity the Critic and the plan-verifier run as `hook-observed-subagent`
+    native subagents; independent readiness stays a `cli-child` (§17). This is a
+    measured precondition, not an assumption: PRD §1.2 and §8 A-2 record that
+    plugin hooks did not fire inside dispatched subagents on the measured
+    Claude build. R4 therefore makes each runner's hook layer (a) observe
+    subagent start, (b) enforce read-only effects on every subagent tool call
+    and (c) record the terminal result bound to the dispatch id, and measures
+    per runner that these hooks fire inside subagents (the A1 conformance
+    probe, §4.1, is the measurement vehicle). Until that measurement is
+    recorded for a runner and role, the preflight reports the role
+    `unavailable`; presentation and close are refused, with no silent
+    downgrade to a self-reported or fallback result (R4-12).
   - A fallback Advisor dispatch is recorded in a dispatch→result record that
     binds the template digest, the exact sent prompt digest, the native
     subagent id and the result digest (closes K3-6). The fallback Advisor runs
@@ -1520,7 +1638,34 @@ Contract:
     typed-unavailable, any exception rationale presented to the PO states only
     receipt-backed facts: the course outcome and code, and the absence of a
     native Advisor child for that runner. It never cites a fallback consult or
-    an earlier chat decision as evidence, and it is non-authorizing.
+    an earlier chat decision as evidence, and it is non-authorizing. In this
+    version the design course has no wired Claude Advisor route: the native
+    no-child route records unavailability, and the governed consult fallback
+    of §17 is not wired into the course (the course accepts an `answered`
+    Advisor result only for Codex; K3-2). R4's role-route preflight delivers
+    that route. Until then the exception may cite only this receipt-backed
+    fact, the course outcome and code, and the no-child facts; it does not
+    claim that no Advisor route can exist.
+- **Model-family approval (PO decision 2026-10-04 #2).** The PO approves a
+  model family per role, not a single model release.
+  - Newer versions of an approved family are used automatically.
+  - Activation is all-or-nothing across runners; there is no per-runner
+    activation scope. Activation is refused unless every available route is
+    assigned.
+  - When the newest release of an approved family is not selectable on a
+    runner, the older selectable release is used and the selection records
+    that it is a fallback. A watermark records the newest release selected for
+    the family, and a later selection of an older release is refused as a
+    downgrade.
+  - A family switch, a slot change, a pin or unpin and a floor change each need
+    a signed authority decision (detached human proof); an agent never applies
+    one, and a chat statement does not.
+  - The existing dormant model-selection subsystem is qualified, wired and
+    activated; no new resolver is introduced.
+  - Activation works on native Windows: neither a POSIX mode-bit check nor a
+    path check that drops the drive letter applies on its path.
+  - A Compact or an offline re-entry reuses the held selection instead of
+    re-resolving it, so the session keeps the same model id (R4-11).
 - **Producers.** Producer failures surface bounded, sanitized stderr text and
   the exit code. Advisor export creates its own output directory, uses
   platform path segmentation, and resumes idempotently: re-running after an
@@ -1630,6 +1775,26 @@ Acceptance cases:
 - R4-10: The schema passed to the Claude CLI carries neither `$schema` nor
   `$id`, the CLI accepts it, and a receipt that violates a constraint of the
   full schema is still rejected (K5-12).
+- R4-11: Model-family fixtures, one set per runner (Claude, Codex,
+  Antigravity):
+  - the newest selectable release of an approved family is used;
+  - a hidden newest release makes the older selectable release the selection,
+    and the selection records the fallback;
+  - a later selection of an older model id is refused as a downgrade
+    (watermark);
+  - activation is refused unless every available route is assigned, and there
+    is no per-runner activation scope;
+  - a family switch, slot change, pin or unpin and floor change without a
+    signed authority decision is refused;
+  - the activation path passes on native Windows (no POSIX mode-bit check, no
+    drive-letter-dropping path check);
+  - after a Compact or an offline re-entry the held selection keeps the same
+    model id and nothing is re-resolved.
+- R4-12: Per runner (Claude, Antigravity) for the Critic and plan-verifier, a
+  fixture and a live A1-style measurement show the hook-recorded subagent start
+  and terminal records bound to the dispatch id, and a write tool refused
+  inside the subagent. A runner and role without that measurement reports
+  `unavailable` and refuses presentation and close.
 
 ### 21.5 R5 — Design-course contract and coordinator redesign
 
@@ -1691,7 +1856,11 @@ Acceptance cases:
 - R5-5: A generated short form contains the EL-16 qualifiers.
 - R5-6: One design revision after an Advisor finding needs zero PO
   interactions and zero overrides, does not loop, and works on Claude and
-  Antigravity after the Advisor stage as well as on Codex (K5-7).
+  Antigravity after the Advisor stage as well as on Codex (K5-7). The same
+  holds for a revision after a not-ready readiness: the full cycle up to the
+  next presentation completes with zero PO terminal commands, zero file
+  placements by the PO, zero overrides and zero intermediate signatures
+  (design-input #16).
 - R5-7: A private first name in a consumer PRD is refused at pre-commit
   (K9-3). A briefing that cites a role path that does not exist is refused by
   the path preflight before launch (K9-1). The generated obligations contain
@@ -1740,8 +1909,15 @@ Acceptance cases:
 
 ### 21.7 Sequencing, integration ownership and completion
 
-1. **R1 + R2 first.** R5's coordinator command catalogue is designed together
-   with R1's registry.
+**Wave 0 (before step 1).** The E1 contract freeze (§3, §13: the first
+authorized foundation act) and the verbatim port of operator hotfixes 1–7 into
+the source tree. R4 and R5 then own the fixtures and acceptance that replace
+every dependence on an applied hotfix (R4-8, R5-8).
+
+1. **R1 + R2 next.** R5's coordinator command catalogue is designed together
+   with R1's registry. The A1/C1 measurement work (§4.1, §6.1) interleaves
+   after R1, because it needs R1's admission catalogue; every other step
+   keeps the order below.
 2. **R4 platform and budget fixes next** (K3-9…K3-17 and K5-12, replacing the
    hotfixes), then the role-route preflight.
 3. **R3, R5 and R6 in parallel slices.** One named **hook-and-commit-policy

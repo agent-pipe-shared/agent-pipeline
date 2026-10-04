@@ -8,8 +8,8 @@ replace item-level acceptance or create review/approval evidence.
 | Source | Purpose | Binding rule |
 | --- | --- | --- |
 | [`design-input.md`](design-input.md) | Current source index and provenance limits. | Historical input files remain unchanged; it is not a replacement for raw input bytes. |
-| [`prd_sprint-alfred-epic.md`](prd_sprint-alfred-epic.md) | Outcomes, full five-track/eighteen-WP scope, gates and success criteria. | `technical-spec-sha256` must equal exact current `spec.md` SHA-256. |
-| [`spec.md`](spec.md) | Technical contracts, verification and acceptance. | §20 contains the recovery deliverable (RV-1…RV-7); §21 contains the findings round. Changing Spec requires same-candidate PRD marker refresh. |
+| [`prd_sprint-alfred-epic.md`](prd_sprint-alfred-epic.md) | Outcomes, full five-track/nineteen-WP scope, gates and success criteria. | `technical-spec-sha256` must equal exact current `spec.md` SHA-256. |
+| [`spec.md`](spec.md) | Technical contracts, verification and acceptance. | §8.2 contains E4 (native Goldfish host-commit); §20 contains the recovery deliverable (RV-1…RV-11); §21 contains the findings round. Changing Spec requires same-candidate PRD marker refresh. |
 | [`design.md`](design.md) | Integrated design and sequencing. | Links detailed sources without superseding their evidence. |
 | This file | Source-to-requirement/evidence map. | No pass or approval claim. |
 
@@ -41,7 +41,7 @@ replace item-level acceptance or create review/approval evidence.
 | Integration/cross-runner qualification | §§4–5, 7 | §§3, 8–15 | E1–E4 contracts | Frozen contracts and per-runner evidence; fixtures are not native evidence. |
 | Greenfield/activation/uninstall | §§1, 4, 7, 12 | §§16, 18 | 2026-09-27 remediation design | Slice acceptance, actual topology evidence, preserved-content readback. |
 | Design workflow | §11 | §17 | 2026-09-19 input | Preserved input bytes, actual route receipt/disposition, fresh readiness, one final PO decision. |
-| Recovery availability (implemented epic deliverable) | §§7.11, 13 | §20 (RV-1…RV-7) | 2026-10-03 recovery design | P1 source confirmation, signed archival, CAS/readback and preservation negatives, host evidence and PO disposition. Owned by the implementation wave for remaining Alfred work, sequenced after R4. |
+| Recovery availability (implemented epic deliverable) | §§7.11, 13 | §20 (RV-1…RV-11) | 2026-10-03 recovery design | P1 source confirmation, signed archival, CAS/readback and preservation negatives (RV-1…RV-7); attended external route anchor, bounded-path, journal/crash and typed-unavailable cases (RV-8…RV-11); host evidence and PO disposition. Owned by the implementation wave for remaining Alfred work, sequenced after R4. |
 | Three-runner happy path (findings round) | §§7.12, 14 | §21 | 2026-10-03 findings register | AC-32 on the host matrix; acceptance cases R1-1…R6-5; AC-26…AC-32. |
 
 ## 2026-10-03 findings-round map
@@ -143,6 +143,50 @@ Requirement-level rows (not register IDs, not counted above):
 
 Owner counts (equal to the Spec §21 headers): R1 13, R2 8, R3 11, R4 20, R5 16,
 R6 6, deferred 3; total 77.
+
+## PO decisions → owner and case
+
+Every PO decision recorded in `design-input.md` (2026-10-03 and 2026-10-04,
+numbering as there) has one owner and at least one acceptance case. A decision
+whose behaviour lives in a workstream is owned by that workstream (Spec §21);
+the others name their Spec section. This section adds no register ID and does
+not change the 77-row map above. Acceptance IDs are those of `acceptance.md`
+(AC-35 and AC-36 extend AC-29 and AC-28 with the revision-4 cases).
+
+2026-10-03 decisions:
+
+| Decision | Owner | Spec § / cases | Acceptance |
+| --- | --- | --- | --- |
+| 2026-10-03 #1: no post-approval binding document; every register row in scope and mapped | Design package (this file) | Spec §21 intro, §21.0 scope rule; reconciliation: register count = mapped rows = Spec §21 header counts (77) | AC-26…AC-32 (via the map above) |
+| 2026-10-03 #2: a fallback self-dispatch never satisfies readiness, Critic or plan-verifier | R4 | §21.4 role-route preflight; R4-1, R4-2 | AC-29 |
+| 2026-10-03 #3: `scratch/` script execution stays fail-closed | R1 | §21.1 scratch bullet; R1-4 | AC-26 |
+| 2026-10-03 #4: every signature-mode push is signed; two decisions per feature plus one per additional push | R3 | §21.0 counting rule; §21.3 push signing; R3-1, R3-2, R3-7 | AC-28, AC-32 |
+| 2026-10-03 route (R1 shared catalogue, R5 simplified coordinator) | R1, R5 | §21.0 route decision; R1-1; R5-1, R5-6 | AC-26, AC-30 |
+| 2026-10-03 hotfixes 1–7 replaced by source fixes | R4, R5 (wave 0 port in §21.7) | §21.4 hotfix removal; §21.7 wave 0; R4-8, R5-8 | AC-29, AC-30 |
+
+2026-10-04 decisions:
+
+| Decision | Owner | Spec § / cases | Acceptance |
+| --- | --- | --- | --- |
+| #1 recovery route delivered completely in 0.7.0, including the signed legacy-custody transaction and the attended external route | Recovery (implementation wave, after R4) | §20.1–§20.3; RV-1…RV-11 | AC-33 |
+| #2 model-family approval, all-or-nothing across runners; older selectable release; later downgrade refused | R4 | §21.4 Model-family approval; R4-11 | AC-35 (extends AC-29) |
+| #3 Antigravity readiness, Critic and Advisor routes enabled without prior host measurement; typed failures | R4 | §21.4 Antigravity bullet; R4-3, R4-12; the PO host run (§21.7) | AC-29, AC-32 |
+| #4 unmarked Codex Goldfish dispatch refused unless `Host commit: not-requested (reason: …)` | R4 | §21.4 Codex bullet; R4-5 | AC-29 |
+| #5 signing window starts at hand-over, 60 minutes default, 5–120 | R3 | §21.3 ceremony mechanics; R3-8 | AC-36 (extends AC-28) |
+| #6 direct Elephant design commits use `Dispatch: stage-0 (elephant)` only | R5 | §21.5 trailer grammar; R5-2 | AC-30 |
+| #7 re-enrollment with retained history is one one-time act | R3 | §21.0 counting rule; R3-1 scenario D | AC-36 (extends AC-28) |
+| #8 Antigravity lock freshness: session-bound, labelled 30-minute compatibility fallback | R4 | §21.4 Antigravity bullet; R4-3 | AC-29 |
+| #9 uninstall with a foreign Git hook keeps refusing, with a clear code and instructions | Activation/uninstall slice (Spec §18) | §18 foreign-hook paragraph; U-1 (`PU-FOREIGN-HOOK-CONFLICT`) | AC-34 |
+| #10 chat-mode confirmations in the session, commit-bound, labelled | R3 | §21.3 ceremony mechanics; R3-9 | AC-36 (extends AC-28) |
+| #11 `standing-approved` projects keep checkpoint pushes without a per-push approval | R3 | §21.3 ceremony mechanics; R3-7, R3-10 | AC-36 (extends AC-28) |
+| #12 all runners, all platforms, consuming repositories too | R1–R6 (each workstream's consumer-layout fixtures) | §21.0 consumer and platform universality; each workstream's cases; R4-8 | AC-26…AC-31; AC-32 host matrix |
+| #13 explicit new Advisor course (child of the previous terminal course) | Design workflow (Spec §17) | §17 new-course decision and prior-course linkage, validator and entrypoint negatives; R4-1 for the exception facts | AC-26…AC-32 package-level; Spec §17 evidence tests |
+| #14 Critic and plan-verifier on Claude and Antigravity as hook-observed native subagents; measured, else `unavailable` | R4 | §21.4 mechanism per role; R4-2, R4-12 | AC-35 (extends AC-29) |
+| #15 "always a repair route" = no dead end, typed result naming the attended prerequisite | Recovery | §20.1 closing paragraph; RV-11 | AC-33 |
+| #16 agent-only design course: no PO terminal command, file placement or intermediate signature; one final approval | R1, R3, R5 | §21.0 agent-only design course; R5-6, R3-1 | AC-30, AC-32 |
+
+Mapped decisions: 2026-10-04 #1–#16 (16 of 16); 2026-10-03 decisions #1–#4 and
+the route and hotfix decisions (6 rows).
 
 ## Evidence and authority limits
 

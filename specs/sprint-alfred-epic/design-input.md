@@ -8,11 +8,12 @@ bindings, or approvals.
 
 The existing epic remains governed by ADR-0043's 2026-08-17 amendment and
 GitHub #108, as recorded in [`prd_sprint-alfred-epic.md`](prd_sprint-alfred-epic.md)
-and [`spec.md`](spec.md). Its five tracks and eighteen work packages remain
-in scope. The 2026-09-27 greenfield remediation, 2026-09-28 activation,
-topology and content-preserving uninstall extension, and design-workflow
-requirements remain included. The 2026-10-03 recovery addition is bounded
-and does not change backlog or sprint ownership.
+and [`spec.md`](spec.md). Its five tracks and nineteen work packages (A1–A5,
+B1–B3, C1–C3, D1–D4, E1–E4) remain in scope. The 2026-09-27 greenfield
+remediation, 2026-09-28 activation, topology and content-preserving
+uninstall extension, and design-workflow requirements remain included. The
+2026-10-03 recovery addition is bounded and does not change backlog or sprint
+ownership.
 
 ## Historical sources to preserve
 
@@ -47,11 +48,14 @@ The latest recovery requirement is retained verbatim from the user request:
 
 > dann mach das bitte heile und sorge dafür dass das nicht generell passieren kann. Es muss immer eine möglichkeit geben per maintaince window oder wie auch immer zu reparieren
 
-The bounded interpretation is proposed in
-[`design/recovery-availability-2026-10-03.md`](design/recovery-availability-2026-10-03.md):
-known-shape intrinsic repair; existing scoped GMW/HGO while verifiable; and
-an attended external route when the current verifier or lifecycle cannot
-safely act. The external route is not an existing API or accepted policy.
+The bounded interpretation is specified in
+[`design/recovery-availability-2026-10-03.md`](design/recovery-availability-2026-10-03.md)
+and in `spec.md` §20: known-shape intrinsic repair; existing scoped GMW/HGO
+while verifiable; and an attended external route when the current verifier or
+lifecycle cannot safely act. The attended external route is an implemented
+0.7.0 deliverable (PO decision 2026-10-04 #1), specified in full in Spec §20.1
+and accepted by RV-8…RV-11 (Spec §20.3). "There must always be a repair route"
+is read as PO decision #15 below states it.
 
 The accompanying Toolbox information is a sanitized handover narrative, not
 verified live tool output. It reports a Windows 11 Claude hard crash during
@@ -112,8 +116,9 @@ an approval of the design and not readiness evidence.
 
 ### PO decisions of 2026-10-04 (chat, from mobile; options with impact and recommendation were presented)
 
-1. Recovery route (Spec §20, RV-1…RV-7) is delivered completely in 0.7.0,
-   including the signed legacy-custody transaction.
+1. Recovery route (Spec §20, RV-1…RV-11) is delivered completely in 0.7.0,
+   including the signed legacy-custody transaction and the attended external
+   source/install route.
 2. Model-family approval is activated all-or-nothing across runners (no
    per-runner activation scope). When the newest release of an approved family
    is not selectable, the older selectable release is used; a later downgrade
@@ -138,6 +143,26 @@ an approval of the design and not readiness evidence.
     per-push approval.
 12. Everything is built to work for all runners and all platforms, in
     consuming user repositories as well, not only in this source checkout.
+
+PO decisions of 2026-10-04, continued (answers to the second independent
+readiness review):
+
+13. The PO explicitly confirms a new Advisor course (child of the previous
+    terminal course) for this revised design.
+14. Critic and plan-verifier on Claude and Antigravity run as hook-observed
+    native subagents; the hook coverage in subagents must be measured,
+    otherwise the role is unavailable.
+15. "There must always be a repair route" means: no dead end; where safe
+    repair is impossible (unknown owner, missing proof/key/trust, ambiguous
+    bytes) the Pipeline returns a typed result naming the concrete attended
+    prerequisite, after which the route applies.
+16. Everything during design is done by the agent; the PO signs only once,
+    when everything is ready. No terminal command (`!`), no file placement
+    and no intermediate signature is asked of the PO for course runs,
+    evidence writes, continuity registration or revision cycles.
+
+Each decision has an owner and an acceptance case in the "PO decisions → owner
+and case" section of `traceability.md`.
 
 ## Provenance and readiness limits
 
