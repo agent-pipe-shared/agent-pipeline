@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn as spawnChild, spawnSync } from "node:child_process";
 import { closeSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { constants as osConstants, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -1290,5 +1290,179 @@ test("AGY-VERIFYTUNER-1: a Tier-B suite's --permission flags still apply correct
     assert.match(log, /ERR_ACCESS_DENIED/u);
     assert.match(log, /FileSystemRead/u);
     assert.equal(log.includes("should never be reached"), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// ALFRED-RF1: a Verify run that created its OWN session descriptor + private binding (the
+// session-less fallback) must retire exactly those on EVERY exit path. Every fixture below is an
+// isolated `git init` repository under os.tmpdir(); nothing touches the real repository.
+const RF1_NO_RESIDUE = { descriptors: 0, binding: "unbound", cleanupManifests: [], descriptorFiles: [] };
+function rf1Residue(f) {
+  const listDir = (...parts) => { try { return readdirSync(join(f.common, "agent-pipeline", ...parts)); } catch { return []; } };
+  return {
+    descriptors: listActiveSessionDescriptors(f.root).length,
+    binding: readOnboardingSessionCleanupBinding({ rootDir: f.root }).status,
+    cleanupManifests: listDir("session-cleanup", "active"),
+    descriptorFiles: listDir("session-descriptors", "active"),
+  };
+}
+function rf1Checkout(prefix) {
+  const f = sessionlessCheckout(prefix, "Exercise owner retirement on every Verify exit path");
+  const suiteFile = join(f.root, "fixture.test.mjs");
+  writeFileSync(suiteFile, "process.stdout.write('complete private log\\n')\n", { mode: 0o600 });
+  return { ...f, suiteFile, suites: [{ name: "fixture-suite", file: suiteFile }] };
+}
+const rf1Run = (f, runId, extra = {}) => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "rf1" }, runId, ...extra });
+const rf1RunDir = (f, runId) => join(f.common, "agent-pipeline", "verify", "runs", runId);
+
+test("ALFRED-RF1: a passed and a numeric failed terminal leave no own descriptor, binding or intent", async () => {
+  const f = rf1Checkout("verify-journal-rf1-terminal-");
+  try {
+    const passed = await rf1Run(f, "verify-rf1-passed");
+    assert.equal(passed.terminal.status, "passed");
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+    writeFileSync(f.suiteFile, "process.exitCode = 7\n", { mode: 0o600 });
+    const failed = await rf1Run(f, "verify-rf1-failed", { reuseReceipts: false });
+    assert.equal(failed.terminal.status, "failed");
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-RF1: a planning error after the owner exists (VERIFY-EXCLUSIVE-SUITE-DEPENDS-ON-POOL-SUITE) retires the exact own descriptor, binding and intent", async () => {
+  const f = rf1Checkout("verify-journal-rf1-planning-");
+  const poolFile = join(f.root, "pool-dep.test.mjs");
+  writeFileSync(poolFile, "process.stdout.write('pool\\n')\n", { mode: 0o600 });
+  f.suites = [{ name: "excl-dep", file: f.suiteFile, dependsOn: ["pool-dep"] }, { name: "pool-dep", file: poolFile, dependsOn: [] }];
+  try {
+    await assert.rejects(
+      () => rf1Run(f, "verify-rf1-planning", { spawn: spawnPass, exclusiveSuites: new Set(["excl-dep"]), serialLaneSuites: new Set() }),
+      /VERIFY-EXCLUSIVE-SUITE-DEPENDS-ON-POOL-SUITE:excl-dep->pool-dep/u,
+    );
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+    assert.equal(existsSync(rf1RunDir(f, "verify-rf1-planning")), false, "the unsealed run directory this invocation created is drained with its intent");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-RF1: a failure raised while the private run is being created retires the owner too", async () => {
+  const f = rf1Checkout("verify-journal-rf1-create-");
+  const otherFile = join(f.root, "other.test.mjs");
+  writeFileSync(otherFile, "process.stdout.write('other\\n')\n", { mode: 0o600 });
+  f.suites = [{ name: "cycle-a", file: f.suiteFile, dependsOn: ["cycle-b"] }, { name: "cycle-b", file: otherFile, dependsOn: ["cycle-a"] }];
+  try {
+    await assert.rejects(() => rf1Run(f, "verify-rf1-create", { spawn: spawnPass }));
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-RF1: an exception thrown from the suite spawn seam is rethrown unchanged and the owner is retired", async () => {
+  const f = rf1Checkout("verify-journal-rf1-seam-");
+  try {
+    await assert.rejects(() => rf1Run(f, "verify-rf1-seam", { spawn: async () => { throw new Error("RF1-SEAM-BOOM"); } }), /RF1-SEAM-BOOM/u);
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+    assert.equal(existsSync(rf1RunDir(f, "verify-rf1-seam")), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-RF1: owner retirement never touches a descriptor it did not create", async () => {
+  const f = rf1Checkout("verify-journal-rf1-foreign-");
+  let foreign = null;
+  try {
+    await assert.rejects(
+      () => rf1Run(f, "verify-rf1-foreign", { spawn: async () => { foreign = startSessionDescriptor(f.root, {}); throw new Error("RF1-SEAM-FOREIGN"); } }),
+      (error) => /VERIFY-OWNER-CLEANUP-REQUIRED:verify-rf1-foreign/u.test(error.message) && /RF1-SEAM-FOREIGN/u.test(error.message),
+    );
+    assert.ok(foreign !== null);
+    assert.equal(listActiveSessionDescriptors(f.root).some((entry) => entry.sessionId === foreign.sessionId && entry.descriptorSha256 === foreign.descriptorSha256), true, "the foreign descriptor is untouched");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-RF1: reusing the id of an existing retained run is refused before any owner exists and deletes nothing", async () => {
+  const f = rf1Checkout("verify-journal-rf1-existing-");
+  try {
+    const first = await rf1Run(f, "verify-rf1-existing");
+    assert.equal(first.terminal.status, "passed");
+    const before = snapshotFiles(first.runDir);
+    await assert.rejects(() => rf1Run(f, "verify-rf1-existing", { reuseReceipts: false }), /VERIFY-JOURNAL-RUN-EXISTS:verify-rf1-existing/u);
+    assert.deepEqual(snapshotFiles(first.runDir), before);
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// Process-level exit paths run in a CHILD node process (the module registers process listeners and
+// may end the process), always against a temp repository. A synthetic `process.emit(signal)` from
+// inside the child exercises the real handler on every platform; real OS signal delivery to a
+// child is only possible on POSIX (native Windows terminates the target without running handlers).
+function rf1ChildScript(f, runId, seamBody) {
+  const journalUrl = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "verify-journal.mjs")).href;
+  const script = join(f.root, `${runId}.child.mjs`);
+  writeFileSync(script, [
+    'import { writeFileSync } from "node:fs";',
+    'import { join } from "node:path";',
+    `import { runVerifyJournal } from ${JSON.stringify(journalUrl)};`,
+    `const root = ${JSON.stringify(f.root)};`,
+    `const marker = ${JSON.stringify(join(f.root, `${runId}.marker`))};`,
+    "const interrupted = (signal) => ({ status: null, signal, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error: undefined, cancellation: { proven: true, method: \"test-seam\", identity: { pid: 1, startId: \"1\", pgrp: 1 }, remaining: 0 } });",
+    `const spawn = (command, args, options) => { ${seamBody} };`,
+    `await runVerifyJournal({ gitCommonDir: join(root, ".git"), repoRoot: root, candidate: { commit: ${JSON.stringify(candidate.commit)}, tree: ${JSON.stringify(candidate.tree)} }, suites: [{ name: "fixture-suite", file: ${JSON.stringify(f.suiteFile)} }], policyInputs: { harness: "rf1-child" }, runId: ${JSON.stringify(runId)}, spawn });`,
+    'console.log("RF1-CHILD-RETURNED");',
+    "",
+  ].join("\n"), { mode: 0o600 });
+  return script;
+}
+const rf1ChildEnv = { ...process.env };
+const rf1Child = (f, script) => spawnSync(process.execPath, [script], { cwd: f.root, encoding: "utf8", shell: false, timeout: 60_000, env: rf1ChildEnv });
+
+test("ALFRED-RF1: an uncaught exception that ends the process leaves no own descriptor, binding or intent", () => {
+  const f = rf1Checkout("verify-journal-rf1-uncaught-");
+  try {
+    const script = rf1ChildScript(f, "verify-rf1-uncaught", 'setImmediate(() => { throw new Error("RF1-UNCAUGHT-BOOM"); }); return new Promise(() => {});');
+    const child = rf1Child(f, script);
+    assert.equal(child.status, 1, child.stderr);
+    assert.match(child.stderr, /RF1-UNCAUGHT-BOOM/u);
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+const RF1_SIGNALS = ["SIGINT", "SIGTERM", ...("SIGBREAK" in osConstants.signals ? ["SIGBREAK"] : [])];
+for (const name of RF1_SIGNALS) {
+  test(`ALFRED-RF1: ${name} stops the child group gracefully, retires the owner and exits with the conventional code`, () => {
+    const f = rf1Checkout(`verify-journal-rf1-${name.toLowerCase()}-`);
+    try {
+      const runId = `verify-rf1-${name.toLowerCase()}`;
+      const script = rf1ChildScript(f, runId, `return new Promise((resolve) => { const settle = () => resolve(interrupted(${JSON.stringify(name)})); options.signal.addEventListener("abort", settle, { once: true }); writeFileSync(marker, "started"); process.emit(${JSON.stringify(name)}, ${JSON.stringify(name)}); });`);
+      const child = rf1Child(f, script);
+      assert.equal(child.status, 128 + osConstants.signals[name], child.stderr);
+      assert.equal(child.stdout.includes("RF1-CHILD-RETURNED"), false, "the process ends instead of continuing after the interrupted run");
+      assert.equal(existsSync(join(f.root, `${runId}.marker`)), true);
+      assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+      const interruption = JSON.parse(readFileSync(join(rf1RunDir(f, runId), "interruption.json"), "utf8"));
+      assert.equal(interruption.signal, name);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  });
+}
+
+test("ALFRED-RF1: a second signal while the first is still being honored forces the exit and still retires the owner", () => {
+  const f = rf1Checkout("verify-journal-rf1-forced-");
+  try {
+    const script = rf1ChildScript(f, "verify-rf1-forced", 'return new Promise(() => { writeFileSync(marker, "started"); process.emit("SIGINT", "SIGINT"); process.emit("SIGINT", "SIGINT"); });');
+    const child = rf1Child(f, script);
+    assert.equal(child.status, 128 + osConstants.signals.SIGINT, child.stderr);
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner", { skip: process.platform === "win32" ? "native Windows terminates a process signalled via kill() without running its handlers, so OS-level SIGINT delivery cannot be exercised; the synthetic process.emit cases above cover the handler on every platform" : false }, async () => {
+  const f = rf1Checkout("verify-journal-rf1-os-sigint-");
+  try {
+    const script = rf1ChildScript(f, "verify-rf1-os-sigint", 'return new Promise((resolve) => { options.signal.addEventListener("abort", () => resolve(interrupted("SIGINT")), { once: true }); writeFileSync(marker, "started"); });');
+    const child = spawnChild(process.execPath, [script], { cwd: f.root, stdio: ["ignore", "pipe", "pipe"], env: rf1ChildEnv });
+    const marker = join(f.root, "verify-rf1-os-sigint.marker");
+    const deadline = Date.now() + 15_000;
+    while (!existsSync(marker) && Date.now() < deadline) await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
+    assert.equal(existsSync(marker), true, "the child reached its running suite");
+    child.kill("SIGINT");
+    const closed = await new Promise((resolveClose) => child.once("close", (code, signal) => resolveClose({ code, signal })));
+    assert.equal(closed.code, 128 + osConstants.signals.SIGINT);
+    assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });

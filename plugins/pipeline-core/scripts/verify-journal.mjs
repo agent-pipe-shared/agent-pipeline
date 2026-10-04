@@ -3,6 +3,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, writeSync } from "node:fs";
+import { constants as osConstants } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn as spawnChildProcess, spawnSync } from "node:child_process";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -15,7 +16,7 @@ import {
 } from "../lib/verify-resume.mjs";
 import { parseVerifyCaseCompletion, validateVerifyCaseCompletionPolicy } from "../lib/verify-case-completion-receipt.mjs";
 import { bindEphemeralPrivateCleanup, readOnboardingSessionCleanupBinding, releaseOnboardingSessionCleanup } from "../lib/onboarding-continuity.mjs";
-import { finalizeTemporaryResource, inspectSessionClosure, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, releaseCompletedVerifyRunSession, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import { cleanupSession, finalizeTemporaryResource, inspectSessionClosure, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, releaseCompletedVerifyRunSession, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 const MAX_LOG_BYTES = 16 * 1024 * 1024;
@@ -255,36 +256,155 @@ function registerBoundVerifyRun({ repoRoot, runId, runPath }) {
     owner = establishSessionLessCleanupBinding({ repoRoot, priorBinding: binding });
     binding = owner.binding;
   }
-  const descriptor = loadSessionDescriptor(repoRoot, binding.sessionCleanup.sessionId, {
-    expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+  try {
+    const descriptor = loadSessionDescriptor(repoRoot, binding.sessionCleanup.sessionId, {
+      expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+    });
+    const resourceId = `verify-${sha(runId).slice(0, 32)}`;
+    registerTemporaryIntent(repoRoot, {
+      sessionId: descriptor.sessionId,
+      ownerNonce: descriptor.ownerNonce,
+      resourceId,
+      type: "verify-run-directory",
+      path: runPath,
+      contentClass: "verify-recovery",
+      soleCopy: false,
+      cleanupPolicy: "remove-directory",
+    });
+    return {
+      descriptor,
+      owner: owner?.created === true ? {
+        stateSha256: binding.stateSha256,
+        revision: binding.revision,
+        sessionCleanup: structuredClone(binding.sessionCleanup),
+      } : null,
+      receipt: sealVerifyCleanupRegistration({
+        status: "registered",
+        runId,
+        runPath,
+        sessionId: descriptor.sessionId,
+        descriptorSha256: descriptor.descriptorSha256,
+        resourceId,
+        registeredAt: new Date().toISOString(),
+      }),
+    };
+  } catch (error) {
+    // A failure between creating OUR OWN owner and handing it to the run must not strand it.
+    if (owner?.created === true) {
+      try {
+        retireInvocationOwner({
+          repoRoot,
+          runPath,
+          descriptor: owner.descriptor,
+          owner: { stateSha256: owner.binding.stateSha256, revision: owner.binding.revision, sessionCleanup: structuredClone(owner.binding.sessionCleanup) },
+        });
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], `VERIFY-OWNER-CLEANUP-REQUIRED:${runId}: ${error?.message ?? error}`);
+      }
+    }
+    throw error;
+  }
+}
+
+function pathPresent(path) {
+  try { lstatSync(path); return true; } catch (error) { return error?.code !== "ENOENT"; }
+}
+
+// Idempotent close of the run lock; a lock still marked active by a live writer (this very process)
+// would otherwise make the registered run directory un-drainable.
+function closeRunLock(run, runId, clock) {
+  if (run.lockClosed === true) return;
+  run.lockClosed = true;
+  const closed = Buffer.from(`${JSON.stringify(verifyRunLock(runId, "closed", clock))}\n`);
+  try { ftruncateSync(run.lockFd, 0); writeSync(run.lockFd, closed, 0, closed.length, 0); fsyncSync(run.lockFd); } finally { closeSync(run.lockFd); }
+}
+
+// ALFRED-RF1: retire EXACTLY the descriptor and private binding this invocation created -- matched
+// by the descriptor id + digest + owner nonce and the binding tuple it captured at creation, and
+// refused (never "repaired") when anything else moved. It drains only the unsealed run directory
+// registered for THIS run (a run that already wrote terminal.json/interruption.json is evidence
+// the terminal path retains, so it is refused here, never deleted).
+function retireInvocationOwner({ repoRoot, runPath, descriptor, owner }) {
+  const binding = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
+  if (binding.status !== "bound" || binding.stateSha256 !== owner.stateSha256
+    || binding.revision !== owner.revision
+    || digestJson(binding.sessionCleanup) !== digestJson(owner.sessionCleanup)) {
+    throw new Error("captured cleanup binding changed");
+  }
+  const active = listActiveSessionDescriptors(repoRoot);
+  if (active.length !== 1 || active[0].sessionId !== descriptor.sessionId
+    || active[0].descriptorSha256 !== descriptor.descriptorSha256) {
+    throw new Error("active descriptor inventory changed");
+  }
+  const exactDescriptor = loadSessionDescriptor(repoRoot, descriptor.sessionId, {
+    expectedDescriptorSha256: descriptor.descriptorSha256,
   });
-  const resourceId = `verify-${sha(runId).slice(0, 32)}`;
-  registerTemporaryIntent(repoRoot, {
+  if (exactDescriptor.ownerNonce !== descriptor.ownerNonce) throw new Error("descriptor owner changed");
+  if (pathPresent(join(runPath, "terminal.json")) || pathPresent(join(runPath, "interruption.json"))) {
+    throw new Error("sealed run evidence is retained by the terminal path and is never deleted here");
+  }
+  const drained = cleanupSession(repoRoot, { sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce }, { allowAbsent: true });
+  if (drained.ok !== true || drained.receipt?.status !== "complete") throw new Error("owner resources could not be drained");
+  retireSessionDescriptor(repoRoot, {
     sessionId: descriptor.sessionId,
     ownerNonce: descriptor.ownerNonce,
-    resourceId,
-    type: "verify-run-directory",
-    path: runPath,
-    contentClass: "verify-recovery",
-    soleCopy: false,
-    cleanupPolicy: "remove-directory",
+    descriptorSha256: descriptor.descriptorSha256,
   });
+  const closure = inspectSessionClosure(repoRoot, descriptor.sessionId, {
+    expectedDescriptorSha256: descriptor.descriptorSha256,
+  });
+  if (closure.status !== "closed" || closure.receiptSha256 !== sha(readFileSync(drained.receiptPath))) {
+    throw new Error("canonical descriptor closure readback failed");
+  }
+  const released = releaseOnboardingSessionCleanup({
+    rootDir: repoRoot,
+    expectedStateSha256: owner.stateSha256,
+    expectedRevision: owner.revision,
+    sessionCleanup: owner.sessionCleanup,
+  });
+  const after = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
+  if (released.status !== "released" || released.sessionCleanup !== null
+    || after.sessionCleanup !== null || after.stateSha256 !== owner.stateSha256
+    || after.revision !== owner.revision || listActiveSessionDescriptors(repoRoot).length !== 0) {
+    throw new Error("private cleanup binding readback failed");
+  }
+}
+
+const OWNER_EXIT_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"].filter((name) => name in osConstants.signals);
+
+// While this invocation owns a session descriptor + binding it also owns the way the process can
+// end around it. The FIRST termination signal asks the run to wind down gracefully (the child
+// group is stopped and the interruption sealed by the normal path) and, unless the caller's own
+// `signal` already handles that delivery, the process then exits with the conventional 128+signo
+// code once the owner is retired. A SECOND signal forces the exit immediately; the `exit` listener
+// -- which also covers an uncaught exception and any process.exit() -- retires the owner
+// synchronously on the way out. Native Windows cannot deliver SIGINT/SIGTERM to a handler via
+// kill(), but console Ctrl+C, Ctrl+Break (SIGBREAK) and console close (SIGHUP) do reach it.
+function guardInvocationOwnerExit({ callerSignal, cancellation, retire }) {
+  let deliveries = 0;
+  let exitSignal = null;
+  const onExit = () => {
+    try { retire(); } catch (error) {
+      try { process.stderr.write(`VERIFY-OWNER-CLEANUP-REQUIRED: ${error?.message ?? error}\n`); } catch { /* nothing left to report to */ }
+    }
+  };
+  const listeners = OWNER_EXIT_SIGNALS.map((name) => {
+    const listener = () => {
+      deliveries += 1;
+      if (deliveries > 1) process.exit(128 + osConstants.signals[name]);
+      if (callerSignal?.aborted !== true) exitSignal = name;
+      cancellation.abort(name);
+    };
+    process.on(name, listener);
+    return [name, listener];
+  });
+  process.on("exit", onExit);
   return {
-    descriptor,
-    owner: owner?.created === true ? {
-      stateSha256: binding.stateSha256,
-      revision: binding.revision,
-      sessionCleanup: structuredClone(binding.sessionCleanup),
-    } : null,
-    receipt: sealVerifyCleanupRegistration({
-      status: "registered",
-      runId,
-      runPath,
-      sessionId: descriptor.sessionId,
-      descriptorSha256: descriptor.descriptorSha256,
-      resourceId,
-      registeredAt: new Date().toISOString(),
-    }),
+    exitCode: () => (exitSignal === null ? null : 128 + osConstants.signals[exitSignal]),
+    dispose() {
+      for (const [name, listener] of listeners) process.removeListener(name, listener);
+      process.removeListener("exit", onExit);
+    },
   };
 }
 
@@ -1003,15 +1123,44 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
   const policySha256 = digestJson({ schema: "pipeline.verify-policy.v1", maxLogBytes: MAX_LOG_BYTES, policyInputs });
   const common = assertPhysicalDirectory(realpathSync(gitCommonDir));
   const runPath = join(common, "agent-pipeline", "verify", "runs", runId);
+  // ALFRED-RF1: refuse a reused run id BEFORE any owner exists, so retirement can only ever drain a
+  // run directory this invocation itself created.
+  if (typeof registerRun !== "function" && pathPresent(runPath)) throw new Error(`VERIFY-JOURNAL-RUN-EXISTS:${runId}`);
   const automaticRegistration = typeof registerRun === "function" ? null : registerBoundVerifyRun({ repoRoot, runId, runPath });
-  const cleanupRegistration = automaticRegistration?.receipt
-    ?? registerRun({ schema: "pipeline.verify-cleanup-registration-request.v1", runId, runPath, candidate, policySha256 });
-  if (!validateCleanupRegistration(cleanupRegistration, { runId, runPath })) throw new Error("VERIFY-CLEANUP-REGISTRATION-INVALID");
-  const run = createVerifyRun({ gitCommonDir, runId, candidate, policySha256, suites: registrations, cleanupRegistration, clock });
+  const ownsSession = automaticRegistration !== null && automaticRegistration.owner !== null;
+  let cleanupRegistration;
+  let run = null;
   let terminalWritten = false;
   let interruptionWritten = false;
   let childCloseProved = false;
+  let ownerRetired = false;
+  let primaryFailure = null;
+  // The owner's own cancellation channel: it carries the caller's `signal` (when any) plus this
+  // module's process-level signal handling, so a signal that reaches an owning run is always
+  // wound down through the same interruption path.
+  const cancellation = new AbortController();
+  let unlinkCallerSignal = null;
+  if (ownsSession && signal) {
+    if (signal.aborted) cancellation.abort(signal.reason);
+    else {
+      const forward = () => cancellation.abort(signal.reason);
+      signal.addEventListener("abort", forward, { once: true });
+      unlinkCallerSignal = () => signal.removeEventListener("abort", forward);
+    }
+  }
+  const effectiveSignal = ownsSession ? cancellation.signal : signal;
+  const retireOwner = () => {
+    if (ownerRetired) return;
+    if (run !== null) closeRunLock(run, runId, clock);
+    retireInvocationOwner({ repoRoot, runPath, descriptor: automaticRegistration.descriptor, owner: automaticRegistration.owner });
+    ownerRetired = true;
+  };
+  const guard = ownsSession ? guardInvocationOwnerExit({ callerSignal: signal, cancellation, retire: retireOwner }) : null;
   try {
+    cleanupRegistration = automaticRegistration?.receipt
+      ?? registerRun({ schema: "pipeline.verify-cleanup-registration-request.v1", runId, runPath, candidate, policySha256 });
+    if (!validateCleanupRegistration(cleanupRegistration, { runId, runPath })) throw new Error("VERIFY-CLEANUP-REGISTRATION-INVALID");
+    run = createVerifyRun({ gitCommonDir, runId, candidate, policySha256, suites: registrations, cleanupRegistration, clock });
     const prior = loadVerifyResumeArtifacts({ runsRoot: run.runsRoot, currentRunId: runId, suites: registrations });
     const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256, allowCrossCandidateReuse, reuseReceipts });
     atomicJson(join(run.runDir, "resume-plan.json"), plan);
@@ -1023,7 +1172,7 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
     // would misrepresent both this run's own timing and how much the reuse mechanism is saving.
     // `steps` is materialized in registration order regardless of real completion order (see
     // runSuitePool's own comment) -- never completion order.
-    const pooled = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal, serialLaneSuites, exclusiveSuites });
+    const pooled = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, signal: effectiveSignal, serialLaneSuites, exclusiveSuites });
     const { steps, receiptBySuite, childCloseProved: allChildrenClosed } = pooled;
     childCloseProved = allChildrenClosed;
     if (pooled.interrupted) {
@@ -1056,11 +1205,17 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
     atomicJson(join(run.runDir, "terminal.json"), terminal);
     terminalWritten = true;
     return { runId, runDir: run.runDir, policySha256, cleanupRegistration, plan, terminal, steps, execution };
+  } catch (error) {
+    primaryFailure = error;
+    throw error;
   } finally {
     try {
-      const closed = Buffer.from(`${JSON.stringify(verifyRunLock(runId, "closed", clock))}\n`);
-      try { ftruncateSync(run.lockFd, 0); writeSync(run.lockFd, closed, 0, closed.length, 0); fsyncSync(run.lockFd); } finally { closeSync(run.lockFd); }
-      if ((terminalWritten || interruptionWritten) && automaticRegistration !== null) {
+      if (run !== null) closeRunLock(run, runId, clock);
+      if (!(terminalWritten || interruptionWritten) && ownsSession) {
+        // Any exit that sealed neither a terminal nor an interruption (a planning error, a failed
+        // run creation, an exception out of the pool): retire the own owner and its unsealed run.
+        retireOwner();
+      } else if ((terminalWritten || interruptionWritten) && automaticRegistration !== null) {
         const canaryRelative = interruptionWritten ? "interruption.json" : "terminal.json";
         if (automaticRegistration.owner === null) {
           finalizeTemporaryResource(repoRoot, {
@@ -1079,10 +1234,20 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
         }
       }
     } catch (error) {
-      if (automaticRegistration?.owner !== null && automaticRegistration?.owner !== undefined) {
-        throw new Error(`VERIFY-OWNER-CLEANUP-REQUIRED:${runId}`, { cause: error });
+      if (ownsSession) {
+        // Keep the original failure visible: it is the diagnosis the caller needs most.
+        throw primaryFailure === null
+          ? new Error(`VERIFY-OWNER-CLEANUP-REQUIRED:${runId}`, { cause: error })
+          : new AggregateError([primaryFailure, error], `VERIFY-OWNER-CLEANUP-REQUIRED:${runId}: ${primaryFailure?.message ?? primaryFailure}`);
       }
       throw error;
+    } finally {
+      guard?.dispose();
+      unlinkCallerSignal?.();
+      // A termination signal that nobody else handles ends the process with the conventional code,
+      // but only AFTER the owner above has been retired.
+      const exitCode = guard?.exitCode() ?? null;
+      if (exitCode !== null) process.exit(exitCode);
     }
   }
 }
