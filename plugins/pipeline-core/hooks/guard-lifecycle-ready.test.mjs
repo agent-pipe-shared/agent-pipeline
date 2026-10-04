@@ -10744,3 +10744,210 @@ test("SIGNED-AGENT basename admission retains lifecycle denial", () => {
     }
   } finally {rmSync(path,{recursive:true,force:true});}
 });
+
+// ALFRED-W0-4 (backlog 2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes):
+// a shape-invalid readiness OBSERVATION (PORG-INVALID-OBSERVATION, session intent) says nothing about the lifecycle,
+// so it must not strand a session that only wants to record a defect or a decision. The guard's record lane admits
+// Write/Edit/NotebookEdit to backlog/ and docs/ -- and ONLY there, never to a path the persisted pipeline state
+// records (bound PRD / Spec / design input / baseline), never through a hidden segment, a traversal, an absolute or
+// cross-drive spelling, a case variant or a link that leaves the record tree, and never when the state cannot be
+// read. These tests are the tracked regression fence for that lane (GL-09: a fault inside the lane blocks).
+// Cost note: every target OUTSIDE the project root pays the cross-repository check's git probe (about 6 s each on
+// the reference Windows host), so the outside-root spellings are kept to one tool and one state on purpose.
+const QW04_FIXTURES = [];
+process.on("exit", () => {
+  for (const dir of QW04_FIXTURES) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* a throwaway fixture */ }
+  }
+});
+
+const QW04_BOUND_PRD = "docs/prd-bound.md";
+const QW04_BOUND_SPEC = "specs/f/spec.md";
+const QW04_BOUND_DESIGN = "specs/f/design-input.md";
+const QW04_BASELINE = "docs/architecture/baseline.md";
+const QW04_MANIFEST = "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n";
+const QW04_FEATURE = { id: "f", planPath: QW04_BOUND_PRD, specPath: QW04_BOUND_SPEC, designInputPath: QW04_BOUND_DESIGN };
+const QW04_STATES = {
+  draft: { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "design" }, planApproved: false },
+  "awaiting-approval": { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "design" }, planApproved: false, planSubmitted: true },
+  approved: { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "design" }, planApproved: true },
+  implementing: { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "implementation" }, planApproved: true },
+};
+const QW04_LANE_PATHS = ["backlog/items/qw04-defect.md", "docs/qw04-note.md", "docs/qw04/deeper/not-yet-created.md"];
+const QW04_OUTCOMES = {
+  invalid() { throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "raw observation message", { intent: "session" }); },
+  invalidBootstrapIntent() { throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "raw observation message", { intent: "bootstrap" }); },
+  partial() { deny("partial"); },
+  drift() { deny("projection-drift"); },
+};
+
+// `state`: an object (serialized), a string (written verbatim, for unparseable fixtures) or null (no state file).
+function qw04GuardRoot(state) {
+  const path = realpathSync(activeGitRoot());
+  QW04_FIXTURES.push(path);
+  writeFileSync(join(path, ".claude", "pipeline.yaml"), QW04_MANIFEST);
+  if (typeof state === "string") writeFileSync(join(path, ".claude", "pipeline-state.json"), state);
+  else if (state !== null) writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify(state));
+  return path;
+}
+
+function qw04Run(path, toolName, toolInput, outcome = "invalid") {
+  return evaluateLifecycleReadyGuard({ tool_name: toolName, tool_input: toolInput }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn: QW04_OUTCOMES[outcome],
+  });
+}
+
+function qw04AssertRefused(path, targets, label, tools = ["Write", "Edit"]) {
+  for (const toolName of tools) {
+    for (const target of targets) {
+      const result = qw04Run(path, toolName, { file_path: target });
+      assert.equal(result.exitCode, 2, `${label}/${toolName}: admitted ${target}`);
+      assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, `${label}/${toolName}/${target}`);
+    }
+  }
+}
+
+test("QW04-1 a PORG-INVALID-OBSERVATION (session) observation admits Write, Edit and NotebookEdit to backlog/ and docs/ records in every lifecycle status", () => {
+  for (const [status, state] of Object.entries(QW04_STATES)) {
+    const path = qw04GuardRoot(state);
+    for (const toolName of ["Write", "Edit"]) {
+      for (const target of QW04_LANE_PATHS) {
+        const result = qw04Run(path, toolName, { file_path: target });
+        assert.equal(result.exitCode, 0, `${status}/${toolName}/${target}: ${result.stderr}`);
+      }
+    }
+    for (const target of ["docs/qw04.ipynb", "backlog/items/qw04.ipynb"]) {
+      const result = qw04Run(path, "NotebookEdit", { notebook_path: target });
+      assert.equal(result.exitCode, 0, `${status}/NotebookEdit/${target}: ${result.stderr}`);
+    }
+  }
+});
+
+test("QW04-2 the bound PRD, Spec and design input stay refused in every spelling, while a sibling record is admitted", () => {
+  for (const [status, state] of Object.entries(QW04_STATES)) {
+    const path = qw04GuardRoot(state);
+    assert.equal(qw04Run(path, "Write", { file_path: "docs/prd-bound-notes.md" }).exitCode, 0, `${status}: sibling control`);
+    qw04AssertRefused(path, [
+      QW04_BOUND_PRD, "docs/Prd-Bound.md", "./docs/prd-bound.md", "docs//prd-bound.md", "docs\\prd-bound.md",
+      join(path, "docs", "prd-bound.md"), QW04_BOUND_SPEC, QW04_BOUND_DESIGN,
+    ], status);
+  }
+});
+
+test("QW04-3 a path the persisted state records anywhere (here a nested baseline) is refused, its sibling is admitted", () => {
+  const path = qw04GuardRoot({ ...QW04_STATES.approved, architecture: { design: { baseline: QW04_BASELINE } } });
+  assert.equal(qw04Run(path, "Write", { file_path: "docs/architecture/baseline-notes.md" }).exitCode, 0, "sibling control");
+  qw04AssertRefused(path, [QW04_BASELINE, "docs/Architecture/Baseline.md", "./docs/architecture/baseline.md"], "recorded baseline");
+});
+
+test("QW04-4 inside the project nothing outside backlog/ and docs/ is admitted: implementation, protected state and baselines, hidden segments, traversal, case variants", () => {
+  for (const status of ["approved", "implementing"]) {
+    const path = qw04GuardRoot(QW04_STATES[status]);
+    assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, `${status}: lane control`);
+    qw04AssertRefused(path, [
+      "src/app.js", "src/docs/x.md", "specs/other/prd.md",
+      ".claude/pipeline-state.json", ".claude/settings.json", ".claude/docs/x.md",
+      "project/pipeline-state.json", "project/pipeline.json", "project/docs/x.md", "evidence/x.json",
+      "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "docs/.hidden/x.md", "backlog/.hidden.md", "docs/.git/config", "docs/node_modules/x.md",
+      "backlog", "docs",
+      "docs/../src/app.js", "backlog/../project/pipeline-state.json",
+      "Docs/x.md", "BACKLOG/items/x.md",
+    ], status);
+  }
+});
+
+test("QW04-4b targets outside the project root (traversal, absolute and cross-drive spellings) are refused", () => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, "lane control");
+  qw04AssertRefused(path, [
+    "../docs/x.md", "docs/../../outside/docs/x.md", join(dirname(path), "outside", "docs", "x.md"), "Q:/elsewhere/docs/x.md",
+  ], "outside root", ["Write"]);
+});
+
+test("QW04-5 a junction or symlink under docs/ that leaves the record tree is refused", (t) => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  mkdirSync(join(path, "src"), { recursive: true });
+  mkdirSync(join(path, "docs"), { recursive: true });
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-qw04-out-")));
+  QW04_FIXTURES.push(outside);
+  try {
+    symlinkSync(join(path, "src"), join(path, "docs", "linked-src"), "junction");
+    symlinkSync(outside, join(path, "docs", "linked-out"), "junction");
+  } catch {
+    t.skip("junction creation not permitted on this host");
+    return;
+  }
+  assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, "lane control");
+  qw04AssertRefused(path, ["docs/linked-src/app.js", "docs/linked-src/new/dir/app.js"], "link into the project");
+  qw04AssertRefused(path, ["docs/linked-out/x.md"], "link out of the project", ["Write"]);
+});
+
+test("QW04-6 the lane fails closed when the persisted state is absent, empty, unparseable or unreadable", () => {
+  const valid = JSON.stringify(QW04_STATES.approved);
+  const fixtures = {
+    absent: qw04GuardRoot(null),
+    empty: qw04GuardRoot(""),
+    truncated: qw04GuardRoot(valid.slice(0, valid.length - 5)),
+    unreadable: qw04GuardRoot(null),
+    "corrupt project state": qw04GuardRoot(QW04_STATES.approved),
+  };
+  mkdirSync(join(fixtures.unreadable, ".claude", "pipeline-state.json"));
+  mkdirSync(join(fixtures["corrupt project state"], "project"), { recursive: true });
+  writeFileSync(join(fixtures["corrupt project state"], "project", "pipeline-state.json"), "{ not json");
+  for (const [label, path] of Object.entries(fixtures)) qw04AssertRefused(path, ["docs/qw04-note.md", "backlog/items/qw04-defect.md"], label);
+  const control = qw04GuardRoot(QW04_STATES.approved);
+  assert.equal(qw04Run(control, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, "readable state control");
+});
+
+test("QW04-7 the lane exists only for PORG-INVALID-OBSERVATION with session intent: PORG-NOT-READY and a bootstrap-intent observation get nothing", () => {
+  for (const status of ["approved", "implementing"]) {
+    const path = qw04GuardRoot(QW04_STATES[status]);
+    assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }, "invalid").exitCode, 0, `${status}: lane control`);
+    for (const outcome of ["partial", "drift", "invalidBootstrapIntent"]) {
+      for (const toolName of ["Write", "Edit"]) {
+        for (const target of QW04_LANE_PATHS) {
+          const result = qw04Run(path, toolName, { file_path: target }, outcome);
+          assert.equal(result.exitCode, 2, `${status}/${outcome}/${toolName}: admitted ${target}`);
+          assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, `${status}/${outcome}/${toolName}/${target}`);
+        }
+      }
+      assert.equal(qw04Run(path, "NotebookEdit", { notebook_path: "docs/qw04.ipynb" }, outcome).exitCode, 2, `${status}/${outcome}/NotebookEdit`);
+    }
+  }
+});
+
+test("QW04-8 GL-09 fault injection: an exception inside the record lane's own evaluation blocks the write and never admits it", () => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  const target = "docs/qw04-fault.md";
+  let armed = false;
+  let fired = 0;
+  const toolInput = {};
+  Object.defineProperty(toolInput, "file_path", {
+    enumerable: true,
+    configurable: true,
+    get() {
+      if (armed) {
+        const limit = Error.stackTraceLimit;
+        Error.stackTraceLimit = 200;
+        const stack = new Error("qw04 stack probe").stack ?? "";
+        Error.stackTraceLimit = limit;
+        // Throw only while the record lane itself is on the stack, so every other reader of the target
+        // (the scratch lane, the grammar, the cross-repository check) still sees a healthy value.
+        if (/w04IsNonAuthorityRecordWrite/u.test(stack)) {
+          fired += 1;
+          throw new Error("qw04 injected fault inside the record lane");
+        }
+      }
+      return target;
+    },
+  });
+  const control = qw04Run(path, "Write", toolInput);
+  assert.equal(control.exitCode, 0, `unarmed control must be admitted by the lane: ${control.stderr}`);
+  assert.equal(fired, 0, "the unarmed control injects nothing");
+  armed = true;
+  const faulted = qw04Run(path, "Write", toolInput);
+  assert.ok(fired >= 1, "the fault must actually fire inside the record lane (the injection point moved if this fails)");
+  assert.equal(faulted.exitCode, 2, `a throwing lane must block, not admit: ${faulted.stderr}`);
+  assert.match(faulted.stderr, /BLOCKED \(guard-lifecycle-ready/u);
+});

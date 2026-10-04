@@ -834,6 +834,79 @@ function rejectedGrammarElement(code, command, parsed, root) {
   return null;
 }
 
+// ALFRED-W0-4: a session whose readiness OBSERVATION was shape-invalid (PORG-INVALID-OBSERVATION)
+// must still be able to persist ordinary records. Narrow by construction: Write/Edit/NotebookEdit
+// only, a physically contained target whose first path segment (lexical AND physical) is exactly
+// backlog, docs or scratch, no hidden segment, and a path that is NOT mentioned anywhere in the
+// persisted pipeline state (the bound PRD, Spec, design input, architecture design ... are all
+// recorded there as strings). Unreadable or absent state fails closed.
+import { readFileSync as w04ReadFileSync, realpathSync as w04RealpathSync } from "node:fs";
+import { dirname as w04Dirname } from "node:path";
+
+const W04_RECORD_PREFIXES = Object.freeze(["backlog", "docs", "scratch"]);
+
+function w04NormalizeRelative(value) {
+  return value.replaceAll("\\", "/").replace(/^(?:\.\/)+/u, "").toLowerCase();
+}
+
+function w04BoundAuthorityPaths(root) {
+  const paths = new Set();
+  let read = 0;
+  for (const state of [join(root, "project", "pipeline-state.json"), join(root, ".claude", "pipeline-state.json")]) {
+    let text;
+    try { text = w04ReadFileSync(state, "utf8"); } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      return null;
+    }
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { return null; }
+    read += 1;
+    const stack = [parsed];
+    while (stack.length > 0) {
+      const value = stack.pop();
+      if (typeof value === "string") paths.add(w04NormalizeRelative(value));
+      else if (Array.isArray(value)) stack.push(...value);
+      else if (value !== null && typeof value === "object") stack.push(...Object.values(value));
+    }
+  }
+  return read === 0 ? null : paths;
+}
+
+function w04RecordSegments(rel) {
+  if (rel === "" || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return null;
+  const segments = rel.split("/");
+  if (segments.length < 2 || !W04_RECORD_PREFIXES.includes(segments[0])) return null;
+  if (segments.some((segment) => segment === "" || segment.startsWith(".") || segment === "node_modules")) return null;
+  return segments;
+}
+
+function w04IsNonAuthorityRecordWrite(input, toolName, root, dependencies = {}) {
+  try {
+    const target = writeTargetPath(input.tool_input, toolName);
+    if (typeof target !== "string" || target === "" || target.includes("\0")) return false;
+    if (!isProjectWritePath(target, root, dependencies)) return false;
+    const absolute = resolve(root, target);
+    const rel = relative(root, absolute).split(sep).join("/");
+    if (w04RecordSegments(rel) === null) return false;
+    const realRoot = w04RealpathSync(root);
+    let current = absolute;
+    const tail = [];
+    for (;;) {
+      try { current = w04RealpathSync(current); break; } catch {
+        const parent = w04Dirname(current);
+        if (parent === current) return false;
+        tail.unshift(basename(current));
+        current = parent;
+      }
+    }
+    const physicalRel = relative(realRoot, join(current, ...tail)).split(sep).join("/");
+    if (w04RecordSegments(physicalRel) === null) return false;
+    const bound = w04BoundAuthorityPaths(root);
+    if (bound === null) return false;
+    return !bound.has(w04NormalizeRelative(rel)) && !bound.has(w04NormalizeRelative(physicalRel));
+  } catch { return false; }
+}
+
 function blocked(
   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
   remediation = null, nearMissHint = null, observationInvalid = false, firstOccurrenceThisSession = true,
@@ -6248,6 +6321,17 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && !restartResumeHintNearMissWrite(input, root)
       && isBootstrapBindingScratchWrite(input, root, dependencies);
     if (bootstrapBindingScratchWrite) return verdict(0);
+    // ALFRED-W0-4 (backlog 2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes):
+    // an invalid OBSERVATION says nothing about the lifecycle, so it must not strand a session
+    // that only wants to record a defect, a decision or a scratch note. Never keyed on a typed
+    // lifecycleStatus (an invalid observation has none) and never for PORG-NOT-READY.
+    const invalidObservationRecordWrite = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-INVALID-OBSERVATION"
+      && error.intent === "session"
+      && WRITE_TOOLS.includes(toolName)
+      && !restartResumeHintNearMissWrite(input, root)
+      && w04IsNonAuthorityRecordWrite(input, toolName, root, dependencies);
+    if (invalidObservationRecordWrite) return verdict(0);
     const exactObservedOnboardingNextAction = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
