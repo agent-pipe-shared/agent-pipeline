@@ -14,6 +14,10 @@ import {
 } from "./project-onboarding-v3.mjs";
 import { SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA } from "../scripts/settings-allowlist-merge.mjs";
 import { isSessionCapabilityFailurePhase } from "./codex-onboarding-capabilities.mjs";
+import {
+  ORPHAN_ARCHIVE_APPLY_SCHEMA,
+  ORPHAN_ARCHIVE_PLAN_SCHEMA,
+} from "./session-cleanup-recovery.mjs";
 
 export const PROJECT_ONBOARDING_READY_GATE_SCHEMA = "pipeline.project-onboarding-ready-gate.v1";
 // This list stays hand-maintained -- unlike BASE_RESULT_KEYS/READY_ONLY_RESULT_KEYS above,
@@ -100,6 +104,8 @@ const READY_RESULT_KEYS = Object.freeze([...BASE_RESULT_KEYS, ...READY_ONLY_RESU
 const SAFE_STATUS = /^[a-z][a-z0-9-]{0,79}$/u;
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../scripts/settings-allowlist-merge.mjs", import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SHA256_HEX = /^[0-9a-f]{64}$/u;
 
 export class ProjectOnboardingReadyError extends Error {
   constructor(code, message, { intent = null, lifecycleStatus = null, sessionCapabilityFailurePhase = null } = {}) {
@@ -282,6 +288,70 @@ function validRunnerPermissionsPlanner(value, root) {
     && JSON.stringify(value.expected.statuses) === JSON.stringify(["ready", "no-op", "unrepairable"]);
 }
 
+// RF2B (ALFRED-RF2B-20261004): a ready observation may carry exactly one kind of
+// diagnostic -- the typed `cleanup_residue_foreign` warning for foreign
+// zero-authority cleanup residue. Its closed shape is validated here and, like
+// every other action this gate admits, its two typed archive actions are bound
+// to the plugin's OWN resolved session-cleanup.mjs and to the observed root --
+// never to a basename in any directory. Any other diagnostic, extra key or
+// mismatched action keeps the observation invalid (PORG-INVALID-OBSERVATION).
+function validOrphanArchivePlanAction(value, root) {
+  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && value.kind === "command"
+    && value.executable === "node"
+    && JSON.stringify(value.argv) === JSON.stringify([SESSION_CLEANUP_SCRIPT, "plan-archive-orphan", "--repo", root])
+    && value.mutation === false
+    && value.requiresConfirmation === false
+    && exactKeys(value.expected, ["schema", "statuses"])
+    && value.expected.schema === ORPHAN_ARCHIVE_PLAN_SCHEMA
+    && JSON.stringify(value.expected.statuses) === JSON.stringify(["ready"]);
+}
+
+function validOrphanArchiveApplyAction(value, root) {
+  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "requiresInput", "executionBoundary", "expected"])
+    && value.kind === "command"
+    && value.executable === "node"
+    && Array.isArray(value.argv)
+    && value.argv.length === 12
+    && value.argv.every((entry) => typeof entry === "string")
+    && value.argv[0] === SESSION_CLEANUP_SCRIPT
+    && value.argv[1] === "archive-orphan"
+    && value.argv[2] === "--repo"
+    && value.argv[3] === root
+    && value.argv[4] === "--session-descriptor"
+    && value.argv[5].length > 0 && !value.argv[5].startsWith("--")
+    && value.argv[6] === "--expected-descriptor-sha256"
+    && SHA256_HEX.test(value.argv[7])
+    && value.argv[8] === "--by"
+    && value.argv[9] === "<operator>"
+    && value.argv[10] === "--reason"
+    && value.argv[11] === "<reason>"
+    && value.mutation === true
+    && value.requiresConfirmation === false
+    && JSON.stringify(value.requiresInput) === JSON.stringify(["--by", "--reason"])
+    && value.executionBoundary === "local-process"
+    && exactKeys(value.expected, ["schema", "statuses"])
+    && value.expected.schema === ORPHAN_ARCHIVE_APPLY_SCHEMA
+    && JSON.stringify(value.expected.statuses) === JSON.stringify(["archived", "already-archived"]);
+}
+
+export function validForeignCleanupResidueWarning(value, root) {
+  return exactKeys(value, ["path", "code", "message", "guidance", "severity", "nextAction", "archiveActions"])
+    && value.path === "$.authority.sessionCleanup"
+    && value.code === "cleanup_residue_foreign"
+    && value.severity === "warning"
+    && typeof value.message === "string" && value.message.length > 0
+    && typeof value.guidance === "string"
+    && validOrphanArchivePlanAction(value.nextAction, root)
+    && Array.isArray(value.archiveActions)
+    && value.archiveActions.length > 0
+    && value.archiveActions.every((action) => validOrphanArchiveApplyAction(action, root));
+}
+
+function validReadyDiagnostics(value, root) {
+  return Array.isArray(value) && value.every((entry) => validForeignCleanupResidueWarning(entry, root));
+}
+
 function validReadyNextAction(value, root) {
   if (value === null) return true;
   if (validPlanLifecycleInspectCommand(value)) return true;
@@ -408,8 +478,7 @@ export function requireProjectOnboardingReady({
     || !plainObject(observed.appServer)
     || !validRunnerPermissions(observed.runnerPermissions, resolvedRunner, physicalRoot)
     || !validReadyNextAction(observed.nextAction, physicalRoot)
-    || !Array.isArray(observed.diagnostics)
-    || observed.diagnostics.length !== 0) {
+    || !validReadyDiagnostics(observed.diagnostics, physicalRoot)) {
     fail(
       "PORG-INVALID-OBSERVATION",
       `Project onboarding readiness returned an invalid result for intent ${intent}.`,

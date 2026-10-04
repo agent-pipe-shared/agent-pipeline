@@ -13,7 +13,9 @@ import {
   PROJECT_ONBOARDING_READY_GATE_SCHEMA,
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
+  validForeignCleanupResidueWarning,
 } from "./project-onboarding-ready-gate.mjs";
+import { planOrphanDescriptorArchive } from "./session-cleanup-recovery.mjs";
 import {
   expectedPipelineScriptsRunnerAllowlistEntries,
   inspectProjectOnboardingV3,
@@ -877,5 +879,131 @@ test("a real, non-stubbed inspectProjectOnboardingV3() result is driven straight
       runner: "codex",
       inspect: () => ({ ...real, status: "a-status-this-gate-has-never-heard-of" }),
     }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// RF2B (ALFRED-RF2B2-20261004): the one diagnostic a ready observation may carry --
+// the typed `cleanup_residue_foreign` warning. The two archive actions inside it are
+// the producer's OWN, built here by the real planner over stubbed observation seams, so
+// the gate's validator is pinned against actual producer output rather than a
+// hand-typed copy that only agrees with itself; the read-only plan action is the one
+// literal the producer does not export.
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+
+function foreignResidueWarning(rootDir, sessionIds = ["foreign-a"]) {
+  const offer = planOrphanDescriptorArchive({
+    rootDir,
+    scriptPath: SESSION_CLEANUP_SCRIPT,
+    deps: {
+      listActiveSessionDescriptorsFn: () => sessionIds.map((sessionId, index) => ({
+        sessionId,
+        descriptorSha256: String(index + 1).repeat(64),
+      })),
+      inspectOrphanArchiveEligibilityFn: () => ({ status: "eligible", ownerStatus: "unavailable", resume: false }),
+      readOnboardingSessionCleanupBindingFn: () => ({ status: "unbound" }),
+    },
+  });
+  assert.equal(offer.status, "ready");
+  assert.equal(offer.candidates.length, sessionIds.length);
+  return {
+    path: "$.authority.sessionCleanup",
+    code: "cleanup_residue_foreign",
+    message: "retained cleanup residue belongs to a foreign session and carries no authority",
+    guidance: "archive it with the exact digest-bound archive-orphan action when convenient; it does not block this session",
+    severity: "warning",
+    nextAction: {
+      kind: "command",
+      executable: "node",
+      argv: [SESSION_CLEANUP_SCRIPT, "plan-archive-orphan", "--repo", rootDir],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: { schema: "pipeline.session-orphan-archive-plan.v1", statuses: ["ready"] },
+    },
+    archiveActions: offer.candidates.map((candidate) => candidate.action),
+  };
+}
+
+test("validForeignCleanupResidueWarning accepts exactly the closed foreign-residue warning and rejects every tamper", () => {
+  const path = root();
+  try {
+    const rootDir = realpathSync(path);
+    const good = foreignResidueWarning(rootDir, ["foreign-a", "foreign-b"]);
+    assert.equal(validForeignCleanupResidueWarning(good, rootDir), true);
+    assert.equal(validForeignCleanupResidueWarning(foreignResidueWarning(rootDir), rootDir), true);
+
+    const elsewhere = join(tmpdir(), "foreign-plugin", "scripts", "session-cleanup.mjs");
+    const tampers = {
+      "severity": (w) => { w.severity = "error"; },
+      "extra top-level key": (w) => { w.extra = true; },
+      "missing key": (w) => { delete w.guidance; },
+      "wrong code": (w) => { w.code = "cleanup_recovery_required"; },
+      "wrong path": (w) => { w.path = "$.runtime"; },
+      "empty archiveActions": (w) => { w.archiveActions = []; },
+      "archiveActions not an array": (w) => { w.archiveActions = w.archiveActions[0]; },
+      "flipped mutation on the read-only plan action": (w) => { w.nextAction.mutation = true; },
+      "flipped mutation on an archive action": (w) => { w.archiveActions[1].mutation = false; },
+      "flipped confirmation on an archive action": (w) => { w.archiveActions[0].requiresConfirmation = true; },
+      "wrong script path on the plan action (same basename, other directory)": (w) => { w.nextAction.argv[0] = elsewhere; },
+      "wrong script path on an archive action (same basename, other directory)": (w) => { w.archiveActions[1].argv[0] = elsewhere; },
+      "a different script": (w) => { w.archiveActions[0].argv[0] = SESSION_CLEANUP_SCRIPT.replace("session-cleanup.mjs", "pipeline-state.mjs"); },
+      "wrong verb": (w) => { w.archiveActions[0].argv[1] = "release-orphan-binding"; },
+      "other repository": (w) => { w.archiveActions[0].argv[3] = join(tmpdir(), "elsewhere"); },
+      "malformed digest": (w) => { w.archiveActions[0].argv[7] = "not-a-digest"; },
+      "pre-filled operator": (w) => { w.archiveActions[0].argv[9] = "mallory"; },
+      "extra argv entry": (w) => { w.archiveActions[0].argv.push("--force"); },
+      "wrong executable": (w) => { w.nextAction.executable = "bash"; },
+      "wrong expected schema": (w) => { w.archiveActions[0].expected.schema = "pipeline.inspect.v1"; },
+      "plan action carries an extra key": (w) => { w.nextAction.requiresInput = ["--by"]; },
+    };
+    for (const [label, tamper] of Object.entries(tampers)) {
+      const tampered = structuredClone(good);
+      tamper(tampered);
+      assert.equal(validForeignCleanupResidueWarning(tampered, rootDir), false, label);
+    }
+    assert.equal(validForeignCleanupResidueWarning(good, join(tmpdir(), "another-root")), false, "bound to the observed root");
+    for (const scalar of [null, undefined, "warning", [], 0]) {
+      assert.equal(validForeignCleanupResidueWarning(scalar, rootDir), false, String(scalar));
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("a ready observation carrying exactly the foreign-residue warnings passes the gate while any other diagnostic is still PORG-INVALID-OBSERVATION", () => {
+  const path = root();
+  try {
+    const rootDir = realpathSync(path);
+    const gate = (diagnostics) => requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "claude",
+      inspect: () => ({ ...readyResultWithPushApprovalKeys(path, "session", "claude"), diagnostics }),
+    });
+    for (const diagnostics of [[], [foreignResidueWarning(rootDir)], [foreignResidueWarning(rootDir, ["foreign-a", "foreign-b"])]]) {
+      assert.deepEqual(gate(diagnostics), {
+        schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
+        status: "ready",
+        intent: "session",
+      }, `${diagnostics.length} diagnostics`);
+    }
+
+    const otherDiagnostic = {
+      path: "$.authority.sessionCleanup",
+      code: "cleanup_recovery_required",
+      message: "exact retained cleanup residue blocks authority completion",
+      guidance: "apply only the descriptor- and digest-bound cleanup recovery action",
+    };
+    const invalid = {
+      "a different diagnostic": [otherDiagnostic],
+      "the warning next to a different diagnostic": [foreignResidueWarning(rootDir), otherDiagnostic],
+      "a tampered severity": [{ ...foreignResidueWarning(rootDir), severity: "error" }],
+      "an extra key": [{ ...foreignResidueWarning(rootDir), extra: true }],
+      "a warning built for another root": [foreignResidueWarning(join(tmpdir(), "another-root"))],
+      "a non-array": foreignResidueWarning(rootDir),
+      "null": null,
+    };
+    for (const [label, diagnostics] of Object.entries(invalid)) {
+      assert.throws(() => gate(diagnostics), (error) => error instanceof ProjectOnboardingReadyError
+        && error.code === "PORG-INVALID-OBSERVATION"
+        && error.lifecycleStatus === null, label);
+    }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

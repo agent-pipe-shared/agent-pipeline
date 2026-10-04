@@ -280,6 +280,7 @@ import {
   applyOrphanDescriptorArchive,
   planOrphanDescriptorArchive,
 } from "../lib/session-cleanup-recovery.mjs";
+import { inspectOrphanArchiveEligibility } from "../lib/worktree-lifecycle.mjs";
 
 /**
  * The requester's own capability, when it presents one: the owner nonce from
@@ -685,6 +686,32 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
         throw new WorktreeLifecycleError(
           "WT-SESSION-BINDING",
           "requested session ID conflicts with the persisted cleanup descriptor",
+        );
+      }
+      // RF2B: never silently adopt a FOREIGN bound descriptor. When the bound
+      // descriptor is a zero-authority orphan that is not this requester's own
+      // (no owner nonce / --session match), starting would leave the single
+      // binding slot pointing at somebody else's descriptor, so refuse with a
+      // typed code that names the archive action instead. Own, observable and
+      // authority-bearing descriptors keep today's reuse behaviour.
+      const inspectEligibility = dependencies.inspectOrphanArchiveEligibilityFn
+        ?? inspectOrphanArchiveEligibility;
+      // Foreignness is only PROVABLE when the requester presents an identity
+      // (an owner nonce) that is not the descriptor's own; an identity-less
+      // `start` is the documented resume form and stays a reuse.
+      const presentedNonce = requesterOwnerNonce(flags, env, {
+        platform: dependencies.platform,
+        assessWindowsPrivate: dependencies.assessWindowsPrivate,
+      });
+      const verdict = presentedNonce === null ? null : inspectEligibility(repo, binding.sessionCleanup.sessionId, {
+        expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+        requesterOwnerNonce: presentedNonce,
+        requesterSessionId: flags.session,
+      });
+      if (verdict?.status === "eligible") {
+        throw new WorktreeLifecycleError(
+          "WT-SESSION-FOREIGN-ORPHAN-BOUND",
+          `the bound cleanup descriptor ${binding.sessionCleanup.sessionId} is a foreign zero-authority orphan; archive it first with "plan-archive-orphan" then "archive-orphan --session-descriptor ${binding.sessionCleanup.sessionId} --expected-descriptor-sha256 ${binding.sessionCleanup.descriptorSha256}"`,
         );
       }
       const reused = loadDescriptor(repo, binding.sessionCleanup.sessionId, {

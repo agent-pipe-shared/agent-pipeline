@@ -233,6 +233,51 @@ test("start binds once, resumes the exact descriptor and rotates only after clos
   }
 });
 
+// RF2B (ALFRED-RF2B-20261004): the single binding slot must not end up pointing
+// at somebody else's descriptor. A requester that presents an identity (owner
+// nonce) which is NOT the bound descriptor's own, over a zero-authority orphan,
+// is refused with a typed code that names the archive action; the identity-less
+// resume form, the requester's own descriptor and an authority-bearing
+// descriptor keep today's reuse, and the binding is never mutated.
+test("start refuses to adopt a provably foreign bound orphan and names the archive action", () => {
+  const root = fixture("foreign-bound-orphan");
+  try {
+    const first = invoke(["start", "--repo", root, "--session", "session-foreign-orphan"]);
+    assert.equal(first.output.code, "WT-SESSION-STARTED");
+    const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+
+    assert.equal(invoke(["start", "--repo", root]).output.code, "WT-SESSION-REUSED");
+
+    const presenter = { PIPELINE_SESSION_OWNER_NONCE: "another-sessions-owner-nonce-0123456789" };
+    let inspected = 0;
+    assert.throws(
+      () => invokeWithEnv(["start", "--repo", root], presenter, {
+        inspectOrphanArchiveEligibilityFn(_repo, sessionId, options) {
+          inspected += 1;
+          assert.equal(sessionId, first.output.sessionId);
+          assert.equal(options.expectedDescriptorSha256, first.output.descriptorSha256);
+          assert.equal(options.requesterOwnerNonce, presenter.PIPELINE_SESSION_OWNER_NONCE);
+          return { status: "eligible" };
+        },
+      }),
+      (error) => error?.code === "WT-SESSION-FOREIGN-ORPHAN-BOUND"
+        && error.message.includes("archive-orphan")
+        && error.message.includes(first.output.descriptorSha256),
+    );
+    assert.equal(inspected, 1);
+
+    for (const code of ["WT-ORPHAN-ARCHIVE-OWN-SESSION", "WT-ORPHAN-ARCHIVE-AUTHORITY", "WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE"]) {
+      const reused = invokeWithEnv(["start", "--repo", root], presenter, {
+        inspectOrphanArchiveEligibilityFn: () => ({ status: "refused", code }),
+      });
+      assert.equal(reused.output.code, "WT-SESSION-REUSED", code);
+    }
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("start honors an explicit --runner over the CLAUDECODE-derived boundary default", () => {
   const root = fixture("runner-flag");
   try {
@@ -1771,11 +1816,20 @@ test("unbound recovery refuses multiple or replaced active descriptors", () => {
     const first = startSessionDescriptor(root, { sessionId: "session-binding-orphan-first" });
     startSessionDescriptor(root, { sessionId: "session-binding-orphan-second" });
     const multiple = invoke(["plan-recovery", "--repo", root]).output;
-    assert.deepEqual(multiple, {
+    // RF2A + PO decision 2026-10-04: with no cleanup manifest active anywhere in
+    // the repository, every zero-authority orphan is additionally offered the
+    // signature-free archive (this assertion used to pin the bare dead end for
+    // a multi-orphan set). The dead-end plan itself is unchanged.
+    const { archiveOrphan, ...deadEnd } = multiple;
+    assert.deepEqual(deadEnd, {
       schema: "pipeline.session-cleanup-recovery-plan.v1",
       status: "orphan-recovery-unavailable",
       activeDescriptorCount: 2,
     });
+    assert.deepEqual(
+      archiveOrphan.candidates.map((candidate) => candidate.sessionId),
+      ["session-binding-orphan-first", "session-binding-orphan-second"],
+    );
 
     unlinkSync(loadSessionDescriptor(root, "session-binding-orphan-second").path);
     const plan = invoke(["plan-recovery", "--repo", root]).output;
