@@ -11,13 +11,18 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import {randomUUID} from 'node:crypto';
-import {coordinateInitialDesignAdvisory} from '../lib/design-advisory-coordinator-v2.mjs';
+import {coordinateInitialDesignAdvisory,rederiveNativeNoChildAdvisory} from '../lib/design-advisory-coordinator-v2.mjs';
 import {createNativeInitialAdvisorExecution} from '../lib/native-initial-advisor-execution.mjs';
 import {observeAdvisorCandidate} from '../lib/design-advisor-provenance.mjs';
 import {designAdvisorValueSha256} from '../lib/design-advisor-course.mjs';
 import {loadRunnerProfilesV3Registry} from '../lib/runner-profiles-v3.mjs';
 import {requireProjectOnboardingReady} from '../lib/project-onboarding-ready-gate.mjs';
 import {parseCodexDesignAdvisorArgs,runCodexDesignAdvisorBootstrap,exportCodexDesignAdvisorArtifacts} from './codex-design-advisor-bootstrap.mjs';
+// Operator hotfix 8 (native child course): extra imports for the prior-course read and the continuity-bound owner decision.
+import {lstatSync} from 'node:fs';
+import {join} from 'node:path';
+import {resolvePoGateRepositoryTopology,derivePoGateRepositoryFingerprint} from '../lib/po-gate-authority.mjs';
+import {readCurrentDesignAdvisorCourseWithInitialContext} from '../lib/design-advisor-course-store.mjs';
 
 import { coordinateLegacyDesignAdvisory } from "../lib/design-advisory-coordinator.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -81,9 +86,41 @@ async function runInitialCoordinator(argv){
  const route={model:null,effort:null,sourceSha256:designAdvisorValueSha256(loadRunnerProfilesV3Registry()),candidateCommit:candidate.commit};
  if(args.inspect)return {ok:true,status:'native-initial-answer-provenance-unavailable',candidate,route,childStarted:false,inputSubmitted:false,implementationAuthority:false};
  const dispatch={dispatchId:'advisor_'+randomUUID(),queueRevision:0,candidateCommit:candidate.commit,candidateTree:candidate.tree};
- const result=await coordinateInitialDesignAdvisory({repoRoot:root,runner,featureId:args['feature-id'],authoringDispatchId:args['authoring-dispatch-id'],sources:args.sources,reason:'risk-review',profile:args.profile,dispatch,route,hostExecution:createNativeInitialAdvisorExecution({runner})});
- if(result.status!=='unavailable-pending-final-approval')return result;
- return {ok:false,status:result.status,code:result.code,runner,profile:args.profile,route,courseBinding:result.courseBinding,hostReceipt:null,artifacts:exportCodexDesignAdvisorArtifacts(root,args['output-prefix'],result),implementationAuthority:false};
+ const coordinate=extra=>coordinateInitialDesignAdvisory({repoRoot:root,runner,featureId:args['feature-id'],authoringDispatchId:args['authoring-dispatch-id'],sources:args.sources,reason:'risk-review',profile:args.profile,dispatch,route,hostExecution:createNativeInitialAdvisorExecution({runner}),...extra});
+ let result=await coordinate();
+ // Operator hotfix 8: the feature's current course is terminal and was opened for a DIFFERENT authoring dispatch (a revised design).
+ // Only then, and only with the explicit continuity-registration decision, open a child course. Every other refusal is unchanged.
+ if(result?.code==='DAC2-COURSE-ALREADY-EXISTS'&&result.course?.status==='reuse-terminal'){
+  const parentCourseId=result.course.courseId;let priorAuthoringDispatchId=null;
+  try{const topology=resolvePoGateRepositoryTopology(root),read=readCurrentDesignAdvisorCourseWithInitialContext({gitCommonDir:topology.gitCommonDir,repoFingerprint:derivePoGateRepositoryFingerprint(topology),featureId:args['feature-id'],runner});if(read.status==='reuse-terminal'&&read.courseId===parentCourseId&&read.stateSha256===result.course.stateSha256)priorAuthoringDispatchId=read.initialContext?.authoringDispatchId;}catch{}
+  if(typeof priorAuthoringDispatchId==='string'&&priorAuthoringDispatchId!==args['authoring-dispatch-id'])result=await coordinate({newCourseParentId:parentCourseId,observeInitialCourseDecision:nativeChildCourseDecisionObserver({root,args,parentCourseId})});
+ }
+ return publishNativeInitialResult({root,args,runner,route,result});
+}
+/** Operator hotfix 4: when the course is already terminal (no-child unavailable) because a first run crashed
+ * before its public export, re-derive the export from the private store and publish it (resume: identical
+ * bytes only). A re-run after a complete export writes nothing and returns the same result. */
+export function publishNativeInitialResult({root,args,runner,route,result}){
+ const rederived=result?.code==='DAC2-COURSE-ALREADY-EXISTS'?rederiveNativeNoChildAdvisory({repoRoot:root,featureId:args['feature-id'],authoringDispatchId:args['authoring-dispatch-id'],sources:args.sources,runner,existing:result.course}):null;
+ const final=rederived??result;
+ if(final.status!=='unavailable-pending-final-approval')return final;
+ return {ok:false,status:final.status,code:final.code,runner,profile:args.profile,route,courseBinding:final.courseBinding,hostReceipt:null,artifacts:exportCodexDesignAdvisorArtifacts(root,args['output-prefix'],final,{resume:final.rederived===true}),implementationAuthority:false};
+}
+/** Operator hotfix 8: the explicit owner decision for a child Advisor course is the continuity registration of the NEW
+ * authoring dispatch (project/pipeline-state.json, read fresh from the physical repository root, synchronously). It is
+ * approved only when the registered feature, dispatch id and prd/spec digests equal the CLI arguments; the decision
+ * digest is the canonical digest of the registered dispatch identity. Anything else is unavailable (fail closed). */
+export function nativeChildCourseDecisionObserver({root,args,parentCourseId}){
+ const unbound=()=>({status:'unavailable',code:'DAC-CHILD-COURSE-DECISION-UNBOUND'});
+ return request=>{
+  try{
+   const file=join(root,'project','pipeline-state.json'),info=lstatSync(file);
+   if(!info.isFile()||info.isSymbolicLink()||info.size>8388608||realpathSync(file)!==resolve(file))return unbound();
+   const continuity=JSON.parse(readFileSync(file,'utf8'))?.continuity,dispatch=continuity?.queueHead?.dispatch,prd=args.sources.prd.sha256,spec=args.sources.spec.sha256;
+   if(request?.kind!=='new-substantive-question'||request.parentCourseId!==parentCourseId||!/^[a-f0-9]{64}$/u.test(request.initialContextSha256??'')||continuity?.featureId!==args['feature-id']||dispatch?.featureId!==args['feature-id']||dispatch.dispatchId!==args['authoring-dispatch-id']||dispatch.authorityDigests?.prdSha256!==prd||dispatch.authorityDigests?.specSha256!==spec||continuity.authority?.prd?.sha256!==prd||continuity.authority?.spec?.sha256!==spec)return unbound();
+   return {status:'approved',kind:'new-substantive-question',parentCourseId:request.parentCourseId,initialContextSha256:request.initialContextSha256,decisionRef:dispatch.dispatchId,decisionSha256:designAdvisorValueSha256(dispatch)};
+  }catch{return unbound();}
+ };
 }
 
 if (isDirectInvocation(import.meta.url)) {
