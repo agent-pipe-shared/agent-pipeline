@@ -40,3 +40,15 @@ path is `hooks/guard-lifecycle-ready.mjs`; bounded pipeline parsing in
 The first prepared passive-read patch was rejected by an independent Critic
 because it explicitly admitted `~/.ssh/id_rsa` and left these existing command
 option holes open. The patch must not be signed or applied as-is.
+
+## Evidence 2026-10-04 (code reading, prework W1-3, not probed)
+
+- The git read-only option denylist matches exact spellings, while git accepts
+  abbreviated long options, so an abbreviated spelling of a denied option passes.
+- `git fetch` is admitted wholesale, including `--upload-pack`, which executes a
+  program.
+- `-C <dir>` is uncontained: it redirects the command to any directory.
+- `git config` is unscreened.
+
+These belong to the R2 work package (W1-5) and to the closed-grammar acceptance
+above; verify with synthetic fixtures only.
