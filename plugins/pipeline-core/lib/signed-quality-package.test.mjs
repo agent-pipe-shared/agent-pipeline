@@ -291,3 +291,139 @@ test("postcommit distinguishes an absent selected receipt from present invalid a
   assert.equal(verifyQualityPackageIntegrationPostCommit({repoRoot:item.root,commitSha:commit,intentSha256:auth.intentSha256}).code,"QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID");
  }finally{rmSync(item.root,{recursive:true,force:true});}
 });
+
+// ---------- Operator hotfix 11: the signed quality package route on native Windows ----------
+// Defect (pre-hotfix): (a) `git rev-parse --show-toplevel` reports "D:/x/y" with forward slashes on Git for Windows and was compared with
+// `!==` against the Node-resolved "D:\x\y", so a valid committed policy was refused on win32 (QUALITY-PACKAGE-COMMITTED-POLICY-INVALID);
+// (b) the receipt checks required `(stat.mode & 0o077) === 0`, but win32 reports a fixed 0o666 mode, so every receipt the module wrote
+// itself was refused. These cases pin the platform-parity behaviour; the fixtures set core.autocrlf=false so they do not depend on the
+// host's line-ending configuration.
+import { chmodSync, existsSync, lstatSync, rmSync as rmSyncHf11, unlinkSync, writeFileSync as writeFileSyncHf11 } from "node:fs";
+import { dirname } from "node:path";
+import { applyCommittedQualityPackage, gitReportedPathIsSamePhysicalPath, receiptModeBitsRefused } from "./signed-quality-package.mjs";
+
+const HF11_ACCEPTED_BEFORE_COMMIT = { commitAuthorization: "QUALITY-PACKAGE-COMMIT-VERIFIED", preCommit: "QUALITY-PACKAGE-INTEGRATION-PRECOMMIT-VERIFIED" };
+const HF11_REFUSED_RECEIPT = { commitAuthorization: "QUALITY-PACKAGE-COMMIT-ABSENT", preCommit: "QUALITY-PACKAGE-INTEGRATION-AUTHORIZATION-INVALID" };
+
+function hf11Repo(label) {
+  const root = mkdtempSync(join(FIXTURE_TMP, `hf11-${label}-`));
+  git(root, ["init", "-q"]);
+  for (const [key, value] of [["user.email", "test@example.invalid"], ["user.name", "Test"], ["core.autocrlf", "false"], ["commit.gpgsign", "false"]]) git(root, ["config", key, value]);
+  const keys = generateKeyPairSync("ed25519"); const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
+  writeFileSync(join(root, "subject.txt"), "before\n");
+  mkdirSync(join(root, "project"));
+  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "test-key", publicKeySha256: sha(publicKey) }] }));
+  git(root, ["add", "subject.txt", "project/critical-human-proof.json"]); git(root, ["commit", "-qm", "base"]);
+  const record = { schema: SIGNED_QUALITY_PACKAGE_SCHEMA, baseCommit: git(root, ["rev-parse", "HEAD"]), unifiedDiff: "diff --git a/subject.txt b/subject.txt\nindex df967b9..3e75765 100644\n--- a/subject.txt\n+++ b/subject.txt\n@@ -1 +1 @@\n-before\n+after\n", expectedDigests: { "subject.txt": sha("after\n") } };
+  record.intentSha256 = qualityPackageIntentSha256(record);
+  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: record.intentSha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(record.intentSha256), keys.privateKey).toString("base64") };
+  return { root, record, proof };
+}
+
+/** A repository with the package applied, staged and authorized (the state a commit hook sees); returns the receipt path. */
+function hf11Authorized(label) {
+  const item = hf11Repo(label);
+  assert.equal(applyCommittedQualityPackage({ repoRoot: item.root, packageIntent: item.record, proof: item.proof, applyToMain: true }).code, "QUALITY-PACKAGE-APPLIED");
+  git(item.root, ["add", "subject.txt"]);
+  assert.equal(authorizeQualityPackageCommit({ repoRoot: item.root, packageIntent: item.record, proof: item.proof }).code, "QUALITY-PACKAGE-COMMIT-AUTHORIZED");
+  const commonDir = git(item.root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  const receipt = join(commonDir, "agent-pipeline", "signed-quality-packages", "commit-authorizations", `${item.record.intentSha256}.json`);
+  assert.equal(existsSync(receipt), true);
+  return { ...item, receipt };
+}
+
+const hf11Verdicts = (item) => ({
+  commitAuthorization: verifyQualityPackageCommitAuthorization({ repoRoot: item.root }).code,
+  preCommit: verifyQualityPackageIntegrationPreCommit({ repoRoot: item.root, intentSha256: item.record.intentSha256 }).code,
+});
+
+test("hotfix 11: receiptModeBitsRefused skips the POSIX mode-bit term on win32 only and fails closed on every platform that has mode bits", () => {
+  for (const mode of [0o666, 0o644, 0o640, 0o604, 0o777, 0o600, 0o400, 0o060, 0o006, 0o100666]) assert.equal(receiptModeBitsRefused(mode, "win32"), false, `win32 ${mode.toString(8)}`);
+  for (const platform of ["linux", "darwin", "freebsd"]) {
+    for (const mode of [0o600, 0o400, 0o700, 0o100600]) assert.equal(receiptModeBitsRefused(mode, platform), false, `${platform} ${mode.toString(8)}`);
+    for (const mode of [0o644, 0o640, 0o604, 0o660, 0o606, 0o666, 0o777, 0o060, 0o006, 0o100644]) assert.equal(receiptModeBitsRefused(mode, platform), true, `${platform} ${mode.toString(8)}`);
+    for (const mode of [undefined, null, "600", Number.NaN, 1.5]) assert.equal(receiptModeBitsRefused(mode, platform), true, `${platform} non-integer ${String(mode)}`);
+  }
+  assert.equal(receiptModeBitsRefused(0o644), process.platform !== "win32", "the default platform is the running platform");
+  assert.equal(receiptModeBitsRefused(0o600), false);
+});
+
+test("hotfix 11: gitReportedPathIsSamePhysicalPath accepts the spellings of one directory (Git's forward slashes on win32) and rejects any other", () => {
+  const base = mkdtempSync(join(FIXTURE_TMP, "hf11-paths-"));
+  try {
+    const dirA = join(base, "Dir-A"); const dirB = join(base, "Dir-B");
+    mkdirSync(dirA); mkdirSync(dirB);
+    const same = gitReportedPathIsSamePhysicalPath;
+    assert.equal(same(dirA, dirA), true);
+    assert.equal(same(dirA.replaceAll("\\", "/"), dirA), true, "Git for Windows spelling (a no-op spelling change on POSIX)");
+    assert.equal(same(`${dirA.replaceAll("\\", "/")}/`, dirA), true);
+    assert.equal(same(dirB, dirA), false);
+    assert.equal(same(base, dirA), false);
+    assert.equal(same(dirname(dirA), dirA), false);
+    assert.equal(same(join(dirA, "does-not-exist"), dirA), false);
+    for (const bad of ["", "Dir-A", undefined, null]) assert.equal(same(bad, dirA), false, `unusable value ${String(bad)}`);
+    const flipped = dirA.replace(/[A-Za-z]/gu, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase()));
+    assert.notEqual(flipped, dirA);
+    assert.equal(same(flipped, dirA), process.platform === "win32", "a different-case spelling is the same directory on win32 only");
+    const link = join(base, "link-to-a");
+    let linked = true;
+    try { symlinkSync(dirA, link, process.platform === "win32" ? "junction" : "dir"); } catch { linked = false; }
+    if (linked) { assert.equal(same(link, dirA), true); assert.equal(same(link, dirB), false); }
+  } finally { rmSyncHf11(base, { recursive: true, force: true }); }
+});
+
+test("hotfix 11: verify, apply, authorize-commit and the commit-time verifiers accept a correctly signed package end to end (native Windows included)", () => {
+  const item = hf11Repo("e2e");
+  try {
+    const request = { repoRoot: item.root, packageIntent: item.record, proof: item.proof };
+    assert.equal(applyCommittedQualityPackage(request).code, "QUALITY-PACKAGE-VERIFIED", "pre-hotfix win32: QUALITY-PACKAGE-COMMITTED-POLICY-INVALID");
+    assert.equal(readFileSync(join(item.root, "subject.txt"), "utf8"), "before\n");
+    assert.equal(applyCommittedQualityPackage({ ...request, applyToMain: true }).code, "QUALITY-PACKAGE-APPLIED");
+    assert.equal(readFileSync(join(item.root, "subject.txt"), "utf8"), "after\n");
+    git(item.root, ["add", "subject.txt"]);
+    assert.equal(authorizeQualityPackageCommit(request).code, "QUALITY-PACKAGE-COMMIT-AUTHORIZED");
+    assert.equal(authorizeQualityPackageCommit(request).code, "QUALITY-PACKAGE-COMMIT-AUTHORIZED", "a repeated authorize-commit re-reads the existing receipt");
+    assert.deepEqual(hf11Verdicts(item), HF11_ACCEPTED_BEFORE_COMMIT);
+    git(item.root, ["commit", "-qm", "integration"]);
+    const commitSha = git(item.root, ["rev-parse", "HEAD"]);
+    assert.equal(verifyQualityPackageIntegrationPostCommit({ repoRoot: item.root, commitSha, intentSha256: item.record.intentSha256 }).code, "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED");
+  } finally { rmSyncHf11(item.root, { recursive: true, force: true }); }
+});
+
+test("hotfix 11: the path normalisation relaxes nothing (subdirectory root, forged proof, wrong key, dirty tree, tampered policy)", () => {
+  const item = hf11Repo("neg");
+  try {
+    const request = { packageIntent: item.record, proof: item.proof };
+    assert.equal(applyCommittedQualityPackage({ repoRoot: join(item.root, "project"), ...request }).code, "QUALITY-PACKAGE-COMMITTED-POLICY-INVALID", "a subdirectory is not the Git top level");
+    const forged = { ...item.proof, signatureBase64: Buffer.alloc(64).toString("base64") };
+    assert.equal(applyCommittedQualityPackage({ repoRoot: item.root, packageIntent: item.record, proof: forged }).ok, false);
+    const stranger = generateKeyPairSync("ed25519");
+    const wrongKey = { ...item.proof, publicKey: stranger.publicKey.export({ type: "spki", format: "pem" }), signatureBase64: sign(null, Buffer.from(item.record.intentSha256), stranger.privateKey).toString("base64") };
+    assert.equal(applyCommittedQualityPackage({ repoRoot: item.root, packageIntent: item.record, proof: wrongKey }).ok, false);
+    writeFileSyncHf11(join(item.root, "subject.txt"), "dirty\n");
+    assert.equal(applyCommittedQualityPackage({ repoRoot: item.root, ...request, applyToMain: true }).code, "QUALITY-PACKAGE-BASE-DRIFT");
+    writeFileSyncHf11(join(item.root, "subject.txt"), "before\n");
+    const policyPath = join(item.root, "project", "critical-human-proof.json");
+    const policyBytes = readFileSync(policyPath);
+    writeFileSyncHf11(policyPath, `${policyBytes.toString("utf8")}\n`);
+    assert.equal(applyCommittedQualityPackage({ repoRoot: item.root, ...request }).code, "QUALITY-PACKAGE-COMMITTED-POLICY-INVALID", "worktree policy bytes that differ from the committed blob");
+    writeFileSyncHf11(policyPath, policyBytes);
+    assert.equal(applyCommittedQualityPackage({ repoRoot: item.root, ...request }).code, "QUALITY-PACKAGE-VERIFIED", "positive control after restoring the policy");
+  } finally { rmSyncHf11(item.root, { recursive: true, force: true }); }
+});
+
+test("hotfix 11: a receipt carrying group/other mode bits is accepted on win32 only (where the platform has no mode bits); a symlinked receipt is refused everywhere", (t) => {
+  const item = hf11Authorized("mode");
+  try {
+    assert.deepEqual(hf11Verdicts(item), HF11_ACCEPTED_BEFORE_COMMIT, "positive control");
+    chmodSync(item.receipt, 0o644); // POSIX: a real 0o644 receipt. win32: Node keeps reporting the fixed 0o666 mode.
+    assert.notEqual(lstatSync(item.receipt).mode & 0o077, 0, "the receipt carries group/other bits");
+    assert.deepEqual(hf11Verdicts(item), process.platform === "win32" ? HF11_ACCEPTED_BEFORE_COMMIT : HF11_REFUSED_RECEIPT);
+    if (process.platform !== "win32") { chmodSync(item.receipt, 0o600); assert.deepEqual(hf11Verdicts(item), HF11_ACCEPTED_BEFORE_COMMIT, "0o600 is accepted again on POSIX"); }
+    const copy = `${item.receipt}.copy`;
+    writeFileSyncHf11(copy, readFileSync(item.receipt));
+    unlinkSync(item.receipt);
+    try { symlinkSync(copy, item.receipt, "file"); } catch (error) { t.skip(`file symlinks are not creatable on this host: ${error?.code ?? error}`); return; }
+    assert.deepEqual(hf11Verdicts(item), HF11_REFUSED_RECEIPT, "the mode-term skip on win32 does not admit a symlinked receipt");
+  } finally { rmSyncHf11(item.root, { recursive: true, force: true }); }
+});
