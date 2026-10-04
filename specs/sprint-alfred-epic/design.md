@@ -49,7 +49,9 @@ The latest user requirement and sanitized Toolbox handover are indexed in
 `design-input.md` and specified in
 [`design/recovery-availability-2026-10-03.md`](design/recovery-availability-2026-10-03.md).
 This is additive proposed design, not a claim that the handover was verified
-live or that recovery source is implemented.
+live or that recovery source is implemented. Recovery is an implemented epic
+deliverable (Spec §20.3, RV-1…RV-7), owned by the implementation wave for the
+remaining Alfred work and sequenced after R4.
 
 Use three levels: evidence-preserving repair for a closed known shape;
 existing GMW/HGO within current authority while verifier and proof remain
@@ -82,27 +84,49 @@ The three-runner greenfield runs and this repository's own bootstrap showed
 that the design course is not walkable on the current candidate. All three
 runners stopped in draft. The source-verified register
 ([`design/greenfield-0.7-findings-round-2026-10-03.md`](design/greenfield-0.7-findings-round-2026-10-03.md))
-groups 40 findings into five root causes plus the push-signature requirement.
-PRD §14 and Spec §21 turn them into six workstreams:
+holds 77 findings (IDs K1-x … K9-5) in five root causes plus the
+push-signature requirement. PRD §14 and Spec §21 turn them into six
+workstreams. Every register ID is owned by exactly one of them or deferred
+with a reproduction step; `traceability.md` carries the complete map and its
+count:
 
-- R1: one shared admission registry for every emitted lifecycle command
-- R2: a per-target read policy that tolerates auxiliary-root failures
-- R3: a two-decision ceremony model and signed checkpoint pushes
-- R4: role-route preflight with a recorded self-dispatch fallback, Antigravity
-  route defaults, and a cross-platform budget lock
-- R5: one design-course and trailer contract
-- R6: a multi-runner transcript reader and audit index
+- R1: one shared admission catalogue for every emitted lifecycle command;
+  `scratch/` script execution stays fail-closed with a truthful denial
+- R2: a per-target read policy that tolerates auxiliary-root failures, with one
+  shared credential-root list for host and distro paths
+- R3: a per-feature two-decision ceremony model; every additional push costs
+  one more signed (or chat-confirmed), commit-bound approval; enrollment and
+  key setup are one-time acts
+- R4: role-route preflight (a fallback self-dispatch may substitute only the
+  labelled, non-authorizing Advisor duty; readiness, Critic and plan-verifier
+  need host-observed children), Antigravity route defaults, a cross-platform
+  budget lock, the trusted runner-CLI location on Windows, and the readiness
+  child contract
+- R5: a simplified design-course coordinator, one revision cycle on every
+  runner, and one trailer contract
+- R6: a multi-runner transcript reader, an audit index and a host-path check
+
+**Revision cycle.** The first drafts of PRD §14 and Spec §21 went through one
+design revision cycle on 2026-10-03. Its corrections are applied in the five
+sources themselves: complete register ownership, the counting rule for PO
+decisions, the Advisor-only fallback, fail-closed `scratch/` execution, the
+end-to-end scenario with its host matrix, and recovery ownership. No separate
+document carries them and no separate document carries binding force beyond
+the approved sources. This paragraph is provenance only, not Advisor or readiness evidence.
 
 **Sequencing.**
 
 1. R1 and R2 come first: they block every runner's design course.
-2. The R4 Windows budget lock and the route preflight follow, because Goldfish
-   dispatch on Windows depends on them.
-3. R3, R5 and R6 then run as parallel slices.
+2. The R4 Windows platform fixes and the route preflight follow, because
+   Goldfish dispatch on Windows depends on them.
+3. R3, R5 and R6 then run as parallel slices through one hook-and-commit-policy
+   integration slice.
+4. Recovery (Spec §20) follows R4, because its owner observation needs the
+   platform sweep.
 
 This interleaves with the existing waves rather than replacing them. The
-amendment's acceptance is three-runner end-to-end evidence on the stamped
-candidate.
+amendment's acceptance is AC-32: the three-runner end-to-end scenario on the
+host matrix of Spec §21.7, on the stamped candidate.
 
 ## Sequence, evidence and gates
 
@@ -123,7 +147,7 @@ historical authoring record.
 
 ## Completion boundary
 
-Completion remains PRD §7, Spec §§12–20 and the existing
+Completion remains PRD §7, Spec §§12–21 and the existing
 [`acceptance.md`](acceptance.md); item-level backlog acceptance remains
 authoritative. Current five-source hashes, actual route/advisor evidence,
 independent readiness, Critic, final PO package decision, Verify, and

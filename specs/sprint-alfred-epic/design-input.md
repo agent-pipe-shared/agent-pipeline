@@ -73,15 +73,42 @@ supplied observations and three runner analyses (Claude/Windows, Codex,
 Antigravity). Live defects were also hit during this repository's bootstrap.
 All are held as sanitized summaries with source verification in
 [`design/greenfield-0.7-findings-round-2026-10-03.md`](design/greenfield-0.7-findings-round-2026-10-03.md),
-with one backlog item per finding cluster. The full analysis reports stay
+and `traceability.md` maps every register ID to its owner and acceptance case
+and to its own backlog item or `register only`. The full analysis reports stay
 outside the repository because they reference private host material. The
 register carries their findings, not their bytes. PO requirements from this
 round:
 
-- All three runners walk the happy path with exactly two PO approvals.
-- Agents may fall back to a recorded self-dispatch when a role route fails.
+- All three runners walk the happy path. Per feature (one feature, one design
+  revision cycle, one push) the PO takes exactly two decisions: the final plan
+  approval and the push approval. Each additional push costs one more approval.
+  Repository enrollment consent and key setup are one-time acts outside that
+  count.
+- When a role route fails, an agent may self-dispatch the canonical Advisor
+  template as a labelled, non-authorizing substitute. Readiness, Critic and
+  plan-verifier evidence always needs a host-observed child.
 - Every signature-mode push is signed.
 - The round is folded into the complete Alfred scope.
+
+**PO decisions on the revision (2026-10-03).** The PO decided, in chat, to
+revise the five sources now, before approval, instead of deferring the
+corrections to a document outside them. For the four blocking review points
+the Elephant's defaults apply, and the PO may overrule any of them at the final
+approval:
+
+1. No post-approval binding document. Every register row is in scope and is
+   mapped in `traceability.md`.
+2. A fallback self-dispatch never satisfies readiness, Critic or
+   plan-verifier; at most it is a labelled Advisor substitute.
+3. Executing a `scratch/` script stays fail-closed; there is no content-based
+   admission, and the denial names the human route.
+4. Every signature-mode push needs a signature. "Two approvals" means the plan
+   approval plus the approval of the single push on the happy path; enrollment
+   consent and key setup are one-time acts outside the count.
+
+There remains exactly one final PO approval per design. These decisions are
+recorded here as PO input in distilled form, not as a transcript. They are not
+an approval of the design and not readiness evidence.
 
 ## Provenance and readiness limits
 

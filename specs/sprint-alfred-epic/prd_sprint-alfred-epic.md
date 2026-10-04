@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 9137adbe3d6e3ba89905e98da50e6937b12ea06d2c0bee8217cc63de7067958c -->
+<!-- technical-spec-sha256: bfb53504f29a7adc25d13f65c9f57cd009f1b6a7db66d0aa103a2324e6892019 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -592,17 +592,24 @@ named in `spec.md` §12 and `acceptance.md`:
     repair itself.** Keep intrinsic known-shape repair and existing scoped
     GMW/HGO within their current authority; for other refusal classes provide
     an attended external handoff or typed unavailable result with a concrete
-    prerequisite. The proposed external source/install protocol and P1 legacy
-    owner boundary are specified in `spec.md` §20 and
-    `design/recovery-availability-2026-10-03.md`. This is design input only:
-    implementation, evidence, review and PO disposition remain open.
-12. **All three runners walk the happy path with two PO approvals.** Claude
-    (native Windows and POSIX), Codex and Antigravity complete onboarding,
-    design, Advisor, plan approval, implementation and push without guard
-    overrides or recovery ceremonies. The PO is asked only for the final plan
-    approval and the push approval. Every signature-mode push, checkpoint
-    pushes included, is signed and commit-bound. Contracts and acceptance:
-    `spec.md` §21 and PRD §14.
+    prerequisite. The external source/install protocol and P1 legacy owner
+    boundary are specified in `spec.md` §20 and
+    `design/recovery-availability-2026-10-03.md`. Recovery is an implemented
+    epic deliverable: it is owned by the implementation wave for the remaining
+    Alfred work, sequenced after R4 (Spec §21.7), and accepted by RV-1…RV-7
+    (Spec §20.3). Implementation, evidence, review and PO disposition remain
+    open.
+12. **All three runners walk the happy path with two PO decisions per
+    feature.** Claude (native Windows and POSIX), Codex and Antigravity
+    complete onboarding, design, Advisor, plan approval, implementation and
+    push without guard overrides, operator hotfixes or recovery ceremonies. Per
+    feature on the happy path (one feature, one design revision cycle, one
+    push) the PO takes exactly two decisions: the final plan approval and the
+    push approval. Every additional push costs one more approval. Repository
+    enrollment consent and key setup, including first-use key confirmation, are
+    one-time acts outside that count; nothing else asks the PO. Every
+    signature-mode push, checkpoint pushes included, is signed and
+    commit-bound. Contracts and acceptance: `spec.md` §21 (AC-32) and PRD §14.
 
 ## 8. Assumptions and risks
 
@@ -693,7 +700,7 @@ executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
 | 2026-08-27 incidents | `docs/state.md` current section; the two filed items → A4/A5, C1 seed codes |
 | 2026-09-27 three-runner greenfield findings | `design/greenfield-0.7-remediation-2026-09-27.md` → five non-overlapping implementation slices, exact backlog acceptance, host readbacks and candidate evidence |
 | 2026-10-03 recovery request and handover | `design-input.md` and `design/recovery-availability-2026-10-03.md` → proposed recovery levels and P1 archival boundary; handover is reported narrative, not verified live evidence |
-| 2026-10-03 findings round (PO observations, three-runner greenfield analyses, live bootstrap defects) | `design/greenfield-0.7-findings-round-2026-10-03.md` → source-verified register K1–K8; PRD §14; Spec §21 R1–R6 |
+| 2026-10-03 findings round (PO observations, three-runner greenfield analyses, live bootstrap defects) | `design/greenfield-0.7-findings-round-2026-10-03.md` → source-verified register K1–K9 (77 IDs); PRD §14; Spec §21 R1–R6; complete ID map in `traceability.md` |
 
 The agent submits the 2026-09-27 amendment autonomously after preparing the
 design and required evidence. No separate PO content acknowledgement or
@@ -787,11 +794,13 @@ authority. State, `activeFeature`, proofs, history and resources remain
 unchanged. Details and acceptance cases are in
 `spec.md` §20.
 
-This is proposed design material only. It does not satisfy the PRD/Spec PO
-gate, enter implementation, change lifecycle state, establish native host
-evidence, or claim the external mechanism exists. Missing secrets, trust
-anchors or evidence remain typed unavailable; bytes and history are preserved
-rather than reconstructed.
+The recovery route is an implemented epic deliverable (Spec §20.3, RV-1…RV-7),
+owned by the implementation wave for the remaining Alfred work and sequenced
+after R4. Until it is implemented and evidenced, this section is design
+material only: it does not satisfy the PRD/Spec PO gate, enter implementation,
+change lifecycle state, establish native host evidence, or claim the external
+mechanism exists. Missing secrets, trust anchors or evidence remain typed
+unavailable; bytes and history are preserved rather than reconstructed.
 
 ## 14. 2026-10-03 findings round amendment
 
@@ -806,34 +815,62 @@ this repository's own session.
 
 **Scope.** The source-verified findings register
 [`design/greenfield-0.7-findings-round-2026-10-03.md`](design/greenfield-0.7-findings-round-2026-10-03.md)
-is in scope in full, through six workstreams specified in `spec.md` §21:
+is in scope in full. Every row is owned by exactly one workstream or by the
+deferred list (Spec §21.0/§21.8). Confirmed and partially confirmed rows get
+contracts and acceptance cases. Requirement rows get contracts. Rows not yet
+determinable from source are reproduced first. The six workstreams of Spec §21
+are:
 
 - R1: lifecycle-command admission
 - R2: read policy
-- R3: authorization ceremonies, including signed checkpoint pushes
-- R4: runner parity and role routes, including the self-dispatch fallback and
-  the native-Windows budget lock
-- R5: design-course contract consistency
+- R3: authorization ceremonies and push
+- R4: runner parity, platform parity and role routes
+- R5: design-course contract and coordinator redesign
 - R6: forensics and audit chain
+
+The complete register-ID-to-owner map, with its count, is `traceability.md`.
 
 **PO decisions (2026-10-03).**
 
 - The amendment is added to the complete Alfred scope. Nothing above is
   reduced.
 - Every finding is verified against source before it is designed.
-- The happy path asks the PO twice (plan, push) on all three runners.
-- In signature mode every push is signed, while non-release pushes keep a slim
-  prerequisite set.
-- Agents may fall back to self-dispatching the canonical role template when a
-  native route fails, recording the fallback.
+- Route: R1 builds a shared admission catalogue; R5 replaces the design-course
+  coordination core with a simplified coordinator instead of patching each
+  refusal (PO direction; the PO may overrule at final approval).
+- Happy path: one feature, one design revision cycle, exactly one push. Per
+  feature the PO takes exactly two decisions, the final plan approval and the
+  push approval, on all three runners. Every additional push costs one more
+  approval. Repository enrollment consent and key setup, including first-use
+  key confirmation, are one-time acts outside the count; nothing else asks the
+  PO.
+- In signature mode every push is signed and commit-bound, while non-release
+  pushes keep a slim prerequisite set.
+- Operator hotfixes 1–7 of the installed copy (2026-10-03) unblock development
+  on native Windows only. The candidate replaces them with source fixes and must
+  not depend on them.
 - This repository's own design round may use targeted guard overrides, or
   switch to a bounded mini patch applied by an attended external script,
   stamped and installed by the PO.
+- The review findings of 2026-10-03 are applied directly to the five sources
+  before the final approval; no separate document carries binding force beyond
+  the approved sources.
+  They are provenance, not readiness evidence. The four defaults below are the
+  Elephant's defaults, and the PO may overrule each at final approval:
+  1. All register rows are in scope and mapped in `traceability.md`; there is
+     no post-approval binding document.
+  2. A fallback self-dispatch may substitute only the Advisor duty, labelled and
+     non-authorizing. It never satisfies readiness, Critic or plan-verifier,
+     which need host-observed children.
+  3. Executing a `scratch/` script stays fail-closed in gated phases; there is
+     no content-based admission, and the denial names the human route.
+  4. Every signature-mode push needs a signature. "Two approvals" counts per
+     feature: plan plus the single happy-path push.
 
 **Non-goals.** No weakening of credential-root protection, the independence of
 Critic and Advisor, template-only briefings, or the release/main promotion
 chain. No retroactive rewriting of history or evidence.
 
-**Success.** Each runner completes the scenario in Spec §21 on the stamped
-local candidate, with host evidence per runner. The findings are traceable
-from register ID to Spec acceptance case in `traceability.md`.
+**Success.** AC-32 passes on the stamped local candidate on the host matrix.
+Every register ID traces to a Spec §21 workstream and acceptance case, or to the
+deferred list, in `traceability.md`.

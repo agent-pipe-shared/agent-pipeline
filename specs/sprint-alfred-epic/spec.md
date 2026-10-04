@@ -1132,30 +1132,36 @@ stop conditions.
 
 ### 20.3 Required acceptance evidence
 
-The proposed recovery path is acceptable only after implementation and
-candidate-bound evidence demonstrate:
+Recovery is an implemented epic deliverable, not design-only input. It is owned
+by the implementation wave for the remaining Alfred work (tracks A–E and this
+section) and is sequenced after R4 (§21.7), because its owner observation needs
+the platform sweep. Its acceptance is RV-1…RV-7 below; the proposed recovery
+path is acceptable only after implementation and candidate-bound evidence
+demonstrate:
 
-- V2 `ownerRuntime: null` is `unavailable`, V1 field-absent is `unobserved`,
-  and neither becomes `not-live`; a new native observer reports live/dead only
-  where platform evidence supports it and never retroactively infers reboot;
-- CAS-conflict classification requires matching bounded status/schema/digest
-  and compare flags; mismatch or ambiguity preserves bytes and returns typed
-  unavailable;
-- detached human proof binds exact receipt bytes or explicit absence,
+- RV-1: V2 `ownerRuntime: null` is `unavailable`, V1 field-absent is
+  `unobserved`, and neither becomes `not-live`; a new native observer reports
+  live/dead only where platform evidence supports it and never retroactively
+  infers reboot;
+- RV-2: CAS-conflict classification requires matching bounded
+  status/schema/digest and compare flags; mismatch or ambiguity preserves bytes
+  and returns typed unavailable;
+- RV-3: detached human proof binds exact receipt bytes or explicit absence,
   repository, classification/comparison, disposition, session-ended
   confirmation and CAS precondition;
-- valid matching receipts preserve exact bytes/metadata and replay only with
-  full actual replay preconditions; valid conflicting/stale and bounded
+- RV-4: valid matching receipts preserve exact bytes/metadata and replay only
+  with full actual replay preconditions; valid conflicting/stale and bounded
   readable invalid/malformed receipts archive only by signed disposition;
   absent receipts bind absence without fabrication; unreadable/symlinked/
   ambiguous targets return typed unavailable;
-- archive readback preserves exact original bytes and grants no authority to
-  archived receipts; missing/invalid signer proof, wrong repo, receipt drift,
-  concurrent writer, symlink target and interrupted archive refuse safely;
-- Pipeline State, `activeFeature`, proofs and history remain byte-for-byte
-  unchanged across archival; crash recovery is forward-only and preserves
-  intervening changes;
-- every new refusal path has observed positive/negative fixtures and an
+- RV-5: archive readback preserves exact original bytes and grants no authority
+  to archived receipts; missing/invalid signer proof, wrong repo, receipt
+  drift, concurrent writer, symlink target and interrupted archive refuse
+  safely;
+- RV-6: Pipeline State, `activeFeature`, proofs and history remain
+  byte-for-byte unchanged across archival; crash recovery is forward-only and
+  preserves intervening changes;
+- RV-7: every new refusal path has observed positive/negative fixtures and an
   explicit recovery/handoff disposition; CI wiring detects an unregistered
   producer, while runtime unknowns return an attended diagnostic handoff.
 
@@ -1170,239 +1176,572 @@ review, Verify, and PO disposition remain open.
 
 Source of findings, verdicts and code references:
 [`design/greenfield-0.7-findings-round-2026-10-03.md`](design/greenfield-0.7-findings-round-2026-10-03.md)
-(the register; IDs K1-1 … K8-4). Only `confirmed` and `partially` rows are
-in scope, and they carry the register's verdict wording. Rows marked
-`not determinable from source` (K7-8) get a reproduction step, not a fix. This
-section is additive. It does not relax §§1–20 and grants no implementation
-authority.
+(the register). This section is additive. It does not relax §§1–20 and grants
+no implementation authority. It is complete in itself: the workstream headers
+below list every register ID exactly once, and `traceability.md` repeats the
+same ownership as a map whose mapped-row count equals the register's ID count.
+The review findings recorded on 2026-10-03 are applied directly in this text
+and in the other four sources. That statement is provenance only: it is not
+Advisor or readiness evidence and not an approval.
 
-**Governing requirement (PO, 2026-10-03):** on the happy path, Claude (native
-Windows and POSIX), Codex and Antigravity each complete onboarding, design,
-Advisor, plan approval, implementation and push without guard overrides,
-recovery ceremonies or repeated signatures. The PO is asked exactly twice: the
-final plan approval and the push approval. A signature-mode push of any
-branch, including a feature-branch checkpoint, requires a signed approval bound
-to the exact commit.
+### 21.0 Scope rule, route decision and governing requirement
 
-### 21.1 R1 — Lifecycle-command admission (K1-x, K1-1…K1-7, K4-3, K7-1, K7-2)
+**Scope rule.** The register is in scope in full. Every register row is owned
+by exactly one workstream (explicit ID lists below) or by the deferred list
+(§21.8):
+
+- `confirmed` / `partially` rows get a contract and at least one acceptance
+  case.
+- Requirement rows get a contract.
+- `pending` / `not determinable from source` rows get a reproduction step
+  first, and a contract only after the reproduction confirms them.
+
+**Route decision (patch vs redesign, PO direction 2026-10-03).**
+
+- R1 builds a shared admission registry for every command the Pipeline emits.
+- R5 replaces the design-course coordination core with a simplified
+  coordinator instead of patching each refusal. The new coordinator removes
+  authoring-dispatch registration through hand-built continuity CAS, resumes
+  idempotently after interruption, and routes Advisor/readiness through the
+  §21.4 role-route preflight.
+- R1's registry must cover the commands of the new coordinator; R1 and R5
+  therefore share one command catalogue.
+- The PO may overrule this route at the final plan approval.
+
+**Governing requirement (PO).** On the happy path, Claude (native Windows and
+POSIX), Codex and Antigravity each complete onboarding, design, Advisor, plan
+approval, implementation and push without guard overrides, operator hotfixes,
+recovery ceremonies or repeated signatures. The happy path is defined as:
+
+- one feature;
+- one design revision cycle after Advisor/readiness findings;
+- exactly one push, the final feature-branch push.
+
+**Counting rule (what "two PO decisions" means).**
+
+- Counted per feature on the happy path, the PO takes exactly two decisions:
+  the final plan approval and the approval of that push.
+- Every additional push costs exactly one more approval. In signature mode it
+  is signed and commit-bound; in chat mode it is a chat confirmation bound to
+  the exact commit. Additional pushes are outside the happy path and are never
+  free.
+- One-time acts are outside the per-feature count and are enumerated by name:
+  repository enrollment consent (once per repository, at onboarding) and key
+  setup, including first-use key confirmation (trust on first use, once per
+  machine and key). Nothing else may ask the PO.
+- The ceremony inventory (§21.3) classifies every PO interaction as
+  `per-feature` or `one-time-onboarding`. Any other class fails the test.
+
+### 21.1 R1 — Lifecycle-command admission
+
+IDs: K1-x, K1-1, K1-2, K1-3, K1-4, K1-5, K1-6, K1-7, K5-8, K7-1, K7-2, K7-3,
+K9-2.
 
 Contract:
 
-- Every command the Pipeline itself emits as `nextAction`, recovery action or
-  documented course step is admitted in every lifecycle phase that emits it.
-  The guard derives admission from one shared registry of closed argv shapes,
-  the same registry the emitters render from, never from a separately
-  maintained allowlist. This covers `continuity-cas`, `continuity-integrate-final`,
-  `cancel-submitted-plan`, `design-course-session` stages,
-  `guard-human-override.mjs` agent-side steps (`plan`, `prepare-authorization`,
+- **Shared command catalogue.** Every command the Pipeline emits as
+  `nextAction`, recovery action or documented course step, including R5's
+  coordinator commands, comes from one shared catalogue of closed argv shapes.
+  The guard admits exactly the catalogue entries valid in the current phase.
+  Path spelling is normalised before matching: drive-letter case, backslash
+  and forward slash, MSYS `/d/...`, repository-relative, and
+  `${PIPELINE_PLUGIN_ROOT}` resolved against the verified plugin root. The
+  catalogue covers `continuity-cas`, `continuity-integrate-final`,
+  `cancel-submitted-plan`, `design-course-session` stages, the agent-side
+  `guard-human-override.mjs` steps (`plan`, `prepare-authorization`,
   `prepare-for-signature`, `refreeze-plan`, `emit-signature-digest`,
   `authorize-by-signature`), `check-observation-governance.mjs`,
   `pipeline-start-preflight.mjs` and `project-onboarding-v3.mjs inspect` for
-  every intent.
-- Script paths are compared after normalisation: drive letter case,
-  backslash and forward slash, MSYS `/d/...`, repository-relative and absolute,
-  and the documented `${PIPELINE_PLUGIN_ROOT}` placeholder resolved against the
-  verified plugin root. Unknown spellings stay refused.
-- A read-only script under `scratch/` is classified as read-only execution
-  when its argv carries no write target and the script is not a known
-  writer. A typed denial names the reason instead of the generic opaque lane.
-- `git stash list` and `git stash show [<stash>]` are read-only. Denials name
-  the real target operand, never a subcommand word.
-- Onboarding scaffold paths (`.gitignore`, `AGENTS.md`, `architecture/`,
-  `pipeline.user.yaml`, `project/`) are committable in every phase, or
-  onboarding commits them itself. Configuration read from `HEAD`
-  (`resolveV3DutyRoute`) never depends on a commit the current phase refuses.
-- The governed repair a typed recovery prescribes (for example F6 inventory
-  classification under `governance/`) is reachable without a guard override.
-- `pipeline-start` documents every preflight status, including
-  `hook-provisioning-required`, with its action.
+  every intent. R3 owns the ceremony preparation itself (K4-3); R1 only admits
+  its commands through the catalogue.
+- **Readiness intent.** `pipeline-start` documents every preflight status,
+  including `hook-provisioning-required`. Bootstrap readiness and session
+  readiness are evaluated with the same intent, or the preflight emits the
+  session intent the guard checks (K7-3).
+- **Scratch scripts stay fail-closed; scratch writes stay admitted.**
+  - Executing a `scratch/` script, or any non-catalogue script, stays
+    fail-closed in gated phases (PRD S2, Spec §5.2 item 3). There is no static
+    scan, no denylist and no post-run diff as an admission mechanism.
+  - Writing files under `scratch/` stays admitted in every phase (K1-5, write
+    part).
+  - The denial is truthful. It names the opaque-execution lane, does not claim
+    that `scratch/` execution is admitted, and names the two sanctioned routes:
+    the human runs the script (`!` prefix), or a Pipeline-owned catalogue
+    command covers the need.
+- **Course evidence outputs (K5-8).** The evidence output paths the course
+  declares (under `evidence/design-course/<feature>/`, for example the Claude
+  exception-rationale file) belong to the catalogue: the agent's Write to
+  exactly those paths is admitted in the design phases that emit them,
+  `awaiting-approval` included, and to no other `evidence/` path. Plan and Spec
+  immutability is unchanged.
+- **Git subcommand classification.** `git stash list` and
+  `git stash show [<stash>]` are read-only. Denials name the real target
+  operand, never a subcommand word (K1-7).
+- **Scaffold commits.** Onboarding commits its own scaffold paths
+  (`.gitignore`, `AGENTS.md`, `architecture/`, `pipeline.user.yaml`,
+  `project/`) in the bootstrap transaction. Afterwards they are committable in
+  every phase, within a stage-0 bound the onboarding exception defines (K9-2).
+  Configuration read from `HEAD` never depends on a commit the current phase
+  refuses.
+- **Governed repairs.** A repair prescribed by a typed recovery is admitted
+  without override. This includes classifier-generated
+  `governance/observation-doc-governance.json` entries for new files under
+  `docs/` and `docs/adr/` in every phase (K1-6, also needed by R6).
 
 Acceptance cases:
 
-- R1-1 A consistency test enumerates every emitted `nextAction`/recovery argv
-  across lifecycle phases and asserts guard admission for each, on win32 and
-  POSIX command dialects.
-- R1-2 A greenfield design course in `draft` reaches `present-plan` with zero
-  guard overrides (Claude/Windows Git Bash fixture and POSIX fixture).
-- R1-3 Preflight admitted for backslash, forward-slash, MSYS and placeholder
-  spellings; refused for a different script with the same basename.
-- R1-4 `node scratch/<read-only>.mjs` admitted; `node scratch/<writer>.mjs` that
-  writes outside `scratch/` refused with a typed reason.
-- R1-5 `git stash list` admitted in draft; `git stash pop` refused.
-- R1-6 Scaffold commit in draft admitted; production path commit in draft refused.
+- R1-1: The catalogue consistency test enumerates every emitted argv across
+  phases and asserts guard admission on the win32 and POSIX dialects. It also
+  asserts that every declared course evidence output accepts the agent's Write
+  in the design phases that emit it and that other `evidence/` paths stay
+  refused (K5-8).
+- R1-2: Admission level: every command the design course emits up to
+  `present-plan` is admitted, with zero overrides, in a Claude/Windows Git Bash
+  fixture and a POSIX fixture. The end-to-end walk is covered only by AC-32 and
+  §21.7.
+- R1-3: The preflight is admitted under backslash, forward-slash, MSYS and
+  placeholder spellings, and refused for a different script with the same
+  basename.
+- R1-4: A `scratch/` script execution in `awaiting-approval` is refused with
+  the typed code. The denial text contains no claim that the path is admitted
+  and names the human route. A Write to `scratch/` in the same phase is
+  admitted.
+- R1-5: `git stash list` is admitted in draft; `git stash pop` is refused; a
+  refused write names its real target.
+- R1-6: Onboarding commits its own scaffold. A later production-path commit in
+  draft is refused.
+- R1-7: An F6 repair (classifying a new `docs/adr/` draft) succeeds in draft
+  with zero overrides.
+- R1-8: `pipeline-start` documents every preflight status. A test fails when
+  the preflight can emit a status the skill does not name.
+- R1-9: The preflight and the guard evaluate the same readiness intent: a
+  fixture whose preflight reports a ready bootstrap is never followed by a
+  `partial` session readiness for the same state (K7-3).
 
-### 21.2 R2 — Read policy (K2-1…K2-5, K7-3 read part)
+### 21.2 R2 — Read policy
+
+IDs: K2-1, K2-1b, K2-2, K2-3, K2-4, K2-5, K2-6, K2-6b.
 
 Contract:
 
-- `isAllowedPassiveReadTarget` evaluates each auxiliary root independently. An
-  unusable root is skipped and reported, and never fails an otherwise admitted
-  target. Session roots are derived with the same realpath implementation the
-  policy compares with (`realpathSync.native`). On win32, path identity
-  comparison is case-insensitive.
-- Windows UNC paths to WSL (`\\wsl.localhost\<distro>\...`, `\\wsl$\...`) are
-  user-visible host paths for exact-file reads. Credential roots stay denied
-  through every spelling.
-- Native Grep admits in-repo directories and `glob`/`type` filters within the
-  project root. Native Glob admits wildcard patterns within the project root.
-  Read-only `rg` flags (`-A/-B/-C`, `--glob`) are admitted on in-root targets.
-- `git <read-only> ... | head -n N` treats revision arguments (`<rev>:<path>`,
-  `HEAD~N`) as revisions, not filesystem paths. Every grammar example printed in
+- **Auxiliary roots.** `isAllowedPassiveReadTarget` evaluates each auxiliary
+  root independently. An unusable root is skipped and reported, and never
+  fails an otherwise admitted target. Session roots are derived with
+  `realpathSync.native`. On win32, path identity is compared case-insensitively.
+- **WSL UNC paths and the credential-root list.** `\\wsl.localhost\<distro>\...`
+  and `\\wsl$\...` are user-visible host paths for exact-file reads. One shared
+  credential-root list applies to host paths and to distro paths alike
+  (home-relative entries resolve against the host home and against every
+  distro user home). Every entry stays denied in every spelling, both UNC
+  spellings included:
+  - `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.azure`, `~/.kube`, `~/.docker`
+  - `~/.config/gh`, `~/.config/gcloud`
+  - `~/.codex/auth.json`, `~/.claude/.credentials.json`
+  - `~/.gemini/oauth_creds.json`
+  - `~/.netrc`, `~/.git-credentials`, `~/.npmrc`, `~/.pypirc`
+  - `/etc/shadow`
+  - the configured PO key directory
+- **Search tools.** Native Grep admits in-repo directories and `glob`/`type`
+  filters. Native Glob admits wildcard patterns within the project root.
+  Read-only `rg` flags (`-n`, `-c`, `-o`, `-l`, `-A/-B/-C`, `--glob`, `-e`) are
+  admitted. Search patterns and `-e` operands are never evaluated as read paths
+  (K2-6b).
+- **Git pipelines.** `git <read-only> ... | head -n N` treats revision
+  arguments (`<rev>:<path>`, `HEAD~N`) as revisions. Every grammar example in
   refusal text is covered by an admission test.
-- Denial texts name the guard code and the real cause. They never say "outside
-  the project root" for an in-root target, and never imply absence.
+- **Transcripts.** The current session's own transcript directory is
+  admissible for read-only forensics through the project-bound reader (K2-6;
+  reproduce first).
+- **Refusal texts.** Every refusal names the guard code and the real cause. No
+  in-root target yields `GUARD-READ-SCOPE-OUTSIDE-ROOT`. No role-name parse
+  failure is reported as an Advisor-prohibition problem (`APB-DISPATCH-INVALID`).
 
 Acceptance cases:
 
-- R2-1 Windows fixture: a transcript-directory case mismatch between runner
-  input and disk does not refuse in-root Read, Grep, Glob or `head`.
-- R2-2 UNC WSL exact-file Read admitted; UNC credential path refused.
-- R2-3 Grep directory, Grep `glob`, Glob `**/*.md`, `rg -A2 --glob` admitted in
-  root; the same shapes targeting `~/.ssh` refused.
-- R2-4 `git show HEAD:docs/state.md | head -n 5` admitted; every printed grammar
-  example passes its admission test.
-- R2-5 Refusal-text audit test: no in-root target yields
-  `GUARD-READ-SCOPE-OUTSIDE-ROOT`.
+- R2-1: In a Windows fixture with case-mismatched session roots, in-root Read,
+  Grep, Glob and `head` are admitted.
+- R2-2: An exact-file Read over UNC is admitted. For every entry of the shared
+  credential-root list, a read through the `\\wsl.localhost\<distro>\` spelling
+  and through the `\\wsl$\<distro>\` spelling is refused.
+- R2-3: Grep on a directory, Grep with `glob`, Glob `**/*.md`,
+  `rg -A2 --glob`, `rg -c` and `rg -e pat` with a `/` in the pattern are all
+  admitted in root. The same shapes targeting `~/.ssh` are refused. The
+  session's own transcript directory is listable once K2-6 is reproduced.
+- R2-4: `git show HEAD:docs/state.md | head -n 5` is admitted. Every printed
+  grammar example passes.
+- R2-5: Refusal-text audit: no in-root target gets an outside-root code, and
+  `APB-DISPATCH-INVALID` is never emitted for a role-name parse failure.
 
-### 21.3 R3 — Authorization ceremonies (K4-1…K4-6b, K6-1…K6-3)
+### 21.3 R3 — Authorization ceremonies and push
+
+IDs: K4-1, K4-2, K4-3, K4-4, K4-5, K4-6, K4-6b, K4-9, K6-1, K6-2, K6-3.
 
 Contract:
 
-- The happy path issues exactly two PO decisions: final plan approval
-  (design-workflow package plus plan approval as one signed act) and push
-  approval. Bootstrap plan acknowledgement, onboarding confirmations and key
-  setup are folded into these or removed from the happy path. Each that
-  remains is listed with its reason in the ceremony inventory test.
-- In signature mode every push requires a signed approval bound to the exact
-  commit, remote and destination, including `feature-checkpoint` pushes. A
-  checkpoint push keeps its slim prerequisite set (no Verify, security or
-  Critic chain); release/main promotion keeps the full chain. The pre-push hook
-  enforces the same rule, including Ed25519 proof verification, so an unsigned
-  push outside the session guard is refused.
-- Guard-override retries match an armed capability on the governed action
-  (tool, `toolInputSha256`, denials, policy). They do not match on unrelated
-  working-tree state: untracked files and Pipeline-owned writes outside the
-  governed target do not drift the capability. Drift that does refuse names
-  the drifted inputs.
-- Signing intents work in an unborn-HEAD repository.
-- All agent-side preparation runs in-session. The PO receives one single-line
-  signing command per decision and never copies JSON back. PO copy commands
-  never use backslash line continuation.
-- A PO-signed configuration override is a durable layer that migrations
-  respect, or the override route is refused up front with the correct
-  alternative.
+- **Decisions.** The happy path issues exactly the PO decisions counted in
+  §21.0. The final plan approval is one signed (or chat) act covering the
+  design-workflow package and the plan approval. The bootstrap plan
+  acknowledgement and the onboarding confirmations are folded into onboarding's
+  single enrollment consent or removed. The ceremony inventory test enumerates
+  every PO interaction per runner and mode and classifies each as `per-feature`
+  or `one-time-onboarding` (§21.0). There is no further class and no list of
+  residual ceremonies that is allowed to pass.
+- **Push signing.**
+  - In signature mode every push requires a signed approval bound to the exact
+    commit, remote and destination; `feature-checkpoint` pushes included. Every
+    additional push costs one more approval (§21.0).
+  - A checkpoint push keeps its slim prerequisite set (no Verify, security or
+    Critic chain). Release and main promotion keep the full chain.
+  - The pre-push hook enforces the same rule, including Ed25519 proof
+    verification.
+  - Onboarding installs the pre-push hook, so a fresh clone has it before the
+    first push (K6-2).
+- **Override match key.**
+  - An armed override is matched on: tool name; a canonical digest over the
+    semantically effective input only (Bash `command`; Edit
+    `file_path`/`old_string`/`new_string`/`replace_all`; Write
+    `file_path`/`content`; never `description` or other runner-cosmetic
+    fields); the denying guard set; and the policy identity.
+  - The **governed target** is the set of repository paths the command can
+    write according to the guard's own classification. For an opaque Bash
+    command it is the whole tracked tree.
+  - **Pipeline-owned writes** are `project/pipeline-state.json`, `evidence/`,
+    `scratch/` and `.git/agent-pipeline/`.
+  - Drift on a tracked file outside the governed target and outside
+    Pipeline-owned paths still refuses the capability. Every refusal names the
+    drifted inputs. Changes to untracked files outside the governed target do
+    not drift the capability. This narrows, never widens, what a capability
+    admits.
+- **Ceremony mechanics.** Signing intents work on unborn HEAD. All agent-side
+  preparation runs in session (K4-3); R1's catalogue admits the commands, but
+  the preparation is owned here. The PO receives one command per decision,
+  rendered without backslash line continuation and within 100 columns per
+  physical line (the digest may be split into variable-assignment chunks as
+  today). The PO never copies JSON back.
+- **Configuration overrides.** A PO-signed configuration override is a durable
+  override layer that migrations preserve (K4-5).
 
 Acceptance cases:
 
-- R3-1 Ceremony inventory test per runner: onboarding → push yields exactly
-  two PO proofs in signature mode, and the same two confirmations in chat mode.
-- R3-2 Signature-mode checkpoint push without approval refused by session
-  guard and by pre-push hook; with an exact-commit signed approval admitted.
-- R3-3 Arm → unrelated untracked file created → identical retry consumes the
-  capability; arm → governed target changed → refused with named drift.
-- R3-4 Unborn-HEAD signing intent builds and verifies.
-- R3-5 Rendered PO commands contain no line continuation and fit the
-  documented column bound.
+- R3-1: The ceremony inventory runs per runner and mode (signature, chat) for
+  three scenarios:
+  - A: enrolled repository, existing key, one push → per-feature count 2,
+    one-time acts 0.
+  - B: fresh repository, fresh key, one push → per-feature count 2, one-time
+    acts exactly {enrollment consent, key setup / first-use key confirmation}.
+  - C: two pushes → per-feature count 3.
 
-### 21.4 R4 — Runner parity and role routes (K3-1…K3-9, K7-4, K7-5)
+  An interaction in any other class fails the test.
+- R3-2: Run from a fresh clone after onboarding:
+  - an unsigned signature-mode checkpoint push is refused by the session guard
+    and by the pre-push hook;
+  - an exact-commit signed approval is admitted;
+  - a chat-mode checkpoint push without chat confirmation is refused.
+- R3-3: Arm the capability, then:
+  - create an unrelated untracked file → the identical retry consumes it;
+  - repeat with a different Bash `description` → it consumes;
+  - change a tracked file outside the target → refused, naming the drift;
+  - change the governed target → refused.
+- R3-4: An unborn-HEAD signing intent builds and verifies.
+- R3-5: Rendered PO commands contain no continuation and keep each physical
+  line within 100 columns.
+- R3-6: A signed routing override survives
+  `runner-profile-migration-v3 apply --activate`.
+- R3-7: A release/main promotion still requires the full chain while a
+  checkpoint push does not.
+
+### 21.4 R4 — Runner parity, platform parity and role routes
+
+IDs: K3-1, K3-2, K3-3, K3-4, K3-5, K3-6, K3-7, K3-8, K3-9, K3-10, K3-11, K3-12,
+K3-13, K3-14, K3-15, K3-16, K3-17, K5-12, K7-4, K7-5.
 
 Contract:
 
-- A typed, read-only role-route preflight reports, per runner and role
-  (Advisor, Critic, Goldfish tiers, readiness), `native` or
-  `fallback-self-dispatch` with a reason code. On `fallback-self-dispatch` the
-  agent dispatches the canonical role template through its native subagent
-  mechanism. The course accepts the result as that role's evidence with an
-  assurance label recording the fallback. Independence (fresh context,
-  read-only Critic/Advisor) and template-only briefings remain mandatory.
-- Producer failures surface stderr text (bounded, sanitized) and exit code.
-- Antigravity defaults make every duty that profile `feature` requires
-  available or fallback-routed. Native subagents receive a bootstrap path they
-  can satisfy. Bootstrap-lock freshness is bound to the session, not a fixed
-  30-minute mtime window.
-- Claude: the dispatch guard accepts built-in agent types (`Explore`, `Plan`,
-  `general-purpose`) and runs Advisor-prohibition parsing only when the line is
-  present. The dispatch-budget counter lock works on native Windows and macOS
-  with the same live/dead/ambiguous semantics. Goldfish/Critic templates state
-  the bootstrap-receipt step and its admitted spelling.
-- Codex: native host commit requirements (marker, role, `worker` type) are
-  stated in the briefing template and checked before dispatch. An ineligible
-  dispatch is reported, never silently `NGHS-NOT-APPLICABLE`.
-- SessionStart hints are runner-specific. A Claude session never receives
-  Codex transcript instructions.
+- **Role-route preflight.** A typed, read-only preflight reports, per runner
+  and role (Advisor, Critic, Goldfish tiers, readiness, plan-verifier),
+  `native`, `fallback-self-dispatch` (Advisor only) or `unavailable`, each with
+  a reason code.
+  - A fallback self-dispatch may substitute ONLY the Advisor duty, and only as
+    a labelled, non-authorizing advisory input
+    (`assurance: fallback-self-dispatch`). It never satisfies independent
+    readiness (§17), the Critic gate or plan-verifier.
+  - Readiness, Critic and plan-verifier evidence must come from a
+    host-observed child: fresh process, read-only effects, terminal state,
+    result bound to the dispatch (§17). Where a runner has no such route, the
+    preflight reports `unavailable` with a reason code, and presentation and
+    close are refused. They are never silently downgraded.
+  - A fallback Advisor dispatch is recorded in a dispatch→result record that
+    binds the template digest, the exact sent prompt digest, the native
+    subagent id and the result digest (closes K3-6). The fallback Advisor runs
+    read-only, and the guard refuses its write tools. A result whose subagent
+    id or prompt binding equals the implementor's dispatch is refused as
+    self-review.
+  - **Advisor exception.** Where a runner's Advisor course ends
+    typed-unavailable, any exception rationale presented to the PO states only
+    receipt-backed facts: the course outcome and code, and the absence of a
+    native Advisor child for that runner. It never cites a fallback consult or
+    an earlier chat decision as evidence, and it is non-authorizing.
+- **Producers.** Producer failures surface bounded, sanitized stderr text and
+  the exit code. Advisor export creates its own output directory, uses
+  platform path segmentation, and resumes idempotently: re-running after an
+  interruption re-exports byte-identical artifacts from the stored terminal
+  course, and a second re-run is a no-op (K3-1, K3-14, K3-15).
+- **Readiness child (K5-12).**
+  - Failure classes (non-zero exit, timeout, stderr output, parse failure,
+    binding mismatch) carry distinct typed sub-reasons with a bounded,
+    sanitized stderr head, and the course reports the real stderr byte count,
+    instead of one `DESIGN-READINESS-RUNNER-UNAVAILABLE`.
+  - The schema handed to the runner CLI is a copy without the `$schema` and
+    `$id` metadata keys. Constraints are unchanged, and the returned output is
+    still validated against the full schema. The Antigravity validator is
+    unknown, so R4 checks it.
+- **Platform parity (Windows and macOS).**
+  - The dispatch-budget counter lock has a cross-platform owner identity with
+    live, dead and ambiguous semantics (K3-9).
+  - POSIX mode-bit and uid checks are applied only where the platform has
+    them. Every private store keeps its symlink, nlink, realpath, identity and
+    exclusive-create checks. Windows privacy relies on profile and `.git` ACLs,
+    which are documented (K3-10).
+  - Directory fsync is skipped where the platform refuses it (K3-13).
+  - `/proc` readers have platform equivalents or typed unavailability.
+  - A sweep test fails on any new unguarded `0o077`, `getuid` or `/proc` use.
+  - The repository's Advisor host fixture builds its temporary repository on
+    native Windows, so the Advisor export and re-run tests run there (K3-16).
+  - **Trusted runner-CLI location (win32, K3-17).** On win32
+    `resolveTrustedSystemExecutable` also trusts `<homedir>\.local\bin` for
+    `.exe` executables, symmetric to POSIX `~/.local/bin`. The directory is
+    derived from the home directory at run time (no host path in code), and all
+    physical, symlink and realpath checks stay.
+- **Dispatch budget.**
+  - Every budget-counted role, Advisor and plan-verifier included, gets a
+    positive working cap. Small roles do not reserve the safety margin
+    (K3-12).
+  - The pre-launch dispatch check validates the budget line for every
+    budget-counted role and refuses a missing or malformed line before launch
+    (K3-11).
+  - The budget line format is documented once and accepted with or without a
+    list marker.
+- **Agent types.** The dispatch guard accepts the built-in agent types
+  `Explore`, `Plan` and `general-purpose`. They stay template-bound (a goldfish
+  or critic template), are budget-counted with a valid budget line, and are
+  write-scoped by the same guards. They never carry Advisor, Critic or
+  readiness authority. Advisor-prohibition parsing runs only when the
+  prohibition line is present (K3-8).
+- **Antigravity.** Every duty profile `feature` requires is available or
+  fallback-routed (Advisor only; other duties follow the preflight rules
+  above). Native subagents get a bootstrap step they can satisfy. Lock
+  freshness is bound to the session, not a 30-minute mtime (K3-3, K3-4, K7-4).
+- **Codex.** Host-commit requirements are stated in the briefing template and
+  checked before dispatch; an ineligible dispatch gets a typed pre-dispatch
+  finding (K3-5).
+- **SessionStart hints** are runner-specific (K7-5).
+- **Hotfix removal.** Operator hotfixes 1–7 of the installed copy are
+  superseded by these source fixes (they address findings in K3-9…K3-15,
+  K3-17, K5-10 and K5-12). The stamped candidate must contain the source fixes
+  and run its R4 and R5 fixtures without any hotfix applied.
 
 Acceptance cases:
 
-- R4-1 Route preflight fixtures per runner, covering both outcomes.
-- R4-2 Fallback Advisor/Critic results accepted by the course with the
-  fallback assurance label; a self-review attempt is refused.
-- R4-3 Antigravity `feature` profile reaches readiness and Critic; a subagent
-  completes Read/Write after its bootstrap step; a resumed session after more
-  than 30 minutes is observed as hard-enforced.
-- R4-4 Native-Windows budget-counted subagent completes Read, Write and Bash
-  calls under the real hook; `Explore` dispatch admitted.
-- R4-5 Codex unmarked dispatch yields a typed pre-dispatch finding.
-- R4-6 Claude SessionStart output contains no other runner's name.
+- R4-1: Route-preflight fixtures per runner cover `native`,
+  `fallback-self-dispatch` (Advisor only) and `unavailable`. Presentation and
+  close are refused when a readiness, Critic or plan-verifier route is
+  `unavailable`. An exception rationale generated for an unavailable Advisor
+  route contains only receipt-backed facts.
+- R4-2: A fallback Advisor result is accepted with the label. A fallback result
+  offered as readiness, Critic or plan-verifier evidence is refused by the
+  package/close validator. A fallback Advisor's Write is refused. A result
+  whose binding equals the implementor dispatch is refused.
+- R4-3: Antigravity: the `feature` profile reaches readiness and Critic through
+  host-observed children; a subagent completes Read and Write after its
+  bootstrap step; a resumed session after more than 30 minutes is observed as
+  hard-enforced.
+- R4-4: A native-Windows budget-counted Goldfish completes Read, Write and Bash.
+  `consult-advisor` (maxTurns 10) and `plan-verifier` (maxTurns 15) complete
+  their capped calls. An `Explore` dispatch is admitted. A consult dispatch with
+  a malformed budget line is refused before launch. Negative cases: a built-in
+  type dispatch with a missing budget line is refused; a built-in type result
+  offered as Critic evidence is refused; the Advisor-prohibition line is still
+  parsed when present.
+- R4-5: A Codex unmarked dispatch yields a typed pre-dispatch finding.
+- R4-6: Claude SessionStart output names no other runner.
+- R4-7: An Advisor producer failure returns stderr text in the session result.
+  An interrupted export re-run yields byte-identical artifacts; the second
+  re-run is a no-op. A readiness-child failure returns a typed sub-reason and a
+  bounded stderr head, and each failure class (exit code, timeout, parse
+  failure, binding mismatch) maps to its own sub-reason (K5-12).
+- R4-8: The Windows sweep test fails on an unguarded mode-bit, uid,
+  directory-fsync or `/proc` check. The Advisor host fixture builds its
+  temporary repository on native Windows (K3-16). The candidate's design course
+  runs on native Windows with no hotfix.
+- R4-9: On native Windows the readiness bootstrap resolves a Claude CLI
+  installed under `<homedir>\.local\bin` as a trusted `.exe`. A symlinked,
+  realpath-escaping or non-`.exe` candidate there is refused (K3-17).
+- R4-10: The schema passed to the Claude CLI carries neither `$schema` nor
+  `$id`, the CLI accepts it, and a receipt that violates a constraint of the
+  full schema is still rejected (K5-12).
 
-### 21.5 R5 — Design-course contract consistency (K5-2…K5-6, K8-3)
+### 21.5 R5 — Design-course contract and coordinator redesign
+
+IDs: K1-8, K4-7, K5-1, K5-2, K5-3, K5-4, K5-5, K5-6, K5-7, K5-9, K5-10, K5-11,
+K8-3, K9-1, K9-3, K9-4.
 
 Contract:
 
-- One documented, machine-emitted sequence: intake → stage-0 authoring (the
-  Elephant authors PRD/Spec/design/traceability under the EL-16 design-phase
-  exemption, or dispatches) → binding → Advisor → `submit-plan` → readiness →
-  presentation. The authoring dispatch is registrable through an admitted
-  command (R1). Generated short forms of role rules do not drop qualifiers
-  (EL-16 design-phase exemption).
-- One trailer grammar generates obligations, guard admission and authorship
-  verification. `Dispatch: design (elephant)` is admitted for design paths in
-  design phases and refused for production paths.
-- `--answers-file` (with digest) is available wherever `--answers-json` is
-  accepted. Intake reuses the onboarding-confirmed language without asking
-  again.
-- The design course fixes an executable Verify contract before presentation.
-  The design→implementation `collect-input` remains as a backstop.
+- **Simplified coordinator (§21.0 route).** One machine-emitted sequence:
+  intake → stage-0 authoring (the Elephant under the EL-16 design-phase
+  exemption, or a dispatch) → binding → Advisor → `submit-plan` → readiness →
+  presentation.
+  - Authoring is recorded by the coordinator itself; no hand-built continuity
+    request.
+  - A design revision after Advisor or readiness findings is one emitted step
+    that rebinds the sources and keeps the existing submission lineage, with
+    no `reopen-design` loop and no PO confirmation (K1-8, K4-7). It works on
+    every runner, Claude and Antigravity included, after the Advisor stage: the
+    package and readiness binding follow the revised sources instead of the
+    Advisor course's initial candidate, the Advisor stage stays one cycle
+    (§17), and no Codex-only `--revisions` option is needed (K5-7).
+  - Each stage resumes idempotently after interruption.
+- **Course-run mechanics (K5-9, K5-10, K5-11).** `--run-v2` runs both with and
+  without `--advisor-result`; its declared output prefix does not collide with
+  the paths the coordinator itself writes and the guard admits. The readiness
+  child receives the runner argument on every runner. A readiness failure after
+  preparation leaves a resumable state: the next `--run-v2` resumes or replaces
+  the stale preparation idempotently instead of refusing
+  `DESIGN-COURSE-PREPARATION-EXISTS`.
+- **Generated role rules.** Generated short forms of role rules keep their
+  qualifiers (EL-16 design-phase exemption).
+- **Trailer grammar.** One trailer grammar generates the obligations, guard
+  admission and authorship verification. `Dispatch: design (elephant)` is
+  admitted for design paths in design phases and refused for production
+  paths.
+- **Intake inputs.** `--answers-file` (with digest) is available wherever
+  `--answers-json` is. Intake reuses the onboarding-confirmed language.
+- **Verify contract.** The design course fixes an executable Verify contract
+  before presentation; the design→implementation `collect-input` stays as a
+  backstop.
+- **Briefing quality.**
+  - Dispatch briefings carry verified exact paths (preflight path check, K9-1).
+  - The generated obligations state the closed shell grammar (K9-4).
+  - The private-identifier pre-commit check covers consumer specs (K9-3).
+- **Proportionality (K5-1).** A small local project gets a bounded course with
+  compact artifacts and the same single final decision.
 
 Acceptance cases:
 
-- R5-1 The course doc/emitter consistency test fails if the documented
-  sequence and the inspect-emitted steps diverge.
-- R5-2 Every printed commit example passes the installed commit guard and
+- R5-1: The doc/emitter consistency test fails if the documented sequence and
+  the coordinator's emitted steps diverge. A small-local-project fixture runs a
+  bounded course with compact artifacts and the same single final decision
+  (K5-1).
+- R5-2: Every printed commit example passes the installed commit guard and
   commit-msg hook.
-- R5-3 A 30 KB answers file is accepted on Windows; the language is asked
-  once.
-- R5-4 Presentation refused without a configured Verify contract.
+- R5-3: A 30 KB answers file is accepted on Windows, and the language is
+  asked once.
+- R5-4: Presentation is refused without a configured Verify contract.
+- R5-5: A generated short form contains the EL-16 qualifiers.
+- R5-6: One design revision after an Advisor finding needs zero PO
+  interactions and zero overrides, does not loop, and works on Claude and
+  Antigravity after the Advisor stage as well as on Codex (K5-7).
+- R5-7: A private first name in a consumer PRD is refused at pre-commit
+  (K9-3). A briefing that cites a role path that does not exist is refused by
+  the path preflight before launch (K9-1). The generated obligations contain
+  the closed shell grammar (K9-4).
+- R5-8: Course-run fixtures:
+  - `--run-v2` without `--advisor-result` completes in a fixture whose output
+    paths start with the declared prefix (K5-9);
+  - the readiness argv contains `--runner` for Claude and Antigravity (K5-10);
+  - after a readiness failure that follows preparation, the next `--run-v2`
+    resumes without any manual file move (K5-11).
 
-### 21.6 R6 — Forensics and audit chain (K8-1, K8-2, K8-4, K7-6, K7-7)
+### 21.6 R6 — Forensics and audit chain
+
+IDs: K7-6, K8-1, K8-2, K8-4, K8-5, K9-5.
 
 Contract:
 
-- The project-bound transcript reader supports Claude, Codex and Antigravity,
-  merges multi-file segments of one session and child sessions, and reports
-  usage only where the host supplies it.
-- `inspect` compares continuity PRD/Spec digests with the checkout and
-  surfaces drift as an open recovery.
-- A new `docs/*.md` cannot be committed unclassified. The observation-governance
-  check runs in the pre-commit hook. The handover writer classifies its own
-  documents.
-- A generated per-change audit index lists source, commit and gate digests and
-  names missing steps explicitly.
+- **Transcript reader.** The project-bound transcript reader supports Claude,
+  Codex and Antigravity. It merges multi-file segments and child sessions, and
+  reports usage only where the host supplies it (K9-5).
+- **Digest drift.** `inspect` compares the continuity PRD/Spec digests with the
+  checkout and surfaces drift as an open recovery.
+- **Unclassified docs.**
+  - A new `docs/*.md` or `docs/adr/*` file cannot be committed unclassified.
+  - The writer classifies its own documents through the R1 governed repair, so
+    a design-phase doc commit needs zero overrides.
+  - The observation-governance check runs in the pre-commit hook.
+- **Host paths.** Host-specific absolute paths are refused by a pre-commit
+  check. The existing occurrences are sanitized forward without a history
+  rewrite (K8-5).
+- **Audit index.** A generated per-change audit index lists source, commit and
+  gate digests and names missing steps explicitly.
 
 Acceptance cases:
 
-- R6-1 Multi-segment session fixture readable per runner.
-- R6-2 Continuity digest drift fixture reported by `inspect`.
-- R6-3 Unclassified `docs/*.md` commit refused by pre-commit.
-- R6-4 Audit index generated for a fixture change with one deliberately
+- R6-1: A multi-segment session fixture is readable per runner. An Antigravity
+  transcript without usage fields yields no usage figures rather than an
+  estimate presented as measured (K9-5).
+- R6-2: A continuity digest drift fixture is reported by `inspect`.
+- R6-3: An unclassified `docs/*.md` commit is refused. A writer-classified ADR
+  draft commit in draft needs zero overrides.
+- R6-4: An audit index is generated for a fixture change with one deliberately
   missing gate.
+- R6-5: A tracked file containing a host user path is refused at pre-commit,
+  and the two known Alfred occurrences are sanitized.
 
-### 21.7 Sequencing and completion
+### 21.7 Sequencing, integration ownership and completion
 
-R1 and R2 come first. They block the design course and every runner, so no
-other workstream can be validated end to end without them. R4's Windows
-budget-lock and route preflight follow, because Goldfish dispatch on Windows
-depends on them. R3, R5 and R6 can then proceed in parallel slices. The round
-is complete only when the three-runner end-to-end scenarios required above
-pass on the stamped local candidate. Each runner has its own host evidence;
-source fixtures do not substitute for native runner observations. Independent
-Critic review, Verify, security and PO acceptance remain separate gates.
+1. **R1 + R2 first.** R5's coordinator command catalogue is designed together
+   with R1's registry.
+2. **R4 platform and budget fixes next** (K3-9…K3-17 and K5-12, replacing the
+   hotfixes), then the role-route preflight.
+3. **R3, R5 and R6 in parallel slices.** One named **hook-and-commit-policy
+   integration slice** owns:
+   - the commit-msg, pre-commit and pre-push installers;
+   - the commit-message policy;
+   - the trailer grammar.
+
+   R3, R5 and R6 contribute through it. Hook provisioning (K6-2) lands before
+   the R3-2 tests.
+4. **Recovery (§20)** is sequenced after R4, because its owner observation
+   needs the platform sweep.
+
+Hotfix dependency: development on this Windows host relies on operator
+hotfixes 1–7 until the source fixes land. The candidate must not depend on
+them (R4-8, R5-8).
+
+**End-to-end scenario (AC-32).** Per host, on the stamped local candidate, one
+feature with one design revision cycle and one push:
+
+1. Onboarding: repository enrollment consent and key setup (one-time acts,
+   §21.0).
+2. Design: intake, stage-0 authoring, binding (§21.5 coordinator).
+3. Advisor stage (native route, or the labelled fallback where §21.4 permits
+   it).
+4. One design revision cycle: the single rebinding step the Advisor or
+   readiness findings require (R5-6). The run record names the trigger.
+5. Independent readiness (host-observed child, §17).
+6. Final plan approval: PO decision 1.
+7. Implementation: Goldfish dispatches and Verify.
+8. One feature-branch push with its approval: PO decision 2, then read-back.
+
+**Host matrix.** Claude on native Windows (Git Bash); Claude on Linux or WSL;
+Codex on Linux or WSL; Antigravity on its supported host.
+
+**Pass rule (per host).** Zero guard overrides, zero operator hotfixes, zero
+recovery ceremonies; per-feature PO decisions exactly two, with one-time acts
+limited to those enumerated in §21.0; the push completed and read back. A host
+without a run record is `not verified`, never passed. Each host has its own
+evidence; source fixtures do not substitute for native runner observations.
+Independent Critic review, Verify, security and PO acceptance remain separate
+gates. The round is complete only when AC-32 passes on the host matrix.
+
+### 21.8 Deferred rows (reproduction first)
+
+Each row below is owned here and by no workstream. A row naming a sub-aspect of
+an owned ID is a reproduction step for that sub-aspect, not a second owner.
+
+| ID | Reproduction step |
+|---|---|
+| K4-8 | Read the HGO plugin identity on a Claude install and a Codex install. A `+codex` label on a Claude install confirms the drift. |
+| K7-7 | Compare the `docs/state.md` projection with `pipeline-state inspect` after a design revision. |
+| K7-8 | Run the PO profile receipt check on a freshly cloned repository and capture its failure code. |
+| K4-1 footer suspicion (sub-aspect of K4-1, owned by R3) | Produce a denial whose reason carries the "remains available" footer, then compare request digests. |
