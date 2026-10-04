@@ -178,7 +178,9 @@ export function buildRunnerReadinessArgs({ runner, model, effort, prompt, schema
   if (!RUNNERS.has(runner) || typeof model !== "string" || !model || typeof effort !== "string" || !effort
     || typeof prompt !== "string" || !prompt || !schema || typeof schema !== "object") fail("readiness runner invocation is invalid");
   if (runner === "claude") {
-    return ["--print", "--input-format", "text", "--output-format", "json", "--json-schema", JSON.stringify(schema),
+    // The Claude CLI cannot resolve the $schema meta-schema ref; pass a shallow copy without the top-level $schema/$id.
+    const { $schema: _metaSchema, $id: _metaId, ...claudeSchema } = schema;
+    return ["--print", "--input-format", "text", "--output-format", "json", "--json-schema", JSON.stringify(claudeSchema),
       "--model", model, "--effort", effort, "--permission-mode", "plan", "--restricted", "--safe-mode",
       "--tools", "", "--strict-mcp-config", "--mcp-config", JSON.stringify({ mcpServers: {} }), "--no-session-persistence"];
   }
