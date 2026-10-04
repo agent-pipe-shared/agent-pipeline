@@ -356,6 +356,7 @@
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.guard-root-admission-compares-typed-to-realpathed | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all |
 | pipeline.guard-string-match-makes-a-file-uncommittable | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
+| pipeline.guard-suite-fails-60-tests-on-native-windows | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.guard-sweep-completion-report | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | — | 2026-08-10 | 2026-09-09 | — |
 | pipeline.guard-testpath-override-ot09-stale-literal-pattern | closed | defect | pipeline | — | 2026-08-19 | — | — |
@@ -499,6 +500,7 @@
 | pipeline.p-ac-11-four-dimensions-declared-but-inert | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry | closed | defect | pipeline | — | 2026-08-17 | 2026-09-15 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.parallel-work-in-one-checkout-is-unsafe | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow | open | defect | pipeline | alfred | 2026-10-04 | — | — |
@@ -680,6 +682,7 @@
 | pipeline.signature-ceremony-requires-operator-work-and-breaks | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.signed-authority-binding-durability | closed | defect | pipeline | — | 2026-08-06 | — | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
+| pipeline.signed-quality-package-route-is-not-agent-operable-on-windows | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | closed | defect | pipeline | — | 2026-08-08 | 2026-09-05 | — |
 | pipeline.signing-ceremony-tty-check-has-no-windows-fallback | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
 | pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | closed | defect | pipeline | nova | 2026-08-29 | — | — |
@@ -800,7 +803,7 @@
 
 ## Counts
 
-- open: 135
+- open: 138
 - in_progress: 0
 - closed: 643
 - rejected: 3

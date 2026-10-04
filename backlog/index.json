@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b20fa130897e2920bdf3653b8003db3e501de5ea221f6b7ff0aedbfb813ec00c"
+    "transitionHead": "336186b9656e53474b023595ecd6c80b93dad865527bc5bcc347ccba3acbf641"
   },
   "counts": {
-    "open": 135,
+    "open": 138,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -4588,6 +4588,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Baseline measurement, native Windows, 2026-10-04, feat/sprint-alfred, repository copy unchanged.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.guard-sweep-completion-report",
       "status": "closed",
       "type": "workflow-improvement",
@@ -6497,6 +6507,16 @@
       "closureRepository": "self",
       "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md"
+    },
+    {
+      "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live observation, W0-3 dispatches, Claude Code session on native Windows, 2026-10-04, feat/sprint-alfred, lifecycle implementing.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.part-a-limitation-2-orphaned-by-the-r2-rework",
@@ -8901,6 +8921,16 @@
       "closureRepository": "self",
       "closureCommit": "9c6bc9230a62cc580383f3803d59d26939bb7900",
       "closureEvidence": "backlog/items/2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md"
+    },
+    {
+      "id": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live pilot of the signed quality package route (hotfix 10 package, intent f15f4f96), native Windows, 2026-10-04, feat/sprint-alfred, lifecycle implementing.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer",
