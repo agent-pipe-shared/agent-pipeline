@@ -1007,6 +1007,12 @@ export function inspectOrphanArchiveEligibility(startPath, sessionId, options = 
     }
     resume = true;
   }
+  // PO decision 2026-10-04: the zero-authority archive is offered only while no
+  // cleanup manifest is active for ANY session in the repository. Checked last so
+  // the per-descriptor refusals above keep their own typed codes.
+  if (repositoryHasActiveCleanupManifest(loaded.repo)) {
+    return refuse("WT-ORPHAN-ARCHIVE-AUTHORITY", "a cleanup manifest is active for a session in this repository");
+  }
   return { ...base, status: "eligible", resume };
 }
 
@@ -1069,7 +1075,7 @@ export function archiveOrphanSessionDescriptor(startPath, fields, options = {}) 
   }
   // TOCTOU: the active descriptor must still be the exact planned bytes with no manifest.
   loadSessionDescriptor(startPath, sessionId, { ...options, expectedDescriptorSha256 });
-  if (existsSync(cleanupManifestPath(repo, sessionId))) {
+  if (existsSync(cleanupManifestPath(repo, sessionId)) || repositoryHasActiveCleanupManifest(repo)) {
     fail("WT-ORPHAN-ARCHIVE-AUTHORITY", `a cleanup manifest appeared before archiving; ${SIGNED_ROUTE_HINT}`);
   }
   if (!verdict.resume) {
@@ -1105,6 +1111,25 @@ export function archiveOrphanSessionDescriptor(startPath, fields, options = {}) 
 function cleanupManifestPath(repo, sessionId) {
   ensureSafeId(sessionId, "session ID");
   return join(localRoot(repo.commonDir), "session-cleanup", "active", `${sessionId}.json`);
+}
+
+/**
+ * True when ANY cleanup manifest (or its writer lock / in-flight temp file) is
+ * present for ANY session in this repository. Conservative by design (PO
+ * decision 2026-10-04): the zero-authority orphan archive is offered only when
+ * no cleanup authority is active repository-wide, and an unreadable or
+ * unexpected directory fails closed as "active".
+ */
+function repositoryHasActiveCleanupManifest(repo) {
+  const directory = join(localRoot(repo.commonDir), "session-cleanup", "active");
+  if (!existsSync(directory)) return false;
+  try {
+    const info = lstatSync(directory);
+    if (info.isSymbolicLink() || !info.isDirectory()) return true;
+    return readdirSync(directory).length > 0;
+  } catch {
+    return true;
+  }
 }
 
 function cleanupReceiptPath(repo, sessionId) {
