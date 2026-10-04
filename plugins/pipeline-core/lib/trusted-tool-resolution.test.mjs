@@ -25,4 +25,76 @@ check("rejects a nested descendant below the PO-approved root", () => { const ro
 if (process.platform === "win32") {
   check("resolves this host's real, PO-approved Git install natively (no mocks)", () => { const resolved = resolveTrustedSystemExecutable("git"); assert.equal(resolved.ok, true, JSON.stringify(resolved)); assert.match(resolved.path.toLowerCase(), /^d:\\dev\\git\\git\\(cmd|bin|mingw64\\bin)\\git\.exe$/); });
 }
+// ---------- Operator hotfix 6: win32 trusts <home>\.local\bin for direct .exe tools ----------
+// Defect (pre-hotfix): on native Windows a direct .exe installed under the user's own `<home>\.local\bin` (where per-user tool installers put
+// their binaries) was never searched, so resolution reported binary_missing / untrusted_path. The hotfix adds exactly that one directory, for
+// direct .exe files only (wrappers and extensionless files stay untrusted_path), only when a home directory is known, and leaves the POSIX
+// branch and the immutable system roots untouched. Fixtures are injected (platform + homeDir + fsOps) so the cases run on every host.
+import { randomUUID } from "node:crypto";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, win32 as winPath } from "node:path";
+const HF6_NAME = `pipeline-hotfix-probe-${randomUUID().slice(0, 8)}`;
+const HF6_HOME = "C:\\Users\\hotfix-probe";
+const hf6Bin = winPath.join(HF6_HOME, ".local", "bin");
+const hf6Win = (extra = {}) => ({ platform: "win32", homeDir: HF6_HOME, windowsRoots: [], ...extra });
+const HF6_MISSING = { ok: false, status: "binary_missing" };
+const HF6_UNTRUSTED = { ok: false, status: "untrusted_path" };
+check("hotfix 6: a direct .exe in <home>\\.local\\bin resolves and assesses ok on win32 (pre-hotfix: binary_missing / untrusted_path)", () => {
+  const exe = winPath.join(hf6Bin, `${HF6_NAME}.exe`);
+  const fsOps = fixture({ [exe]: file });
+  for (const name of [HF6_NAME, `${HF6_NAME}.exe`]) assert.deepEqual(resolveTrustedSystemExecutable(name, hf6Win({ fsOps })), { ok: true, path: exe }, name);
+  assert.deepEqual(assessTrustedExecutablePath(exe, hf6Win({ fsOps })), { ok: true, path: exe });
+});
+check("hotfix 6: .cmd/.bat/.ps1 wrappers and extensionless files in <home>\\.local\\bin stay untrusted_path", () => {
+  for (const extension of [".cmd", ".bat", ".ps1"]) {
+    const wrapper = winPath.join(hf6Bin, `${HF6_NAME}${extension}`);
+    const fsOps = fixture({ [wrapper]: file });
+    assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, hf6Win({ fsOps })), HF6_UNTRUSTED, extension);
+    assert.deepEqual(assessTrustedExecutablePath(wrapper, hf6Win({ fsOps })), HF6_UNTRUSTED, extension);
+  }
+  const bare = winPath.join(hf6Bin, HF6_NAME);
+  assert.deepEqual(assessTrustedExecutablePath(bare, hf6Win({ fsOps: fixture({ [bare]: file }) })), HF6_UNTRUSTED);
+});
+check("hotfix 6: an .exe elsewhere in the home directory is not trusted (only the exact <home>\\.local\\bin directory)", () => {
+  const elsewhere = [winPath.join(HF6_HOME, `${HF6_NAME}.exe`), winPath.join(HF6_HOME, ".local", `${HF6_NAME}.exe`), winPath.join(hf6Bin, "nested", `${HF6_NAME}.exe`), winPath.join(HF6_HOME, "go", "bin", `${HF6_NAME}.exe`)];
+  const fsOps = fixture(Object.fromEntries(elsewhere.map((path) => [path, file])));
+  for (const path of elsewhere) assert.deepEqual(assessTrustedExecutablePath(path, hf6Win({ fsOps })), HF6_UNTRUSTED, path);
+  assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, hf6Win({ fsOps })), HF6_MISSING);
+});
+check("hotfix 6: a link in <home>\\.local\\bin whose resolved target is outside it (or is not an .exe) is refused by the resolved-path recheck", () => {
+  const candidate = winPath.join(hf6Bin, `${HF6_NAME}.exe`);
+  for (const target of [winPath.join(HF6_HOME, "Downloads", `${HF6_NAME}.exe`), winPath.join(hf6Bin, `${HF6_NAME}.dat`)]) {
+    const fsOps = fixture({ [candidate]: link, [target]: file }, { [candidate]: target });
+    assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, hf6Win({ fsOps })), HF6_UNTRUSTED, target);
+    assert.deepEqual(assessTrustedExecutablePath(candidate, hf6Win({ fsOps })), HF6_UNTRUSTED, target);
+  }
+});
+check("hotfix 6: without an injected homeDir a caller-named home is never trusted implicitly, and a POSIX ~/.local/bin file resolves as before", () => {
+  const exe = winPath.join(hf6Bin, `${HF6_NAME}.exe`);
+  const fsOps = fixture({ [exe]: file });
+  assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, { platform: "win32", windowsRoots: [], fsOps }), HF6_MISSING);
+  assert.deepEqual(assessTrustedExecutablePath(exe, { platform: "win32", windowsRoots: [], fsOps }), HF6_UNTRUSTED);
+  const posixPath = `/home/dev/.local/bin/${HF6_NAME}`;
+  for (const platform of ["linux", "darwin"]) assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, { platform, homeDir: "/home/dev", fsOps: fixture({ [posixPath]: file }) }), { ok: true, path: posixPath }, platform);
+});
+check("hotfix 6: an injected win32 platform inherits the host home only on a win32 host (it probes the four candidates in that home's .local\\bin)", () => {
+  const probes = [];
+  const fsOps = { lstatSync(path) { probes.push(path); throw missing(path); }, realpathSync(path) { return path; } };
+  assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, { platform: "win32", windowsRoots: [], fsOps }), HF6_MISSING);
+  if (process.platform === "win32") assert.deepEqual(probes, [`${HF6_NAME}.exe`, `${HF6_NAME}.cmd`, `${HF6_NAME}.bat`, `${HF6_NAME}.ps1`].map((name) => winPath.join(homedir(), ".local", "bin", name)));
+  else assert.deepEqual(probes, [], "a mocked foreign-platform resolution must not inherit this host's home directory");
+});
+if (process.platform === "win32") {
+  check("hotfix 6 (real files, native Windows): an .exe in a temp <home>\\.local\\bin resolves through the real filesystem, but only for that homeDir", () => {
+    const home = realpathSync(mkdtempSync(join(tmpdir(), "hotfix-win32-userbin-")));
+    try {
+      const exe = winPath.join(home, ".local", "bin", `${HF6_NAME}.exe`);
+      mkdirSync(dirname(exe), { recursive: true }); writeFileSync(exe, "MZ");
+      assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, { platform: "win32", homeDir: home }), { ok: true, path: realpathSync(exe) });
+      assert.deepEqual(assessTrustedExecutablePath(exe, { platform: "win32", homeDir: home }), { ok: true, path: realpathSync(exe) });
+      assert.deepEqual(resolveTrustedSystemExecutable(HF6_NAME, { platform: "win32" }), HF6_MISSING, "a temp home is not trusted implicitly");
+    } finally { rmSync(home, { recursive: true, force: true }); }
+  });
+}
 process.stdout.write(`${passed}/${passed} checks passed.\n`);
