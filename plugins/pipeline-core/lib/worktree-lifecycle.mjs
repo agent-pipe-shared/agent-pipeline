@@ -13,6 +13,7 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -863,6 +864,242 @@ export function retireSessionDescriptor(startPath, fields, options = {}) {
   unlinkSync(loaded.path);
   fsyncDirectory(dirname(loaded.path));
   return { sessionId: loaded.sessionId, descriptorSha256: loaded.descriptorSha256 };
+}
+
+export const ORPHAN_ARCHIVE_AUDIT_SCHEMA = "pipeline.session-orphan-archive-audit.v1";
+export const ORPHAN_ARCHIVE_STATUS_SCHEMA = "pipeline.session-orphan-archive-status.v1";
+export const ORPHAN_ARCHIVE_RESULT_SCHEMA = "pipeline.session-orphan-archive-result.v1";
+
+// Zero-authority archive tier (PO decision 2026-10-04): only a descriptor whose
+// owner can never be observed is eligible. `not-live` is deliberately absent --
+// an observable dead owner keeps the existing retirement route.
+const ORPHAN_ARCHIVE_OWNER_STATUSES = new Set(["unavailable", "unobserved"]);
+const ORPHAN_ARCHIVE_BY = /^[A-Za-z0-9][A-Za-z0-9 ._@:-]{0,79}$/u;
+const ORPHAN_ARCHIVE_AUDIT_KEYS = ["archivedAt", "by", "descriptorSha256", "ownerStatus", "reason", "schema", "sessionId"];
+const SIGNED_ROUTE_HINT = "use the signed custody recovery route (PO signature, Spec 20.2) for a descriptor with an observable owner, a cleanup manifest, registered resources or any other authority";
+
+function orphanArchivePaths(repo, sessionId, descriptorSha256) {
+  const directory = join(localRoot(repo.commonDir), "session-descriptors");
+  return {
+    directory,
+    target: join(directory, "archived", `${sessionId}.${descriptorSha256}.json`),
+    audit: join(directory, "orphan-archive-audit.jsonl"),
+  };
+}
+
+/** Strictly parse the append-only archive audit log; any malformed record fails closed. */
+function parseOrphanArchiveAudit(path) {
+  if (!existsSync(path)) return [];
+  const info = lstatSync(path);
+  if (info.isSymbolicLink() || !info.isFile()) fail("WT-ORPHAN-ARCHIVE-AUDIT", "orphan archive audit log is not a regular file");
+  const entries = [];
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line === "") continue;
+    let entry;
+    try { entry = JSON.parse(line); } catch { fail("WT-ORPHAN-ARCHIVE-AUDIT", "orphan archive audit log contains a malformed record"); }
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)
+      || JSON.stringify(Object.keys(entry).sort()) !== JSON.stringify(ORPHAN_ARCHIVE_AUDIT_KEYS)
+      || entry.schema !== ORPHAN_ARCHIVE_AUDIT_SCHEMA
+      || typeof entry.sessionId !== "string" || !SAFE_ID.test(entry.sessionId)
+      || typeof entry.descriptorSha256 !== "string" || !SHA256.test(entry.descriptorSha256)
+      || !ORPHAN_ARCHIVE_OWNER_STATUSES.has(entry.ownerStatus)
+      || typeof entry.by !== "string" || typeof entry.reason !== "string"
+      || typeof entry.archivedAt !== "string" || Number.isNaN(Date.parse(entry.archivedAt))) {
+      fail("WT-ORPHAN-ARCHIVE-AUDIT", "orphan archive audit log contains a record outside the closed schema");
+    }
+    entries.push(entry);
+  }
+  return entries;
+}
+
+export function readOrphanArchiveAudit(startPath, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  return parseOrphanArchiveAudit(orphanArchivePaths(repo, "audit-read", "0".repeat(64)).audit);
+}
+
+/** Exclusive, atomic publish: the target either appears complete or not at all; never overwrites. */
+function publishExclusiveFile(path, bytes, mode = 0o600) {
+  const parent = dirname(path);
+  let existing = parent;
+  while (!existsSync(existing)) existing = dirname(existing);
+  if (realpathSync(existing) !== resolve(existing)) fail("WT-LOCAL-SYMLINK", "local state path crosses a symlink");
+  const existingBeforeCreate = resolve(existing);
+  mkdirSync(parent, { recursive: true, mode: 0o700 });
+  if (lstatSync(parent).isSymbolicLink() || realpathSync(parent) !== resolve(parent)) {
+    fail("WT-LOCAL-SYMLINK", "local state directory crosses a symlink");
+  }
+  if (process.platform === "win32") assureWindowsLocalDirectories(existingBeforeCreate, parent, "WT-LOCAL-WINDOWS-ASSURANCE");
+  const temporary = join(parent, `.${basename(path)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
+  const fd = openSync(temporary, "wx", mode);
+  try {
+    try {
+      writeFileSync(fd, bytes);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    try {
+      linkSync(temporary, path);
+    } catch (error) {
+      if (error?.code === "EEXIST") fail("WT-ORPHAN-ARCHIVE-TARGET-EXISTS", "orphan archive target already exists and was not overwritten");
+      throw error;
+    }
+  } finally {
+    try { unlinkSync(temporary); } catch {}
+  }
+  fsyncDirectory(parent);
+}
+
+function appendOrphanArchiveAudit(path, entry) {
+  const fd = openSync(path, "a", 0o600);
+  try {
+    writeFileSync(fd, `${JSON.stringify(entry)}\n`);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  fsyncDirectory(dirname(path));
+}
+
+/**
+ * Read-only eligibility of one exact descriptor for the zero-authority ARCHIVE
+ * tier. Returns `{status: "eligible"}` or `{status: "refused", code, reason}`;
+ * an unreadable, symlinked or hardlinked descriptor and a digest mismatch throw
+ * (the descriptor loader's own typed codes).
+ */
+export function inspectOrphanArchiveEligibility(startPath, sessionId, options = {}) {
+  const { requesterOwnerNonce, requesterSessionId, ...loadOptions } = options;
+  const loaded = loadSessionDescriptor(startPath, sessionId, loadOptions);
+  const owner = inspectSessionOwnerRuntime(startPath, sessionId, {
+    ...loadOptions,
+    expectedDescriptorSha256: loaded.descriptorSha256,
+  });
+  const base = {
+    schema: ORPHAN_ARCHIVE_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+    ownerStatus: owner.status,
+  };
+  const refuse = (code, reason) => ({ ...base, status: "refused", code, reason: `${reason}; ${SIGNED_ROUTE_HINT}` });
+  if (!ORPHAN_ARCHIVE_OWNER_STATUSES.has(owner.status)) {
+    return refuse("WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE", `descriptor owner is observable (${owner.status})`);
+  }
+  if (existsSync(cleanupManifestPath(loaded.repo, sessionId))) {
+    return refuse("WT-ORPHAN-ARCHIVE-AUTHORITY", "descriptor has a cleanup manifest (registered resources or temporary intents)");
+  }
+  const ownNonce = typeof requesterOwnerNonce === "string" && requesterOwnerNonce !== ""
+    && timingSafeEqual(
+      Buffer.from(rawSha256(Buffer.from(requesterOwnerNonce))),
+      Buffer.from(rawSha256(Buffer.from(loaded.ownerNonce))),
+    );
+  if (ownNonce || requesterSessionId === sessionId) {
+    return refuse("WT-ORPHAN-ARCHIVE-OWN-SESSION", "descriptor belongs to the requesting session");
+  }
+  const paths = orphanArchivePaths(loaded.repo, sessionId, loaded.descriptorSha256);
+  let resume = false;
+  if (existsSync(paths.target)) {
+    const targetInfo = lstatSync(paths.target);
+    const audited = parseOrphanArchiveAudit(paths.audit)
+      .some((entry) => entry.sessionId === sessionId && entry.descriptorSha256 === loaded.descriptorSha256);
+    if (targetInfo.isSymbolicLink() || !targetInfo.isFile() || !audited
+      || rawSha256(readFileSync(paths.target)) !== loaded.descriptorSha256) {
+      return refuse("WT-ORPHAN-ARCHIVE-TARGET-EXISTS", "an archive target already exists and is not the audited copy of this exact descriptor");
+    }
+    resume = true;
+  }
+  return { ...base, status: "eligible", resume };
+}
+
+/**
+ * Archive (never delete) an orphaned zero-authority session descriptor without
+ * a PO signature: exclusive-create `archived/<id>.<sha256>.json`, prove the
+ * readback equals the original bytes, append one schema-closed audit record,
+ * then remove the active name. Eligibility, the digest and the absence of any
+ * manifest are re-proven immediately before the active name is removed.
+ */
+export function archiveOrphanSessionDescriptor(startPath, fields, options = {}) {
+  const { sessionId, expectedDescriptorSha256, by, reason } = fields ?? {};
+  ensureSafeId(sessionId, "session ID");
+  if (typeof expectedDescriptorSha256 !== "string" || !SHA256.test(expectedDescriptorSha256)) {
+    fail("WT-ORPHAN-ARCHIVE-ARGUMENT", "an exact expected descriptor sha256 is required");
+  }
+  if (typeof by !== "string" || !ORPHAN_ARCHIVE_BY.test(by)) {
+    fail("WT-ORPHAN-ARCHIVE-ARGUMENT", "--by must name the operator (1..80 plain characters, no placeholder)");
+  }
+  if (typeof reason !== "string" || reason.trim() === "" || reason.length > 500
+    || /[\u0000-\u001f\u007f]/u.test(reason) || /^<[^>]*>$/u.test(reason.trim())) {
+    fail("WT-ORPHAN-ARCHIVE-ARGUMENT", "--reason must be a single-line explanation (1..500 characters, no placeholder)");
+  }
+  const repo = discoverRepository(startPath, options);
+  const activePath = sessionDescriptorPath(repo, sessionId);
+  const paths = orphanArchivePaths(repo, sessionId, expectedDescriptorSha256);
+  const requester = { requesterOwnerNonce: fields.requesterOwnerNonce, requesterSessionId: fields.requesterSessionId };
+  if (!existsSync(activePath)) {
+    const audited = parseOrphanArchiveAudit(paths.audit)
+      .find((entry) => entry.sessionId === sessionId && entry.descriptorSha256 === expectedDescriptorSha256);
+    if (audited !== undefined && existsSync(paths.target) && lstatSync(paths.target).isFile()
+      && rawSha256(readFileSync(paths.target)) === expectedDescriptorSha256) {
+      return {
+        schema: ORPHAN_ARCHIVE_RESULT_SCHEMA,
+        status: "already-archived",
+        sessionId,
+        descriptorSha256: expectedDescriptorSha256,
+        ownerStatus: audited.ownerStatus,
+        archivePath: paths.target,
+        mutated: false,
+      };
+    }
+    fail("WT-SESSION-MISSING", "session descriptor is missing and no audited archive exists for the exact digest");
+  }
+  const verdict = inspectOrphanArchiveEligibility(startPath, sessionId, {
+    ...options,
+    ...requester,
+    expectedDescriptorSha256,
+  });
+  if (verdict.status !== "eligible") fail(verdict.code, verdict.reason);
+  const bytes = readFileSync(activePath);
+  if (rawSha256(bytes) !== expectedDescriptorSha256) fail("WT-SESSION-DIGEST", "session descriptor digest changed before archiving");
+  if (!verdict.resume) {
+    publishExclusiveFile(paths.target, bytes);
+    const published = lstatSync(paths.target);
+    if (published.isSymbolicLink() || !published.isFile() || published.nlink !== 1
+      || !readFileSync(paths.target).equals(bytes)) {
+      fail("WT-ORPHAN-ARCHIVE-READBACK", "archived descriptor readback does not equal the original bytes");
+    }
+  }
+  // TOCTOU: the active descriptor must still be the exact planned bytes with no manifest.
+  loadSessionDescriptor(startPath, sessionId, { ...options, expectedDescriptorSha256 });
+  if (existsSync(cleanupManifestPath(repo, sessionId))) {
+    fail("WT-ORPHAN-ARCHIVE-AUTHORITY", `a cleanup manifest appeared before archiving; ${SIGNED_ROUTE_HINT}`);
+  }
+  if (!verdict.resume) {
+    const entry = {
+      schema: ORPHAN_ARCHIVE_AUDIT_SCHEMA,
+      sessionId,
+      descriptorSha256: expectedDescriptorSha256,
+      ownerStatus: verdict.ownerStatus,
+      by,
+      reason,
+      archivedAt: nowIso(options.now),
+    };
+    appendOrphanArchiveAudit(paths.audit, entry);
+    const last = parseOrphanArchiveAudit(paths.audit).at(-1);
+    if (JSON.stringify(last) !== JSON.stringify(entry)) {
+      fail("WT-ORPHAN-ARCHIVE-READBACK", "archive audit record readback does not equal the appended record");
+    }
+  }
+  unlinkSync(activePath);
+  fsyncDirectory(dirname(activePath));
+  return {
+    schema: ORPHAN_ARCHIVE_RESULT_SCHEMA,
+    status: "archived",
+    sessionId,
+    descriptorSha256: expectedDescriptorSha256,
+    ownerStatus: verdict.ownerStatus,
+    archivePath: paths.target,
+    resumed: verdict.resume === true,
+    mutated: true,
+  };
 }
 
 function cleanupManifestPath(repo, sessionId) {

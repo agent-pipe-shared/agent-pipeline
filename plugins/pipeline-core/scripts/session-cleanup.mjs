@@ -62,6 +62,8 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
+  session-cleanup.mjs plan-archive-orphan --repo <checkout> [--owner-nonce-file <0600-file>]
+  session-cleanup.mjs archive-orphan --repo <checkout> --session-descriptor <id> --expected-descriptor-sha256 <sha256> --by <name> --reason <text> [--owner-nonce-file <0600-file>]
   session-cleanup.mjs status --repo <checkout>
   session-cleanup.mjs release-binding --repo <checkout>
   session-cleanup.mjs release-orphan-binding --repo <checkout> --by <name> --reason <reason>
@@ -179,6 +181,28 @@ function planHumanRecovery(repo, dependencies = {}) {
       }
     }
   } catch {}
+  // RF2A: a zero-authority orphan descriptor (unobservable owner, no manifest,
+  // not the requester's own) is clearable by the typed, signature-free archive
+  // action -- offered per exact descriptor + digest, never as a deletion.
+  try {
+    const planArchive = dependencies.planOrphanDescriptorArchiveFn ?? planOrphanDescriptorArchive;
+    const offer = planArchive({
+      rootDir: repo,
+      scriptPath: SESSION_CLEANUP_SCRIPT,
+      requesterOwnerNonce: dependencies.requesterOwnerNonce ?? null,
+      deps: dependencies,
+    });
+    for (const candidate of offer.candidates) {
+      candidates.push({
+        id: "archive-orphan-descriptor",
+        mutation: false,
+        effect: "archive-zero-authority-orphan-descriptor-without-signature",
+        sessionId: candidate.sessionId,
+        descriptorSha256: candidate.descriptorSha256,
+        command: `node ${SESSION_CLEANUP_SCRIPT} archive-orphan --repo ${repo} --session-descriptor ${candidate.sessionId} --expected-descriptor-sha256 ${candidate.descriptorSha256} --by "<operator>" --reason "<reason>"`,
+      });
+    }
+  } catch {}
   if (offerAttendedRecovery) {
     candidates.push({
       id: "attended-host-recovery",
@@ -248,7 +272,47 @@ function drainSessionPower(repo, session) {
   }
 }
 
+// RF2A (ALFRED-RF2A-20261004): typed, signature-free ARCHIVE of an orphaned
+// zero-authority session descriptor. These two verbs deliberately never consult
+// onboarding readiness -- the session they unblock is, by definition, the one
+// that is not ready -- and have their own closed flag grammar.
+import {
+  applyOrphanDescriptorArchive,
+  planOrphanDescriptorArchive,
+} from "../lib/session-cleanup-recovery.mjs";
+
+/**
+ * The requester's own capability, when it presents one: the owner nonce from
+ * --owner-nonce-file or PIPELINE_SESSION_OWNER_NONCE. It is only used to REFUSE
+ * archiving the requester's own descriptor; absence is not an error.
+ */
+function requesterOwnerNonce(flags, env, io = {}) {
+  if (flags["owner-nonce-file"]) return ownerNonce(flags, env, io);
+  return typeof env.PIPELINE_SESSION_OWNER_NONCE === "string" && env.PIPELINE_SESSION_OWNER_NONCE !== ""
+    ? env.PIPELINE_SESSION_OWNER_NONCE
+    : null;
+}
+
+function parseArchiveArgs(argv) {
+  const [command, ...rest] = argv;
+  const allowed = command === "archive-orphan"
+    ? new Set(["repo", "session-descriptor", "expected-descriptor-sha256", "by", "reason", "owner-nonce-file", "runner"])
+    : new Set(["repo", "owner-nonce-file", "runner"]);
+  const flags = {};
+  for (let index = 0; index < rest.length; index += 2) {
+    const key = rest[index];
+    const value = rest[index + 1];
+    if (!key?.startsWith("--") || value === undefined || value.startsWith("--")) throw new Error(USAGE);
+    const name = key.slice(2);
+    if (name in flags) throw new Error(`Duplicate option: ${key}`);
+    if (!allowed.has(name)) throw new Error(`Unknown option: --${name}`);
+    flags[name] = value;
+  }
+  return { command, flags };
+}
+
 function parseArgs(argv) {
+  if (new Set(["plan-archive-orphan", "archive-orphan"]).has(argv[0])) return parseArchiveArgs(argv);
   const [command, ...rest] = argv;
   if (!new Set([
     "start", "status", "release-binding", "release-orphan-binding", "plan-privatization", "confirm-privatization", "apply-privatization",
@@ -436,13 +500,39 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       status: "observed",
       descriptors,
     };
+  } else if (command === "plan-archive-orphan") {
+    // RF2A: read-only listing of the descriptors the zero-authority archive tier
+    // may clear; never consults onboarding readiness.
+    const planArchive = dependencies.planOrphanDescriptorArchiveFn ?? planOrphanDescriptorArchive;
+    output = planArchive({
+      rootDir: repo,
+      scriptPath: SESSION_CLEANUP_SCRIPT,
+      requesterOwnerNonce: requesterOwnerNonce(flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate }),
+      deps: dependencies,
+    });
+  } else if (command === "archive-orphan") {
+    // RF2A: archive (never delete) one exact zero-authority orphan descriptor and
+    // release the cleanup binding to it. No signature, no onboarding readiness:
+    // the stuck session must be able to run this. Eligibility is re-proven at
+    // apply time by the archive writer; anything with authority is refused with a
+    // typed code naming the signed route.
+    const applyArchive = dependencies.applyOrphanDescriptorArchiveFn ?? applyOrphanDescriptorArchive;
+    output = applyArchive({
+      rootDir: repo,
+      sessionId: required(flags, "session-descriptor"),
+      expectedDescriptorSha256: required(flags, "expected-descriptor-sha256"),
+      by: required(flags, "by"),
+      reason: required(flags, "reason"),
+      requesterOwnerNonce: requesterOwnerNonce(flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate }),
+      deps: dependencies,
+    });
   } else if (command === "plan-recovery") {
     const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
     output = promotionRecovery.status === "not-applicable"
-      ? planSessionCleanupRecovery({ rootDir: repo })
+      ? planSessionCleanupRecovery({ rootDir: repo, requesterOwnerNonce: requesterOwnerNonce({}, env) })
       : promotionRecovery;
   } else if (command === "plan-human-recovery") {
-    output = planHumanRecovery(repo, dependencies);
+    output = planHumanRecovery(repo, { ...dependencies, requesterOwnerNonce: requesterOwnerNonce({}, env) });
   } else if (command === "apply-recovery") {
     const planSha256 = required(flags, "plan-sha256");
     const planPromotionRecovery = dependencies.planOnboardingKickoffPromotionCleanupRecoveryFn

@@ -944,6 +944,198 @@ function planExactOrphanRetirement({
 export function planSessionCleanupRecovery({
   rootDir,
   scriptPath = DEFAULT_SCRIPT,
+  requesterOwnerNonce = null,
+  deps = {},
+} = {}) {
+  const plan = planSessionCleanupRecoveryBase({ rootDir, scriptPath, deps });
+  if (!ARCHIVE_OFFER_STATUSES.has(plan.status)) return plan;
+  let offer = null;
+  try {
+    offer = planOrphanDescriptorArchive({ rootDir, scriptPath, requesterOwnerNonce, deps });
+  } catch {
+    offer = null;
+  }
+  if (offer === null || offer.candidates.length === 0) return plan;
+  return { ...plan, archiveOrphan: { schema: offer.schema, candidates: offer.candidates } };
+}
+
+// RF2A (ALFRED-RF2A-20261004): the two states that used to be a dead end for an
+// orphaned descriptor whose owner can never be observed (a V2 `ownerRuntime:
+// null` is `unavailable`, a V1 descriptor `unobserved`). A ready typed plan
+// keeps precedence and is never extended, so no planSha256 changes.
+const ARCHIVE_OFFER_STATUSES = new Set(["cleanup-required", "orphan-recovery-unavailable"]);
+
+import {
+  archiveOrphanSessionDescriptor,
+  inspectOrphanArchiveEligibility,
+} from "./worktree-lifecycle.mjs";
+
+export const ORPHAN_ARCHIVE_PLAN_SCHEMA = "pipeline.session-orphan-archive-plan.v1";
+export const ORPHAN_ARCHIVE_APPLY_SCHEMA = "pipeline.session-orphan-archive-apply.v1";
+
+function orphanArchiveAction(scriptPath, root, candidate) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [
+      scriptPath,
+      "archive-orphan",
+      "--repo",
+      root,
+      "--session-descriptor",
+      candidate.sessionId,
+      "--expected-descriptor-sha256",
+      candidate.descriptorSha256,
+      "--by",
+      "<operator>",
+      "--reason",
+      "<reason>",
+    ],
+    mutation: true,
+    requiresConfirmation: false,
+    requiresInput: ["--by", "--reason"],
+    executionBoundary: "local-process",
+    expected: { schema: ORPHAN_ARCHIVE_APPLY_SCHEMA, statuses: ["archived", "already-archived"] },
+  };
+}
+
+/**
+ * Read-only: list every active descriptor that the zero-authority ARCHIVE tier
+ * may clear without a signature (unobservable owner, no cleanup manifest, not
+ * the requester's own session), with the digest the apply step is bound to.
+ * Everything else is reported with the typed refusal code naming its route.
+ */
+export function planOrphanDescriptorArchive({
+  rootDir,
+  scriptPath = DEFAULT_SCRIPT,
+  requesterOwnerNonce = null,
+  deps = {},
+} = {}) {
+  const listDescriptors = deps.listActiveSessionDescriptorsFn ?? listActiveSessionDescriptors;
+  const inspectEligibility = deps.inspectOrphanArchiveEligibilityFn ?? inspectOrphanArchiveEligibility;
+  const readBinding = deps.readOnboardingSessionCleanupBindingFn ?? readOnboardingSessionCleanupBinding;
+  let descriptors = [];
+  let observationCode = null;
+  try {
+    descriptors = listDescriptors(rootDir);
+  } catch (error) {
+    observationCode = typeof error?.code === "string" ? error.code : "WT-SESSION-OBSERVATION";
+  }
+  let boundTuple = null;
+  try {
+    const binding = readBinding({ rootDir });
+    if (binding?.status === "bound") boundTuple = binding.sessionCleanup;
+  } catch {
+    boundTuple = null;
+  }
+  const candidates = [];
+  const refusals = [];
+  for (const descriptor of descriptors) {
+    let verdict;
+    try {
+      verdict = inspectEligibility(rootDir, descriptor.sessionId, {
+        expectedDescriptorSha256: descriptor.descriptorSha256,
+        requesterOwnerNonce,
+      });
+    } catch (error) {
+      refusals.push({
+        sessionId: descriptor.sessionId,
+        descriptorSha256: descriptor.descriptorSha256,
+        code: typeof error?.code === "string" ? error.code : "WT-ORPHAN-ARCHIVE-OBSERVATION",
+      });
+      continue;
+    }
+    if (verdict.status !== "eligible") {
+      refusals.push({
+        sessionId: descriptor.sessionId,
+        descriptorSha256: descriptor.descriptorSha256,
+        ownerStatus: verdict.ownerStatus,
+        code: verdict.code,
+      });
+      continue;
+    }
+    const bindingState = boundTuple === null
+      ? "unbound"
+      : boundTuple.sessionId === descriptor.sessionId
+        && boundTuple.descriptorSha256 === descriptor.descriptorSha256
+        ? "bound-to-descriptor"
+        : "bound-elsewhere";
+    const candidate = {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+      ownerStatus: verdict.ownerStatus,
+      bindingState,
+      resume: verdict.resume === true,
+    };
+    candidates.push({ ...candidate, action: orphanArchiveAction(scriptPath, rootDir, candidate) });
+  }
+  return {
+    schema: ORPHAN_ARCHIVE_PLAN_SCHEMA,
+    status: candidates.length === 0 ? "none-eligible" : "ready",
+    root: rootDir,
+    mutation: false,
+    candidates,
+    refusals,
+    ...(observationCode === null ? {} : { observationCode }),
+  };
+}
+
+/**
+ * Archive one exact zero-authority orphan descriptor (never deleting it) and
+ * release the cleanup binding to that exact descriptor, if there is one, under
+ * the existing State CAS. Eligibility is re-proven by the archive writer at
+ * apply time; a crash between the two steps is recoverable by the existing
+ * lost-binding recovery and by re-running this action.
+ */
+export function applyOrphanDescriptorArchive({
+  rootDir,
+  sessionId,
+  expectedDescriptorSha256,
+  by,
+  reason,
+  requesterOwnerNonce = null,
+  deps = {},
+} = {}) {
+  const readBinding = deps.readOnboardingSessionCleanupBindingFn ?? readOnboardingSessionCleanupBinding;
+  const archive = deps.archiveOrphanSessionDescriptorFn ?? archiveOrphanSessionDescriptor;
+  const releaseBinding = deps.releaseOnboardingSessionCleanupFn ?? releaseOnboardingSessionCleanup;
+  // Observe the binding BEFORE mutating so an unreadable State fails closed.
+  readBinding({ rootDir });
+  const archived = archive(rootDir, {
+    sessionId,
+    expectedDescriptorSha256,
+    by,
+    reason,
+    requesterOwnerNonce,
+  });
+  const binding = readBinding({ rootDir });
+  let bindingReleased = false;
+  if (binding.status === "bound"
+    && binding.sessionCleanup?.sessionId === sessionId
+    && binding.sessionCleanup?.descriptorSha256 === expectedDescriptorSha256) {
+    releaseBinding({
+      rootDir,
+      expectedStateSha256: binding.stateSha256,
+      expectedRevision: binding.revision,
+      sessionCleanup: binding.sessionCleanup,
+    });
+    bindingReleased = true;
+  }
+  return {
+    schema: ORPHAN_ARCHIVE_APPLY_SCHEMA,
+    status: archived.status,
+    sessionId: archived.sessionId,
+    descriptorSha256: archived.descriptorSha256,
+    ownerStatus: archived.ownerStatus,
+    archivePath: archived.archivePath,
+    bindingReleased,
+    mutated: archived.mutated || bindingReleased,
+  };
+}
+
+function planSessionCleanupRecoveryBase({
+  rootDir,
+  scriptPath = DEFAULT_SCRIPT,
   deps = {},
 } = {}) {
   const readBinding = deps.readOnboardingSessionCleanupBindingFn

@@ -688,6 +688,136 @@ test("release-closed-feature auto-executes without confirmation, backs up onboar
 // `git worktree list` and an on-disk `.git` pointer file, so a real repository is required
 // rather than a mocked one.
 
+// RF2A (ALFRED-RF2A-20261004): typed, signature-free ARCHIVE of an orphaned
+// zero-authority session descriptor. Namespace import keeps each new-API test
+// individually reportable. The CLI tests live here because this file already
+// drives `sessionCleanupMain` with the fixture() onboarding repos.
+import * as orphanArchive from "./session-cleanup-recovery.mjs";
+
+const RF2A_NO_READINESS = {
+  requireProjectOnboardingReadyFn() { throw new Error("archive verbs must not consult onboarding readiness"); },
+};
+
+function rf2aArchivePath(root, sessionId, sha256) {
+  return join(gitCommonDir(root), "agent-pipeline", "session-descriptors", "archived", `${sessionId}.${sha256}.json`);
+}
+
+function rf2aForgeManifest(root, sessionId) {
+  const dir = join(gitCommonDir(root), "agent-pipeline", "session-cleanup", "active");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${sessionId}.json`), "{}\n");
+}
+
+function rf2aArchiveArgv(root, descriptor, extra = []) {
+  return [
+    "archive-orphan", "--repo", root,
+    "--session-descriptor", descriptor.sessionId,
+    "--expected-descriptor-sha256", descriptor.descriptorSha256,
+    "--by", "po-test", "--reason", "orphaned zero-authority descriptor",
+    ...extra,
+  ];
+}
+
+test("RF2A two unavailable-owner descriptors: plan-recovery offers the archive action, archive keeps exact bytes with an audit record, nothing is deleted, a second run is a no-op", () => {
+  const root = fixture("rf2a-two-orphans");
+  try {
+    const first = startSessionDescriptor(root, { sessionId: "session-rf2a-orphan-a", ownerPid: -1 });
+    const second = startSessionDescriptor(root, { sessionId: "session-rf2a-orphan-b", ownerPid: -1 });
+    const firstBytes = readFileSync(first.path);
+    const plan = planSessionCleanupRecovery({ rootDir: root });
+    assert.equal(plan.status, "orphan-recovery-unavailable");
+    assert.deepEqual(plan.archiveOrphan.candidates.map((candidate) => candidate.sessionId), [first.sessionId, second.sessionId]);
+    assert.equal(plan.archiveOrphan.candidates[0].descriptorSha256, first.descriptorSha256);
+    assert.equal(plan.archiveOrphan.candidates[0].ownerStatus, "unavailable");
+    const listed = invoke(["plan-archive-orphan", "--repo", root], RF2A_NO_READINESS);
+    assert.equal(listed.code, 0);
+    assert.equal(listed.output.status, "ready");
+    assert.deepEqual(listed.output.candidates.map((candidate) => candidate.descriptorSha256), [first.descriptorSha256, second.descriptorSha256]);
+    assert.equal(listActiveSessionDescriptors(root).length, 2, "plan-archive-orphan is read-only");
+    assert.throws(
+      () => invoke(rf2aArchiveArgv(root, { sessionId: second.sessionId, descriptorSha256: "0".repeat(64) }), RF2A_NO_READINESS),
+      (error) => error.code === "WT-SESSION-DIGEST",
+    );
+    const applied = invoke(rf2aArchiveArgv(root, first), RF2A_NO_READINESS);
+    assert.equal(applied.code, 0);
+    assert.equal(applied.output.status, "archived");
+    assert.equal(applied.output.bindingReleased, false);
+    assert.deepEqual(readFileSync(rf2aArchivePath(root, first.sessionId, first.descriptorSha256)), firstBytes);
+    assert.deepEqual(listActiveSessionDescriptors(root), [{ sessionId: second.sessionId, descriptorSha256: second.descriptorSha256 }]);
+    const audit = readFileSync(join(gitCommonDir(root), "agent-pipeline", "session-descriptors", "orphan-archive-audit.jsonl"), "utf8")
+      .split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    assert.equal(audit.length, 1);
+    assert.equal(audit[0].sessionId, first.sessionId);
+    assert.equal(audit[0].ownerStatus, "unavailable");
+    assert.equal(audit[0].by, "po-test");
+    const again = invoke(rf2aArchiveArgv(root, first), RF2A_NO_READINESS);
+    assert.equal(again.output.status, "already-archived");
+    assert.equal(again.output.mutated, false);
+    assert.deepEqual(readFileSync(rf2aArchivePath(root, first.sessionId, first.descriptorSha256)), firstBytes);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("RF2A a bound unavailable-owner descriptor: plan-recovery and plan-human-recovery offer archive, apply archives it and releases the binding without readiness or a signature", () => {
+  const root = fixture("rf2a-bound");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-rf2a-bound"], {
+      startSessionDescriptorFn: (startPath, options) => startSessionDescriptor(startPath, { ...options, ownerPid: -1 }),
+    });
+    assert.equal(started.code, 0);
+    const descriptor = { sessionId: started.output.sessionId, descriptorSha256: started.output.descriptorSha256 };
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "bound");
+    const plan = planSessionCleanupRecovery({ rootDir: root });
+    assert.equal(plan.status, "cleanup-required");
+    assert.deepEqual(plan.archiveOrphan.candidates.map((candidate) => [candidate.sessionId, candidate.bindingState]), [[descriptor.sessionId, "bound-to-descriptor"]]);
+    const human = invoke(["plan-human-recovery", "--repo", root]);
+    const offered = human.output.candidates.filter((candidate) => candidate.id === "archive-orphan-descriptor");
+    assert.equal(offered.length, 1);
+    assert.equal(offered[0].sessionId, descriptor.sessionId);
+    assert.equal(offered[0].descriptorSha256, descriptor.descriptorSha256);
+    const bytes = readFileSync(loadSessionDescriptor(root, descriptor.sessionId).path);
+    const applied = invoke(rf2aArchiveArgv(root, descriptor), RF2A_NO_READINESS);
+    assert.equal(applied.output.status, "archived");
+    assert.equal(applied.output.bindingReleased, true);
+    assert.deepEqual(readFileSync(rf2aArchivePath(root, descriptor.sessionId, descriptor.descriptorSha256)), bytes);
+    assert.notEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "bound");
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
+    assert.equal(invoke(["plan-recovery", "--repo", root]).output.status, "not-needed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("RF2A a descriptor with a cleanup manifest or the requester's own session is never offered and is refused with a typed code naming the signed route", () => {
+  const root = fixture("rf2a-refused");
+  try {
+    const withManifest = startSessionDescriptor(root, { sessionId: "session-rf2a-b-manifest", ownerNonce: "owner-nonce-rf2a-manifest-0001", ownerPid: -1 });
+    const own = startSessionDescriptor(root, { sessionId: "session-rf2a-a-own", ownerNonce: "owner-nonce-rf2a-own-session-001", ownerPid: -1 });
+    rf2aForgeManifest(root, withManifest.sessionId);
+    const offer = orphanArchive.planOrphanDescriptorArchive({ rootDir: root, requesterOwnerNonce: own.ownerNonce });
+    assert.equal(offer.status, "none-eligible");
+    assert.deepEqual(offer.refusals.map((refusal) => [refusal.sessionId, refusal.code]), [
+      [own.sessionId, "WT-ORPHAN-ARCHIVE-OWN-SESSION"],
+      [withManifest.sessionId, "WT-ORPHAN-ARCHIVE-AUTHORITY"],
+    ]);
+    const plan = planSessionCleanupRecovery({ rootDir: root, requesterOwnerNonce: own.ownerNonce });
+    assert.equal(plan.status, "orphan-recovery-unavailable");
+    assert.equal("archiveOrphan" in plan, false);
+    let humanOutput = "";
+    sessionCleanupMain(["plan-human-recovery", "--repo", root], { PIPELINE_SESSION_OWNER_NONCE: own.ownerNonce }, {
+      writeFn(value) { humanOutput += value; },
+    });
+    assert.equal(JSON.parse(humanOutput).candidates.some((candidate) => candidate.id === "archive-orphan-descriptor"), false);
+    assert.throws(
+      () => invoke(rf2aArchiveArgv(root, withManifest), RF2A_NO_READINESS),
+      (error) => error.code === "WT-ORPHAN-ARCHIVE-AUTHORITY" && /signed/u.test(error.message),
+    );
+    assert.throws(
+      () => sessionCleanupMain(rf2aArchiveArgv(root, own), { PIPELINE_SESSION_OWNER_NONCE: own.ownerNonce }, { ...RF2A_NO_READINESS, writeFn() {} }),
+      (error) => error.code === "WT-ORPHAN-ARCHIVE-OWN-SESSION",
+    );
+    assert.deepEqual(listActiveSessionDescriptors(root).map((entry) => entry.sessionId), [own.sessionId, withManifest.sessionId]);
+    assert.equal(existsSync(join(gitCommonDir(root), "agent-pipeline", "session-descriptors", "archived")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 function freshWorktreeSweepRepo() {
   const root = mkdtempSync(join(tmpdir(), "session-cleanup-recovery-worktree-sweep-"));
   const run = (args) => {

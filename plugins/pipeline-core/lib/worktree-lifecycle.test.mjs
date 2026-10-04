@@ -1070,6 +1070,120 @@ check("D0-TMP-IGN listActiveSessionDescriptors ignores abandoned atomic write te
   retireSessionDescriptor(primary, { sessionId: started.sessionId, ownerNonce: started.ownerNonce });
 });
 
+// RF2A (ALFRED-RF2A-20261004): typed, signature-free ARCHIVE of an orphaned
+// zero-authority session descriptor. Namespace import keeps each new-API check
+// individually reportable (a missing export fails one check, not the module).
+import * as archiveApi from "./worktree-lifecycle.mjs";
+import { linkSync } from "node:fs";
+
+function archivePaths(primary, id, sha) {
+  const dir = join(discoverRepository(primary).commonDir, "agent-pipeline", "session-descriptors");
+  return { dir, archived: join(dir, "archived", `${id}.${sha}.json`), audit: join(dir, "orphan-archive-audit.jsonl") };
+}
+
+function orphanFixture(primary, id, { legacy = false } = {}) {
+  const ownerNonce = `owner-nonce-${id}-000001`;
+  startSessionDescriptor(primary, { sessionId: id, ownerNonce, ownerPid: -1 });
+  const loaded = loadSessionDescriptor(primary, id);
+  if (legacy) {
+    const descriptor = JSON.parse(readFileSync(loaded.path, "utf8"));
+    delete descriptor.ownerRuntime;
+    descriptor.schema = "pipeline.session-descriptor.v1";
+    writeFileSync(loaded.path, `${JSON.stringify(descriptor, null, 2)}\n`, { mode: 0o600 });
+  }
+  const reloaded = loadSessionDescriptor(primary, id);
+  return { sessionId: id, ownerNonce, path: reloaded.path, sha: reloaded.descriptorSha256, bytes: readFileSync(reloaded.path) };
+}
+
+function archiveFields(d, extra = {}) {
+  return { sessionId: d.sessionId, expectedDescriptorSha256: d.sha, by: "po-test", reason: "orphaned zero-authority descriptor", ...extra };
+}
+
+for (const [label, legacy, ownerStatus] of [["V2 null-owner", false, "unavailable"], ["V1 field-absent", true, "unobserved"]]) {
+  check(`RF2A archive moves a ${label} descriptor byte-exactly to archived/<id>.<sha>.json with one audit record, deletes nothing, and a second run is a no-op`, () => {
+    const { primary } = repoFixture();
+    const d = orphanFixture(primary, legacy ? "rf2a-v1" : "rf2a-v2", { legacy });
+    assert.equal(inspectSessionOwnerRuntime(primary, d.sessionId).status, ownerStatus);
+    const result = archiveApi.archiveOrphanSessionDescriptor(primary, archiveFields(d));
+    const paths = archivePaths(primary, d.sessionId, d.sha);
+    assert.equal(result.status, "archived");
+    assert.equal(result.ownerStatus, ownerStatus);
+    assert.equal(result.mutated, true);
+    assert.equal(existsSync(d.path), false);
+    assert.deepEqual(readFileSync(paths.archived), d.bytes);
+    assert.deepEqual(listActiveSessionDescriptors(primary), []);
+    const lines = readFileSync(paths.audit, "utf8").split("\n").filter(Boolean);
+    assert.equal(lines.length, 1);
+    const audit = JSON.parse(lines[0]);
+    assert.deepEqual(Object.keys(audit).sort(), ["archivedAt", "by", "descriptorSha256", "ownerStatus", "reason", "schema", "sessionId"]);
+    assert.equal(audit.schema, "pipeline.session-orphan-archive-audit.v1");
+    assert.equal(audit.sessionId, d.sessionId);
+    assert.equal(audit.descriptorSha256, d.sha);
+    assert.equal(audit.ownerStatus, ownerStatus);
+    assert.equal(audit.by, "po-test");
+    assert.equal(audit.reason, "orphaned zero-authority descriptor");
+    assert.equal(Number.isNaN(Date.parse(audit.archivedAt)), false);
+    assert.equal(lines[0].includes(d.ownerNonce), false);
+    const again = archiveApi.archiveOrphanSessionDescriptor(primary, archiveFields(d));
+    assert.equal(again.status, "already-archived");
+    assert.equal(again.mutated, false);
+    assert.equal(readFileSync(paths.audit, "utf8").split("\n").filter(Boolean).length, 1);
+    assert.deepEqual(readFileSync(paths.archived), d.bytes);
+    assert.deepEqual(readdirSync(join(paths.dir, "archived")), [`${d.sessionId}.${d.sha}.json`]);
+  });
+}
+
+check("RF2A archive refuses a manifest, the requester's own session, digest drift, hardlink, symlink, an existing target, a placeholder operator and an observable owner, and never deletes", () => {
+  const { fixture, primary } = repoFixture();
+  const common = discoverRepository(primary).commonDir;
+  const refused = (d, extra, code, signedRoute = false) => {
+    assert.throws(
+      () => archiveApi.archiveOrphanSessionDescriptor(primary, archiveFields(d, extra)),
+      (error) => error instanceof WorktreeLifecycleError && error.code === code && (!signedRoute || /signed/u.test(error.message)),
+    );
+    assert.deepEqual(readFileSync(d.path), d.bytes);
+    assert.equal(existsSync(archivePaths(primary, d.sessionId, d.sha).archived), false);
+  };
+  const manifest = orphanFixture(primary, "rf2a-manifest");
+  mkdirSync(join(common, "agent-pipeline", "session-cleanup", "active"), { recursive: true });
+  writeFileSync(join(common, "agent-pipeline", "session-cleanup", "active", "rf2a-manifest.json"), "{}\n");
+  refused(manifest, {}, "WT-ORPHAN-ARCHIVE-AUTHORITY", true);
+  const own = orphanFixture(primary, "rf2a-own");
+  refused(own, { requesterOwnerNonce: own.ownerNonce }, "WT-ORPHAN-ARCHIVE-OWN-SESSION");
+  refused(own, { requesterSessionId: own.sessionId }, "WT-ORPHAN-ARCHIVE-OWN-SESSION");
+  const drift = orphanFixture(primary, "rf2a-drift");
+  refused(drift, { expectedDescriptorSha256: "0".repeat(64) }, "WT-SESSION-DIGEST");
+  const hard = orphanFixture(primary, "rf2a-hardlink");
+  linkSync(hard.path, join(fixture, "rf2a-hardlink-copy"));
+  refused(hard, {}, "WT-SESSION-DESCRIPTOR");
+  const placeholder = orphanFixture(primary, "rf2a-placeholder");
+  refused(placeholder, { by: "<operator>" }, "WT-ORPHAN-ARCHIVE-ARGUMENT");
+  const target = orphanFixture(primary, "rf2a-target");
+  const targetPaths = archivePaths(primary, target.sessionId, target.sha);
+  mkdirSync(join(targetPaths.dir, "archived"), { recursive: true });
+  writeFileSync(targetPaths.archived, "preexisting archive bytes");
+  assert.throws(
+    () => archiveApi.archiveOrphanSessionDescriptor(primary, archiveFields(target)),
+    (error) => error instanceof WorktreeLifecycleError && error.code === "WT-ORPHAN-ARCHIVE-TARGET-EXISTS",
+  );
+  assert.deepEqual(readFileSync(target.path), target.bytes);
+  assert.equal(readFileSync(targetPaths.archived, "utf8"), "preexisting archive bytes");
+  if (process.platform === "linux") {
+    startSessionDescriptor(primary, { sessionId: "rf2a-live", ownerNonce: "owner-nonce-rf2a-live-000001" });
+    const live = loadSessionDescriptor(primary, "rf2a-live");
+    refused({ sessionId: "rf2a-live", path: live.path, sha: live.descriptorSha256, bytes: readFileSync(live.path) }, {}, "WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE", true);
+  }
+  const symlinked = orphanFixture(primary, "rf2a-symlink");
+  const real = join(fixture, "rf2a-symlink-real.json");
+  writeFileSync(real, symlinked.bytes, { mode: 0o600 });
+  unlinkSync(symlinked.path);
+  let symlinkCreated = true;
+  try { symlinkSync(real, symlinked.path); } catch { symlinkCreated = false; }
+  if (symlinkCreated) refused(symlinked, {}, "WT-SESSION-DESCRIPTOR");
+  assert.equal(readdirSync(join(common, "agent-pipeline", "session-descriptors", "archived")).every((name) => name.startsWith("rf2a-target.")), true);
+  assert.equal(existsSync(join(common, "agent-pipeline", "session-descriptors", "orphan-archive-audit.jsonl")), false);
+});
+
 function readdirJson(path) {
   if (!existsSync(path)) return [];
   assert.equal(lstatSync(path).isSymbolicLink(), false);
