@@ -44,6 +44,7 @@ import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs
 import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
 import { checkPlanningAdoptionDisposition } from "../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
+import { inspectArchitectureEntryReadiness } from "../lib/architecture-entry-readiness.mjs";
 import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../scripts/rigor-floor.mjs";
 import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabilities.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
@@ -497,6 +498,15 @@ function architectureAdoptionAuthorityVerdict(root, command, dependencies = {}) 
  * enough to receive implementation authority. Keep the two gates separate:
  * a PO's adoption decision never turns an unavailable or failing evaluator
  * result into a pass.
+ *
+ * One narrow rule (operator hotfix 10): when the active plan scope's adoption
+ * disposition is a PO deferral AND the writer's own library gate
+ * (inspectArchitectureEntryReadiness) reports "ready" for the same root and
+ * task scope -- it validates the physical map, fitness model, baseline,
+ * re-entry pointer and checkpoint debt, and treats fitness as non-enforced
+ * under deferral -- the fitness FINDINGS are report-only and do not block.
+ * An unavailable or unknown evaluator result, a missing planning surface, any
+ * other disposition, and any error while deciding all keep the denial.
  */
 function architectureFitnessAuthorityVerdict(root, command, dependencies = {}) {
   if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
@@ -522,6 +532,27 @@ function architectureFitnessAuthorityVerdict(root, command, dependencies = {}) {
     fitness = null;
   }
   if (fitness?.overallStatus === "pass" || fitness?.overallStatus === "excepted") return null;
+  // Operator hotfix 10: a complete findings-bearing fitness result under a PO-deferred
+  // adoption is report-only, but only while the library entry gate agrees. Any throw,
+  // any shortfall, any other disposition falls through to the unchanged denial below.
+  if (fitness !== null && typeof fitness === "object"
+    && typeof fitness.overallStatus === "string"
+    && fitness.overallStatus !== "unavailable" && fitness.overallStatus !== "unknown"
+    && Array.isArray(fitness.outcomes)) {
+    try {
+      const scope = (dependencies.activeFeaturePlanningScopeFn ?? activeFeaturePlanningScope)(root, dependencies);
+      if (typeof scope === "string" && scope.trim() !== "") {
+        const adoption = (dependencies.checkPlanningAdoptionDispositionFn ?? checkPlanningAdoptionDisposition)(root, scope);
+        if (adoption?.ok === true && adoption.disposition === "deferred") {
+          const entry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
+            rootDir: root,
+            taskScope: scope,
+          });
+          if (entry?.status === "ready") return null;
+        }
+      }
+    } catch { /* unchanged denial below */ }
+  }
   const status = typeof fitness?.overallStatus === "string" ? fitness.overallStatus : "unavailable";
   const remedyIds = (Array.isArray(fitness?.outcomes) ? fitness.outcomes : [])
     .filter((outcome) => outcome?.outcome === "finding")
