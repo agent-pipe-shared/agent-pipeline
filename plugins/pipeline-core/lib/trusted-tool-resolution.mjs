@@ -34,11 +34,18 @@ function missing(error) { return error?.code === "ENOENT" || error?.code === "EN
 function normalWinPath(value) { return String(value).replaceAll("/", "\\").replace(/\\+$/u, "").toLowerCase(); }
 function withinWindowsRoots(path, roots) { const candidate = normalWinPath(path); return roots.some((root) => winPath.dirname(candidate) === normalWinPath(root)); }
 function windowsCandidate(name) { return name.toLowerCase().endsWith(".exe") ? name : `${name}.exe`; }
+/** Win32 trusted roots plus `<home>\.local\bin` (symmetric to POSIX `~/.local/bin`); a mocked foreign platform never inherits this host's home directory. */
+function effectiveWindowsRoots(platform, options) {
+  const roots = options.windowsRoots ?? WINDOWS_SYSTEM_TOOL_ROOTS;
+  if (platform !== "win32") return roots;
+  const homeDir = options.homeDir ?? (platform === process.platform ? homedir() : undefined);
+  return typeof homeDir === "string" ? [...roots, winPath.join(homeDir, ".local", "bin")] : roots;
+}
 
 /** Validates a candidate selected by a caller through the same authority. */
 export function assessTrustedExecutablePath(path, options = {}) {
   const platform = options.platform ?? process.platform;
-  const windowsRoots = options.windowsRoots ?? WINDOWS_SYSTEM_TOOL_ROOTS;
+  const windowsRoots = effectiveWindowsRoots(platform, options);
   const fsOps = options.fsOps ?? { lstatSync, realpathSync };
   if (typeof path !== "string" || path.length === 0) return { ok: false, status: "probe_error" };
   if (platform === "win32" && (!path.toLowerCase().endsWith(".exe") || !withinWindowsRoots(path, windowsRoots))) return { ok: false, status: "untrusted_path" };
@@ -71,14 +78,14 @@ export function resolveTrustedSystemExecutable(name, options = {}) {
     return { ok: false, status: "binary_missing" };
   }
   let untrusted = false; let probeError = false; const executable = windowsCandidate(name);
-  for (const root of windowsRoots) {
+  for (const root of effectiveWindowsRoots(platform, options)) {
     const path = winPath.join(root, executable);
     try { fsOps.lstatSync(path); } catch (error) {
       if (!missing(error)) probeError = true;
       if (missing(error)) for (const extension of [".cmd", ".bat", ".ps1"]) { try { fsOps.lstatSync(winPath.join(root, `${name}${extension}`)); untrusted = true; } catch (wrapperError) { if (!missing(wrapperError)) probeError = true; } }
       continue;
     }
-    const assessed = assessTrustedExecutablePath(path, { platform, windowsRoots, fsOps });
+    const assessed = assessTrustedExecutablePath(path, { platform, windowsRoots, homeDir: options.homeDir, fsOps });
     if (assessed.ok) return assessed;
     if (assessed.status === "probe_error") probeError = true; else untrusted = true;
   }
