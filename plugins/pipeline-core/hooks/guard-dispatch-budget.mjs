@@ -94,7 +94,11 @@
  * serialized by `<agentId>.json.binding.lock`. The owner record binds hostname,
  * Linux boot id, PID and `/proc` process start time; live or ambiguous owners
  * block, while a provably dead owner is reclaimed through a separate recovery
- * lock and inode/content readback. A pending dispatch whose child never makes
+ * lock and inode/content readback. On native Windows (no `/proc`) the owner
+ * record binds hostname, a boot epoch derived from `os.uptime()`, PID and a
+ * process start epoch derived from `process.uptime()`; liveness of a foreign
+ * PID is probed with `process.kill(pid, 0)` (ESRCH dead, EPERM/success live).
+ * Mixed-platform owner/reader pairs stay ambiguous. A pending dispatch whose child never makes
  * its first tool call remains an orphan in `pending/`; safe bounded cleanup
  * needs a dispatch-lifecycle signal and is deliberately a follow-on rather
  * than a TTL guess in this hook.
@@ -139,7 +143,7 @@
 import { existsSync, linkSync, lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { hostname } from "node:os";
+import { hostname, uptime } from "node:os";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
@@ -170,7 +174,7 @@ function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
 }
 
-function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count }) {
+function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false }) {
   const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
   const continuation = remainingClosingCalls > 0
     ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
@@ -182,7 +186,9 @@ function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count })
     2,
     "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
       + `${DENIAL_CODE}: this dispatch (${agentType}, agent ${agentId}) has counted ${count} tool-call attempts against a working cap of ${workingCap} `
-      + `(effective cap min(baseCalls=${baseCalls}, maxTurns=${maxTurns} minus the fixed ${CLOSING_ALLOWANCE}-closing + ${SAFETY_MARGIN}-safety reserve)).\n`
+      + (smallRole
+        ? `(small-role lane: baseCalls=${baseCalls} is maxTurns=${maxTurns} minus the fixed ${CLOSING_ALLOWANCE}-closing reserve, no ${SAFETY_MARGIN}-safety reserve).\n`
+        : `(effective cap min(baseCalls=${baseCalls}, maxTurns=${maxTurns} minus the fixed ${CLOSING_ALLOWANCE}-closing + ${SAFETY_MARGIN}-safety reserve)).\n`)
       + continuation,
   );
 }
@@ -417,11 +423,81 @@ function processStart(pid, dependencies = {}) {
   return fields[19];
 }
 
+// Native Windows has no /proc. Boot and process-start identities are epochs
+// in whole seconds derived from wall clock minus uptime; they are compared
+// with tolerances because both derivations jitter by rounding and clock skew.
+const WIN32_BOOT_TOLERANCE_SECONDS = 300;
+const WIN32_PROCESS_START_TOLERANCE_SECONDS = 2;
+const WIN32_BOOT_ID_PATTERN = /^w32boot-([0-9]{1,15})$/u;
+
+/** Wall clock in seconds; `epochNowFn` returns milliseconds since the Unix epoch (Date.now shape). */
+function win32EpochSeconds(dependencies = {}) {
+  const epochNowFn = dependencies.epochNowFn ?? (() => Date.now());
+  const value = Number(epochNowFn()) / 1000;
+  if (!Number.isFinite(value) || value <= 0) throw new Error("counter-lock-owner-ambiguous");
+  return value;
+}
+
+function win32BootSeconds(dependencies = {}) {
+  const uptimeFn = dependencies.uptimeFn ?? uptime;
+  const seconds = Number(uptimeFn());
+  if (!Number.isFinite(seconds) || seconds < 0) throw new Error("counter-lock-owner-ambiguous");
+  return Math.round(win32EpochSeconds(dependencies) - seconds);
+}
+
+function win32ProcessStartSeconds(dependencies = {}) {
+  const processUptimeFn = dependencies.processUptimeFn ?? (() => process.uptime());
+  const seconds = Number(processUptimeFn());
+  if (!Number.isFinite(seconds) || seconds < 0) throw new Error("counter-lock-owner-ambiguous");
+  return Math.round(win32EpochSeconds(dependencies) - seconds);
+}
+
+function win32CounterLockOwner(dependencies = {}) {
+  const hostnameFn = dependencies.hostnameFn ?? hostname;
+  const pid = dependencies.pid ?? process.pid;
+  const hostId = String(hostnameFn()).toLowerCase();
+  const bootId = `w32boot-${win32BootSeconds(dependencies)}`;
+  const processStartValue = String(win32ProcessStartSeconds(dependencies));
+  if (!/^[A-Za-z0-9._-]{1,120}$/u.test(hostId)
+    || !WIN32_BOOT_ID_PATTERN.test(bootId)
+    || !/^[0-9]+$/u.test(processStartValue)
+    || !Number.isSafeInteger(pid) || pid < 1) throw new Error("counter-lock-owner-ambiguous");
+  return { platform: "win32", hostId, bootId, pid, processStart: processStartValue, nonce: randomUUID().replaceAll("-", "") };
+}
+
+function win32CounterLockOwnerState(record, dependencies = {}) {
+  let hostId;
+  let bootSeconds;
+  try {
+    hostId = String((dependencies.hostnameFn ?? hostname)()).toLowerCase();
+    bootSeconds = win32BootSeconds(dependencies);
+  } catch { return "ambiguous"; }
+  if (record.owner.hostId !== hostId) return "ambiguous";
+  const ownerBoot = WIN32_BOOT_ID_PATTERN.exec(record.owner.bootId);
+  if (!ownerBoot) return "ambiguous";
+  if (Math.abs(Number(ownerBoot[1]) - bootSeconds) > WIN32_BOOT_TOLERANCE_SECONDS) return "dead";
+  if (record.owner.pid === (dependencies.pid ?? process.pid)) {
+    let ownStart;
+    try { ownStart = win32ProcessStartSeconds(dependencies); } catch { return "ambiguous"; }
+    return Math.abs(Number(record.owner.processStart) - ownStart) <= WIN32_PROCESS_START_TOLERANCE_SECONDS ? "live" : "dead";
+  }
+  const killFn = dependencies.killFn ?? ((pid, signal) => process.kill(pid, signal));
+  try {
+    killFn(record.owner.pid, 0);
+    return "live";
+  } catch (error) {
+    if (error?.code === "ESRCH") return "dead";
+    if (error?.code === "EPERM") return "live";
+    return "ambiguous";
+  }
+}
+
 function localCounterLockOwner(dependencies = {}) {
   const platform = dependencies.platform ?? process.platform;
   const hostnameFn = dependencies.hostnameFn ?? hostname;
   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
   const pid = dependencies.pid ?? process.pid;
+  if (platform === "win32") return win32CounterLockOwner(dependencies);
   if (platform !== "linux") throw new Error("counter-lock-owner-ambiguous");
   const hostId = hostnameFn().toLowerCase();
   const bootId = readFileSyncFn("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase();
@@ -472,7 +548,7 @@ function readCounterLock(path, dependencies = {}) {
     || Object.keys(value).sort().join(",") !== "owner,schema"
     || owner === null || typeof owner !== "object" || Array.isArray(owner)
     || Object.keys(owner).sort().join(",") !== "bootId,hostId,nonce,pid,platform,processStart"
-    || owner.platform !== "linux"
+    || (owner.platform !== "linux" && owner.platform !== "win32")
     || !/^[A-Za-z0-9._-]{1,120}$/u.test(owner.hostId ?? "")
     || !/^[A-Za-z0-9._-]{1,120}$/u.test(owner.bootId ?? "")
     || !Number.isSafeInteger(owner.pid) || owner.pid < 1
@@ -498,6 +574,7 @@ function readStableCounterLock(path, dependencies = {}) {
 
 function counterLockOwnerState(record, dependencies = {}) {
   const platform = dependencies.platform ?? process.platform;
+  if (platform === "win32" && record.owner.platform === "win32") return win32CounterLockOwnerState(record, dependencies);
   if (platform !== "linux" || record.owner.platform !== "linux") return "ambiguous";
   let hostId;
   let bootId;
@@ -620,8 +697,26 @@ function initializeBoundCounter(path, seed, pendingContext, dependencies) {
   }
 }
 
-function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir, input, nowFn, dependencies }) {
-  const workingCap = Math.min(baseCalls, dispatchWorkingCap(maxTurns));
+/**
+ * Small-role lane (operator hotfix, 2026-10-03): a role WITHOUT a budget contract
+ * whose maxTurns leaves no working cap after the fixed closing + safety reserve
+ * (dispatchWorkingCap(maxTurns) < 1, e.g. consult-advisor 10, plan-verifier 15)
+ * is still counted and capped, but without the safety reserve:
+ * baseCalls = maxTurns - CLOSING_ALLOWANCE, closing allowance preserved, so
+ * working + closing calls never exceed maxTurns. The shared core always
+ * subtracts both reserves, so the lane is evaluated against the policy tier
+ * maxTurns + SAFETY_MARGIN, whose working cap is exactly that baseCalls; the
+ * counter keeps the real maxTurns. maxTurns <= CLOSING_ALLOWANCE keeps the
+ * existing refusal (null). Budgeted roles never take this lane.
+ */
+function smallRolePolicyMaxTurns(maxTurns) {
+  const workingCap = dispatchWorkingCap(maxTurns);
+  if (workingCap === null || workingCap >= 1 || maxTurns - CLOSING_ALLOWANCE < 1) return null;
+  return maxTurns + SAFETY_MARGIN;
+}
+
+function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir, input, nowFn, dependencies, policyMaxTurns = maxTurns }) {
+  const workingCap = Math.min(baseCalls, dispatchWorkingCap(policyMaxTurns));
   const bindingMatches = counter.agentId === identity.agentId
     && counter.agentType === identity.agentType
     && counter.maxTurns === maxTurns
@@ -630,12 +725,12 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   if (!bindingMatches) {
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: "counter-binding-mismatch" });
   }
-  const preliminaryBudget = decideDispatchBudgetCall({ maxTurns, baseCalls, currentCount: counter.count, isClosingAct: false });
+  const preliminaryBudget = decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: false });
   if (preliminaryBudget.decision === "invalid-input") {
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: preliminaryBudget.reason });
   }
   const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir)
-    ? decideDispatchBudgetCall({ maxTurns, baseCalls, currentCount: counter.count, isClosingAct: true })
+    ? decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: true })
     : preliminaryBudget;
   counter.count = budget.nextCount;
   counter.updatedAt = nowFn();
@@ -643,7 +738,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   if (budget.allowed) return verdict(0);
   return blocked({
     agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls,
-    workingCap: budget.workingCap, count: counter.count,
+    workingCap: budget.workingCap, count: counter.count, smallRole: policyMaxTurns !== maxTurns,
   });
 }
 
@@ -968,11 +1063,14 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
       (options.releaseDispatchBudgetCounterLockFn ?? releaseDispatchBudgetCounterLock)(acquired.lock, options);
     }
   }
-  const workingCap = Math.min(baseCalls, dispatchWorkingCap(maxTurns));
+  // Non-budgeted role: small-role lane when maxTurns leaves no working cap (see smallRolePolicyMaxTurns).
+  const policyMaxTurns = smallRolePolicyMaxTurns(maxTurns) ?? maxTurns;
+  if (policyMaxTurns !== maxTurns) baseCalls = maxTurns - CLOSING_ALLOWANCE;
+  const workingCap = Math.min(baseCalls, dispatchWorkingCap(policyMaxTurns));
   counter ??= loadCounter(path, {
     agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls, workingCap,
   }, options);
-  return advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir, input, nowFn, dependencies: options });
+  return advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir, input, nowFn, dependencies: options, policyMaxTurns });
 }
 
 if (isDirectInvocation(import.meta.url)) {
