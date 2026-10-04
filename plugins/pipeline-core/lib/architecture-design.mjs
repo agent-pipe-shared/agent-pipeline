@@ -209,6 +209,19 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
     const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
     requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
       finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
+    // Brownfield and other non-greenfield repositories never carried the fresh
+    // greenfield map scaffold, so they cannot hold the greenfield design block
+    // either. Apply exactly the applicability predicate that
+    // inspectArchitectureDesignDraft applies at draft time, so draft time and
+    // implementation entry agree. A repository with a materialization receipt
+    // is always validated below, never exempted here.
+    if (!existsSync(physical(root, "architecture/design-materialization.json"))) {
+      const greenfieldScaffold = initialGreenfieldMapTargets("fresh");
+      if (greenfieldScaffold.every(target => !existsSync(join(root, target.path)))
+        || !greenfieldScaffold.every(target => bytes(root, target.path) === target.bytes)) {
+        return { ok: true, status: "not-required", required: false, scope: null };
+      }
+    }
     const input = parseArchitectureDesign(prd);
     requireValue(covers(input.disposition.scope, authority.planPath)
       && covers(input.disposition.scope, "architecture/map/index.md")
@@ -387,7 +400,7 @@ export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } 
     assertLock(root, lock);
     const stateBytes = bytes(root, "project/pipeline-state.json");
     const inspected = inspectArchitectureDesign(root, null, inspectDeps);
-    if (!inspected.ok || inspected.status === "materialized") return inspected;
+    if (!inspected.ok || inspected.status !== "materialization-required") return inspected;
     const state = JSON.parse(stateBytes);
     const authority = state.planApproval.poGateAuthority;
     const targets = [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }];
