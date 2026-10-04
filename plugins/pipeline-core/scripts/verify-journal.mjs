@@ -760,8 +760,12 @@ const SERIAL_LANE_SUITES = Object.freeze(new Set([
 // before the pool starts. `test-tmpdir-tests` (test-tmpdir.test.mjs, read in full) was
 // deliberately NOT added: its own checks (unique-name non-collision, parent-directory reuse)
 // never observe sibling fixture content, so they are immune to concurrent siblings.
-const EXCLUSIVE_SUITES = Object.freeze(new Set([
+export const EXCLUSIVE_SUITES = Object.freeze(new Set([
   "test-tmpdir-budget-tests",
+  // Declared predecessor of the exclusive `security-scan`. An exclusive suite may only depend on
+  // another exclusive suite (runSuitePool rejects otherwise), so this cheap manifest validation,
+  // which has no checkout side effects, runs inside the exclusive phase, in order, before it.
+  "validate-manifest",
   // This suite intentionally binds a consumer Verify run to the byte digest of the
   // complete installed plugin tree before and after its nested checks. Any sibling
   // suite that probes a source file in place can otherwise manufacture VEP-DRIFT.

@@ -1142,6 +1142,46 @@ test("AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a n
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("BUGFIX ALFRED-VERIFY-EXCL-B: the real validate-manifest -> security-scan pair resolves inside the exclusive set and does not throw", async () => {
+  const { EXCLUSIVE_SUITES } = await import("./verify-journal.mjs");
+  assert.ok(EXCLUSIVE_SUITES instanceof Set, "EXCLUSIVE_SUITES must be exported");
+  const realPair = [
+    { name: "validate-manifest", dependsOn: [] },
+    { name: "security-scan", dependsOn: ["validate-manifest"] },
+  ];
+  for (const suite of realPair) {
+    if (!EXCLUSIVE_SUITES.has(suite.name)) continue;
+    for (const dep of suite.dependsOn) {
+      assert.equal(EXCLUSIVE_SUITES.has(dep), true, `${suite.name} is exclusive, so its dependency ${dep} must be exclusive too`);
+    }
+  }
+  assert.equal(EXCLUSIVE_SUITES.has("security-scan"), true, "security-scan must stay exclusive");
+  const f = twoSuiteFixture(["validate-manifest", "security-scan"]);
+  const suites = [
+    { name: "validate-manifest", file: f.files[0], dependsOn: [] },
+    { name: "security-scan", file: f.files[1], dependsOn: ["validate-manifest"] },
+  ];
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "test" }, runId: "verify-real-exclusive-pair", registerRun, spawn: spawnPass, serialLaneSuites: new Set() });
+    assert.deepEqual(result.steps.map((step) => step.name), ["validate-manifest", "security-scan"]);
+    assert.equal(result.steps.every((step) => step.exitCode === 0), true);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("BUGFIX ALFRED-VERIFY-EXCL-B: a synthetic exclusive suite depending on a pool suite still throws", async () => {
+  const f = twoSuiteFixture(["synthetic-excl", "synthetic-pool"]);
+  const suites = [
+    { name: "synthetic-excl", file: f.files[0], dependsOn: ["synthetic-pool"] },
+    { name: "synthetic-pool", file: f.files[1], dependsOn: [] },
+  ];
+  try {
+    await assert.rejects(
+      () => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "test" }, runId: "verify-synthetic-excl-bad", registerRun, spawn: spawnPass, exclusiveSuites: new Set(["synthetic-excl"]), serialLaneSuites: new Set() }),
+      /VERIFY-EXCLUSIVE-SUITE-DEPENDS-ON-POOL-SUITE:synthetic-excl->synthetic-pool/u,
+    );
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("AGY-VERIFYTUNER-1: concurrency > 1 genuinely overlaps suites' child processes in real wall-clock time", async () => {
   const f = twoSuiteFixture(["par-a", "par-b"]);
   let maxInFlight = 0;
