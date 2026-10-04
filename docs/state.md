@@ -5,7 +5,7 @@
 
 **Release state:** version `0.6.3` · tag `v0.6.3` · commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` · tree `6821503f8f4fd72ed31459cb843d97bf8bfaa049` · status `published`
 
-**Current recovery 2026-10-03:** [Session handover](0.7-recovery-2026-10-03.md): clean baseline, runtime ready; Alfred design/draft. Local drafts stashed; product fixes and verification open.
+**Current 2026-10-04:** Alfred design approved; lifecycle implementing; hotfixes 1–10 installed; next steps: [PO queue](../specs/sprint-alfred-epic/design/po-queue-2026-10-03.md).
 
 **Transfer 2026-09-30:** [Alfred 0.7 feature checkpoint and exact resume notes](0.7-alfred-transfer-2026-09-30.md). This branch transfer is not a qualified release.
 
