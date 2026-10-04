@@ -130,7 +130,7 @@ export function buildDesignCourseProducerAction({
       || !safePackagePath(preparationPath) || !Number.isSafeInteger(queueRevision) || queueRevision < 0) {
       fail("DESIGN-COURSE-READINESS-BINDING-REQUIRED");
     }
-    argv.push("--repo-root", root, "--dispatch-id", readinessDispatchId,
+    argv.push(...(runner === "codex" ? [] : ["--runner", runner]), "--repo-root", root, "--dispatch-id", readinessDispatchId,
       "--queue-revision", String(queueRevision), "--receipt", receiptPath);
     for (const name of SOURCES) argv.push("--source", name, sources[name].path);
     argv.push("--advisor-preparation", preparationPath);
