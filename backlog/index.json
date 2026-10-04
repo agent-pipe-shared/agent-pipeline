@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ba70a745c1e3e005314395f18e1edc755b775b22b98928b43bdd85a3f6794378"
+    "transitionHead": "b20fa130897e2920bdf3653b8003db3e501de5ea221f6b7ff0aedbfb813ec00c"
   },
   "counts": {
-    "open": 107,
+    "open": 135,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -535,6 +535,16 @@
       "closureEvidence": "backlog/items/2026-08-18-adr-0056-conflict-scope-text-narrower-than-code.md"
     },
     {
+      "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Manual observation, Claude Code session on Windows, 2026-10-03, feat/sprint-alfred at a0d83ce78.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.advisor-consent-is-requested-before-the-readiness-preflight",
       "status": "closed",
       "type": "defect",
@@ -751,6 +761,16 @@
       "closureRepository": "self",
       "closureCommit": "955f5ebe58b46a3e26f0b5352a417dc5ec49db08",
       "closureEvidence": "backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md"
+    },
+    {
+      "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "PO observation after the 0.7.0 three-runner greenfield tests, 2026-10-03 (Antigravity test repo docs/pipeline-analyse-greenfield.md).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.agy-greenfield-run-used-stale-plugin",
@@ -995,6 +1015,16 @@
       "closureRepository": "self",
       "closureCommit": "ad81a9b9ab89aab52fb4099971c3c3a0fcd6f852",
       "closureEvidence": "backlog/evidence/2026-08-09-approve-push-humanname-fix-closure.md"
+    },
+    {
+      "id": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live observation, Claude Code session on native Windows, 2026-10-04, feat/sprint-alfred at ae7ef5a23, lifecycle approved (between approve-plan and set-phase).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.approved-not-implementing-is-a-silent-trap",
@@ -1510,6 +1540,16 @@
       "closureEvidence": "backlog/items/2026-08-08-a-briefings-model-field-can-contradict-the-agent-it-dispatches.md"
     },
     {
+      "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live observation, Claude Code session on native Windows, 2026-10-04, feat/sprint-alfred at ae7ef5a23, lifecycle approved (final design-workflow package signed and approved).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.browser-preflight-misses-missing-host-library",
       "status": "open",
       "type": "defect",
@@ -1729,6 +1769,16 @@
       "closureEvidence": "backlog/evidence/2026-09-11-claude-resume-hint-hook-closure.md"
     },
     {
+      "id": "pipeline.claude-design-readiness-cannot-start-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-03: three consecutive design-course readiness runs failed before any model call; a diagnostic probe located each cause.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
       "status": "closed",
       "type": "defect",
@@ -1779,6 +1829,36 @@
       "closureRepository": "self",
       "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
       "closureEvidence": "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
+    },
+    {
+      "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Manual observation, Claude Code session on Windows, 2026-10-03, SessionStart:startup additional context.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "PO observation after the 0.7.0 three-runner greenfield tests, 2026-10-03, and the Claude/Windows analysis in the Claude test repo (docs/pipeline-analyse-greenfield.md).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Manual observation, Claude Code session on Windows, 2026-10-03; reproduced after a clean session start on feat/sprint-alfred at a0d83ce78 with the locally installed 0.7.0 candidate.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.cli-docs-generated-from-parser",
@@ -2767,6 +2847,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-03/04 while walking the Alfred design course; confirmed in source.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.design-generator-repeats-large-source-material",
       "status": "open",
       "type": "workflow-improvement",
@@ -2814,6 +2904,16 @@
       "closureRepository": "self",
       "closureCommit": "d7600de57502e89fc18bb95d2324f02e022e5352",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
+    },
+    {
+      "id": "pipeline.design-trailer-verifier-lost-after-closure",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Alfred triage batch A (2026-10-04), confirmed by the Elephant with git log -S on the current branch.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.design-workflow-package-omits-contract",
@@ -2875,6 +2975,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-03: a pipeline-core:goldfish-deep authoring dispatch (ALFRED-FR-AUTHOR-1) was refused on every tool call, including Read.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2887,6 +2997,16 @@
       "closureRepository": "self",
       "closureCommit": "01062acb163f01c592922009a4af8e1b5d5c951e",
       "closureEvidence": "plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs"
+    },
+    {
+      "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-03: five parallel read-only verification dispatches with subagent_type Explore were all refused.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.dispatch-provenance",
@@ -3103,6 +3223,16 @@
       "closureRepository": "self",
       "closureCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
       "closureEvidence": "backlog/items/2026-09-02-documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it.md"
+    },
+    {
+      "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Manual observation, Claude Code session on Windows, 2026-10-03, feat/sprint-alfred at a0d83ce78, active feature sprint-alfred-epic in lifecycle draft.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.dual-channel-publication",
@@ -3406,6 +3536,16 @@
       "closureEvidence": "plugins/pipeline-core/lib/push-destination-policy.test.mjs"
     },
     {
+      "id": "pipeline.feature-branch-push-admitted-without-signature-approval",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "PO special finding, 2026-10-03: the last push of feat/sprint-alfred to origin (handover commit a0d83ce78) was admitted without a push signature, although gates.push_approval is signature in this repository.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
       "status": "closed",
       "type": "defect",
@@ -3443,6 +3583,16 @@
       "closureRepository": "self",
       "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
       "closureEvidence": "backlog/items/2026-08-08-first-verify-run-is-red-with-four-failures.md"
+    },
+    {
+      "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "0.7.0 three-runner greenfield analyses 2026-10-03: Codex report P0 (transcript reader), P1 (continuity digests), P2 (Verify null, audit index); Claude report §0/V-8; Antigravity report §2.3.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.four-critic-preimage-pins-drifted-or-never-valid",
@@ -3727,6 +3877,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live observation, Claude Code session on native Windows, 2026-10-04, feat/sprint-alfred, lifecycle implementing (first commits after set-phase).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.git-identity-ask-step-unreachable-through-live-cli-path",
       "status": "closed",
       "type": "defect",
@@ -3765,6 +3925,16 @@
       "closureRepository": "self",
       "closureCommit": "018d523b707d8ae2b72a13e30ac8a2e013c1f1e0",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Manual observation, Claude Code session on Windows, 2026-10-03, feat/sprint-alfred at a0d83ce78, lifecycle draft.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts",
@@ -4337,6 +4507,16 @@
       "closureEvidence": "backlog/evidence/2026-09-11-guard-signature-role-ceremony.md"
     },
     {
+      "id": "pipeline.guard-override-request-digest-drifts-after-arming",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Claude/Windows greenfield analysis 2026-10-03 (Claude test repo docs/pipeline-analyse-greenfield.md, finding V-3, T:1151/T:1168/T:1171).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",
       "status": "closed",
       "type": "defect",
@@ -4532,6 +4712,16 @@
       "closureRepository": "self",
       "closureCommit": "8f7b617d0f4c8d6834cfb73eabfb5e32c68ba83f",
       "closureEvidence": "backlog/evidence/2026-09-18-dispatch-record-binding-and-collision-closure.md"
+    },
+    {
+      "id": "pipeline.handover-doc-committed-without-governance-classification",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Bootstrap F6 finding, Claude Code session on Windows, 2026-10-03: `check-observation-governance.mjs` reported `OG-DOC-UNCLASSIFIED docs/0.7-recovery-2026-10-03.md` at HEAD a0d83ce78.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
@@ -5239,6 +5429,16 @@
       "closureRepository": "self",
       "closureCommit": "04e28774d8416904cccee5dd1fc561db4d2a86af",
       "closureEvidence": "plugins/pipeline-core/scripts/security-scan.test.mjs"
+    },
+    {
+      "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Claude/Windows greenfield analysis 2026-10-03 (Claude test repo docs/pipeline-analyse-greenfield.md, findings V-1, V-4, V-6, V-8) and the Agent-Pipeline Claude/Windows session of the same day.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
@@ -6324,6 +6524,16 @@
       "closureRepository": "self",
       "closureCommit": "67335361ad70924cd5668db72d994c152f2db035",
       "closureEvidence": "backlog/items/2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback.md"
+    },
+    {
+      "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Code reading during the Alfred W1-5 read-policy prework (2026-10-04); not probed against a real credential store.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.path-bound-fingerprints-break-across-windows-wsl-access",
@@ -7480,6 +7690,16 @@
       "closureEvidence": "backlog/evidence/2026-08-10-apply-patch-invariant-closure.md"
     },
     {
+      "id": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "PO observation after the 0.7.0 three-runner greenfield tests, 2026-10-03, plus live observations in the Agent-Pipeline Claude/Windows session the same day.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.read-containment-removed-with-no-recorded-decision",
       "status": "closed",
       "type": "defect",
@@ -8042,6 +8262,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-03/04: the Alfred design had to be revised after a not-ready readiness verdict, and no command path led to an Advisor stage bound to the revised sources.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.rg-pipe-lexical-containment-gap",
       "status": "closed",
       "type": "defect",
@@ -8069,6 +8299,16 @@
       "closureRepository": "self",
       "closureCommit": "b3272edc25741fee42aaeda4913aa4b517fc531c",
       "closureEvidence": "backlog/evidence/2026-09-18-role-dispatch-payload-preflight-closure.md"
+    },
+    {
+      "id": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "PO requirement after the 0.7.0 three-runner greenfield tests, 2026-10-03; Claude Advisor producer failed silently (Claude test repo analysis V-2, V-11), Antigravity lacked Critic/Advisor routes.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
@@ -8463,6 +8703,16 @@
       "closureEvidence": "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
     },
     {
+      "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "Manual observation, Claude Code session on Windows, 2026-10-03, feat/sprint-alfred at a0d83ce78.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
       "status": "closed",
       "type": "defect",
@@ -8616,6 +8866,16 @@
       "closureEvidence": "backlog/evidence/2026-08-09-devplan-scratch-exemption-closure.md"
     },
     {
+      "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "0.7.0 three-runner greenfield analyses 2026-10-03: Antigravity report §5.2/E25, Codex report (P1 'PO had to run recovery commands', HGO-SIGNATURE-INTENT-INVALID, HGO-DRIFT), Claude report §4/E25.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.signed-authority-binding-durability",
       "status": "closed",
       "type": "defect",
@@ -8684,6 +8944,16 @@
       "closureRepository": "self",
       "closureCommit": "dac74b61a4b9c59a13e1c1866b1cca01571ab8bd",
       "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    },
+    {
+      "id": "pipeline.signing-prompt-prints-the-whole-review-package",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-04",
+      "source": "PO observation, native Windows PowerShell, 2026-10-04, po-human-approval.mjs sign-intent for the Alfred revision-4 design-workflow package.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
@@ -9251,6 +9521,16 @@
       "closureRepository": "self",
       "closureCommit": "6262d408aa616651232b46ab8ecbfd88ce4055b0",
       "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md"
+    },
+    {
+      "id": "pipeline.three-runner-happy-path-with-two-po-approvals",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-10-03",
+      "source": "PO requirement after the 0.7.0 three-runner greenfield tests (local mini HTML game), 2026-10-03; Codex run needed several signatures, Claude run needed two guard-override signatures (docs/pipeline-analyse-greenfield.md in the Claude test repo, section 4).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance",
