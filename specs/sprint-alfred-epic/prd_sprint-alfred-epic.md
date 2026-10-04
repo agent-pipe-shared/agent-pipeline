@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 94de82a10618749780e88e6d4cd7d7de9461767cd47bbc6f6528d5323e6f7e7a -->
+<!-- technical-spec-sha256: 9c89f81b4919586da9ed13f442c582cc1519edd9637f0e4d03da4ad2a273de3e -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -866,6 +866,19 @@ The complete register-ID-to-owner map, with its count, is `traceability.md`.
      no content-based admission, and the denial names the human route.
   4. Every signature-mode push needs a signature. "Two approvals" counts per
      feature: plan plus the single happy-path push.
+
+**PO decisions (2026-10-04).** Recorded in `design-input.md` (twelve items) and
+reflected in Spec §21: complete recovery route in 0.7.0; all-or-nothing
+model-family activation with fallback to the older selectable release;
+Antigravity readiness/Critic/Advisor enabled without prior measurement, with
+typed failures; unmarked Codex Goldfish dispatches refused unless explicitly
+declined; signing window from hand-over (60 min default); `stage-0 (elephant)`
+as the only Elephant design trailer; re-enrollment as one one-time act;
+Antigravity lock with a labelled compatibility fallback; uninstall refuses
+foreign hooks with a clear code; chat-mode confirmations in session;
+`standing-approved` checkpoint pushes unchanged. Overarching requirement:
+every change works for all runners and all platforms in consuming user
+repositories, not only in this source checkout (Spec §21.0).
 
 **Non-goals.** No weakening of credential-root protection, the independence of
 Critic and Advisor, template-only briefings, or the release/main promotion

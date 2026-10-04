@@ -110,6 +110,35 @@ There remains exactly one final PO approval per design. These decisions are
 recorded here as PO input in distilled form, not as a transcript. They are not
 an approval of the design and not readiness evidence.
 
+### PO decisions of 2026-10-04 (chat, from mobile; options with impact and recommendation were presented)
+
+1. Recovery route (Spec §20, RV-1…RV-7) is delivered completely in 0.7.0,
+   including the signed legacy-custody transaction.
+2. Model-family approval is activated all-or-nothing across runners (no
+   per-runner activation scope). When the newest release of an approved family
+   is not selectable, the older selectable release is used; a later downgrade
+   is refused.
+3. Antigravity readiness, Critic and Advisor routes are enabled in 0.7.0
+   without a prior host measurement; failures must be typed and visible, and
+   the PO's Antigravity host run is the evidence.
+4. An unmarked Codex Goldfish dispatch is refused before launch unless the
+   briefing states `Host commit: not-requested (reason: …)`.
+5. The signing window starts when the signing command is handed over: 60
+   minutes by default (configurable 5–120).
+6. Direct Elephant design commits use `Dispatch: stage-0 (elephant)` only.
+7. Re-enrollment of a repository with retained history is one one-time
+   enrollment act.
+8. Antigravity lock freshness: session-bound when a session id exists; without
+   one, the 30-minute window stays as a labelled compatibility fallback.
+9. Uninstall with a foreign Git hook keeps refusing, with a clear code and
+   instructions.
+10. Chat-mode confirmations happen in the session itself, commit-bound and
+    labelled as chat attribution.
+11. `standing-approved` projects keep admitting checkpoint pushes without a
+    per-push approval.
+12. Everything is built to work for all runners and all platforms, in
+    consuming user repositories as well, not only in this source checkout.
+
 ## Provenance and readiness limits
 
 The historical PO-input files are distilled records, not original transcript

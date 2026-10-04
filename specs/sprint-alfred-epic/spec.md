@@ -1228,9 +1228,31 @@ recovery ceremonies or repeated signatures. The happy path is defined as:
 - One-time acts are outside the per-feature count and are enumerated by name:
   repository enrollment consent (once per repository, at onboarding) and key
   setup, including first-use key confirmation (trust on first use, once per
-  machine and key). Nothing else may ask the PO.
+  machine and key). Re-enrollment of a repository with retained Pipeline
+  history is the same single enrollment act: the PO consents once, and the
+  retire and activate steps run without further prompts (PO decision
+  2026-10-04). Nothing else may ask the PO.
 - The ceremony inventory (§21.3) classifies every PO interaction as
   `per-feature` or `one-time-onboarding`. Any other class fails the test.
+
+**Consumer and platform universality (PO requirement 2026-10-04).** Every
+R1–R6 change must work for every supported runner (Claude, Codex,
+Antigravity) on every supported platform (native Windows, Linux, macOS, WSL),
+and in consuming user repositories, not only in this source checkout:
+
+- A consuming repository has the plugin installed outside its root and no
+  Pipeline source tree; no fix may depend on source-only paths
+  (`harness/…`, `specs/sprint-…`) or on files that exist only here
+  (consumer-safe-paths check on every plugin change).
+- Each workstream's acceptance fixtures run against a consumer-layout fixture
+  repository (installed plugin outside the root, fresh `git init`, onboarding
+  through the plugin) in addition to the source checkout, on the win32 and
+  POSIX dialects.
+- Runner-specific behaviour is selected by the runner identity, never by the
+  host this repository was developed on; a runner or platform without a
+  route gets a typed `unavailable` with a handoff, never a silent gap.
+- AC-32's host matrix runs on greenfield user repositories, which is the
+  end-to-end proof of this rule.
 
 ### 21.1 R1 — Lifecycle-command admission
 
@@ -1418,6 +1440,16 @@ Contract:
   rendered without backslash line continuation and within 100 columns per
   physical line (the digest may be split into variable-assignment chunks as
   today). The PO never copies JSON back.
+  - The signing window starts when the signing command is handed to the PO
+    (prepare-for-signature), not at the denial. Default 60 minutes,
+    configurable 5–120; the absolute expiry is part of the signed text (PO
+    decision 2026-10-04).
+  - Chat mode: a push or plan confirmation is given in the session itself,
+    bound to the exact commit/target text and labelled as chat attribution
+    (ADR-0056); no separate terminal code (PO decision 2026-10-04).
+  - Projects whose push gate is `standing-approved` keep admitting checkpoint
+    pushes without a per-push approval (PO decision 2026-10-04); the
+    every-push rule applies to signature and chat modes.
 - **Configuration overrides.** A PO-signed configuration override is a durable
   override layer that migrations preserve (K4-5).
 
@@ -1538,10 +1570,18 @@ Contract:
 - **Antigravity.** Every duty profile `feature` requires is available or
   fallback-routed (Advisor only; other duties follow the preflight rules
   above). Native subagents get a bootstrap step they can satisfy. Lock
-  freshness is bound to the session, not a 30-minute mtime (K3-3, K3-4, K7-4).
+  freshness is bound to the session when a session id is available. Without a
+  session id the 30-minute window remains as a compatibility fallback,
+  reported as `unbound-window` and never as session-bound (PO decision
+  2026-10-04; K3-3, K3-4, K7-4). Readiness, Critic and Advisor routes are
+  enabled for Antigravity in 0.7.0 without a prior host measurement (PO
+  decision 2026-10-04); every failure of these routes is typed and surfaced,
+  and the PO host run (AC-32) is the evidence.
 - **Codex.** Host-commit requirements are stated in the briefing template and
   checked before dispatch; an ineligible dispatch gets a typed pre-dispatch
-  finding (K3-5).
+  finding (K3-5). A Codex Goldfish dispatch without the host-commit binding is
+  refused before launch unless its briefing states
+  `Host commit: not-requested (reason: …)` (PO decision 2026-10-04).
 - **SessionStart hints** are runner-specific (K7-5).
 - **Hotfix removal.** Operator hotfixes 1–7 of the installed copy are
   superseded by these source fixes (they address findings in K3-9…K3-15,
@@ -1622,9 +1662,9 @@ Contract:
 - **Generated role rules.** Generated short forms of role rules keep their
   qualifiers (EL-16 design-phase exemption).
 - **Trailer grammar.** One trailer grammar generates the obligations, guard
-  admission and authorship verification. `Dispatch: design (elephant)` is
-  admitted for design paths in design phases and refused for production
-  paths.
+  admission and authorship verification. Direct Elephant design commits use
+  `Dispatch: stage-0 (elephant)` only; the `design (elephant)` form is removed
+  from every printed example and generator (PO decision 2026-10-04).
 - **Intake inputs.** `--answers-file` (with digest) is available wherever
   `--answers-json` is. Intake reuses the onboarding-confirmed language.
 - **Verify contract.** The design course fixes an executable Verify contract
