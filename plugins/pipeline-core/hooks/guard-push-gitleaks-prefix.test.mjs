@@ -214,6 +214,19 @@ check("GL-B16 allow an executable that only ends with gitleaks and carries --no-
   stderrNotIncludes: [AMBIGUOUS_PREFIX],
 });
 
+// GPGL-5 (Critic finding F1): GPGL-4 looked for a contiguous `push` in the raw text, so a push word split by
+// interior quotes behind an escaped-quote span was not classified while the shell still pushed.
+check(
+  "GL-B17 block a push whose word is split by interior quotes behind an escaped-quote span",
+  String.raw`gitleaks detect --no-git --x \'; git pu"sh" origin HEAD:refs/heads/feat/x; echo \'`,
+  dir,
+  BLOCK,
+  { stderrIncludes: ["BLOCKED (guard-push"] },
+);
+check("GL-B18 block a push whose word is split by interior quotes", 'git pu"sh" origin HEAD:refs/heads/feat/x', dir, BLOCK, {
+  stderrIncludes: ["BLOCKED (guard-push"],
+});
+
 // ---- C. tokens that only resemble git are untouched --------------------------------------------
 check("GL-C1 unchanged: gitx push is not a git push", "gitx push origin main", dir, ALLOW, { stderrEmpty: true });
 check("GL-C2 unchanged: git-foo with a flag is not a git push", "git-foo --bar origin main", dir, ALLOW, { stderrEmpty: true });

@@ -463,6 +463,99 @@ for (const [cmd, why] of GPGL3_NEGATIVE_TABLE) {
   record(`GPGL3-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
 }
 
+// ---- POSIX quoting in the quote stripper and the tokenizer (GPGL-5) ----------------------------
+// Outside quotes a backslash escapes the next character; inside double quotes it escapes only
+// `"`, `\`, `$`, a backtick and a newline; inside single quotes nothing is escaped; adjacent quoted
+// and unquoted parts of one word concatenate. The helpers used to ignore backslashes, so an
+// escaped quote desynchronised them and a real command was swallowed into a "quoted span".
+{
+  const out = stripQuotedSegments(String.raw`git commit -m "say \"hi\""`);
+  record("GPGL5-STRIP escaped quotes inside a double-quoted span stay inside it", out === 'git commit -m ""', `out=${JSON.stringify(out)}`);
+}
+{
+  const cmd = String.raw`echo \'; git push origin main; echo \'`;
+  const out = stripQuotedSegments(cmd);
+  record("GPGL5-STRIP an escaped quote outside quotes is a literal, never a delimiter (the text stays visible)", out === cmd, `out=${JSON.stringify(out)}`);
+}
+{
+  const out = stripQuotedSegments(String.raw`echo $'it\'s' ; git status`);
+  record("GPGL5-STRIP an escaped quote inside an ANSI-C string does not end it", out === "echo $'' ; git status", `out=${JSON.stringify(out)}`);
+}
+{
+  const out = tokenizeArgv(String.raw`git commit -m "say \"hi\""`);
+  record(
+    "GPGL5-TOKENIZE escaped quotes inside double quotes become literal characters of one token",
+    JSON.stringify(out) === JSON.stringify(["git", "commit", "-m", 'say "hi"']),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv(String.raw`echo \' x \'`);
+  record(
+    "GPGL5-TOKENIZE an escaped quote outside quotes is a literal character, not a span opener",
+    JSON.stringify(out) === JSON.stringify(["echo", "'", "x", "'"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv(String.raw`git p\ush pu"sh" 'pu'sh`);
+  record(
+    "GPGL5-TOKENIZE an unquoted backslash escapes one character and adjacent parts concatenate",
+    JSON.stringify(out) === JSON.stringify(["git", "push", "push", "push"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv(String.raw`echo "C:\repo" 'a\b'`);
+  record(
+    "GPGL5-TOKENIZE a backslash before an ordinary character stays literal inside double quotes and single quotes",
+    JSON.stringify(out) === JSON.stringify(["echo", String.raw`C:\repo`, String.raw`a\b`]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+
+// ---- commandIsGitPush: classification runs on the dequoted words (GPGL-5, Critic finding F1) ------
+// The GPGL-4 conjunct looked for a contiguous `push` in the RAW text, so a push word split by
+// interior quotes (`pu"sh"`) behind an escaped-quote span was not classified while the shell still
+// pushed. Detection now works on the dequoted words; the escaped-quote backstop needs no push word.
+const GPGL5_FAIL_CLOSED_TABLE = [
+  [String.raw`echo \'; git pu"sh" origin main; echo \'`, "F1 attack: escaped quotes outside quotes, push word split by interior quotes"],
+  [String.raw`echo \'; "git" pu"sh" origin main; echo \'`, "F1 attack variant: the executable name is quoted as well"],
+  ['git pu"sh" origin main', "push word split by interior double quotes"],
+  ["git 'push' origin main", "push word wrapped in single quotes"],
+  ['g"it" push origin main', "git word split by interior quotes"],
+  [String.raw`git p\ush origin main`, "a backslash inside the push word"],
+  ['echo hi; git pu"sh" origin main', "split push word behind another command"],
+  ['echo hi; g"it" push origin main', "split git word behind another command"],
+  ["git p''ush origin main", "an empty quote pair inside the push word"],
+  ["echo hi; git p''ush origin main", "an empty quote pair inside the push word behind another command"],
+  [String.raw`git $'pu\163h' origin main`, "an ANSI-C octal escape spells the push word"],
+  ["git \\\npush origin main", "a backslash-newline continuation between git and push"],
+  ["git pu\\\nsh origin main", "a backslash-newline continuation inside the push word"],
+  [String.raw`echo \'; g"it" pu"sh" origin main; echo \'`, "both words split behind an escaped-quote span"],
+  [String.raw`echo \'; git status; echo \'`, "backstop: an escaped quote outside quotes plus a git word needs no push word (GPGL-3 rule)"],
+  [String.raw`echo "a \\" ; git push origin main ; echo "b \\"`, "an escaped backslash does not escape the closing quote, so the push after it is executed"],
+  ["git status \\", "a trailing lone backslash cannot be parsed with certainty: fail closed"],
+];
+for (const [cmd, why] of GPGL5_FAIL_CLOSED_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL5-FAIL-CLOSED ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
+const GPGL5_NEGATIVE_TABLE = [
+  [String.raw`git commit -m "say \"hi\""`, "an escaped quote inside a double-quoted message is parsed, never a trigger"],
+  [String.raw`git commit -m "say \"push\""`, "the same, even with a push word inside the message"],
+  [String.raw`git log --grep "a \"push\" word"`, "push only inside a quoted argument of a non-push subcommand"],
+  ["gitleaks detect --no-git --redact", "the GPGL-2 trigger stays fixed"],
+  ['echo "git push"', "quoted text that is not executed"],
+  ["git commit -m 'say \"hi\" push'", "double quotes inside a single-quoted message"],
+  ['git log --format="%h %s" -n 3', "an ordinary double-quoted argument"],
+];
+for (const [cmd, why] of GPGL5_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL5-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);

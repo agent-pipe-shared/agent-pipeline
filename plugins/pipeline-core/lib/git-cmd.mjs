@@ -20,7 +20,195 @@
  * STRIPPING invariant). Former guard-git.mjs inline logic (~line 210).
  */
 export function stripQuotedSegments(cmd) {
-  return cmd.replace(/"[^"]*"/g, '""').replace(/'[^']*'/g, "''");
+  // GPGL-5: one POSIX-aware pass instead of two regex passes that ignored backslashes. An escaped
+  // quote used to desynchronise the regexes, so a real command was swallowed into a "quoted span".
+  let out = "";
+  let i = 0;
+  while (i < cmd.length) {
+    const ch = cmd[i];
+    if (ch === "\\") {
+      // Outside quotes a backslash and the character it escapes are one literal unit: an escaped
+      // quote is never a delimiter, so what follows it stays visible.
+      out += cmd.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    let span = null;
+    let blank = "";
+    if (ch === "$" && cmd[i + 1] === "'") {
+      span = readAnsiCQuoted(cmd, i + 1);
+      blank = "$''";
+    } else if (ch === "'") {
+      span = readSingleQuoted(cmd, i);
+      blank = "''";
+    } else if (ch === '"') {
+      span = readDoubleQuoted(cmd, i);
+      blank = '""';
+    }
+    if (span === null) {
+      out += ch;
+      i += 1;
+      continue;
+    }
+    // An unterminated span is left exactly as written: nothing hides behind a quote that never closes.
+    if (span.end === -1) return out + cmd.slice(i);
+    out += blank;
+    i = span.end + 1;
+  }
+  return out;
+}
+
+// ---- POSIX quoting primitives (GPGL-5) ---------------------------------------------------
+// One quoting grammar shared by `stripQuotedSegments`, `tokenizeArgv` and the push classifier, so the three
+// can never disagree about where a quoted span ends. Outside quotes a backslash escapes the next character;
+// inside double quotes it escapes only `"`, `\`, `$`, a backtick and a newline (before any other character
+// it is itself a literal); inside single quotes nothing is escaped; `$'...'` decodes ANSI-C escapes; adjacent
+// quoted and unquoted parts of one word concatenate (`pu"sh"` is the word `push`).
+
+// Characters that give a word structure when unquoted. A quoted part holding one of them is data (an
+// argument such as `ssh -i key`), never command text, so the detection view blanks it.
+const SHELL_STRUCTURAL_RE = /[\s;&|()<>`$"'\\]/u;
+
+/** A single-quoted span whose opening quote is at `open`. `end` is the closing quote's index, -1 when unterminated. */
+function readSingleQuoted(cmd, open) {
+  const end = cmd.indexOf("'", open + 1);
+  return end === -1 ? { end: -1, content: cmd.slice(open + 1) } : { end, content: cmd.slice(open + 1, end) };
+}
+
+/** An ANSI-C span; `open` is the index of the quote that follows the `$`. */
+function readAnsiCQuoted(cmd, open) {
+  let content = "";
+  for (let i = open + 1; i < cmd.length; i += 1) {
+    const ch = cmd[i];
+    if (ch === "'") return { end: i, content };
+    if (ch === "\\") {
+      const decoded = decodeBashAnsiCEscape(cmd, i);
+      content += decoded.value;
+      i = decoded.end;
+    } else content += ch;
+  }
+  return { end: -1, content };
+}
+
+/**
+ * A double-quoted span whose opening quote is at `open`. One deliberate tolerance: a `\"` that is the last
+ * non-blank text of the whole command (a Windows path such as `"C:\repo\"`) closes the span with the backslash
+ * kept literal. POSIX would call that span unterminated, but nothing follows it, so no command can hide behind
+ * it under either reading and the command is not routed to the push gate for it.
+ */
+function readDoubleQuoted(cmd, open) {
+  let content = "";
+  for (let i = open + 1; i < cmd.length; i += 1) {
+    const ch = cmd[i];
+    if (ch === '"') return { end: i, content };
+    if (ch !== "\\") {
+      content += ch;
+      continue;
+    }
+    const next = cmd[i + 1];
+    if (next === undefined) {
+      content += ch;
+      break;
+    }
+    if (next === '"' && /^\s*$/u.test(cmd.slice(i + 2))) return { end: i + 1, content: `${content}\\` };
+    if (next === "\n") i += 1;
+    else if (next === '"' || next === "\\" || next === "$" || next === "`") {
+      content += next;
+      i += 1;
+    } else content += ch;
+  }
+  return { end: -1, content };
+}
+
+/**
+ * scanShell(cmd, pathBackslash) -- one POSIX pass over `cmd` that returns what the classifier needs:
+ *   words: the argv-style words (split on unquoted whitespace only, operators stay glued), dequoted;
+ *   view: the command text for regex detection -- structure (whitespace, operators, newlines) kept as
+ *     written, every quoted or escaped part replaced by its dequoted content (`pu"sh"` reads `push`), except
+ *     a part that holds structural characters, which is blanked to `''` exactly like `stripQuotedSegments`
+ *     blanks quoted prose, so `echo "git push"` is not a push;
+ *   unterminated: an unclosed quote or a trailing lone backslash -- the text cannot be parsed with certainty;
+ *   escapedQuoteOutsideQuotes: a backslash-escaped quote outside every quote, the shape that used to fake a span.
+ * `pathBackslash` selects the other reading of an unquoted backslash before an ordinary character: a Windows
+ * path separator (`C:\Git\bin\git.exe`) kept literally instead of a POSIX escape.
+ */
+function scanShell(cmd, pathBackslash = false) {
+  const words = [];
+  let view = "";
+  let word = "";
+  let sawAny = false;
+  let unterminated = false;
+  let escapedQuoteOutsideQuotes = false;
+
+  const endWord = () => {
+    if (!sawAny) return;
+    words.push(word);
+    // A word made only of empty quotes (`''`) adds nothing to the view yet still occupies an argument slot.
+    if (word === "") view += '""';
+    word = "";
+    sawAny = false;
+  };
+
+  let i = 0;
+  while (i < cmd.length) {
+    const ch = cmd[i];
+    if (/\s/u.test(ch)) {
+      endWord();
+      view += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "\\") {
+      const next = cmd[i + 1];
+      if (next === undefined) {
+        // A trailing lone backslash escapes nothing: the command is incomplete.
+        word += ch;
+        view += ch;
+        sawAny = true;
+        unterminated = true;
+        i += 1;
+        continue;
+      }
+      i += 2;
+      if (next === "\n") continue; // line continuation: the shell drops both characters and the word goes on
+      if (next === "'" || next === '"') escapedQuoteOutsideQuotes = true;
+      sawAny = true;
+      if (SHELL_STRUCTURAL_RE.test(next)) {
+        word += next;
+        view += `\\${next}`;
+      } else if (pathBackslash) {
+        word += `\\${next}`;
+        view += `\\${next}`;
+      } else {
+        word += next;
+        view += next;
+      }
+      continue;
+    }
+    let span = null;
+    if (ch === "$" && cmd[i + 1] === "'") span = readAnsiCQuoted(cmd, i + 1);
+    else if (ch === "'") span = readSingleQuoted(cmd, i);
+    else if (ch === '"') span = readDoubleQuoted(cmd, i);
+    if (span !== null) {
+      sawAny = true;
+      word += span.content;
+      if (span.end === -1) {
+        unterminated = true;
+        view += cmd.slice(i);
+        i = cmd.length;
+      } else {
+        view += SHELL_STRUCTURAL_RE.test(span.content) ? "''" : span.content;
+        i = span.end + 1;
+      }
+      continue;
+    }
+    word += ch;
+    view += ch;
+    sawAny = true;
+    i += 1;
+  }
+  endWord();
+  return { words, view, unterminated, escapedQuoteOutsideQuotes };
 }
 
 // ---- global git option recognition ----------------------------------------------------
@@ -116,8 +304,10 @@ export function decodeBashAnsiCEscape(source, index) {
  * PRESERVING the inner content verbatim -- `"v1.2.3"` -> `v1.2.3`, `'refs/tags/v*'`
  * -> `refs/tags/v*`, a bare `v1.2.3` -> `v1.2.3` unchanged. A quote appearing anywhere
  * INSIDE a token (not just at its edges) also collapses to its content (`a"b"c` ->
- * `abc`) -- mirrors standard POSIX-ish quote unwrapping; the guard only needs
- * ref-shaped tokens to survive intact, not full shell-quoting fidelity.
+ * `abc`). Since GPGL-5 the tokenizer follows POSIX quoting (`scanShell`): outside quotes a
+ * backslash escapes the next character (`p\ush` -> `push`; a backslash-newline pair is
+ * removed); inside double quotes it escapes only `"`, `\`, `$`, a backtick and a newline;
+ * inside single quotes nothing is escaped; `$'...'` decodes ANSI-C escapes.
  *
  * Tokenizes ONE command segment -- it does NOT split on `&&`/`;`/`|`; the caller
  * (guard-push.mjs's deploy branch) isolates the push segment first. NO new regex is
@@ -126,63 +316,7 @@ export function decodeBashAnsiCEscape(source, index) {
  * plain token list this function returns.
  */
 export function tokenizeArgv(cmd) {
-  const tokens = [];
-  let current = "";
-  let inSingle = false;
-  let inDouble = false;
-  let inAnsiC = false;
-  let sawAnyChar = false; // distinguishes an empty quoted token (`''`) from no token at all
-
-  for (let i = 0; i < cmd.length; i++) {
-    const ch = cmd[i];
-    if (inAnsiC) {
-      if (ch === "'") inAnsiC = false;
-      else if (ch === "\\") {
-        const decoded = decodeBashAnsiCEscape(cmd, i);
-        current += decoded.value;
-        i = decoded.end;
-      } else current += ch;
-      continue;
-    }
-    if (inSingle) {
-      if (ch === "'") inSingle = false;
-      else current += ch;
-      continue;
-    }
-    if (inDouble) {
-      if (ch === '"') inDouble = false;
-      else current += ch;
-      continue;
-    }
-    if (ch === "$" && cmd[i + 1] === "'") {
-      inAnsiC = true;
-      sawAnyChar = true;
-      i += 1;
-      continue;
-    }
-    if (ch === "'") {
-      inSingle = true;
-      sawAnyChar = true;
-      continue;
-    }
-    if (ch === '"') {
-      inDouble = true;
-      sawAnyChar = true;
-      continue;
-    }
-    if (/\s/.test(ch)) {
-      if (sawAnyChar) {
-        tokens.push(current);
-        current = "";
-        sawAnyChar = false;
-      }
-      continue;
-    }
-    current += ch;
-    sawAnyChar = true;
-  }
-  if (sawAnyChar) tokens.push(current);
-  return tokens;
+  return scanShell(cmd).words;
 }
 
 const REGEX_SPECIAL_CHAR_RE = /[.*+?^${}()|[\]\\]/;
@@ -224,88 +358,13 @@ export function refMatchesPattern(ref, pattern) {
 
 // ---- shared push-command detection --------------------------------------------------
 
-/**
- * hasUnterminatedQuote(cmd) -- true when `cmd` ends still "inside" an open single- or
- * double-quote. Mirrors `tokenizeArgv`'s own quote-state tracking exactly (a `'` while
- * inside a `"..."` span is literal, and vice versa) so it agrees with how this module's
- * own tokenizer would actually see the string, rather than a naive quote-character
- * count (which would misfire on a legitimate case like `git commit -m "it's fine"`, one
- * single quote nested inside a balanced double-quoted span). Used by `commandIsGitPush`
- * to fail closed rather than trust token boundaries downstream of an unparseable
- * quoting state (NVA-PUSHCLASS-1).
- */
-function hasUnterminatedQuote(cmd) {
-  let inSingle = false;
-  let inDouble = false;
-  for (const ch of cmd) {
-    if (inSingle) {
-      if (ch === "'") inSingle = false;
-      continue;
-    }
-    if (inDouble) {
-      if (ch === '"') inDouble = false;
-      continue;
-    }
-    if (ch === "'") inSingle = true;
-    else if (ch === '"') inDouble = true;
-  }
-  return inSingle || inDouble;
-}
-
-/**
- * hasEscapedQuoteOutsideSingleQuotes(cmd) -- true when `cmd` contains a backslash-escaped
- * quote (`\'` or `\"`) anywhere except inside a plain single-quoted span (GPGL-3).
- *
- * In a POSIX shell an escaped quote is a literal character, never a delimiter, so the text
- * between two of them is EXECUTED. `stripQuotedSegments` and `tokenizeArgv` do not know
- * that: they read the pair as a quoted span and blank or merge it, which hides a real push
- * placed there (`echo \'; git push origin main; echo \'`). The same desynchronisation
- * happens with an escaped quote INSIDE a double-quoted span and inside an ANSI-C `$'...'`
- * string, where `\'` is an escape too -- so only a plain `'...'` span, where a backslash
- * is a literal character, is exempt. Backslash handling mirrors the shell: outside a plain
- * single-quoted span a backslash consumes the next character.
- */
-function hasEscapedQuoteOutsideSingleQuotes(cmd) {
-  let inSingle = false;
-  let inAnsiC = false;
-  let inDouble = false;
-  for (let i = 0; i < cmd.length; i += 1) {
-    const ch = cmd[i];
-    if (inSingle) {
-      if (ch === "'") inSingle = false;
-      continue;
-    }
-    if (ch === "\\") {
-      const next = cmd[i + 1];
-      if (next === "'" || next === '"') return true;
-      i += 1;
-      continue;
-    }
-    if (inAnsiC) {
-      if (ch === "'") inAnsiC = false;
-      continue;
-    }
-    if (inDouble) {
-      if (ch === '"') inDouble = false;
-      continue;
-    }
-    if (ch === "$" && cmd[i + 1] === "'") {
-      inAnsiC = true;
-      i += 1;
-    } else if (ch === "'") inSingle = true;
-    else if (ch === '"') inDouble = true;
-  }
-  return false;
-}
+// A `git`/`git.exe` word anywhere in the text: an unparseable quoting state only matters for a command that
+// can carry a git invocation at all.
+const GIT_WORD_RE = /\bgit(?:\.exe)?\b/iu;
 
 // A `git`/`git.exe` word at a position an executable can occupy (see the boundary rule of
 // GIT_EXECUTABLE_THEN_OPTION_RE below), without requiring a following option.
 const GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b/iu;
-
-// The word `push` as a separate token anywhere in the raw text (GPGL-4): a word boundary on both
-// sides, case-insensitive. Check #3 only matters for a command that can carry a push at all, so an
-// escaped quote alone, with no push word to hide, is not a reason to route a command to the push gate.
-const PUSH_WORD_ANYWHERE_RE = /\bpush\b/iu;
 
 // A quoted executable name: a quote, an optional path ending in a separator, `git`/`git.exe`,
 // then a quote (`"git"`, `'git.exe'`, `"/usr/bin/git"`, `"C:\Git Tools\cmd\git.exe"`).
@@ -326,9 +385,8 @@ const PUSH_WORD_TOKEN_RE = /(?:^|[;&|(`])push(?:$|[;&|)`])/iu;
  * and `"git" -c a=b push` evade classification. Fail closed on the quoted-executable shape
  * instead of guessing what sits between the executable and the push word.
  */
-function hasQuotedGitWordBeforePushWord(cmd) {
+function hasQuotedGitWordBeforePushWord(cmd, tokens) {
   if (!QUOTED_GIT_WORD_RE.test(cmd)) return false;
-  const tokens = tokenizeArgv(cmd);
   const gitIndex = tokens.findIndex((token) => GIT_EXECUTABLE_TOKEN_RE.test(token));
   return gitIndex !== -1 && tokens.slice(gitIndex + 1).some((token) => PUSH_WORD_TOKEN_RE.test(token));
 }
@@ -406,21 +464,23 @@ const GIT_EXECUTABLE_THEN_OPTION_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b\s+-\S
  *      push gate. A whitespace-separated literal `git` ARGUMENT (`gitleaks git --redact`)
  *      is deliberately still indistinguishable from the executable and stays refused:
  *      fail-closed, accepted.
- *   3. A backslash-escaped quote (`\'` or `\"`) anywhere outside a plain single-quoted
- *      span, together with a `git`/`git.exe` word at an executable boundary (the same
- *      boundary rule as check #2, no option required) and the word `push` as a separate
- *      token (a word boundary on both sides, case-insensitive) anywhere in the raw text
- *      (GPGL-3, narrowed by GPGL-4). A shell treats an escaped quote as a literal character,
- *      so text between two of them is executed, while `stripQuotedSegments`/`tokenizeArgv`
- *      read the pair as a quoted span and hide it (`echo \'; git push origin main; echo \'`):
- *      a fail-open the other checks cannot see. Deliberately blunt where a push word is
- *      present: `git commit -m "say \"push\""` is routed to the push gate too, because an
- *      escaped quote inside a double-quoted span desynchronises the stripper the same way.
- *      Without a push word there is nothing for the desynchronisation to hide, so
- *      `git commit -m "say \"hi\""`, `git log --grep "a \"b\""` and a Windows path ending in
- *      `\"` are not pushes. This check keys on the literal token: a push word split so that
- *      it never appears as that token in the raw text (for example by interior quotes) does
- *      not trigger it.
+ *   3. A backslash-escaped quote (`\'` or `\"`) OUTSIDE every quote, together with a
+ *      `git`/`git.exe` word at an executable boundary (the same boundary rule as check #2,
+ *      no option required) -- and NO push-word requirement (GPGL-3). GPGL-4 narrowed this
+ *      with a raw-text push-word conjunct; GPGL-5 removed it again because a push word split
+ *      by interior quotes (`pu"sh"`) never appears as that token in raw text (Critic finding
+ *      F1: `echo \'; git pu"sh" origin main; echo \'`). A shell treats an escaped quote as a
+ *      literal character, so text between two of them is executed. The scanner now follows
+ *      that, and this check stays as a backstop that does not depend on the scanner being
+ *      right about everything after the escape. An escaped quote INSIDE a double-quoted span
+ *      or an ANSI-C `$'...'` string is parsed by the scanner and is not a trigger, which keeps
+ *      `git commit -m "say \"hi\""` and `git log --grep "a \"push\" word"` out of the push gate.
+ *      Detection itself (the three branches and checks #2/#4) runs on the DEQUOTED words and
+ *      view, never on raw text: `git pu"sh"`, `g"it" push` and `git p\ush` all read `git push`.
+ *      An unquoted backslash is read both as a POSIX escape and as a Windows path separator;
+ *      either reading classifying as a push is enough. An unterminated quote or a trailing lone
+ *      backslash fails closed under #1 as well. PowerShell quoting (backtick escapes, doubled
+ *      quotes) follows neither reading and is NOT covered.
  *   4. A QUOTED git executable name (`"git"`, `'git.exe'`, a quoted path ending in git)
  *      with a push word later in the command (GPGL-3). Quote-stripping blanks `"git"`, so
  *      neither the whole-string branch nor the global-option collapse ever sees the
@@ -432,16 +492,24 @@ const GIT_EXECUTABLE_THEN_OPTION_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b\s+-\S
  */
 export function commandIsGitPush(cmd) {
   if (typeof cmd !== "string" || cmd === "") return false;
-  if (/\bgit(?:\.exe)?\b/iu.test(cmd) && hasUnterminatedQuote(cmd)) return true;
-  // Fail-closed checks #3 and #4 (GPGL-3), raw-text based and independent of the branches below.
+  // An unquoted backslash has two readings: a POSIX escape (`p\ush` is `push`) and a Windows path
+  // separator (`C:\Git\bin\git.exe push`). Which one a runner's shell applies is not known here, so
+  // classify under both and fail closed when either reading is a push (GPGL-5).
+  return classifyPush(cmd, false) || classifyPush(cmd, true);
+}
+
+/** One reading of `cmd` (see `scanShell` for `pathBackslash`); detection runs on the dequoted view and words. */
+function classifyPush(cmd, pathBackslash) {
+  const scan = scanShell(cmd, pathBackslash);
+  const view = scan.view;
+  // Fail-closed checks #1 and #3 (NVA-PUSHCLASS-1, GPGL-3, GPGL-5) and #4 (GPGL-3), independent of the branches below.
+  if (scan.unterminated && (GIT_WORD_RE.test(cmd) || GIT_WORD_RE.test(view))) return true;
   if (
-    PUSH_WORD_ANYWHERE_RE.test(cmd) &&
-    GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(cmd) &&
-    hasEscapedQuoteOutsideSingleQuotes(cmd)
+    scan.escapedQuoteOutsideQuotes &&
+    (GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(cmd) || GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(view))
   ) return true;
-  if (hasQuotedGitWordBeforePushWord(cmd)) return true;
-  const stripped = stripQuotedSegments(cmd);
-  const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
+  if (hasQuotedGitWordBeforePushWord(cmd, scan.words)) return true;
+  const normalized = normalizeGlobalGitOptions(view.toLowerCase());
   const commandRegion = (() => {
     const opener = /(^|\s)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/u;
     let text = normalized;
@@ -474,7 +542,7 @@ export function commandIsGitPush(cmd) {
   // `git`/`git.exe` still immediately followed by a `-`-prefixed token here names an
   // option this file does not know how to consume. Do not guess "not a push".
   if (GIT_EXECUTABLE_THEN_OPTION_RE.test(commandRegion)) return true;
-  const rawDetectionTokens = tokenizeArgv(cmd);
+  const rawDetectionTokens = scan.words;
   // Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
   // `env git push` are still detected POSITIONALLY.
   const detectionTokens = (() => {
