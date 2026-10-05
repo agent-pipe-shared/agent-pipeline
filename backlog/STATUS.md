@@ -287,6 +287,7 @@
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
+| pipeline.fanout-ledger-spawns-powershell-on-every-stop-on-windows | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy | closed | requirement | pipeline | nova | 2026-09-14 | — | — |
 | pipeline.feature-branch-push-admitted-without-signature-approval | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors | closed | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry. |
@@ -833,7 +834,7 @@
 
 ## Counts
 
-- open: 168
+- open: 169
 - in_progress: 0
 - closed: 643
 - rejected: 3
