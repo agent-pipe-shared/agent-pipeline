@@ -32,6 +32,7 @@ no hand-maintained guard count or command list.
 | Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;invoke_subagent | node hooks/antigravity-pretool-guard.mjs |
 | Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;invoke_subagent | node hooks/antigravity-slicing-hint.mjs observe |
 | Antigravity | Stop | (all) | node hooks/antigravity-stop-hook.mjs |
+| Claude Code | PostToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs" |
 | Claude Code | PostToolUse | Task&#124;Agent | node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude |
 | Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;Agent&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs" |
 | Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs" |
@@ -53,6 +54,7 @@ no hand-maintained guard count or command list.
 | Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs" |
 | Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs" |
 | Claude Code | Stop | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs" |
+| Claude Code | UserPromptSubmit | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/claude-intake-prompt-capture.mjs" |
 | Codex | PreToolUse | Bash | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
 | Codex | PreToolUse | apply_patch&#124;Edit&#124;Write | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
 | Codex | PreToolUse | spawn_agent | node "${PLUGIN_ROOT}/hooks/guard-dispatch.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/guard-dispatch.mjs" |
@@ -79,6 +81,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
 
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `130b87bd2eafab2738ec22aba16d76f8fa0194ade863583d4c45bbc93fba931b` |
+| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `65dec57031b859906087bcd0669390c2d1eb0a9409ae6a93890eab32950f983d` |
 | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `dcc23075e81a254603c9b7ab96bc6e2bc046830532b1cc0535934e6af67aa010` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96` |
