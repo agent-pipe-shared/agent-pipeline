@@ -154,3 +154,48 @@ ACL assurance (own finding); macOS not examined; both swallow sites also hide a 
 consumer repos (design note, no measurement).
 Prepared but not run (git-ignored): `scratch/PROBEA/fake-linux.mjs` preload (forces `process.platform` to linux to skip the
 ACL step; indicative only, not a Linux emulation) via `scratch/PROBEA/run.mjs fake-ct <test file>`.
+
+## Family B follow-up: check-state-phase-consistency
+
+Dispatch FXB3, native Windows only, candidate `b6f310f1f` + FXB2's uncommitted `git init -q` in `freshDir`. Probes (git-ignored,
+lost unless moved): `scratch/FXB3/probe.test.mjs`, `scratch/FXB3/patched-projection.test.mjs`. They were run via `node --test` because the
+guard refused the briefed `node scratch/FXB2/dbg.mjs` form (GUARD-DEVPLAN-SHELL, lane `opaque-script-execution`); they write only to a tmp dir.
+
+Verdict: **production / Windows-platform defect (not fixture)**, plus a second, platform-independent **test-design conflict** that blocks a pure
+fixture fix. No file was edited by this dispatch except this section and scratch.
+
+Exact reason `readRuntimeNextAction` is unavailable: `plugins/pipeline-core/lib/runtime-handover-projection.mjs` line 23-24.
+`git rev-parse --path-format=absolute --git-common-dir` prints a forward-slash path on native Windows; line 24 compares it with
+`realpathSync(common)`, which returns the backslash form, so `realpathSync(common) !== common` is true and `throw Error("physical metadata")` fires. The
+`catch` at line 64 returns `{status:"unavailable", code:"RUNTIME-HANDOVER-PROJECTION-UNAVAILABLE"}` (publish: same throw, caught at 42-44). Line 20 is NOT
+affected (it compares `realpathSync(top)` with the already-resolved `root`). Probe output (`node --test scratch/FXB3/probe.test.mjs`, exit 0; host path redacted to `<tmp>`):
+```
+PROBE git-common-dir stdout/status: {"stdout":"<tmp>/fxb3-iFwA5o/.git","status":0,"isAbsolute":true}
+PROBE realpath(common): <tmp>\fxb3-iFwA5o\.git
+PROBE realpath(common)===common (line 24 gate): false
+PROBE publish (prod): {"status":"unavailable","code":"RUNTIME-HANDOVER-PROJECTION-UNAVAILABLE","trackedHandoverChanged":false}
+PROBE read (prod): {"status":"unavailable","code":"RUNTIME-HANDOVER-PROJECTION-UNAVAILABLE"}
+```
+Ruled out (same probe): `assertPrivateRegularFile`/DACL (file and parent `assessWindowsPrivatePath` = `secure`, `nlink` 1 when the write is done directly), a
+`stateSha256` mismatch, and a missing initial commit (never reached). Sufficiency (`node --test scratch/FXB3/patched-projection.test.mjs`, exit 0): a local copy with
+ONLY `common = resolve(common)` publishes (`projected`) and `checkStatePhaseConsistency(..., {readRuntimeNextAction: patched})` returns `consistent`,
+`projection: "private-current-state"` (it was `blocked state-phase-projection-mismatch` before the patched publish).
+
+Why the check then reports `blocked`: `pipeline-state.mjs` 1126-1136 `syncNextActionDocs` returns right after `publishRuntimeNextAction` unless the code is
+`RUNTIME-HANDOVER-NON-GIT`, so in a git repo the marker is NEVER written to `docs/state.md` ("a failed private-boundary check never falls back to tracked writes"). With the
+projection unavailable on Windows, the check falls back to `docs/state.md`, which never receives the marker -> mismatch. Consequence beyond this fixture: on native Windows every
+git-backed project has an unavailable private next-action projection (finding for a backlog item; not filed, out of this dispatch's scope).
+
+Second conflict (platform-independent; Windows-observed, POSIX inferred from the same line-1131 early return, not run): the test also asserts the marker in `docs/state.md`
+(lines 198-199 and 219-221). In a git repo that can never hold, even after the line-24 fix. A non-git fixture is not an alternative: `inspectSelectedPlanProfile` calls
+`readOnboardingIntakeCheckpoint({ rootDir })` (pipeline-state.mjs 3819) with no injection seam, so submit-plan needs a git root (Family B above). So a pure fixture fix
+with "no assertion changed" does not exist for the whole file; the whole-file RED stays as measured (`node --test` exit 1, tests 3 / pass 2 / fail 1, failing at line 196).
+
+Proposal (needs a dispatcher/PO decision; not applied): (1) production: normalise `common` before the line-24 comparison (e.g. `const common = resolve(metadata.stdout.trim())`) and
+add a unit test with a forward-slash common dir; (2) test: re-target the marker reads at lines 198-199 and 219-221 to the private projection (`readRuntimeNextAction`), which is
+an assertion change and therefore not done here.
+
+`plugins/pipeline-core/lib/po-gate-authority.test.mjs` (`node --test`, exit 1, 29 `ok` checks, then an uncaught AssertionError at line 701 `submitFixturePlan`, called from 719):
+`submit-plan refused (PROFILE-AUTHORITY-INVALID)`, exit 2 != 0. Same Family B fixture cause (its `withFixture` root, line 198, has no `git init`; `"init"` appears only at 986 and 1035
+in other tests). Not fixed: the briefing lists only the check-state test file as editable, and it is unproven that `git init` alone makes it green (the git-backed fixture may meet the
+same docs-vs-projection conflict). Matrix: the line-24 defect is Windows-specific (git prints `/`; POSIX paths are already identical); WSL/macOS untested (host rule / no host).
