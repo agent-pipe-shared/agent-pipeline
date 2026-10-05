@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
@@ -120,6 +120,6 @@ test("non-background, wrong-tool, and stdout-only identifiers create no scope", 
 
 if (completionCases.length !== 2) throw new Error("case completion count drift: expected 2, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });

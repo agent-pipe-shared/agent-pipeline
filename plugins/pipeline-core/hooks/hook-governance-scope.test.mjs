@@ -14,6 +14,7 @@ import {join,resolve} from 'node:path';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {pathToFileURL,fileURLToPath} from 'node:url';
+import { devNull } from 'node:os';
 const hookRoot=fileURLToPath(new URL('.',import.meta.url)),repoRoot=resolve(hookRoot,'../../..');
 const runtime=["antigravity-pretool-guard.mjs","antigravity-slicing-hint.mjs","antigravity-start-hint.mjs","antigravity-stop-hook.mjs","codex-pretool-guard.mjs","codex-session-start-hint.mjs","codex-slicing-hint.mjs","guard-advisor-prohibition.mjs","guard-apply-patch.mjs","guard-devplan.mjs","guard-dispatch-budget.mjs","guard-dispatch.mjs","guard-el01-tripwire.mjs","guard-gate-strength.mjs","guard-git.mjs","guard-handover-size.mjs","guard-lifecycle-ready.mjs","guard-onboarding-consent-lock.mjs","guard-push.mjs","guard-slicing.mjs","guard-testpath.mjs","guard-worktree-isolation.mjs","native-goldfish-host.mjs","native-slicing.mjs","post-compact-reground.mjs","setup-check.mjs","staleness-check.mjs","stop-suggest.mjs"];
 const sha=b=>createHash('sha256').update(b).digest('hex');
@@ -86,7 +87,7 @@ test('Antigravity slicing observes the active consumer workspace from inactive h
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 9) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -10,7 +10,7 @@ function test(name, run) {
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {evaluateLifecycleReadyGuard} from './guard-lifecycle-ready.mjs';
@@ -111,7 +111,7 @@ test('actual guard preserves refusal on telemetry failure and mismatched/invalid
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 5) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

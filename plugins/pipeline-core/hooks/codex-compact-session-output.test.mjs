@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 
 import { main } from "./codex-session-start-hint.mjs";
 import { decideOutput } from "./post-compact-reground.mjs";
+import { devNull } from "node:os";
 
 const hookPath = fileURLToPath(new URL("./codex-session-start-hint.mjs", import.meta.url));
 const scratch = fileURLToPath(new URL("../../../scratch/", import.meta.url));
@@ -184,7 +185,7 @@ test("direct hook subprocess emits one supported JSON object for stopped and rea
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 3) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

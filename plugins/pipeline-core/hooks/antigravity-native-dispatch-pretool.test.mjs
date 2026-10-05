@@ -12,6 +12,7 @@ import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-disp
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { devNull } from "node:os";
 
 const hook = join(dirname(fileURLToPath(import.meta.url)), "antigravity-pretool-guard.mjs");
 const prepareScript = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "antigravity-native-dispatch-prepare.mjs");
@@ -159,6 +160,6 @@ for (const entry of cases) {
 }
 assert.equal(cases.length, 8, "the complete Antigravity native pretool corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
