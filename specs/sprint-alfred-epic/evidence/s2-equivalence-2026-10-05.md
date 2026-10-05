@@ -71,17 +71,17 @@ Test names extracted from the file: 302 of 302 top-level `test(` calls (0 not ex
 | 0 | 26 | 1 / 26 / 5 / no / 84 | 1 / 26 / 5 / no / 84 | yes |
 | 1 | 26 | 1 / 26 / 5 / no / 259 | 1 / 26 / 5 / no / 259 | yes |
 | 2 | 25 | 1 / 25 / 1 / no / 111 | 1 / 25 / 1 / no / 111 | yes |
-| 3 | 25 | pending | pending | - |
-| 4 | 25 | pending | pending | - |
-| 5 | 25 | pending | pending | - |
-| 6 | 25 | pending | pending | - |
-| 7 | 25 | pending | pending | - |
-| 8 | 25 | pending | pending | - |
-| 9 | 25 | pending | pending | - |
-| 10 | 25 | pending | pending | - |
-| 11 | 25 | pending | pending | - |
+| 3 | 25 | 1 / 25 / 6 / no / 151 | 1 / 25 / 6 / no / 151 | yes |
+| 4 | 25 | 1 / 26 / 3 / no / 92 | 1 / 26 / 3 / no / 92 | yes |
+| 5 | 25 | 1 / 25 / 6 / no / 69 | 1 / 25 / 6 / no / 69 | yes |
+| 6 | 25 | 1 / 26 / 5 / no / 103 | 1 / 26 / 5 / no / 103 | yes |
+| 7 | 25 | 1 / 27 / 3 / no / 27 | 1 / 27 / 3 / no / 27 | yes |
+| 8 | 25 | 1 / 25 / 6 / no / 27 | 1 / 25 / 6 / no / 27 | yes |
+| 9 | 25 | 1 / 27 / 5 / no / 64 | 1 / 27 / 5 / no / 64 | yes |
+| 10 | 25 | 1 / 25 / 7 / no / 79 | 1 / 25 / 7 / no / 79 | yes |
+| 11 | 25 | 1 / 25 / 4 / no / 172 | 1 / 25 / 4 / no / 172 | yes |
 
-Shard pairs completed in both trees: 3/12; identical name+status sets: 3; tests parsed in completed pairs: A 77, B 77. **INCOMPLETE when this file was generated: the shard run was still in progress.** Results keep landing in scratch/S2-72/results/shards-A.json and shards-B.json; re-run scratch/S2-72/build-report.mjs to refresh this file.
+Shard pairs completed in both trees: 12/12; identical name+status sets: 12; tests parsed in completed pairs: A 308, B 308. 
 
 ## 4. Cold start (plan item 5), native Windows
 
