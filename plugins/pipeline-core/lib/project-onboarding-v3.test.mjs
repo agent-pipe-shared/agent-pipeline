@@ -1240,28 +1240,95 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(readyAndApplied.status, "ready");
     assertPlanLifecycleInspectAction(readyAndApplied.nextAction);
 
+    // RF2B (ALFRED-RF2B-20261004): the retained-binding rule is MONOTONE. It used
+    // to key off a descriptor COUNT, so two residues locked LESS than one. Now
+    // only whether EVERY active descriptor is a foreign zero-authority orphan
+    // (the RF2A archive tier's own eligibility) decides: that is a ready result
+    // carrying one typed `cleanup_residue_foreign` warning; anything else --
+    // authority, the requester's own descriptor, a mix -- blocks as one did.
     let activeSessionAppServerCalls = 0;
-    const activeSession = inspectProjectOnboardingV3({ runner: "codex",
-      rootDir: path,
-      intent: "session",
-      deps: {
-        ...fakeDeps,
-        listActiveSessionDescriptors: () => [{ id: "session-1" }, { id: "session-2" }],
-        observeOnboardingAppServer(options) {
-          activeSessionAppServerCalls += 1;
-          return fakeAppServer(options);
+    const orphanCandidate = (sessionId, digestChar) => {
+      const descriptorSha256 = digestChar.repeat(64);
+      return {
+        sessionId,
+        descriptorSha256,
+        ownerStatus: "unavailable",
+        bindingState: "bound-to-descriptor",
+        resume: false,
+        action: {
+          kind: "command",
+          executable: "node",
+          argv: [SESSION_CLEANUP_SCRIPT, "archive-orphan", "--repo", path, "--session-descriptor", sessionId, "--expected-descriptor-sha256", descriptorSha256, "--by", "<operator>", "--reason", "<reason>"],
+          mutation: true,
+          requiresConfirmation: false,
+          requiresInput: ["--by", "--reason"],
+          executionBoundary: "local-process",
+          expected: { schema: "pipeline.session-orphan-archive-apply.v1", statuses: ["archived", "already-archived"] },
         },
-        planSessionCleanupRecovery() {
-          return {
-            schema: "pipeline.session-cleanup-recovery-plan.v1",
-            status: "cleanup-required",
-          };
-        },
-      },
+      };
+    };
+    const offerOf = (candidates, refusals = []) => ({
+      schema: "pipeline.session-orphan-archive-plan.v1",
+      status: candidates.length === 0 ? "none-eligible" : "ready",
+      root: path,
+      mutation: false,
+      candidates,
+      refusals,
     });
-    assert.equal(activeSession.status, "ready");
-    assertPlanLifecycleInspectAction(activeSession.nextAction);
+    const retainedBindingDeps = (offer) => ({
+      ...fakeDeps,
+      observeOnboardingAppServer(options) {
+        activeSessionAppServerCalls += 1;
+        return fakeAppServer(options);
+      },
+      planSessionCleanupRecovery() {
+        return { schema: "pipeline.session-cleanup-recovery-plan.v1", status: "cleanup-required" };
+      },
+      planOrphanDescriptorArchive() { return offer; },
+    });
+    const sessionInspect = (offer) => inspectProjectOnboardingV3({
+      runner: "codex", rootDir: path, intent: "session", deps: retainedBindingDeps(offer),
+    });
+
+    const foreignOne = sessionInspect(offerOf([orphanCandidate("foreign-1", "a")]));
+    assert.equal(foreignOne.status, "ready");
+    assertPlanLifecycleInspectAction(foreignOne.nextAction);
     assert.equal(activeSessionAppServerCalls, 1);
+    assert.equal(foreignOne.diagnostics.length, 1);
+    const [foreignWarning] = foreignOne.diagnostics;
+    assert.deepEqual(Object.keys(foreignWarning).sort(), [
+      "archiveActions", "code", "guidance", "message", "nextAction", "path", "severity",
+    ]);
+    assert.equal(foreignWarning.code, "cleanup_residue_foreign");
+    assert.equal(foreignWarning.severity, "warning");
+    assert.equal(foreignWarning.nextAction.argv[1], "plan-archive-orphan");
+    assert.equal(foreignWarning.nextAction.mutation, false);
+    assert.equal(foreignWarning.archiveActions.length, 1);
+    assert.equal(foreignWarning.archiveActions[0].argv[1], "archive-orphan");
+
+    // Two foreign orphans: monotone -- still ready, one warning, both actions.
+    const foreignTwo = sessionInspect(offerOf([orphanCandidate("foreign-1", "a"), orphanCandidate("foreign-2", "b")]));
+    assert.equal(foreignTwo.status, "ready");
+    assert.equal(foreignTwo.diagnostics.length, 1);
+    assert.equal(foreignTwo.diagnostics[0].code, "cleanup_residue_foreign");
+    assert.equal(foreignTwo.diagnostics[0].archiveActions.length, 2);
+
+    // Authority-bearing, the requester's own, and a mixed set all keep blocking,
+    // exactly like a single retained residue always did.
+    const withResources = { sessionId: "has-resources", descriptorSha256: "c".repeat(64), code: "WT-ORPHAN-ARCHIVE-AUTHORITY" };
+    const ownSession = { sessionId: "own", descriptorSha256: "d".repeat(64), code: "WT-ORPHAN-ARCHIVE-OWN-SESSION" };
+    for (const offer of [
+      offerOf([], [withResources]),
+      offerOf([], [ownSession]),
+      offerOf([orphanCandidate("foreign-1", "a")], [withResources]),
+      { ...offerOf([orphanCandidate("foreign-1", "a")]), observationCode: "WT-SESSION-OBSERVATION" },
+    ]) {
+      const blocked = sessionInspect(offer);
+      assert.equal(blocked.status, "partial");
+      assert.deepEqual(blocked.nextAction, humanRecoveryAction);
+      assertDiagnostic(blocked, "cleanup_recovery_required");
+    }
+    assert.equal(activeSessionAppServerCalls, 2);
 
     const unavailable = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,

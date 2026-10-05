@@ -93,7 +93,13 @@ import {
   SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA,
   SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA,
 } from "../scripts/settings-allowlist-merge.mjs";
-import { applySessionCleanupRecovery, planSessionCleanupRecovery, SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
+import {
+  applySessionCleanupRecovery,
+  ORPHAN_ARCHIVE_PLAN_SCHEMA,
+  planOrphanDescriptorArchive,
+  planSessionCleanupRecovery,
+  SessionCleanupRecoveryError,
+} from "./session-cleanup-recovery.mjs";
 import {
   LEGACY_CALIBRATION,
   LEGACY_STATE,
@@ -109,7 +115,7 @@ import {
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
-import { discoverRepository, listActiveSessionDescriptors } from "./worktree-lifecycle.mjs";
+import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
@@ -1630,6 +1636,55 @@ function cleanupHumanRecoveryAction(root) {
   };
 }
 
+// RF2B (ALFRED-RF2B-20261004): the read-only typed plan that lists, per exact
+// descriptor and digest, the zero-authority orphans the signature-free archive
+// tier may clear.
+function orphanArchivePlanAction(root) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [SESSION_CLEANUP_SCRIPT, "plan-archive-orphan", "--repo", root],
+    mutation: false,
+    requiresConfirmation: false,
+    expected: { schema: ORPHAN_ARCHIVE_PLAN_SCHEMA, statuses: ["ready"] },
+  };
+}
+
+// RF2B: a retained cleanup binding whose descriptors are ALL foreign
+// zero-authority orphans (unobservable owner, no manifest/resources/intents,
+// not the requester's own) is a warning, not a lock. Anything else -- a
+// descriptor with authority, the requester's own, an unreadable observation --
+// yields null and keeps today's blocking behaviour. The requester's own
+// capability is read only to REFUSE treating its own descriptor as foreign.
+function foreignOrphanResidueWarning({ root, deps = {} }) {
+  try {
+    const planArchive = deps.planOrphanDescriptorArchive ?? planOrphanDescriptorArchive;
+    const nonce = deps.requesterOwnerNonce ?? process.env.PIPELINE_SESSION_OWNER_NONCE ?? null;
+    const offer = planArchive({
+      rootDir: root,
+      scriptPath: SESSION_CLEANUP_SCRIPT,
+      requesterOwnerNonce: typeof nonce === "string" && nonce !== "" ? nonce : null,
+    });
+    if (offer?.status !== "ready"
+      || !Array.isArray(offer.candidates) || offer.candidates.length === 0
+      || !Array.isArray(offer.refusals) || offer.refusals.length !== 0
+      || offer.observationCode !== undefined) return null;
+    return {
+      ...lifecycleDiagnostic(
+        "$.authority.sessionCleanup",
+        "cleanup_residue_foreign",
+        "retained cleanup residue belongs to a foreign session and carries no authority",
+        "archive it with the exact digest-bound archive-orphan action when convenient; it does not block this session",
+      ),
+      severity: "warning",
+      nextAction: orphanArchivePlanAction(root),
+      archiveActions: offer.candidates.map((candidate) => candidate.action),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function partialCleanupRecoveryResult({
   root,
   runner,
@@ -1638,6 +1693,7 @@ function partialCleanupRecoveryResult({
   runtime = emptyRuntime(),
   deps = {},
   strict = false,
+  observation = null,
 }) {
   requireRunner(runner, "partialCleanupRecoveryResult");
   try {
@@ -1693,11 +1749,22 @@ function partialCleanupRecoveryResult({
       ? recovery.nextAction ?? null
       : null;
     if (intent === "session" && recovery.status === "cleanup-required") {
-      const listDescriptors = deps.listActiveSessionDescriptors ?? listActiveSessionDescriptors;
-      let descriptorCount = 0;
-      try { descriptorCount = listDescriptors(root).length; } catch {}
-      if (descriptorCount <= 1) {
+      // RF2B: monotone. The count of residues never decides (two used to lock
+      // LESS than one); only whether every one of them is a foreign
+      // zero-authority orphan does. That case is a typed warning carried on
+      // the ready result; everything else blocks exactly as one residue did.
+      // The warning applies only to the bare bound-and-active residue (the
+      // plan carries no typed action of its own) and only when the caller can
+      // carry it on its ready result: a closed-bound plan with its own typed
+      // `cleanup` action, or a caller without an observation (the legacy
+      // partial-authority paths), is never downgraded to a warning.
+      const warning = nextAction === null && observation !== null
+        ? foreignOrphanResidueWarning({ root, deps })
+        : null;
+      if (warning === null) {
         nextAction = cleanupHumanRecoveryAction(root);
+      } else {
+        observation.warnings.push(warning);
       }
     }
     if (nextAction !== null) {
@@ -3147,6 +3214,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
   // complete its typed repository initialization; probing the protected host
   // control mount here would turn that legitimate transition into a false
   // cleanup-observation failure.
+  const residueObservation = { warnings: [] };
   if (repository.mode === "local" && continuity.status === "valid") {
     const cleanupRecovery = partialCleanupRecoveryResult({
       root,
@@ -3156,6 +3224,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       runtime,
       deps: fs,
       strict: true,
+      observation: residueObservation,
     });
     if (cleanupRecovery !== null) return cleanupRecovery;
     // Critic finding F1, 2026-08-19 (dispatch W4-CRITIC-2C): a null return
@@ -3652,7 +3721,9 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       appServer,
       nextAction: planLifecycleInspectAction(root, fs)
         ?? designToImplementationHandoverAction(root, fs),
-      diagnostics: [],
+      // RF2B: the only diagnostics a ready result may carry are the typed
+      // warnings the cleanup-residue observation recorded above.
+      diagnostics: residueObservation.warnings,
     }),
     ...readyOnlyFields,
   };
