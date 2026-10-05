@@ -1,0 +1,25 @@
+--- a/harness/scripts/verify.mjs
++++ b/harness/scripts/verify.mjs
+@@ -308,4 +308,6 @@
+   { name: "architecture-push-currency-tests", file: join(libDir, "architecture-push-currency.test.mjs") },
+   { name: "checkpoint-push-audit-tests", file: join(libDir, "checkpoint-push-audit.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CPA001"], maxBytes: 65_536 } },
++  { name: "checkpoint-push-approval-tests", file: join(libDir, "checkpoint-push-approval.test.mjs") },
++  { name: "fanout-ledger-tests", file: join(libDir, "fanout-ledger.test.mjs") },
+   { name: "stop-suggest-tests", file: join(hooksDir, "stop-suggest.test.mjs") },
+   { name: "close-coordinator-tests", file: join(pluginScriptsDir, "close-coordinator.test.mjs") },
+@@ -320,3 +322,4 @@
+   { name: "runner-profiles-v3-tests", file: join(libDir, "runner-profiles-v3.test.mjs") },
+   { name: "runtime-projection-v3-tests", file: join(libDir, "runtime-projection-v3.test.mjs") },
++  { name: "runtime-handover-projection-win-path-tests", file: join(libDir, "runtime-handover-projection.win-path.test.mjs") },
+   { name: "runner-profile-migration-v3-tests", file: join(libDir, "runner-profile-migration-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 56 }, (_, index) => `RPM${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+@@ -330,3 +333,4 @@
+   { name: "v3-bootstrap-authority-tests", file: join(pluginScriptsDir, "v3-bootstrap-authority.test.mjs") },
+   { name: "project-onboarding-e2e-tests", file: join(pluginScriptsDir, "project-onboarding-e2e.test.mjs") },
++  { name: "project-onboarding-v3-flap-tests", file: join(libDir, "project-onboarding-v3.flap.test.mjs") },
+   // ADR-0051/ADR-0057 R1: walks the consumer chain executing each returned action
+@@ -471,4 +475,5 @@
+   { name: "critic-fail-closed-tests", file: join(scriptDir, "check-critic-fail-closed.test.mjs") },
+   { name: "critic-fail-closed-check", file: join(scriptDir, "check-critic-fail-closed.mjs") },
+   { name: "agents-adapter-migration-tests", file: join(scriptDir, "check-agents-adapter-migration.test.mjs") },
++  { name: "guard-split-map-tests", file: join(scriptDir, "guard-split-map.test.mjs") },
+   { name: "agents-adapter-migration-check", file: join(scriptDir, "check-agents-adapter-migration.mjs") },
