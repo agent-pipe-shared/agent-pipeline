@@ -33,6 +33,15 @@
  * guards also import from; that is reuse, not the drift this convention
  * exists to avoid.
  *
+ * ## ALFRED-BUDGET-20261005 behaviour (PO decision 2026-10-05)
+ * - Checkpoint notice: at about 80 % of the working cap a budget-bearing
+ *   role gets an allow verdict carrying `additionalContext` telling it to
+ *   commit what is green, write an interim report and hand back.
+ * - Critic notes lane: the Critic's closing lane also admits its own
+ *   `scratch/dispatch/<subdir>/critic-notes.md` (that exact file name only).
+ * - Grant store: an orchestrator-written, digest-chained per-agent grant
+ *   adds working calls; any dispatched agent touching it is refused.
+ *
  * ## Identity chain (empirically confirmed 2026-08-27 against this
  * dispatch's own live session directory, not merely assumed from the
  * briefing that described it):
