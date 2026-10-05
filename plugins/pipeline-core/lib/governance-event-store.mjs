@@ -642,19 +642,32 @@ async function scanStream(root, registry, streamId, acceptedFingerprints) {
   return { stream, streamRoot, events };
 }
 
-async function writeAtomic(target, bytes) {
+// Native Windows refuses to open or fsync a directory (EPERM/EISDIR); the rename
+// is already durable enough there.  Tolerate exactly those two codes on win32 only.
+async function syncDirectory(directory, { open: openFn, platform }) {
+  const tolerated = (error) => platform === "win32" && (error?.code === "EPERM" || error?.code === "EISDIR");
+  let directoryHandle;
+  try { directoryHandle = await openFn(directory, "r"); }
+  catch (error) { if (tolerated(error)) return; throw error; }
+  try { await directoryHandle.sync(); }
+  catch (error) { if (!tolerated(error)) throw error; }
+  finally { await directoryHandle.close(); }
+}
+
+export async function writeAtomic(target, bytes, io = {}) {
+  const openFn = io.open ?? open;
+  const platform = io.platform ?? process.platform;
   const directory = path.dirname(target);
   await assertNoSymlink(directory, { directory: true });
   const temporary = path.join(directory, `.${path.basename(target)}.${randomBytes(12).toString("hex")}.tmp`);
   let handle;
   try {
-    handle = await open(temporary, "wx", 0o644);
+    handle = await openFn(temporary, "wx", 0o644);
     await handle.writeFile(bytes, "utf8");
     await handle.sync();
     await handle.close(); handle = null;
     await rename(temporary, target);
-    const directoryHandle = await open(directory, "r");
-    try { await directoryHandle.sync(); } finally { await directoryHandle.close(); }
+    await syncDirectory(directory, { open: openFn, platform });
   } catch (error) {
     if (handle) await handle.close().catch(() => {});
     await unlink(temporary).catch(() => {});
