@@ -132,3 +132,106 @@ for (const [name, decline, stateName] of [
     });
   });
 }
+
+// WINACLFIX-F (finding F2): a created segment that fails its assurance is taken back, and the
+// refusal says which directory, why, and what the owner must do.
+const REMEDY = "an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run";
+
+function refusalMessage(run) {
+  try {
+    run();
+  } catch (error) {
+    assert.ok(isAssuranceRefusal(error), `expected PB-WINDOWS-ASSURANCE, got ${error?.code ?? error}`);
+    return error.message;
+  }
+  return assert.fail("expected a PB-WINDOWS-ASSURANCE refusal");
+}
+
+for (const status of ["unavailable", "insecure"]) {
+  test(`win32 removes a created segment whose hardening ends ${status}, so a retry meets no existing insecure directory`, () => {
+    withTemp(`hpd-rollback-${status}-`, (anchor) => {
+      const parent = join(anchor, "agent-pipeline");
+      const leaf = join(parent, "hook-state");
+      const message = refusalMessage(() => ensureHardenedPrivateDirectory(anchor, leaf, {
+        platform: "win32",
+        assess: unreachable("assess"),
+        harden: (path) => (path === leaf ? { status, reason: "PowerShell missing" } : { status: "secure" }),
+      }));
+      assert.equal(existsSync(leaf), false, "the created segment that failed hardening is removed before the refusal");
+      assert.equal(existsSync(parent), true, "an earlier created segment that hardened to secure stays");
+      assert.ok(message.includes("agent-pipeline/hook-state"), message);
+      assert.ok(message.includes(status) && message.includes("PowerShell missing"), message);
+      assert.ok(message.includes(REMEDY), message);
+      assert.equal(message.includes(anchor), false, "the message is anchor-relative and carries no host path");
+
+      const assessed = [];
+      const result = ensureHardenedPrivateDirectory(anchor, leaf, {
+        platform: "win32",
+        assess: (path) => { assessed.push(path); return { status: "secure" }; },
+        harden: () => ({ status: "secure" }),
+      });
+      assert.equal(result, leaf);
+      assert.equal(existsSync(leaf), true);
+      assert.deepEqual(assessed, [parent], "the retry assesses the surviving secure segment and creates the leaf afresh");
+    });
+  });
+}
+
+test("win32 removes only the failing created segment and never a pre-existing parent", () => {
+  withTemp("hpd-rollback-parent-", (anchor) => {
+    const parent = join(anchor, "agent-pipeline");
+    mkdirSync(parent);
+    const leaf = join(parent, "hook-state");
+    const message = refusalMessage(() => ensureHardenedPrivateDirectory(anchor, leaf, {
+      platform: "win32",
+      assess: () => ({ status: "secure" }),
+      harden: () => ({ status: "unavailable", reason: "PowerShell missing" }),
+    }));
+    assert.equal(existsSync(leaf), false);
+    assert.equal(existsSync(parent), true, "a directory that existed before the call is never removed");
+    assert.ok(message.includes(REMEDY), message);
+  });
+});
+
+test("win32 removes a failed created segment only while it is still empty and says when it could not", () => {
+  withTemp("hpd-rollback-nonempty-", (anchor) => {
+    const leaf = join(anchor, "agent-pipeline");
+    const message = refusalMessage(() => ensureHardenedPrivateDirectory(anchor, leaf, {
+      platform: "win32",
+      assess: unreachable("assess"),
+      harden: (path) => { writeFileSync(join(path, "raced-in"), "x"); return { status: "unavailable", reason: "PowerShell missing" }; },
+    }));
+    assert.equal(existsSync(join(leaf, "raced-in")), true, "content that appeared in the directory is never deleted");
+    assert.ok(message.includes("could not be removed"), message);
+    assert.ok(message.includes(REMEDY), message);
+  });
+});
+
+test("win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged", () => {
+  withTemp("hpd-rollback-throws-", (anchor) => {
+    const leaf = join(anchor, "agent-pipeline");
+    const boom = new Error("powershell crashed");
+    assert.throws(() => ensureHardenedPrivateDirectory(anchor, leaf, {
+      platform: "win32",
+      assess: unreachable("assess"),
+      harden: () => { throw boom; },
+    }), (error) => error === boom);
+    assert.equal(existsSync(leaf), false);
+  });
+});
+
+test("win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy", () => {
+  withTemp("hpd-existing-message-", (anchor) => {
+    const existing = join(anchor, "agent-pipeline");
+    mkdirSync(existing);
+    const message = refusalMessage(() => ensureHardenedPrivateDirectory(anchor, join(existing, "hook-state"), {
+      platform: "win32",
+      assess: () => ({ status: "insecure", reason: "foreign ACE" }),
+      harden: unreachable("harden"),
+    }));
+    assert.equal(existsSync(existing), true, "an existing directory is refused, never removed");
+    assert.ok(message.includes("agent-pipeline") && message.includes("insecure") && message.includes("foreign ACE"), message);
+    assert.ok(message.includes(REMEDY), message);
+    assert.equal(message.includes(anchor), false, "the message is anchor-relative and carries no host path");
+  });
+});
