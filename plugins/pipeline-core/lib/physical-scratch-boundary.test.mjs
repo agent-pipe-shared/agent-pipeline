@@ -10,7 +10,7 @@ function test(name, run) {
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, symlinkSync, linkSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, devNull } from 'node:os';
 import { isPhysicalScratchTarget as permits, isBoundedScratchOnlyWords } from './physical-scratch-boundary.mjs';
 
 function fixture(t, scratch = true) {
@@ -112,7 +112,7 @@ test('shell exception admits only exact parsed scratch writes', t => {
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 7) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -9,7 +9,7 @@ function test(name, run) {
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync,existsSync,readdirSync,statSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createProjectUninstallController,PROJECT_UNINSTALL_FAULT_STAGES} from './project-uninstall.mjs';
 import {createGovernanceScopeController} from './governance-scope.mjs';
@@ -93,7 +93,7 @@ test('re-enrollment contract retains historical scope identity and does not reti
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 7) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -8,7 +8,7 @@ import {
   chmodSync, closeSync, copyFileSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
   openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {observeOnboardingEnrollmentHistory} from "./onboarding-continuity.mjs";
@@ -10360,7 +10360,7 @@ if (DIRECT_INVOCATION) {
 
 if (ORCHESTRATING_SHARDS) {
   const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-    ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+    ? openSync(devNull, "w")
     : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
   const recorder = createTestCaseCompletionRecorder({
     caseIds: ONBOARDING_CASE_IDS, fd: completionFd,

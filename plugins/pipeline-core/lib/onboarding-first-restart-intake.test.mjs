@@ -20,6 +20,7 @@ import {persistRestartBarrier,readRestartBarrier,prepareRuntimeRestartBinding} f
 import {readOnboardingIntakeCheckpoint,readOnboardingIntakeMaterialInput} from './onboarding-continuity.mjs';
 import {main as onboardingCli} from '../scripts/project-onboarding-v3.mjs';
 import {sessionStartDecision} from '../hooks/codex-session-start-hint.mjs';
+import { devNull } from 'node:os';
 
 const prefix='Erster Auftrag: Größe, Straße und 🚀.\r\n\r\n'.repeat(120),tail='\r\n\r\n';
 const request=prefix+'Anforderung '.repeat(Math.floor((14110-Buffer.byteLength(prefix+tail))/12));
@@ -195,7 +196,7 @@ test('manual kickoff plan and direct apply cannot bypass missing first-restart m
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 7) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

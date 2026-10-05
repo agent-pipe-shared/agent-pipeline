@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { createHash } from "node:crypto";
 import { mkdtempSync, openSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { NATIVE_GOLDFISH_BRIEFING_SCHEMA, NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA, NATIVE_GOLDFISH_RETURN_SCHEMA,
   NATIVE_GOLDFISH_HOST_DIRECTIVE, observeClaudeGoldfishReturn, observeCodexGoldfishReturn, parseNativeGoldfishBriefing,
@@ -66,7 +66,7 @@ try {
 } finally { rmSync(temp, { recursive: true, force: true }); }
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases.map(([name, run]) => ({ id: name.slice(0, 6), name: name.slice(7), run })),
   fd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

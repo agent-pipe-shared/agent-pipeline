@@ -84,6 +84,7 @@ import {
   syncStateMdNextAction,
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 let activeScratchRoots = null;
@@ -5011,7 +5012,7 @@ check("first enrollment history reads stay empty and ignore foreign shared workt
 
 assert.equal(cases.length, 298, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

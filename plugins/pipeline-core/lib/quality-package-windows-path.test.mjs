@@ -4,9 +4,10 @@ import { win32 } from "node:path";
 import { openSync } from "node:fs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import * as signedQuality from "./signed-quality-package.mjs";
+import { devNull } from "node:os";
 
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: [{

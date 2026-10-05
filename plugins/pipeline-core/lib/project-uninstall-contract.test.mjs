@@ -12,6 +12,7 @@ import {join} from 'node:path';
 import {fixture} from './project-uninstall.fixture.mjs';
 import {validateUninstallContract} from './project-uninstall-contract.mjs';
 import {main} from '../scripts/project-uninstall.mjs';
+import { devNull } from 'node:os';
 test('closed uninstall schemas admit actual plans/journals and byte-identical mirrors; CLI rejects undeclared request fields',t=>{
  const f=fixture(t,{hooks:false}),plan=f.controller.plan({rootDir:f.root});assert.equal(validateUninstallContract('plan',plan),true);
  const request={schema:'pipeline.project-uninstall-request.v1',verb:'plan',rootDir:f.root,activate:false,planSha256:null};assert.equal(validateUninstallContract('request',request),true);assert.equal(validateUninstallContract('request',{...request,force:true}),false);
@@ -28,7 +29,7 @@ for(const change of ['unknown-journal','unknown-plan','unknown-hook','plan-diges
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 8) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

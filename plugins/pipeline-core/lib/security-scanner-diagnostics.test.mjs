@@ -4,7 +4,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
 import assert from "node:assert/strict";
 import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,lstatSync,chmodSync,symlinkSync,linkSync,renameSync,unlinkSync,rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -258,6 +258,6 @@ test('producer publication refusal preserves original evidence and verdict seman
 
 if(completionCases.length!==24)throw new Error("G13 completion topology drift");
 const completionFd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined
-  ? openCompletionDescriptor(process.platform==="win32"?"NUL":"/dev/null","w")
+  ? openCompletionDescriptor(devNull,"w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({cases:completionCases,fd:completionFd,maxBytes:65536});
