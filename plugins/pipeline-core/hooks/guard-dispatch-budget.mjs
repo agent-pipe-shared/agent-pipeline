@@ -79,8 +79,10 @@
  * authenticated child call this guard resolves that id from Claude's measured
  * child meta file, binds the cap into the agent-id counter, and consumes the
  * pending record. Later calls read only the bound counter. `maxTurns` is still
- * read live from the selected agent definition and must match the preflighted
- * tier; CLOSING_ALLOWANCE and SAFETY_MARGIN come from the shared policy core:
+ * read live from the selected agent definition of THIS guard's own plugin
+ * (`resolveAgentPluginRoot`; never the project root, so a consumer repository
+ * without `plugins/pipeline-core/` is enforced too) and must match the
+ * preflighted tier; CLOSING_ALLOWANCE and SAFETY_MARGIN come from the shared policy core:
  *
  *   workingCap = min(baseCalls,
  *                    max(0, maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN)))
@@ -154,6 +156,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { hostname, uptime } from "node:os";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -342,16 +345,46 @@ export function resolveGitCommonDir(rootDir, dependencies = {}) {
   }
 }
 
+// The plugin this guard itself ships in (hooks/ -> plugin root). Computed defensively: a
+// module-load throw here would take down every importer of the guard.
+const GUARD_PLUGIN_ROOT = (() => {
+  try { return fileURLToPath(new URL("..", import.meta.url)); }
+  catch { return null; }
+})();
+
 /**
- * Reads `maxTurns` live from `plugins/pipeline-core/agents/<name>.md`'s own
- * YAML frontmatter, where `<name>` is `agentType` with any `<host>:` prefix
- * stripped (e.g. `pipeline-core:goldfish-deep` -> `goldfish-deep`). Returns
- * null (never throws) when the agent definition cannot be found or its
- * `maxTurns` cannot be read as a positive integer.
+ * Where agent definitions are resolved from -- the ONE place the guard answers that question
+ * (the maxTurns read and the budget-contract lookup both call it, so they cannot disagree).
+ * Resolution order:
+ *   1. `dependencies.pluginRoot`: an explicitly injected plugin root (test seam) always wins.
+ *   2. A hermetic harness that injects its own filesystem (`existsSyncFn` / `readFileSyncFn`)
+ *      without a plugin root owns the layout of that fake filesystem, which lays definitions out
+ *      under the project root, so `<rootDir>/plugins/pipeline-core` is used there. The hook
+ *      entrypoint passes no options at all, so production never takes this rung.
+ *   3. The plugin this guard ships in (module-relative): the installed plugin that Claude
+ *      actually dispatches with. It exists in a consumer repository, which has no
+ *      `plugins/pipeline-core/` under its project root, and it cannot drift from the hook that
+ *      is enforcing the cap the way a checkout's copy of the definition can.
+ */
+export function resolveAgentPluginRoot(rootDir, dependencies = {}) {
+  const injected = dependencies?.pluginRoot;
+  if (typeof injected === "string" && injected !== "") return injected;
+  const injectedFilesystem = typeof dependencies?.existsSyncFn === "function" || typeof dependencies?.readFileSyncFn === "function";
+  if (injectedFilesystem && typeof rootDir === "string" && rootDir !== "") return join(rootDir, "plugins", "pipeline-core");
+  return GUARD_PLUGIN_ROOT;
+}
+
+/**
+ * Reads `maxTurns` live from `<plugin root>/agents/<name>.md`'s own YAML frontmatter (plugin
+ * root: `resolveAgentPluginRoot`), where `<name>` is `agentType` with any `<host>:` prefix
+ * stripped (e.g. `pipeline-core:goldfish-deep` -> `goldfish-deep`). Returns null (never throws)
+ * when the agent definition cannot be found or its `maxTurns` cannot be read as a positive
+ * integer.
  */
 export function resolveMaxTurns(agentType, rootDir, dependencies = {}) {
-  if (typeof rootDir !== "string" || rootDir === "") return null;
-  return readAgentMaxTurns(agentType, join(rootDir, "plugins", "pipeline-core"), {
+  const pluginRoot = resolveAgentPluginRoot(rootDir, dependencies);
+  if (typeof pluginRoot !== "string" || pluginRoot === "") return null;
+  return readAgentMaxTurns(agentType, pluginRoot, {
     existsSyncFn: dependencies.existsSyncFn,
     readFileSyncFn: dependencies.readFileSyncFn,
   });
@@ -367,7 +400,7 @@ export function resolveMaxTurns(agentType, rootDir, dependencies = {}) {
  */
 function budgetContractOptions(rootDir, options) {
   const contractOptions = {
-    pluginRoot: join(rootDir, "plugins", "pipeline-core"),
+    pluginRoot: resolveAgentPluginRoot(rootDir, options),
     existsSyncFn: options.existsSyncFn,
     readFileSyncFn: options.readFileSyncFn,
   };

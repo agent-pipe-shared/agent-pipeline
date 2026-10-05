@@ -10,15 +10,18 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
+import { persistPendingDispatchBudgetBindings, readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
+import { dispatchBudgetBinding, dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 import { applyGovernanceScopeDecision, planGovernanceScopeDecision } from "../lib/governance-scope.mjs";
 import {
+  DENIAL_CODE,
   MAX_GRANT_ENTRIES,
   appendGrant,
   decideDispatchBudgetCall,
@@ -34,17 +37,20 @@ const GRANT_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-budget-grant.mjs
 const roots = [];
 process.on("exit", () => { for (const root of roots) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } } });
 
-function activeRoot(prefix) {
+// A consumer-style repository: governance-enrolled, with NO plugins/pipeline-core of its own.
+function consumerRoot(prefix) {
   const root = mkdtempSync(join(tmpdir(), `budget-ckpt-${prefix}-`));
   roots.push(root);
   execFileSync("git", ["init", "--quiet"], { cwd: root });
   const plan = planGovernanceScopeDecision({ rootDir: root, decision: "enroll", by: "Dispatch budget checkpoint fixture" });
   assert.equal(applyGovernanceScopeDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
-  const agents = join(root, "plugins", "pipeline-core", "agents");
-  mkdirSync(agents, { recursive: true });
-  writeFileSync(join(agents, "goldfish-deep.md"), "---\nname: goldfish-deep\nmaxTurns: 80\n---\nbody\n");
-  writeFileSync(join(agents, "critic.md"), "---\nname: critic\nmaxTurns: 30\n---\nbody\n");
   return root;
+}
+
+// The guard resolves agent definitions from its own plugin, so these fixtures deliberately
+// carry none: a definition planted under the project root would be dead data.
+function activeRoot(prefix) {
+  return consumerRoot(prefix);
 }
 
 const budgetDir = (root) => join(root, ".git", "agent-pipeline", "dispatch-budget");
@@ -67,6 +73,93 @@ function callGuard(root, payload) {
 }
 
 const read = (root, agentId, agentType = GOLDFISH) => callGuard(root, subagentCall(root, agentId, agentType, "Read", { file_path: join(root, "x.txt") }));
+
+// ------------------------------------------- maxTurns single source, consumer repo
+// The guard resolves a dispatched agent's maxTurns from the definition in ITS OWN plugin
+// (module-relative), never from <project root>/plugins/pipeline-core -- a consumer repository
+// has no such directory, and a checkout's copy can differ from the installed plugin that Claude
+// actually dispatches with. The expected values are read from that plugin through the one reader.
+
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const DEEP_MAX_TURNS = readAgentMaxTurns("goldfish-deep", PLUGIN_ROOT);
+const CRITIC_MAX_TURNS = readAgentMaxTurns("critic", PLUGIN_ROOT);
+
+const RESOLVE_RUNNER_SOURCE = [
+  "const { guardUrl, agentType, rootDir, pluginRoot, files } = JSON.parse(process.env.RESOLVE_CASE);",
+  "const mod = await import(guardUrl);",
+  "const fs = new Map(Object.entries(files));",
+  "const fakeFs = { existsSyncFn: (p) => fs.has(p), readFileSyncFn: (p) => fs.get(p) };",
+  "console.log('RESULT: ' + JSON.stringify({",
+  "  injectedRoot: mod.resolveMaxTurns(agentType, rootDir, { pluginRoot }),",
+  "  moduleRelative: mod.resolveMaxTurns(agentType, rootDir),",
+  "  injectedFilesystem: mod.resolveMaxTurns(agentType, rootDir, fakeFs),",
+  "}));",
+].join("\n");
+
+test("consumer repo: no plugins/pipeline-core under the project root, and the guard still enforces the plugin's own tier", () => {
+  assert.ok(Number.isSafeInteger(DEEP_MAX_TURNS) && DEEP_MAX_TURNS > 0, "the plugin's own goldfish-deep definition resolves");
+  const root = consumerRoot("consumer");
+  assert.equal(existsSync(join(root, "plugins")), false);
+  seed(root, { agentId: "co1", agentType: GOLDFISH, maxTurns: DEEP_MAX_TURNS, baseCalls: 20, count: 20 });
+  const denied = read(root, "co1");
+  assert.equal(denied.status, 2, `an exhausted counter must deny, not fail open: ${denied.stderr}`);
+  assert.ok(denied.stderr.includes(DENIAL_CODE));
+  assert.equal(existsSync(join(budgetDir(root), "unresolved-observations")), false, "the call must not be recorded as max-turns-unresolved");
+});
+
+test("consumer repo, Critic first call: a project-root copy of the definition at another tier is never read; the plugin's own tier binds", () => {
+  const root = consumerRoot("critic-binding");
+  const decoyAgents = join(root, "plugins", "pipeline-core", "agents");
+  mkdirSync(decoyAgents, { recursive: true });
+  writeFileSync(join(decoyAgents, "critic.md"), `---\nname: critic\nmaxTurns: ${CRITIC_MAX_TURNS - 15}\n---\nbody\n`);
+  const binding = dispatchBudgetBinding({ subagentType: CRITIC, prompt: dispatchBudgetLineForRole(CRITIC), pluginRoot: PLUGIN_ROOT });
+  assert.equal(binding.status, "prepared");
+  assert.equal(binding.maxTurns, CRITIC_MAX_TURNS);
+  const toolUseId = "toolu-critic-consumer-1";
+  const persisted = persistPendingDispatchBudgetBindings({
+    commonDir: join(root, ".git"),
+    toolUseId,
+    bindings: [{ agentType: "critic", baseCalls: binding.baseCalls, maxTurns: binding.maxTurns, effectiveCap: binding.effectiveCap }],
+  });
+  assert.equal(persisted.status, "prepared");
+  const metaDir = join(root, "parent-session", "subagents");
+  mkdirSync(metaDir, { recursive: true });
+  writeFileSync(join(metaDir, "agent-crit1.meta.json"), JSON.stringify({ agentType: CRITIC, description: "x", toolUseId, spawnDepth: 1 }));
+  const first = read(root, "crit1", CRITIC);
+  assert.equal(first.status, 0, first.stderr);
+  assert.ok(!first.stderr.includes("budget-tier-max-turns-conflict"), first.stderr);
+  assert.ok(!first.stderr.includes("pending-binding-tier-conflict"), first.stderr);
+  const counter = JSON.parse(readFileSync(counterFile(root, "crit1"), "utf8"));
+  assert.equal(counter.maxTurns, CRITIC_MAX_TURNS);
+  assert.equal(counter.count, 1);
+});
+
+test("resolveMaxTurns: an injected plugin root wins; the default is the guard's own plugin, never the project root", () => {
+  const root = consumerRoot("resolve");
+  const altPlugin = join(root, "alt-plugin");
+  mkdirSync(join(altPlugin, "agents"), { recursive: true });
+  writeFileSync(join(altPlugin, "agents", "goldfish-deep.md"), "---\nname: goldfish-deep\nmaxTurns: 33\n---\nbody\n");
+  const harnessDefinition = join(root, "plugins", "pipeline-core", "agents", "goldfish-deep.md");
+  const runnerPath = join(root, "resolve-runner.mjs");
+  writeFileSync(runnerPath, RESOLVE_RUNNER_SOURCE);
+  const res = spawnSync(process.execPath, [runnerPath], {
+    encoding: "utf8", timeout: 60000, cwd: root,
+    env: {
+      ...process.env,
+      RESOLVE_CASE: JSON.stringify({
+        guardUrl: pathToFileURL(GUARD).href, agentType: GOLDFISH, rootDir: root, pluginRoot: altPlugin,
+        files: { [harnessDefinition]: "---\nname: goldfish-deep\nmaxTurns: 77\n---\nbody\n" },
+      }),
+    },
+  });
+  assert.equal(res.status, 0, res.stderr);
+  const line = String(res.stdout).split("\n").find((entry) => entry.startsWith("RESULT: "));
+  assert.ok(line, `runner printed no RESULT line: ${res.stdout} ${res.stderr}`);
+  const result = JSON.parse(line.slice("RESULT: ".length));
+  assert.equal(result.injectedRoot, 33, "an explicitly injected plugin root wins");
+  assert.equal(result.moduleRelative, DEEP_MAX_TURNS, "the default is the guard's own plugin, not <rootDir>/plugins/pipeline-core");
+  assert.equal(result.injectedFilesystem, 77, "a hermetic harness that injects its own filesystem keeps its project-root layout");
+});
 
 // ---------------------------------------------------------------- pure core
 
@@ -182,7 +275,7 @@ test("hook: the orchestrator is never given a notice or counted", () => {
 
 test("hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file", () => {
   const root = activeRoot("critic");
-  seed(root, { agentId: "cn", agentType: CRITIC, maxTurns: 30, baseCalls: 15, count: 11 });
+  seed(root, { agentId: "cn", agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 11 });
   const notice = read(root, "cn", CRITIC);
   assert.equal(notice.status, 0);
   const text = JSON.parse(notice.stdout).hookSpecificOutput.additionalContext;
@@ -196,10 +289,10 @@ test("hook: a Critic notice names critic-notes.md; the closing lane admits only 
     "scratch/dispatch/review-1/critic-notes.md",
   ];
   admitted.forEach((rel, index) => {
-    seed(root, { agentId: `ca${index}`, agentType: CRITIC, maxTurns: 30, baseCalls: 15, count: 15 });
+    seed(root, { agentId: `ca${index}`, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
     assert.equal(write(`ca${index}`, CRITIC, rel).status, 0, `admitted ${rel}`);
   });
-  seed(root, { agentId: "ca-edit", agentType: CRITIC, maxTurns: 30, baseCalls: 15, count: 15 });
+  seed(root, { agentId: "ca-edit", agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
   assert.equal(callGuard(root, subagentCall(root, "ca-edit", CRITIC, "Edit", { file_path: notes("ABS:scratch/dispatch/review-1/critic-notes.md"), old_string: "a", new_string: "b" })).status, 0);
   const refused = [
     "ABS:scratch/dispatch/review-1/notes.md",
@@ -213,7 +306,7 @@ test("hook: a Critic notice names critic-notes.md; the closing lane admits only 
     "../scratch/dispatch/review-1/critic-notes.md",
   ];
   refused.forEach((rel, index) => {
-    seed(root, { agentId: `cr${index}`, agentType: CRITIC, maxTurns: 30, baseCalls: 15, count: 15 });
+    seed(root, { agentId: `cr${index}`, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
     const result = write(`cr${index}`, CRITIC, rel);
     assert.equal(result.status, 2, `refused ${rel}`);
     assert.match(result.stderr, /DISPATCH-BUDGET-EXHAUSTED/u);

@@ -36,8 +36,8 @@ function modulePluginRoot() {
  * no second copy of the number can drift from the agent definition.
  *
  * `agentType` may carry a `<host>:` prefix (`pipeline-core:critic`) or be bare (`critic`).
- * `pluginRoot` defaults to the plugin this module ships in; a caller that resolves agent
- * definitions elsewhere (the guard resolves them under the project root) passes its own.
+ * `pluginRoot` defaults to the plugin this module ships in -- the same plugin the budget guard
+ * ships in and resolves from; only a test seam or a hermetic fake filesystem passes its own.
  * `dependencies.existsSyncFn` / `readFileSyncFn` are injectable for tests.
  * Returns a positive safe integer, or null (never throws) when the definition is missing,
  * has no frontmatter, or carries no well-formed `maxTurns:` line.
