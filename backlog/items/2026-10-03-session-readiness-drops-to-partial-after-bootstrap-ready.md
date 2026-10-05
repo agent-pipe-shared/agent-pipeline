@@ -59,3 +59,12 @@ read-only calls see one consistent readiness snapshot.
 Flapping readiness `partial` was seen again in the Alfred session. It is not
 caused by GUARD-READ-TARGET (the Explore lookup). Hypothesis: concurrent
 preflights rewrite authority state. Not measured. Instrument first, then fix.
+
+## Observed again 2026-10-05 (measured)
+
+2 of 60 sequential `project-onboarding-v3.mjs inspect --intent session` runs
+returned `partial` under 4-5 concurrent agents. Both carried
+`$.authority.sessionCleanup` / `cleanup_recovery_observation_unavailable`. The
+code path is the bare strict-mode `catch` in `lib/project-onboarding-v3.mjs`
+(about lines 1869-1886), which turns any observation failure into that code.
+A fix dispatch (FLAP) is in progress.
