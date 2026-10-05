@@ -5,7 +5,7 @@ import { openSync as openCompletionDescriptor } from "node:fs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
@@ -361,6 +361,6 @@ test("installed hook compares settings hooks against Git base and exact staged d
 
 if (completionCases.length !== 22) throw new Error("case completion count drift: expected 22, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
@@ -159,7 +159,7 @@ async function lateEvidenceDrift() {
 }
 
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

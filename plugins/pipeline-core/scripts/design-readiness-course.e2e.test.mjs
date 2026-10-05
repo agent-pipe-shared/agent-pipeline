@@ -10,6 +10,7 @@ import {createNativeInitialAdvisorExecution} from '../lib/native-initial-advisor
 import {designAdvisorValueSha256} from '../lib/design-advisor-course.mjs';
 import {loadRunnerProfilesV3Registry} from '../lib/runner-profiles-v3.mjs';
 import {createDesignWorkflowPackageApprovalRequest} from '../lib/design-workflow-approval.mjs';
+import { devNull } from 'node:os';
 
 const completionCases=[];
 function test(name,run){completionCases.push({id:'DREC001',name,run});}
@@ -55,7 +56,7 @@ test('each native runner has a terminal no-child Advisor route and cannot loop i
 });
 
 const completionFd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined
- ?openCompletionDescriptor(process.platform==='win32'?'NUL':'/dev/null','w')
+ ?openCompletionDescriptor(devNull,'w')
  :Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({cases:completionCases,fd:completionFd,
  maxBytes:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES??'65536')});

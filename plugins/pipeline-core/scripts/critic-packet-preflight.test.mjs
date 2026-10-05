@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -401,7 +401,7 @@ check("signed import anchor rejects candidate drift and canonical verifier denia
 
 assert.equal(cases.length, 12, "the complete candidate packet corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

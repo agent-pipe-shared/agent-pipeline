@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openSync } from "node:fs";
@@ -243,7 +243,7 @@ test("confirmed course reaches one unsigned final package through actual produce
 });
 
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 if (isDirectInvocation(import.meta.url)) {
   registerTestCaseCompletion({ cases: completionCases, fd: completionFd,

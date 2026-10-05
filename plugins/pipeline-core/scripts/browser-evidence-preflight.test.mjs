@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
@@ -99,7 +99,7 @@ test("static evidence does not launch the browser", () => {
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 7) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

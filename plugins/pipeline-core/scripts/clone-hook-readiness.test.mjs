@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { mkdtempSync, openSync as openCompletionDescriptor, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { applyMandatoryHookReadiness, inspectMandatoryHookReadiness } from "./clone-hook-readiness.mjs";
 import { applyMandatoryHookGate, assessMandatoryHookReadiness } from "./check-clone-provisioning.mjs";
@@ -74,6 +74,6 @@ test("non-repository roots never trigger Git initialization or hook writes", () 
 
 if (completionCases.length !== 1) throw new Error("case completion count drift: expected 1, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });

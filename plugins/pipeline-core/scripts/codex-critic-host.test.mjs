@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { arch, release, tmpdir, type } from "node:os";
+import { arch, release, tmpdir, type, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync, execFileSync } from "node:child_process";
 import { canonical, createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
@@ -79,7 +79,7 @@ const caseResults = Array.from({ length: EXPECTED_CASE_COUNT }, () => {
   return { promise, resolve: resolveCase, reject: rejectCase };
 });
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: caseResults.map((result, index) => ({

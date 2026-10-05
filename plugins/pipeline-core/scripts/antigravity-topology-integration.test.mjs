@@ -9,7 +9,7 @@ function test(name, run) {
 }
 import assert from 'node:assert/strict';
 import {mkdirSync,mkdtempSync,writeFileSync,readFileSync,cpSync,rmSync,existsSync,symlinkSync,utimesSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {refreshAntigravityInstallation} from '../install-agy.mjs';
@@ -85,7 +85,7 @@ test('bounded span rewriting preserves untouched escaped Unicode and rejects non
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 9) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

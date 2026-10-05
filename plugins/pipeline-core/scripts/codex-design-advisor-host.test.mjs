@@ -21,6 +21,7 @@ import {ADVISOR_FINALIZATION_FILENAME} from '../lib/codex-advisor-host-record.mj
 import {validateCodexAdvisorInitialAnswer} from '../lib/codex-advisor-request.mjs';
 import {canonicalJson} from '../lib/codex-sandbox-compatibility.mjs';
 import {inspectCodexInitialAdvisorMetadata,createNativeCodexDesignAdvisorExecution} from './codex-design-advisor-host.mjs';
+import { devNull } from 'node:os';
 
 const hash=value=>createHash('sha256').update(typeof value==='string'?value:canonical(value)).digest('hex');
 const taskRoute='duty.advisory',role='worker',effort='high',modelId='gpt-6-sol',familyId='sol';
@@ -109,7 +110,7 @@ test('active Advisor keeps its signed S4/S2 selection through metadata rechecks 
 });
 
 const completionFd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined
- ?openCompletionDescriptor(process.platform==='win32'?'NUL':'/dev/null','w')
+ ?openCompletionDescriptor(devNull,'w')
  :Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({cases:completionCases,fd:completionFd,
  maxBytes:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES??'65536')});

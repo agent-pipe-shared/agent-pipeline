@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { reportSha256, validateDispatchRecord } from "../lib/dispatch-record.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
@@ -432,7 +432,7 @@ check("Critic addendum writer refuses v3 in-progress and zero-commit sources", (
 
 assert.equal(cases.length, 19, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

@@ -26,6 +26,7 @@ import {createDesignWorkflowPackageApprovalRequest,validateDesignWorkflowPackage
 import {verifyPoApprovalProof} from '../lib/po-approval-proof.mjs';
 import {runHumanApproval} from './po-human-approval.mjs';
 import {parseYaml} from '../lib/yaml-lite.mjs';
+import { devNull } from 'node:os';
 const sha=b=>createHash('sha256').update(b).digest('hex'),bytes=v=>Buffer.from(canonicalJson(v));
 function yaml(v,indent='') {if(Array.isArray(v))return v.map(x=>x!==null&&typeof x==='object'?`${indent}-\n${yaml(x,indent+'  ')}`:`${indent}- ${JSON.stringify(x)}\n`).join('');return Object.entries(v).map(([k,x])=>x!==null&&typeof x==='object'?`${indent}${k}:\n${yaml(x,indent+'  ')}`:`${indent}${k}: ${JSON.stringify(x)}\n`).join('');}
 const fixtureRoot=process.env.PIPELINE_SIGNING_FIXTURE_ROOT ?? new URL("../../../../scratch/default-signing/",import.meta.url).pathname;
@@ -102,7 +103,7 @@ test('canonical equality cannot accept changed physical package or current repos
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 5) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

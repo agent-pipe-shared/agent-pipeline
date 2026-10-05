@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join, resolve } from "node:path";
 import { inspectDesignCourse } from "./design-course-coordinator.mjs";
 const completionCases = [];
@@ -42,6 +42,6 @@ test("course inspection exposes runner-specific readiness and preserves typed na
 
 if (completionCases.length !== 1) throw new Error("case completion count drift: expected 1, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });
