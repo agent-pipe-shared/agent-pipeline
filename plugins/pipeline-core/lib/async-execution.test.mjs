@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { appendAsyncJournal, createAsyncExecutionState, createAsyncJournalEntry, reconcileSyntheticAsyncExecution, reconcileSyntheticAsyncWithLease } from "./async-execution.mjs";
 import { createAssumptionSet, createCredentialLease } from "./credential-lease.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 const injectedFailure = process.env.PIPELINE_AEX_TEST_INJECT_FAILURE ?? "";
@@ -87,5 +88,5 @@ check("an early failed case still emits dispositions for the complete declared c
 });
 
 assert.equal(cases.length, 5, "the complete async execution corpus must be registered before execution begins");
-const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

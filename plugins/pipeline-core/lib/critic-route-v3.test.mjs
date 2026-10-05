@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from './runner-profiles-v3.mjs';
 import { resolveV3DutyRoute, resolveCriticHighRiskRoute } from './critic-route-v3.mjs';
 import { parseYaml } from './yaml-lite.mjs';
+import { devNull } from 'node:os';
 function yaml(value,indent=''){
   if(Array.isArray(value))return value.map(entry=>entry!==null&&typeof entry==='object'?`${indent}-\n${yaml(entry,indent+'  ')}`:`${indent}- ${JSON.stringify(entry)}\n`).join('');
   return Object.entries(value).map(([key,entry])=>entry!==null&&typeof entry==='object'?`${indent}${key}:\n${yaml(entry,indent+'  ')}`:`${indent}${key}: ${JSON.stringify(entry)}\n`).join('');
@@ -65,7 +66,7 @@ test('uncommitted edits cannot replace exact selected committed route authority'
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 6) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

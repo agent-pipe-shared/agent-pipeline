@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { admitCredentialLeaseUse, createAssumptionSet, createCredentialLease, evaluateLeaseAssumptions, revokeSyntheticCredentialLease, validateCredentialLease } from "./credential-lease.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const A = "a".repeat(64);
 const B = "b".repeat(64);
@@ -89,6 +90,6 @@ check("an early failed case still emits dispositions for the complete declared c
 
 assert.equal(cases.length, 5, "the complete credential lease corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

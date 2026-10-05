@@ -5,6 +5,7 @@ import { openSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { validateControl, lintCatalogContent, lintStandardMappingsAndClaims } from "./control-catalog-schema.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 const injectedFailure = process.env.PIPELINE_CCS_TEST_INJECT_FAILURE ?? "";
@@ -361,7 +362,7 @@ check("an early failed case still emits dispositions for the complete declared c
 
 assert.equal(cases.length, 33, "the complete control catalog schema corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 
 import { AGY_ERROR_TAXONOMY, AGY_MAX_OUTPUT_BYTES, createAgyStreamCollector, discoverAgyPath, invokeAgy, parseAgyOutput } from "./antigravity-execution-host.mjs";
@@ -275,7 +275,7 @@ for (const [id, suffix] of [["EPH23", "--oversized-stdout-test"], ["EPH24", "--o
 
 assert.equal(cases.length, 24, "the complete Antigravity execution host corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

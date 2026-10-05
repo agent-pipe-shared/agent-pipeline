@@ -6,7 +6,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { EventEmitter } from "node:events";
 import * as nativeFs from "node:fs";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -1277,7 +1277,7 @@ test("selected intake rejects an aliased physical root before creating state",()
 test("selected intake scope remains stable and creation never edits foreign scope bytes",()=>{const base=root();try{const a=join(base,'a'),b=join(base,'b'),common=join(base,'common');mkdirSync(a);mkdirSync(b);mkdirSync(common);const spawn=()=>({status:0,stdout:common+'\n'}),first=resolveOnboardingIntakeScope(a,'local',{spawn,create:true});writeFileSync(join(first.directory,'sentinel'),'foreign exact bytes');const before=treeSnapshot(first.directory);const selected=resolveOnboardingIntakeScope(b,'local',{spawn,create:true});assert.deepEqual(treeSnapshot(first.directory),before);assert.equal(resolveOnboardingIntakeScope(b,'local',{spawn}).scopeKey,selected.scopeKey);}finally{dispose(base);}});
 
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? nativeFs.openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? nativeFs.openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 assert.equal(cases.length, CASE_IDS_BY_NAME.size, "every declared runtime callback must register");
 registerTestCaseCompletion({ cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

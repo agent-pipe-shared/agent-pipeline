@@ -9,7 +9,7 @@ function test(name, run) {
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { canonical } from "./po-approval-proof.mjs";
 import { inspectArchitectureDecisionWaivers } from "./architecture-decision-waiver-store.mjs";
@@ -59,7 +59,7 @@ test("AC-19 waiver source requires exact PO proof, names the original and expire
 // Register each original sibling callback directly with the canonical recorder.
 if (completionCases.length !== 1) throw new Error("Required completion case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

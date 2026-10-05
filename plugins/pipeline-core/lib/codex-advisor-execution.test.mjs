@@ -21,6 +21,7 @@ import {advisorProposalSetSha256} from './codex-advisor-request.mjs';
 import {createDesignAdvisorCourseStore} from './design-advisor-course-store.mjs';
 import {designAdvisorValueSha256} from './design-advisor-course.mjs';
 import {loadRunnerProfilesV3Registry} from './runner-profiles-v3.mjs';
+import { devNull } from 'node:os';
 async function run(f){const prepared=await f.execution.prepareInitial(f.args);assert.equal(prepared.ok,true,prepared.code);const result=await f.execution.executeInitial(f.args,prepared.preparedRequest);return {result,prepared};}
 test('Advisor actual unknown managed output becomes fresh privately bound initial answer',async t=>{
  const f=advisorHostFixture(t);const gate=await f.execution.admitSourceMetadata({candidate:f.candidate,sources:f.sources,featureId:f.args.initialContext.featureId,profile:f.args.profile,reason:f.args.reason,dispatch:f.args.dispatch,route:f.route});assert.equal(gate.status,'admitted');assert.equal(isCodexAdvisorExecution(f.execution),true);assert.equal(isCodexAdvisorExecution({executeInitial(){}}),false);assert.deepEqual(getCodexAdvisorExecutionAdmission(f.execution),gate);
@@ -73,7 +74,7 @@ test('Durable single course finalizes actual managed failed turn without reset o
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 7) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

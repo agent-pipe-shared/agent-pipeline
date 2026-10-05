@@ -8,6 +8,7 @@ function test(name, run) {
   completionCases.push({ id: "ARS" + String(completionCases.length + 1).padStart(3, "0"), name, run });
 }
 import { createAdvisoryRouteSelection, validateAdvisoryRouteSelection } from "./advisory-route-selection.mjs";
+import { devNull } from "node:os";
 
 function fixture(status) {
   const receipt = {
@@ -44,7 +45,7 @@ test("an answer or child claim cannot be reclassified as route selection", () =>
 
 if (completionCases.length !== 2) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
