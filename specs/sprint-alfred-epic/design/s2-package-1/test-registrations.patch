@@ -11,7 +11,7 @@
 +  { name: "fanout-governor-tests", file: join(libDir, "fanout-governor.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 33 }, (_, index) => `FG${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 +  { name: "slice-queue-tests", file: join(libDir, "slice-queue.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 34 }, (_, index) => `SQ${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 +  { name: "slice-queue-cli-tests", file: join(pluginScriptsDir, "slice-queue.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 14 }, (_, index) => `SC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-+  { name: "stop-fanout-tests", file: join(hooksDir, "stop-fanout.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 15 }, (_, index) => `SF${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
++  { name: "stop-fanout-tests", file: join(hooksDir, "stop-fanout.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 20 }, (_, index) => `SF${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 +  { name: "guard-dispatch-fanout-tests", file: join(hooksDir, "guard-dispatch-fanout.test.mjs") },
 +  { name: "close-block-fanout-report-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "close-block", "close-block-fanout-report.test.mjs") },
    { name: "stop-suggest-tests", file: join(hooksDir, "stop-suggest.test.mjs") },

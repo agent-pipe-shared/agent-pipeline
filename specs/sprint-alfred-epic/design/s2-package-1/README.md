@@ -37,7 +37,7 @@ still required (MP-07). New suite names may also need `verify-phase:` surfaces i
 | `plugins/pipeline-core/lib/slice-queue.test.mjs` | `slice-queue-tests` (caseCompletion SQ01-SQ34) |
 | `plugins/pipeline-core/scripts/slice-queue.test.mjs` | `slice-queue-cli-tests` (caseCompletion SC01-SC14) |
 | `plugins/pipeline-core/lib/fanout-governor.test.mjs` | `fanout-governor-tests` (caseCompletion FG01-FG33) |
-| `plugins/pipeline-core/hooks/stop-fanout.test.mjs` | `stop-fanout-tests` (caseCompletion SF01-SF15) |
+| `plugins/pipeline-core/hooks/stop-fanout.test.mjs` | `stop-fanout-tests` (caseCompletion SF01-SF20) |
 | `plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs` | `guard-dispatch-fanout-tests` |
 | `plugins/pipeline-core/hooks/post-compact-reground.fanout.test.mjs` | `post-compact-reground-fanout-tests` |
 | `plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs` | `pipeline-start-preflight-session-intent-tests` |
