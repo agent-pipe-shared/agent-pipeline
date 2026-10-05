@@ -136,6 +136,8 @@ for (const [name, decline, stateName] of [
 // WINACLFIX-F (finding F2): a created segment that fails its assurance is taken back, and the
 // refusal says which directory, why, and what the owner must do.
 const REMEDY = "an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run";
+const REMEDY_UNAVAILABLE = "the Windows assurance could not be performed; the installer can be re-run once that is resolved";
+const REMEDY_INSECURE = "the new directory did not end private; the installer can be re-run after checking the inherited permissions of its parent";
 
 function refusalMessage(run) {
   try {
@@ -161,7 +163,10 @@ for (const status of ["unavailable", "insecure"]) {
       assert.equal(existsSync(parent), true, "an earlier created segment that hardened to secure stays");
       assert.ok(message.includes("agent-pipeline/hook-state"), message);
       assert.ok(message.includes(status) && message.includes("PowerShell missing"), message);
-      assert.ok(message.includes(REMEDY), message);
+      // WINACLFIX-G: nothing is left behind, so the owner remedy must not appear; the observed cause is named.
+      assert.equal(message.includes(REMEDY), false, message);
+      assert.equal(message.includes("must be removed or re-secured"), false, message);
+      assert.ok(message.includes(status === "unavailable" ? REMEDY_UNAVAILABLE : REMEDY_INSECURE), message);
       assert.equal(message.includes(anchor), false, "the message is anchor-relative and carries no host path");
 
       const assessed = [];
@@ -189,7 +194,8 @@ test("win32 removes only the failing created segment and never a pre-existing pa
     }));
     assert.equal(existsSync(leaf), false);
     assert.equal(existsSync(parent), true, "a directory that existed before the call is never removed");
-    assert.ok(message.includes(REMEDY), message);
+    assert.equal(message.includes(REMEDY), false, message);
+    assert.ok(message.includes(REMEDY_UNAVAILABLE), message);
   });
 });
 

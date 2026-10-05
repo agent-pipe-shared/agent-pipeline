@@ -21,7 +21,15 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { PrivateBoundaryError, assureWindowsPrivateDirectories } from "./private-boundary.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
-const ASSURANCE_REMEDY = "Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.";
+const OWNER_REMEDY = "Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.";
+const UNAVAILABLE_REMEDY = "Remedy: the Windows assurance could not be performed; the installer can be re-run once that is resolved.";
+const INSECURE_REMEDY = "Remedy: the new directory did not end private; the installer can be re-run after checking the inherited permissions of its parent.";
+
+/** Nothing is left behind after a created-and-removed segment, so the remedy names the observed cause. */
+function remedyFor(created, removed, status) {
+  if (!(created && removed)) return OWNER_REMEDY;
+  return status === "insecure" ? INSECURE_REMEDY : UNAVAILABLE_REMEDY;
+}
 
 function fail(code, message) {
   throw new PrivateBoundaryError(code, message);
@@ -64,7 +72,7 @@ function assureSegment(anchorPath, directory, created, { harden, assess, rmdir }
         ? "The directory was created by this call and has been removed again."
         : "The directory was created by this call but could not be removed again.";
     }
-    fail("PB-WINDOWS-ASSURANCE", `private-state directory Windows assurance is ${status} for ${name}: ${reason}. ${disposition}\n${ASSURANCE_REMEDY}`);
+    fail("PB-WINDOWS-ASSURANCE", `private-state directory Windows assurance is ${status} for ${name}: ${reason}. ${disposition}\n${remedyFor(created, removed, status)}`);
   }
 }
 
