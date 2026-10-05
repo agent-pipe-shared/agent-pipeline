@@ -330,6 +330,19 @@ function preflightAt(rootDir, installedVersion = "0.5.3+test") {
     read: () => PREFLIGHT_MANIFEST,
     cwd: rootDir,
     observe: readyObservation,
+    // Fixtures are fresh `git init` repos without the mandatory pre-commit/commit-msg hooks;
+    // without this seam the real check downgrades `ready` to `hook-provisioning-required`
+    // on any host whose global core.hooksPath does not happen to supply them. The downgrade
+    // itself stays covered by pipeline-start-preflight.test.mjs ("preflight gates mandatory
+    // local hooks and keeps pre-push advisory").
+    checkCloneProvisioningFn: () => ({
+      schema: "pipeline.clone-provisioning-report.v1",
+      status: "ready",
+      checks: [
+        { id: "pre-commit-hook", status: "current" },
+        { id: "commit-msg-hook", status: "current" },
+      ],
+    }),
   });
 }
 
