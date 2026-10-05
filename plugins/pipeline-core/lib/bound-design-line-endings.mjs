@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import { spawnSync } from "node:child_process";
 import { realpathSync, lstatSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
