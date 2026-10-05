@@ -7,7 +7,10 @@ import { constants as osConstants } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn as spawnChildProcess, spawnSync } from "node:child_process";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
-import { composeWindowsHideNodeOptions, resolveWindowsVerifyConcurrency } from "../lib/windows-hide-preload.mjs";
+// NOTE: this import is what installs the windowsHide wrapper in the Verify ROOT process too (the
+// module wraps child_process as a load-time side effect), because harness/scripts/verify.mjs
+// (TP-3, protected) imports this file. The guard test in verify-journal.test.mjs pins that edge.
+import { clampWindowsVerifyConcurrency, composeWindowsHideNodeOptions, resolveWindowsVerifyConcurrency } from "../lib/windows-hide-preload.mjs";
 import {
   VERIFY_PROGRESS_SCHEMA,
   digestJson,
@@ -717,17 +720,24 @@ function spawnAsync(command, argv, options = {}) {
 // machine-derived default would make the wall-clock evidence and the pool width incomparable
 // between them on a gate whose whole point is determinism (Advisor guidance, AGY-VERIFYTUNER-2).
 //
-// ALFRED-WINHIDE2: on native Windows the literal is replaced by a conservative cap (2) --
-// `resolveWindowsVerifyConcurrency` -- because eight parallel suites each spawning short-lived
-// children destabilised the host. The cap applies ONLY when nothing explicit is configured, so
-// the precedence is: argument > env var > calibration file > win32 cap > literal. Every other
-// platform keeps the literal unchanged. `platform` is injectable for tests.
+// ALFRED-WINHIDE2 / WINVERIFY: on native Windows the literal is replaced by a conservative default
+// (4) -- `resolveWindowsVerifyConcurrency` -- because eight parallel suites each spawning
+// short-lived children destabilised the host, and the result is clamped to a hard maximum of 5
+// (`clampWindowsVerifyConcurrency`) whatever its source. The default applies ONLY when nothing
+// explicit is configured, so the precedence is: argument > env var > calibration file > win32
+// default > literal, with the win32 hard maximum applied last to every one of them. Every other
+// platform keeps the literal unchanged and is never clamped. `platform` is injectable for tests.
+//
+// THE operator knob is the environment variable PIPELINE_VERIFY_CONCURRENCY (a positive integer),
+// e.g. PowerShell: `$env:PIPELINE_VERIFY_CONCURRENCY = "3"; node harness/scripts/verify.mjs ...`.
+// harness/scripts/verify.mjs has no argument for it (that file is TP-3 protected); the argument
+// above is for programmatic callers and tests.
 const DEFAULT_VERIFY_CONCURRENCY = 8;
 export function resolveDefaultConcurrency(repoRoot, environment, { platform = process.platform } = {}) {
   const envValue = environment?.PIPELINE_VERIFY_CONCURRENCY;
   if (typeof envValue === "string" && envValue.trim() !== "") {
     const parsed = Number(envValue);
-    if (Number.isSafeInteger(parsed) && parsed >= 1) return parsed;
+    if (Number.isSafeInteger(parsed) && parsed >= 1) return clampWindowsVerifyConcurrency(parsed, { platform });
   }
   try {
     // project/pipeline.json is this repo's own calibration file (not TP-protected, not owned by
@@ -736,7 +746,7 @@ export function resolveDefaultConcurrency(repoRoot, environment, { platform = pr
     // hardcoded literal below, exactly like a read failure would.
     const calibration = JSON.parse(readFileSync(join(repoRoot, "project", "pipeline.json"), "utf8"));
     const declared = calibration?.verifyConcurrency;
-    if (Number.isSafeInteger(declared) && declared >= 1) return declared;
+    if (Number.isSafeInteger(declared) && declared >= 1) return clampWindowsVerifyConcurrency(declared, { platform });
   } catch { /* no calibration override available -- fall through to the hardcoded default */ }
   // `undefined` = "leave the resolution alone" (non-win32, or an explicit env override that the
   // lines above already honoured). Only a win32 host with nothing configured reaches the cap.
@@ -1074,6 +1084,8 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 // `process.env`, overridable so a test never depends on ambient environment or leaks into it).
 export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, signal = null, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, reuseReceipts = true, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new TypeError("VERIFY-JOURNAL-CONCURRENCY");
+  // WINVERIFY: the win32 hard maximum also binds an explicit argument; recorded poolWidth is the effective one.
+  concurrency = clampWindowsVerifyConcurrency(concurrency);
   if (typeof reuseReceipts !== "boolean") throw new TypeError("VERIFY-JOURNAL-REUSE");
   const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations, environment });
   // ADR-0065 coupling (3): this digest no longer covers `suites: registrations`, so one suite's

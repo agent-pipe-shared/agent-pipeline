@@ -18,11 +18,15 @@ import { promisify } from "node:util";
 import {
   WINDOWS_HIDE_WRAPPED,
   WINDOWS_VERIFY_CONCURRENCY_CAP,
+  WINDOWS_VERIFY_CONCURRENCY_DEFAULT,
+  clampWindowsVerifyConcurrency,
+  withWindowsHideEnv,
   composeWindowsHideNodeOptions,
   installWindowsHide,
   resolveWindowsVerifyConcurrency,
   windowsHideImportOption,
 } from "../lib/windows-hide-preload.mjs";
+import { WINDOWS_HIDE_SCAN_ALLOWLIST, scanSource, scanTree, staticImportGraph, summarizeScan } from "../lib/windows-hide-scan.mjs";
 
 // The journal deliberately emits one bounded public progress line per state
 // transition in production.  Most cases below exercise storage, scheduling,
@@ -1535,11 +1539,12 @@ test("ALFRED-WINHIDE2: composeWindowsHideNodeOptions adds one gated --import ent
   }
 });
 
-test("ALFRED-WINHIDE2: resolveWindowsVerifyConcurrency caps win32 unless a valid override is given, and leaves other platforms alone", () => {
-  assert.equal(WINDOWS_VERIFY_CONCURRENCY_CAP, 2);
-  assert.equal(resolveWindowsVerifyConcurrency({}, WH_WIN), 2);
+test("ALFRED-WINHIDE2/WINVERIFY: resolveWindowsVerifyConcurrency defaults win32 to 4 (hard maximum 5) unless a valid override is given, and leaves other platforms alone", () => {
+  assert.equal(WINDOWS_VERIFY_CONCURRENCY_DEFAULT, 4);
+  assert.equal(WINDOWS_VERIFY_CONCURRENCY_CAP, 5);
+  assert.equal(resolveWindowsVerifyConcurrency({}, WH_WIN), 4);
   for (const override of ["1", "4", "8", " 6 ", "16"]) assert.equal(resolveWindowsVerifyConcurrency({ PIPELINE_VERIFY_CONCURRENCY: override }, WH_WIN), undefined, override);
-  for (const override of ["", "   ", "0", "-3", "abc", "2.5", "NaN", "Infinity"]) assert.equal(resolveWindowsVerifyConcurrency({ PIPELINE_VERIFY_CONCURRENCY: override }, WH_WIN), 2, override);
+  for (const override of ["", "   ", "0", "-3", "abc", "2.5", "NaN", "Infinity"]) assert.equal(resolveWindowsVerifyConcurrency({ PIPELINE_VERIFY_CONCURRENCY: override }, WH_WIN), 4, override);
   for (const platform of ["linux", "darwin", "freebsd"]) {
     assert.equal(resolveWindowsVerifyConcurrency({}, { platform }), undefined, platform);
     assert.equal(resolveWindowsVerifyConcurrency({ PIPELINE_VERIFY_CONCURRENCY: "6" }, { platform }), undefined, platform);
@@ -1563,22 +1568,28 @@ test("ALFRED-WINHIDE2: resolveSuiteChildEnvironment composes NODE_OPTIONS on win
   }
 });
 
-test("ALFRED-WINHIDE2: resolveDefaultConcurrency caps win32 at 2 unless env or calibration say otherwise; other platforms keep 8", () => {
+test("ALFRED-WINHIDE2/WINVERIFY: resolveDefaultConcurrency defaults win32 to 4 and clamps every source to 5; other platforms keep 8 and are never clamped", () => {
   const root = mkdtempSync(join(tmpdir(), "winhide-concurrency-"));
   try {
-    assert.equal(resolveDefaultConcurrency(root, {}, WH_WIN), 2);
-    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "abc" }, WH_WIN), 2, "an unusable override does not lift the cap");
-    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "6" }, WH_WIN), 6);
+    assert.equal(resolveDefaultConcurrency(root, {}, WH_WIN), 4);
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "abc" }, WH_WIN), 4, "an unusable override does not lift the default");
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "6" }, WH_WIN), 5, "an env value above the win32 maximum is clamped to it");
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "5" }, WH_WIN), 5);
     assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "1" }, WH_WIN), 1);
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "6" }, { platform: "linux" }), 6, "no clamp off win32");
     for (const platform of ["linux", "darwin", "freebsd"]) {
       assert.equal(resolveDefaultConcurrency(root, {}, { platform }), 8, platform);
       assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "3" }, { platform }), 3, platform);
     }
     mkdirSync(join(root, "project"), { recursive: true });
     writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ verifyConcurrency: 5 }), { mode: 0o600 });
-    assert.equal(resolveDefaultConcurrency(root, {}, WH_WIN), 5, "an explicit calibration value is configuration, so it beats the win32 cap");
-    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "7" }, WH_WIN), 7);
+    assert.equal(resolveDefaultConcurrency(root, {}, WH_WIN), 5, "an explicit calibration value is configuration, so it beats the win32 default");
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "7" }, WH_WIN), 5, "env beats calibration, then the hard maximum applies");
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "3" }, WH_WIN), 3);
     assert.equal(resolveDefaultConcurrency(root, {}, { platform: "linux" }), 5);
+    writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ verifyConcurrency: 9 }), { mode: 0o600 });
+    assert.equal(resolveDefaultConcurrency(root, {}, WH_WIN), 5, "a calibration value above the win32 maximum is clamped");
+    assert.equal(resolveDefaultConcurrency(root, {}, { platform: "linux" }), 9, "and left alone elsewhere");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -1599,9 +1610,9 @@ test("ALFRED-WINHIDE2: runVerifyJournal hands each suite child this host's NODE_
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("ALFRED-WINHIDE2: the default pool width is 2 on win32 and 8 elsewhere, and an explicit env override wins on every host", async () => {
-  for (const [override, expected] of [[undefined, WH_IS_WIN32 ? 2 : 4], ["3", 3]]) {
-    const f = twoSuiteFixture(["wh-a", "wh-b", "wh-c", "wh-d"]);
+test("ALFRED-WINHIDE2/WINVERIFY: the default pool width is 4 on win32 and 8 elsewhere (six suites), an env override wins, and win32 never exceeds 5", async () => {
+  for (const [override, expected] of [[undefined, WH_IS_WIN32 ? 4 : 6], ["3", 3], ["9", WH_IS_WIN32 ? 5 : 6]]) {
+    const f = twoSuiteFixture(["wh-a", "wh-b", "wh-c", "wh-d", "wh-e", "wh-f"]);
     let inFlight = 0;
     let maxInFlight = 0;
     const spawn = delayedSpawn({ delayMs: 30, onStart: () => { inFlight += 1; maxInFlight = Math.max(maxInFlight, inFlight); }, onSettle: () => { inFlight -= 1; } });
@@ -1655,6 +1666,114 @@ test("ALFRED-WINHIDE2: the only non-test spawn site in the verify spawner and in
     const block = source.slice(sites[0].index, source.indexOf("});", sites[0].index));
     assert.ok(block.includes("windowsHide: true"), `${file}: the spawn call passes windowsHide: true`);
   }
+});
+
+// ============================================================================================
+// WINVERIFY: (1) the wrapper keeps the preload reaching Node grandchildren whose `env` is built
+// by hand, (2) the win32 concurrency maximum, (3) the guard: a static scan over everything a full
+// Verify can reach that fails when a spawn the preload cannot cover appears. Fixture text below
+// is allowlisted for THIS file in windows-hide-scan.mjs on purpose.
+// ============================================================================================
+const WV_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const WV_HAS_SOURCE = (() => { try { readFileSync(join(WV_ROOT, "harness", "scripts", "verify.mjs")); return true; } catch { return false; } })();
+
+test("WINVERIFY: win32 extends an explicit env with the preload entry, folds key casing, and leaves an inherited or already-carrying env alone", () => {
+  const option = windowsHideImportOption();
+  const { target, calls } = whInstallOnFake();
+  const handBuilt = { PATH: "p" };
+  target.spawnSync("node", ["x.mjs"], { env: handBuilt });
+  target.spawn("node", { env: { Node_Options: "--no-warnings", X: "1" } });
+  const carrying = { PATH: "p", NODE_OPTIONS: option };
+  target.execFileSync("node", ["x.mjs"], { env: carrying });
+  target.spawnSync("node", ["x.mjs"], {});
+  const optedOut = { A: "1" };
+  target.fork("m.js", ["a"], { env: optedOut, windowsHide: false });
+  assert.deepEqual(calls[0].args[2], { env: { PATH: "p", NODE_OPTIONS: option }, windowsHide: true });
+  assert.deepEqual(handBuilt, { PATH: "p" }, "the caller's env object is never mutated");
+  assert.deepEqual(calls[1].args[1], { env: { X: "1", NODE_OPTIONS: `--no-warnings ${option}` }, windowsHide: true });
+  assert.equal(calls[2].args[2].env, carrying, "an env that already carries the entry is passed through as the same object");
+  assert.deepEqual(calls[3].args[2], { windowsHide: true }, "no explicit env: the child inherits, nothing is added");
+  assert.deepEqual(calls[4].args[2], { env: { A: "1", NODE_OPTIONS: option }, windowsHide: false }, "an explicit windowsHide: false is respected, the env is still extended");
+  assert.deepEqual(optedOut, { A: "1" });
+  assert.equal(withWindowsHideEnv(undefined), undefined);
+  assert.equal(withWindowsHideEnv(null), null);
+});
+
+test("WINVERIFY: a Node grandchild started with a hand-built env (no NODE_OPTIONS) still loads the preload, on win32 only", () => {
+  const probe = "process.stdout.write(String(require('node:child_process').spawnSync[Symbol.for('pipeline.windows-hide-preload.wrapped')] === true))";
+  const parent = [
+    "const cp = require('node:child_process');",
+    "const env = { PATH: process.env.PATH ?? '' };",
+    "if (process.env.SystemRoot) env.SystemRoot = process.env.SystemRoot;",
+    `process.stdout.write(cp.execFileSync(process.execPath, ['-e', ${JSON.stringify(probe)}], { env, encoding: 'utf8' }));`,
+  ].join("\n");
+  const env = { ...process.env, NODE_OPTIONS: composeWindowsHideNodeOptions(process.env.NODE_OPTIONS, WH_WIN) };
+  const result = spawnSync(process.execPath, ["-e", parent], { env, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, String(WH_IS_WIN32));
+});
+
+test("WINVERIFY: clampWindowsVerifyConcurrency applies the hard maximum of 5 on win32 only", () => {
+  for (const value of [1, 4, 5]) assert.equal(clampWindowsVerifyConcurrency(value, WH_WIN), value);
+  for (const value of [6, 8, 64]) assert.equal(clampWindowsVerifyConcurrency(value, WH_WIN), 5, String(value));
+  for (const value of [0, -1, 2.5, "x", undefined]) assert.equal(clampWindowsVerifyConcurrency(value, WH_WIN), value, "validation stays the caller's job");
+  for (const platform of ["linux", "darwin", "freebsd"]) for (const value of [1, 8, 64]) assert.equal(clampWindowsVerifyConcurrency(value, { platform }), value, `${platform}/${value}`);
+});
+
+test("WINVERIFY: an explicit concurrency above the win32 maximum runs at the maximum (seven suites)", async () => {
+  const f = twoSuiteFixture(["wv-a", "wv-b", "wv-c", "wv-d", "wv-e", "wv-f", "wv-g"]);
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const spawn = delayedSpawn({ delayMs: 30, onStart: () => { inFlight += 1; maxInFlight = Math.max(maxInFlight, inFlight); }, onSettle: () => { inFlight -= 1; } });
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-winverify-explicit-width", registerRun, spawn, concurrency: 9 });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(maxInFlight, WH_IS_WIN32 ? 5 : 7);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("WINVERIFY guard: the scanner classifies calls, follows import aliases and skips comments and RegExp.exec", () => {
+  const { sites, findings } = scanSource([
+    "import { spawn as run, execFileSync } from 'node:child_process';",
+    "// spawnSync('x')",
+    "run('a', [], { windowsHide: true });",
+    "execFileSync(process.execPath, ['x'], { env: { A: '1' } });",
+    "/re/.exec('x');",
+    "",
+  ].join("\n"), "unit.mjs");
+  assert.deepEqual(findings, []);
+  assert.deepEqual(sites.map((site) => [site.line, site.call, site.className, site.envEscape, site.nodeChild]), [[3, "run", "explicit-hide", false, false], [4, "execFileSync", "preload", true, true]]);
+});
+
+test("WINVERIFY guard: the scanner is RED on deliberately uncovered fixture spawns", () => {
+  const { sites, findings } = scanSource([
+    "import cp from 'node:child_process';",
+    "import { execa } from 'execa';",
+    "cp.spawnSync('git', ['status'], { windowsHide: false });",
+    "const child = new ChildProcess();",
+    "const binding = process.binding('spawn_sync');",
+    "const flags = ['--permission', '--allow-child-process'];",
+    "delete process.env.NODE_OPTIONS;",
+    "",
+  ].join("\n"), "fixture.mjs");
+  assert.deepEqual([...new Set(findings.map((finding) => finding.rule))].sort(), ["allow-child-process", "constructor", "foreign-spawner", "internal-binding", "node-options-mutation", "opt-out"]);
+  assert.equal(sites.find((site) => site.line === 3).className, "opt-out");
+});
+
+test("WINVERIFY guard: GREEN on the real tree -- no spawn the windowsHide preload cannot cover is reachable from a full Verify", { skip: !WV_HAS_SOURCE }, () => {
+  const scan = scanTree({ repoRoot: WV_ROOT });
+  const summary = summarizeScan(scan);
+  assert.ok(scan.files.length > 500 && summary.total > 500, `the scan must actually see the tree (${scan.files.length} files, ${summary.total} sites)`);
+  assert.deepEqual(scan.findings, [], "every finding is a spawn form the preload cannot reach: fix the call site or, if intentional, allowlist it with a reason");
+  const optOutSites = scan.sites.filter((site) => site.className === "opt-out" && !WINDOWS_HIDE_SCAN_ALLOWLIST.some((entry) => entry.file === site.file && entry.rule === "opt-out"));
+  assert.deepEqual(optOutSites, []);
+});
+
+test("WINVERIFY guard: the Verify ROOT process loads the windowsHide preload (verify.mjs -> verify-journal.mjs -> windows-hide-preload.mjs)", { skip: !WV_HAS_SOURCE }, () => {
+  const graph = staticImportGraph(join(WV_ROOT, "harness", "scripts", "verify.mjs"));
+  assert.ok(graph.has(join(WV_ROOT, "harness", "scripts", "verify.mjs")));
+  assert.ok(graph.has(join(WV_ROOT, "plugins", "pipeline-core", "scripts", "verify-journal.mjs")), "verify.mjs must keep importing the journal");
+  assert.ok(graph.has(join(WV_ROOT, "plugins", "pipeline-core", "lib", "windows-hide-preload.mjs")), "the journal must keep importing the preload: its load-time side effect is what hides the root process's own git calls");
 });
 
 // ALFRED-RF1: a Verify run that created its OWN session descriptor + private binding (the

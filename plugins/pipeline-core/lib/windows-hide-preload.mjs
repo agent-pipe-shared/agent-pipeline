@@ -38,8 +38,15 @@ export const WINDOWS_HIDE_WRAPPED = Symbol.for("pipeline.windows-hide-preload.wr
 /** Absolute `file:` URL of this module, as NODE_OPTIONS must name it. */
 export const WINDOWS_HIDE_PRELOAD_URL = import.meta.url;
 
-/** Suite parallelism on native Windows when no explicit PIPELINE_VERIFY_CONCURRENCY is given. */
-export const WINDOWS_VERIFY_CONCURRENCY_CAP = 2;
+/** Suite parallelism on native Windows when nothing (env var, calibration) configures it. */
+export const WINDOWS_VERIFY_CONCURRENCY_DEFAULT = 4;
+
+/**
+ * Hard maximum suite parallelism on native Windows (WINVERIFY, PO 2026-10-05): every resolution
+ * path -- env var, calibration file, an explicit argument -- is clamped to this on win32. Other
+ * platforms are never clamped.
+ */
+export const WINDOWS_VERIFY_CONCURRENCY_CAP = 5;
 
 // Where the options object sits, per signature: `args` = a middle argument array exists,
 // `callback` = a trailing callback is accepted.
@@ -58,8 +65,30 @@ function isOptionsObject(value) {
 }
 
 /**
- * Return the call arguments with `windowsHide: true` supplied when the options do not state it.
- * A shape this cannot classify is returned untouched so Node raises its own argument error.
+ * An explicit child environment that carries the preload entry (WINVERIFY). A caller that builds
+ * its child's `env` by hand (`{ PATH, HOME }`, `delete env.NODE_OPTIONS`, ...) silently drops the
+ * NODE_OPTIONS entry, so a Node grandchild started that way runs WITHOUT this module and every
+ * `git` it spawns opens a console window. Returns the very same object when `env` is not an
+ * explicit plain object (inherit -- the parent's own entry flows through) or already carries the
+ * entry; otherwise a copy whose NODE_OPTIONS keeps any existing value and gains the entry once.
+ * Windows environment names are case-insensitive, so a differently cased key is folded in.
+ */
+export function withWindowsHideEnv(env, { preloadUrl = WINDOWS_HIDE_PRELOAD_URL } = {}) {
+  if (!isOptionsObject(env)) return env;
+  const option = windowsHideImportOption(preloadUrl);
+  const keys = Object.keys(env).filter((key) => key.toUpperCase() === "NODE_OPTIONS");
+  const existing = keys.map((key) => env[key]).find((value) => typeof value === "string");
+  if (typeof existing === "string" && existing.includes(option)) return env;
+  const next = { ...env };
+  for (const key of keys) delete next[key];
+  next.NODE_OPTIONS = composeWindowsHideNodeOptions(existing, { platform: "win32", preloadUrl });
+  return next;
+}
+
+/**
+ * Return the call arguments with `windowsHide: true` supplied when the options do not state it,
+ * and an explicit `env` extended with the preload entry. A shape this cannot classify is returned
+ * untouched so Node raises its own argument error.
  */
 function withDefaultWindowsHide(callArgs, shape) {
   if (callArgs.length < 1) return callArgs;
@@ -71,7 +100,11 @@ function withDefaultWindowsHide(callArgs, shape) {
   const options = rest[optionsIndex];
   let nextOptions;
   if (options === undefined) nextOptions = { windowsHide: true };
-  else if (isOptionsObject(options)) nextOptions = options.windowsHide === undefined ? { ...options, windowsHide: true } : options;
+  else if (isOptionsObject(options)) {
+    nextOptions = options.windowsHide === undefined ? { ...options, windowsHide: true } : options;
+    const env = withWindowsHideEnv(nextOptions.env);
+    if (env !== nextOptions.env) nextOptions = { ...nextOptions, env };
+  }
   else return callArgs;
   const rebuilt = [first];
   if (hasArgsSlot) rebuilt.push(rest[0]);
@@ -154,18 +187,29 @@ export function composeWindowsHideNodeOptions(existing, { platform = process.pla
 }
 
 /**
- * Suite parallelism cap for native Windows: the cap when no valid PIPELINE_VERIFY_CONCURRENCY is
- * set (same validity rule as the Verify journal's own resolution), `undefined` ("leave the
- * resolution alone") on every other platform or when an explicit override is present.
+ * Default suite parallelism for native Windows: the default (4) when no valid
+ * PIPELINE_VERIFY_CONCURRENCY is set (same validity rule as the Verify journal's own resolution),
+ * `undefined` ("leave the resolution alone") on every other platform or when an explicit
+ * override is present.
  */
-export function resolveWindowsVerifyConcurrency(env = process.env, { platform = process.platform, cap = WINDOWS_VERIFY_CONCURRENCY_CAP } = {}) {
+export function resolveWindowsVerifyConcurrency(env = process.env, { platform = process.platform, fallback = WINDOWS_VERIFY_CONCURRENCY_DEFAULT } = {}) {
   if (platform !== "win32") return undefined;
   const raw = env?.PIPELINE_VERIFY_CONCURRENCY;
   if (typeof raw === "string" && raw.trim() !== "") {
     const parsed = Number(raw);
     if (Number.isSafeInteger(parsed) && parsed >= 1) return undefined;
   }
-  return cap;
+  return fallback;
+}
+
+/**
+ * The hard maximum: on win32 a positive integer above WINDOWS_VERIFY_CONCURRENCY_CAP becomes the
+ * cap, whatever its source. Every other platform, and any non-positive-integer value (the caller's
+ * own validation rejects those), is returned unchanged.
+ */
+export function clampWindowsVerifyConcurrency(value, { platform = process.platform } = {}) {
+  if (platform !== "win32" || !Number.isSafeInteger(value)) return value;
+  return Math.min(value, WINDOWS_VERIFY_CONCURRENCY_CAP);
 }
 
 installWindowsHide();
