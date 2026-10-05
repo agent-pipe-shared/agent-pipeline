@@ -12,6 +12,10 @@ done_when: manual
 
 # On native Windows every Pipeline subagent tool call is refused by the dispatch-budget lock
 
+## Observed again 2026-10-05
+
+Defect 5 of the ALFRED-BACKLOG-20261005 set: when a dispatched agent issues parallel tool calls, the budget-counter lock collides and the refusal tells the agent to "repair through the trusted host path", although a plain retry of the same call succeeds. Impact: the misleading message sends agents hunting for a repair route that does not exist and each refused attempt spends budget. Fix direction: distinguish a transient lock collision from a genuine counter fault and say "retry this call once" (or retry inside the guard with a short bounded back-off) before surfacing a refusal.
+
 ## Description
 
 A `pipeline-core:goldfish-deep` dispatch from a Claude Code session on native

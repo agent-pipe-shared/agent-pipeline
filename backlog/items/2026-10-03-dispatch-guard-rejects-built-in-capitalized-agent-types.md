@@ -12,6 +12,10 @@ done_when: manual
 
 # Dispatch guard rejects built-in agent types `Explore`/`Plan` with a misleading Advisor message
 
+## Observed again 2026-10-05
+
+Defect 8 of the ALFRED-BACKLOG-20261005 set, reproduced live: two read-only `Explore` dispatches were refused with `APB-DISPATCH-INVALID` ("the Advisor prohibition cannot be assigned to one exact child before launch"), with and without the prohibition sentence in the prompt. Cause: `advisor-prohibition-binding.mjs` `normalizedRole()` accepts only a lowercase grammar, so capitalised built-in names map to `null` and the rejection fires before the prompt is checked for a prohibition at all. Fix direction: (1) reject an unbindable role only when the prompt actually carries the prohibition, otherwise `not-applicable`; (2) accept the host's built-in type names with case-preserving identity. Regression test with the exact live tool_input shapes (`subagent_type: "Explore"`, with and without the prohibition token). Check whether the hook file sits in the protected baseline; if so, ship as a signed package.
+
 ## Description
 
 Every `Agent` call with `subagent_type: "Explore"` is refused with

@@ -12,6 +12,10 @@ done_when: manual
 
 # The signed quality package route is not agent-operable on native Windows
 
+## Observed again 2026-10-05
+
+Defect 12 of the ALFRED-BACKLOG-20261005 set: `sign-intent` for a signed quality package takes more than 5 minutes before the passphrase prompt appears, and its confirmation text labels the package as an HGO guard-override (`HGO-RECORD-DIGEST-MISMATCH`), so the signer cannot tell which artifact they are authorizing. Impact: the PO's signing step is slow and the mislabel undermines informed consent. Fix direction: measure and remove the pre-prompt latency (suspected repeated per-path Windows DACL observation spawns), keep the output short, and label the package by its real kind and digest; target is one signature per candidate with everything else agent-executed.
+
 ## Description
 
 The first real use of the signed quality package route (the pilot with the

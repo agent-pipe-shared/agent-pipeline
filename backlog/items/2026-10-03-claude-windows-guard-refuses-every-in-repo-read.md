@@ -12,6 +12,16 @@ done_when: manual
 
 # Claude on Windows: the lifecycle guard refuses every in-repository read
 
+## Observed again 2026-10-05
+
+Root cause of the read false positives established during the 2026-10-05 session (backlog defect 2 of the ALFRED-BACKLOG-20261005 set): `GUARD-READ-SCOPE-OUTSIDE-ROOT` is emitted for EVERY unsupported read-family command, not only for targets outside the project root. Observed live, in Elephant, Goldfish and Critic sessions alike:
+
+- `rg`/`tail` reads whose targets are inside the root are refused with that code (relative and absolute spellings); rg flags missing from the grammar (`--no-heading`, `-m N`, repeated `-g`) and Windows quoted drive paths mangled by the parser are the real causes.
+- The Grep and Glob tools with a directory target are refused with `GUARD-READ-TARGET` ("use an exact passive path ...").
+- A Read of a not-yet-existing file is refused with the same mislabelled `GUARD-READ-TARGET`; there is no distinct missing-target code.
+
+Reproduction shape: run `rg -n needle <in-root directory>` through Bash, or Grep/Glob with a directory path, in a ready session on native Windows. Impact: refusals consume the dispatch tool budget, so Critics and Goldfish go partial. Fix direction (prepared as signed quality package 4 for the protected `guard-lifecycle-ready`): a distinct unsupported-command code instead of OUTSIDE-ROOT, in-root Glob/Grep lanes, a win32 quoted-path rewrite, a `READ-TARGET-MISSING` code; the unprotected `guard-command-grammar.mjs` gets the missing rg flags by ordinary commit. Verification item: re-run the live shapes above after install.
+
 ## Description
 
 In a Claude Code session on Windows whose working directory is the repository
