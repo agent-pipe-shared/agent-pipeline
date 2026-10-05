@@ -8628,6 +8628,10 @@ test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, an
   const values = {
     "--text": "one captured PO message",
     "--text-file": "scratch/design-input.md",
+    "--text-turn-ref": JSON.stringify({
+      schema: "pipeline.claude-intake-prompt-reference.v1", captureId: "c".repeat(48), sessionId: "cli-session-test",
+      transcriptPathSha256: "b".repeat(64), promptSha256: "d".repeat(64), byteLength: 42,
+    }),
     "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
     "--plan-sha256": "a".repeat(64),
     "--proof": "scratch/bootstrap-plan-acknowledgement-proof-test.json",
@@ -8655,6 +8659,17 @@ test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, an
         for (const other of oneOf) if (other !== oneOf[0]) delete single[other];
         const both = [...automatedMutatingApplyArgv(name, path, single), oneOf[1], values[oneOf[1]]];
         assert.equal(admits(both), false, `${name}: two one-of alternatives were admitted together`);
+        // Every pair of alternatives together (covers the three-way group), each refused.
+        for (let i = 0; i < oneOf.length; i += 1) {
+          for (let j = i + 1; j < oneOf.length; j += 1) {
+            // The builder itself refuses two alternatives, so build with one and append the other.
+            const baseSupplied = { ...values };
+            for (const other of oneOf) if (other !== oneOf[i]) delete baseSupplied[other];
+            const pair = [...automatedMutatingApplyArgv(name, path, baseSupplied), oneOf[j], values[oneOf[j]]];
+            assert.equal(admits(pair), false,
+              `${name}: ${oneOf[i]} and ${oneOf[j]} were admitted together`);
+          }
+        }
         const neither = automatedMutatingApplyArgv(name, path, single)
           .filter((token, index, argv) => token !== oneOf[0] && argv[index - 1] !== oneOf[0]);
         assert.equal(admits(neither), false, `${name}: admitted with no one-of alternative at all`);
