@@ -11,7 +11,20 @@ const decode=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
 const fail=code=>({ok:false,code});
 function safePath(p){return typeof p==='string'&&/^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$/u.test(p)&&p.split('/').every(s=>s!==''&&!s.startsWith('.')&&!['scratch','node_modules'].includes(s));}
 function identity(a,b){return a.dev===b.dev&&a.ino===b.ino&&a.mode===b.mode&&a.nlink===b.nlink&&a.size===b.size&&a.mtimeNs===b.mtimeNs;}
-export function readAdvisorPhysicalBytes(repoRoot,path,maxBytes=262144){
+// FLAP3: a sibling create/delete in an ancestor directory (e.g. another agent's evidence/dispatch-record-*.json)
+// changes that ancestor's mtime/size/nlink between the walk and the re-check. That is the one confirmed
+// benign cause of DAP-PHYSICAL-PARENT-DRIFT, so only it is re-observed: a fresh full walk, 3 attempts,
+// 50 then 100 ms. Every other error, and exhaustion, re-throws unchanged (fail-closed).
+const PARENT_DRIFT_RETRY_DELAYS_MS=Object.freeze([50,100]);
+function sleepSync(ms){Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);}
+export function reobserveAdvisorPhysicalDrift(read,{delaysMs=PARENT_DRIFT_RETRY_DELAYS_MS,sleep=sleepSync}={}){
+ for(let attempt=0;;attempt++){
+  try{return read();}
+  catch(error){if(error?.message!=='DAP-PHYSICAL-PARENT-DRIFT'||attempt>=delaysMs.length)throw error;sleep(delaysMs[attempt]);}
+ }
+}
+export function readAdvisorPhysicalBytes(repoRoot,path,maxBytes=262144){return reobserveAdvisorPhysicalDrift(()=>readAdvisorPhysicalBytesOnce(repoRoot,path,maxBytes));}
+function readAdvisorPhysicalBytesOnce(repoRoot,path,maxBytes){
  if(!safePath(path)||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>1048576)throw Error('DAP-PHYSICAL-INPUT');
  const root=resolve(repoRoot),parents=[];let cursor=root,fd;
  try{
