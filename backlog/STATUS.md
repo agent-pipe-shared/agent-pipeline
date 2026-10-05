@@ -191,6 +191,7 @@
 | pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | — | 2026-08-10 | — | — |
 | pipeline.complete-adr-governs-coverage-before-reader-review-binding | closed | requirement | pipeline | nova-b | 2026-09-07 | — | — |
+| pipeline.completion-fd-suites-cannot-run-as-single-files | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | closed | defect | pipeline | nova-b | 2026-09-01 | 2026-09-30 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | — | 2026-08-18 | — | — |
@@ -832,7 +833,7 @@
 
 ## Counts
 
-- open: 167
+- open: 168
 - in_progress: 0
 - closed: 643
 - rejected: 3

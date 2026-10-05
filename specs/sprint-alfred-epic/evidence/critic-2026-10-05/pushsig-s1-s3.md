@@ -52,6 +52,24 @@ this file is its durable record.
 - **Not reached:** `guardrails/git.md`, `guardrails/security.md`, `docs/push-release-flow.md`, `CLAUDE.md` hard rules,
   ADR-0063. Follow-up Critic dispatched with exactly that scope.
 
+## Review 4 — `f332d36aa`, `29629211c`, `016417c9a` (guardrails, `parsePushBinding`, C13c, C14)
+
+- **Partial review; verdict withheld** (hook cap at 20/24).
+- **F1 (minor):** `29629211c` (S2) adds `specs/sprint-alfred-epic/design/pushsig-s5-guard-push-test.patch`, which the
+  design assigns to slice S5 (§4, §8); row 9 (registration of the two new suites) is in none of the commits.
+  Disposition: accepted as a documented slicing deviation (the patch is the reviewed S5 artifact for the signed
+  package); row 9 joins `../../design/s2-package-1/test-registrations.patch` before the package is built.
+- Cleared: S1/S2 spec fidelity incl. SEC-01; `parsePushBinding` admits only `git [-C <path>] push` and the F1 fix
+  compares exactly the bound directory with `evidenceProjectDir` by native real path, fault → strict; C14 runs the real
+  writer under `dir` (the only home-directory default, the external push ledger, is off without user config); C13c
+  asserts what it names; GIT-01/02/03, SEC-01/04/10, QG-06, ADR-0011.
+- Open hypothesis (not a finding): if Git already resolves the junction alias in `rev-parse`/`worktree list`, C13c would
+  not catch a realpath → string-equality mutation.
+- Trajectory: `016417c9a` consistent; S1/S2 claims not verifiable (no artifacts); the TP-5 guard-push regression with
+  the staged patch has not run (it runs in the signed package ceremony).
+- Not reached: ADR-0063 placement of the patch, `docs/push-release-flow.md` checkpoint section (slice S6, blocked by
+  PO Q3), own read of `CLAUDE.md`, where `pushGate` is read from.
+
 ## Process observations
 
 - Both Critics spent budget on guard refusals (Glob `GUARD-READ-TARGET`, `rg` spellings). Critic notes are not

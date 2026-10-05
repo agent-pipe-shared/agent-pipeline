@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "71b76c9d4977b35f70c42560548e28f065570b4f5d777ae1dc9ba6a706bb98ad"
+    "transitionHead": "48e60516f13d5924d87ef75569df9d78b57c2e8f877adcda5e4b09c78d514d4c"
   },
   "counts": {
-    "open": 167,
+    "open": 168,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -2424,6 +2424,16 @@
       "closureRepository": "self",
       "closureCommit": "62dddced0df1cfe46b6e72239e46bf7d3ba72cde",
       "closureEvidence": "backlog/evidence/2026-09-11-adr-governs-coverage-closure.md"
+    },
+    {
+      "id": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed live during the Alfred night run, 2026-10-05/06 (FANOUT-S9 regression check, S2-72 adapter suites).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches",
