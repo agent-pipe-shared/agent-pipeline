@@ -132,7 +132,7 @@
  * to `applyInstall`.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, chmodSync, rmdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync, rmdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -140,6 +140,7 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+import { ensureHardenedPrivateDirectory } from "../lib/hardened-private-directory.mjs";
 function decorateInstalledImpl(content, pluginLibDir, deadline) {
   const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/pre-commit-hook\/runtime-([a-f0-9]{64}))\/lib$/);
   if (!matched) return content;
@@ -908,7 +909,7 @@ export function applyDecline({ rootDir } = {}) {
     schema: DECLINE_MARKER_SCHEMA,
     declinedAt: new Date().toISOString(),
   };
-  mkdirSync(join(commonDir, "agent-pipeline", "pre-commit-hook"), { recursive: true, mode: 0o700 });
+  ensureHardenedPrivateDirectory(commonDir, join(commonDir, "agent-pipeline", "pre-commit-hook"));
   writeFileSync(declineMarkerPath(commonDir), `${JSON.stringify(marker, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   return { status: "declined", declinedAt: marker.declinedAt };
 }
@@ -922,7 +923,7 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, p
 
   const { hookPath, commonDir } = plan;
   const snapshotState = join(commonDir, "agent-pipeline", "pre-commit-hook");
-  mkdirSync(snapshotState, { recursive: true, mode: 0o700 });
+  ensureHardenedPrivateDirectory(commonDir, snapshotState);
   const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState, onProgress, timeBudgetMs });
   pluginLibDir = join(runtimeSnapshot.root, "lib");
   pluginHooksDir = join(runtimeSnapshot.root, "hooks");
@@ -931,7 +932,7 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, p
   const implContent = decorateInstalledImpl(renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir }), pluginLibDir, runtimeSnapshot.deadline);
   const shimContent = renderShim(impl);
 
-  mkdirSync(join(commonDir, "agent-pipeline", "pre-commit-hook"), { recursive: true, mode: 0o700 });
+  ensureHardenedPrivateDirectory(commonDir, snapshotState);
   writeFileSync(impl, implContent, { encoding: "utf8", mode: 0o600 });
   writeFileSync(hookPath, shimContent, { encoding: "utf8", mode: 0o700 });
   chmodSync(hookPath, 0o755);

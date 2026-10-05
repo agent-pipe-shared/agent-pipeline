@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+import { ensureHardenedPrivateDirectory } from "../lib/hardened-private-directory.mjs";
 function decorateInstalledImpl(content, pluginLibDir, deadline) {
   const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/commit-msg-hook\/runtime-([a-f0-9]{64}))\/lib$/);
   if (!matched) return content;
@@ -415,6 +416,7 @@ export function applyDecline({ rootDir } = {}) {
   const plan = planDecline({ rootDir });
   if (plan.status !== "ready") return plan;
   const marker = { schema: DECLINE_MARKER_SCHEMA, declinedAt: new Date().toISOString() };
+  ensureHardenedPrivateDirectory(plan.commonDir, stateDir(plan.commonDir));
   atomicWrite(declineMarkerPath(plan.commonDir), `${JSON.stringify(marker, null, 2)}\n`, 0o600);
   return { status: "declined", declinedAt: marker.declinedAt };
 }
@@ -443,7 +445,7 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, o
   }
   const impl = implPath(plan.commonDir);
   const snapshotState = join(plan.commonDir, "agent-pipeline", "commit-msg-hook");
-  mkdirSync(snapshotState, { recursive: true, mode: 0o700 });
+  ensureHardenedPrivateDirectory(plan.commonDir, snapshotState);
   const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState, onProgress, timeBudgetMs });
   pluginLibDir = join(runtimeSnapshot.root, "lib");
   const shimContent = renderShim(impl);
