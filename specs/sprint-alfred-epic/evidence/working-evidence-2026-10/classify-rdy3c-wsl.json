@@ -1,0 +1,17 @@
+{
+ "label": "rdy3c-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": true,
+   "seconds": 1800,
+   "pass": null,
+   "fail": null,
+   "failedCases": [],
+   "firstError": "✔ AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking (90.884023ms)"
+  }
+ ]
+}

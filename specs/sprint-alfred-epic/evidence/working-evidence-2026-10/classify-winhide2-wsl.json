@@ -1,0 +1,30 @@
+{
+ "label": "winhide2-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 25,
+   "pass": "ℹ pass 82",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner (2365.472401ms)"
+   ],
+   "firstError": "✔ AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking (89.454079ms)"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 420,
+   "pass": "ℹ pass 33",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  }
+ ]
+}

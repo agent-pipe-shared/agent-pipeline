@@ -1,0 +1,45 @@
+{
+ "label": "base2",
+ "cwdRel": "scratch/perf/base",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 724,
+   "pass": "ℹ pass 19",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (0.841ms)",
+    "✖ CMI018 generated hook fails closed when Git's message file is unreadable (34695.6432ms)",
+    "✖ CMI021 installed hook permits first permissions settings but rejects new hook authority (31566.6003ms)"
+   ],
+   "firstError": "Error: ENOENT: no such file or directory, mkdtemp '<path> path ' $(touch${IFS}SHIM_SENTINEL) `touch${IFS}BACKTICK_SENTINEL` $SHIM_EXPANSION line"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 699,
+   "pass": "ℹ pass 24",
+   "fail": "ℹ fail 12",
+   "failedCases": [
+    "✖ onboarding pre-push offer executes from a consumer repository with an absolute installer path (31998.8751ms)",
+    "✖ installed hook: no manifest at all -> allow (opt-in feature, not a 'cannot evaluate' case) (33101.8221ms)",
+    "✖ installed hook: push gate mode off -> allow (33764.2887ms)",
+    "✖ installed hook: manifest present but unparseable -> BLOCK (fail-closed, diverges from guard-push.mjs's WARN) (32915.8404ms)",
+    "✖ installed hook: verify evidence missing -> BLOCK (32929.2737ms)",
+    "✖ installed hook: push approval state missing (approval required, not standing-approved) -> BLOCK (32765.0025ms)",
+    "✖ installed hook: fresh verify evidence + standing-approved -> ALLOW, record written (32874.8303ms)",
+    "✖ installed hook: linked worktree reads fresh canonical evidence (32938.4457ms)",
+    "✖ installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (33080.6849ms)",
+    "✖ installed hook: fresh verify evidence + recorded approval (general mode) -> ALLOW (33387.4437ms)",
+    "✖ installed hook: ref deletion is blocked without evidence evaluation, and recorded (33038.7736ms)",
+    "✖ planInstall: a decline marker never suppresses an already-installed hook (33711.8999ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: [pipeline-core] hook snapshot copy 128/894"
+  }
+ ]
+}

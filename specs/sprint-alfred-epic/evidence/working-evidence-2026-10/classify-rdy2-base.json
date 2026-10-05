@@ -1,0 +1,72 @@
+{
+ "label": "rdy2-base",
+ "cwdRel": "scratch/rdy/base",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+   "exit": null,
+   "signal": "SIGTERM",
+   "timedOut": true,
+   "seconds": 270,
+   "pass": null,
+   "fail": null,
+   "failedCases": [
+    "✖ private journal writes bounded JSON progress and keeps complete logs off the channel (6846.7065ms)",
+    "✖ permissive or symlinked prior run parents are ignored, never traversed (7420.2972ms)"
+   ],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+   "exit": null,
+   "signal": "SIGTERM",
+   "timedOut": true,
+   "seconds": 270,
+   "pass": null,
+   "fail": null,
+   "failedCases": [
+    "✖ candidate Verify carries a consumed Critic only over exact registered evidence commits (99558.2551ms)",
+    "✖ an explicit event output emits exactly one aggregate candidate-bound action after passing source readback (24266.7503ms)",
+    "✖ an explicit event output maps terminal Verify failure without creating success evidence (24182.7352ms)",
+    "✖ event target preflight failure leaves prior source evidence untouched and never starts Verify (131.794ms)",
+    "✖ a post-source event path race returns typed retry data and does not roll back Verify evidence (24070.4713ms)"
+   ],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-recovery.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": null,
+   "fail": null,
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-owner-nonce.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1,
+   "pass": "ℹ pass 2",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ POSIX: a mode-0600 single-link owner-nonce file is admitted (regression, unchanged) (257.1099ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /--owner-nonce-file must be a mode-0600 single-link regular file/u. Input:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+   "exit": null,
+   "signal": "SIGTERM",
+   "timedOut": true,
+   "seconds": 270,
+   "pass": null,
+   "fail": null,
+   "failedCases": [],
+   "firstError": null
+  }
+ ]
+}

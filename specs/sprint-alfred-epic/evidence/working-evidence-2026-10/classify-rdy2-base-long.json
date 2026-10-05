@@ -1,0 +1,57 @@
+{
+ "label": "rdy2-base-long",
+ "cwdRel": "scratch/rdy/base",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 971,
+   "pass": "ℹ pass 61",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ private journal writes bounded JSON progress and keeps complete logs off the channel (6974.6677ms)",
+    "✖ permissive or symlinked prior run parents are ignored, never traversed (7045.034ms)",
+    "✖ SIGINT interruption terminates only its child group, seals distinct immutable evidence, and releases its exact automatic owner (17946.7785ms)"
+   ],
+   "firstError": "✔ AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking (4420.8402ms)"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1245,
+   "pass": "ℹ pass 25",
+   "fail": "ℹ fail 8",
+   "failedCases": [
+    "✖ candidate Verify carries a consumed Critic only over exact registered evidence commits (97219.2337ms)",
+    "✖ an explicit event output emits exactly one aggregate candidate-bound action after passing source readback (23259.6597ms)",
+    "✖ an explicit event output maps terminal Verify failure without creating success evidence (23233.2213ms)",
+    "✖ event target preflight failure leaves prior source evidence untouched and never starts Verify (125.565ms)",
+    "✖ a post-source event path race returns typed retry data and does not roll back Verify evidence (23243.1809ms)",
+    "✖ the CLI exposes the explicit event boundary without changing the evidence default (23438.9699ms)",
+    "✖ output aliases cannot delete outside bytes even when configuration is invalid (122.4934ms)",
+    "✖ an interrupted new attempt clears stale canonical success (23772.4264ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: {\"code\":\"CBV-ROOT\",\"evidence\":{\"schema\":\"pipeline.verify-evidence.v0\",\"commit\":\"6e04a6bad4da2f1e50a8e62625b4bc930da7f790\",\"tree\":\"a963f9fc7a8b4e56b384ce27e181e79a69efdb8c\",\"candidate\":{\"commit\":\"6e04a6bad4da2"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1037,
+   "pass": "ℹ pass 59",
+   "fail": "ℹ fail 4",
+   "failedCases": [
+    "✖ apply-recovery emits one plan- and pre-action-candidate-bound event only after successful source readback (12946.4744ms)",
+    "✖ post-source recovery event failure returns a closed event-only retry without rolling back recovery (12582.2883ms)",
+    "✖ neutral coordinator-close release is private, byte-stable, and replayable (124170.0765ms)",
+    "✖ lost binding plus an exact retirable orphan set converges in one confirmed composite recovery (11825.4606ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  }
+ ]
+}

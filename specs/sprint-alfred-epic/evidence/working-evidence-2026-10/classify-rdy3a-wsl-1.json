@@ -1,0 +1,17 @@
+{
+ "label": "rdy3a-wsl-1",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 3,
+   "pass": "ℹ pass 3",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  }
+ ]
+}

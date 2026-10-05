@@ -1,0 +1,119 @@
+{
+ "label": "rdy2-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 3,
+   "pass": "ℹ pass 1",
+   "fail": "ℹ fail 2",
+   "failedCases": [
+    "✖ foreign descriptors (incident shapes, with and without resources) are a warning, never a lock (25.062687ms)",
+    "✖ the requester's own descriptor (matching owner nonce) keeps today's blocking behaviour (13.927507ms)"
+   ],
+   "firstError": "Error [WorktreeLifecycleError]: Verify run root is not owner-private"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/verify-run-record.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 3",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 3,
+   "pass": "ℹ pass 27",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "✔ a ready observation with an unexpected extra key beyond the thirteen is still rejected (not a subset check) (0.218545ms)"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 6,
+   "pass": "ℹ pass 38",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 46,
+   "pass": "ℹ pass 1",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "PASS D0-01 branch mapping is canonical and traversal is rejected"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 12,
+   "pass": "ℹ pass 62",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ unbound recovery refuses multiple or replaced active descriptors (123.983338ms)"
+   ],
+   "firstError": "TypeError: Cannot read properties of undefined (reading 'candidates')"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-owner-nonce.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 3,
+   "pass": "ℹ pass 2",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ POSIX: a mode-0600 single-link owner-nonce file is admitted (regression, unchanged) (9.223228ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /--owner-nonce-file must be a mode-0600 single-link regular file/u. Input:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 466,
+   "pass": "ℹ pass 33",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 29,
+   "pass": "ℹ pass 58",
+   "fail": "ℹ fail 6",
+   "failedCases": [
+    "✖ a session-less checkout with an already-active session descriptor falls back to the original refusal, never overriding it (166.636405ms)",
+    "✖ a normalized failed receipt after a production spawn error cannot release a newly-created owner (155.208778ms)",
+    "✖ a suite-created foreign descriptor blocks owner teardown without losing terminal evidence (202.5727ms)",
+    "✖ an extra owner resource blocks retention and preserves the journal and binding (2745.737257ms)",
+    "✖ ALFRED-RF1: owner retirement never touches a descriptor it did not create (155.061677ms)",
+    "✖ ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner (2579.705678ms)"
+   ],
+   "firstError": "✔ AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking (98.9198ms)"
+  }
+ ]
+}

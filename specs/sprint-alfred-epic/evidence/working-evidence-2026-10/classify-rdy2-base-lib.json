@@ -1,0 +1,32 @@
+{
+ "label": "rdy2-base-lib",
+ "cwdRel": "scratch/rdy/base",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 247,
+   "pass": "ℹ pass 35",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ backupBeforeMutation fails closed on a live symlinked source instead of silently skipping it (2861.9644ms)",
+    "✖ backupBeforeMutation fails closed on a DANGLING symlinked source, not a silent null (2827.2114ms)",
+    "✖ backupOnboardingPrivateState fails closed on a non-regular entry in the private onboarding directory instead of silently skipping it (2828.7749ms)"
+   ],
+   "firstError": "Error: EPERM: operation not permitted, symlink '<path>' -> '<path>'"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 27",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "✔ a ready observation with an unexpected extra key beyond the thirteen is still rejected (not a subset check) (0.8669ms)"
+  }
+ ]
+}

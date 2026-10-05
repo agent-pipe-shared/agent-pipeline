@@ -1,0 +1,19 @@
+{
+ "label": "rdy3c-wsl-rerun",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 24,
+   "pass": "ℹ pass 63",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner (2358.461232ms)"
+   ],
+   "firstError": "✔ AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking (90.795255ms)"
+  }
+ ]
+}

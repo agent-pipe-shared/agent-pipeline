@@ -1,0 +1,47 @@
+{
+ "label": "sst2c-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 185,
+   "pass": "ℹ pass 44",
+   "fail": "ℹ fail 5",
+   "failedCases": [
+    "✖ resolveMaxTurns: reads the live maxTurns value out of a real agent definition's frontmatter (no mocking) (2287.708209ms)",
+    "✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10014.680635ms)",
+    "✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10013.961564ms)",
+    "✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10014.754156ms)",
+    "✖ evaluateDispatchBudgetGuard: workingCap always equals each agent's own maxTurns minus the documented reserve (2278.374654ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 116,
+   "pass": "ℹ pass 14",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ resolveMaxTurns: an injected plugin root wins; the default is the guard's own plugin, never the project root (4538.551967ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: an injected filesystem without pluginRoot resolves to the guard's own plugin, never under the project root"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 3,
+   "pass": "ℹ pass 13",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "✔ fully and partially sparse sample arrays are rejected before calibration (0.152634ms)"
+  }
+ ]
+}

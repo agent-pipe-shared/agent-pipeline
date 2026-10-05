@@ -1,0 +1,19 @@
+{
+ "label": "rdy3a-wsl-base",
+ "cwdRel": "scratch/rdy/base",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 11,
+   "pass": "ℹ pass 62",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ unbound recovery refuses multiple or replaced active descriptors (110.883042ms)"
+   ],
+   "firstError": "TypeError: Cannot read properties of undefined (reading 'candidates')"
+  }
+ ]
+}

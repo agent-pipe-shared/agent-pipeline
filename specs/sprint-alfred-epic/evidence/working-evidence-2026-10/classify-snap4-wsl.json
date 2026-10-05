@@ -1,0 +1,17 @@
+{
+ "label": "snap4-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1,
+   "pass": "ℹ pass 13",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  }
+ ]
+}

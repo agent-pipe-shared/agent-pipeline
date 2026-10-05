@@ -1,0 +1,147 @@
+{
+ "label": "rdy2-head",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 40,
+   "pass": "ℹ pass 3",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/verify-run-record.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 3",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 26",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ validForeignCleanupResidueWarning accepts exactly the closed foreign-residue warning and rejects every tamper (1.625ms)"
+   ],
+   "firstError": "✔ a ready observation with an unexpected extra key beyond the thirteen is still rejected (not a subset check) (0.7452ms)"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 228,
+   "pass": "ℹ pass 35",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ backupBeforeMutation fails closed on a live symlinked source instead of silently skipping it (2663.173ms)",
+    "✖ backupBeforeMutation fails closed on a DANGLING symlinked source, not a silent null (2700.09ms)",
+    "✖ backupOnboardingPrivateState fails closed on a non-regular entry in the private onboarding directory instead of silently skipping it (2725.0374ms)"
+   ],
+   "firstError": "Error: EPERM: operation not permitted, symlink '<path>' -> '<path>'"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 187,
+   "pass": "ℹ pass 1",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "PASS D0-01 branch mapping is canonical and traversal is rejected"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1014,
+   "pass": "ℹ pass 59",
+   "fail": "ℹ fail 4",
+   "failedCases": [
+    "✖ apply-recovery emits one plan- and pre-action-candidate-bound event only after successful source readback (12249.8169ms)",
+    "✖ post-source recovery event failure returns a closed event-only retry without rolling back recovery (12640.3065ms)",
+    "✖ neutral coordinator-close release is private, byte-stable, and replayable (121966.2892ms)",
+    "✖ lost binding plus an exact retirable orphan set converges in one confirmed composite recovery (11653.814ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-owner-nonce.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1,
+   "pass": "ℹ pass 2",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ POSIX: a mode-0600 single-link owner-nonce file is admitted (regression, unchanged) (242.5363ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /--owner-nonce-file must be a mode-0600 single-link regular file/u. Input:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/session-cleanup-power.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 19,
+   "pass": "ℹ pass 1",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1009,
+   "pass": "ℹ pass 25",
+   "fail": "ℹ fail 8",
+   "failedCases": [
+    "✖ candidate Verify carries a consumed Critic only over exact registered evidence commits (85236.9664ms)",
+    "✖ an explicit event output emits exactly one aggregate candidate-bound action after passing source readback (16394.6548ms)",
+    "✖ an explicit event output maps terminal Verify failure without creating success evidence (16546.4778ms)",
+    "✖ event target preflight failure leaves prior source evidence untouched and never starts Verify (127.3946ms)",
+    "✖ a post-source event path race returns typed retry data and does not roll back Verify evidence (16201.4586ms)",
+    "✖ the CLI exposes the explicit event boundary without changing the evidence default (16270.4306ms)",
+    "✖ output aliases cannot delete outside bytes even when configuration is invalid (106.6498ms)",
+    "✖ an interrupted new attempt clears stale canonical success (16076.2094ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: {\"code\":\"CBV-ROOT\",\"evidence\":{\"schema\":\"pipeline.verify-evidence.v0\",\"commit\":\"7308046318c164be526d8e5d7fc29989603e81ba\",\"tree\":\"a963f9fc7a8b4e56b384ce27e181e79a69efdb8c\",\"candidate\":{\"commit\":\"7308046318c16"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 708,
+   "pass": "ℹ pass 56",
+   "fail": "ℹ fail 8",
+   "failedCases": [
+    "✖ private journal writes bounded JSON progress and keeps complete logs off the channel (6725.2277ms)",
+    "✖ permissive or symlinked prior run parents are ignored, never traversed (6689.6296ms)",
+    "✖ a session-less checkout with an already-active session descriptor falls back to the original refusal, never overriding it (12026.2282ms)",
+    "✖ a normalized failed receipt after a production spawn error cannot release a newly-created owner (11923.9627ms)",
+    "✖ SIGINT interruption terminates only its child group, seals distinct immutable evidence, and releases its exact automatic owner (10495.9268ms)",
+    "✖ a suite-created foreign descriptor blocks owner teardown without losing terminal evidence (12373.8558ms)",
+    "✖ an extra owner resource blocks retention and preserves the journal and binding (12405.628ms)",
+    "✖ ALFRED-RF1: owner retirement never touches a descriptor it did not create (10897.8064ms)"
+   ],
+   "firstError": "✔ AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking (4407.6923ms)"
+  }
+ ]
+}

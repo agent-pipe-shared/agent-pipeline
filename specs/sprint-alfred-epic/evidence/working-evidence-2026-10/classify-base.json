@@ -1,0 +1,131 @@
+{
+ "label": "base",
+ "cwdRel": "scratch/perf/base",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/windows-private-state.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1,
+   "pass": "ℹ pass 12",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (930.0232ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 36,
+   "pass": "ℹ pass 3",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ ISP001 all three hook installers forward bounded snapshot progress callbacks (29924.9458ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: batched native ACL verification reports bounded progress"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/project-reset-git-hooks.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 0",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ plugins\\pipeline-core\\scripts\\project-reset-git-hooks.test.mjs (61.4152ms)"
+   ],
+   "firstError": "Error: ENOENT: no such file or directory, open '<path>'"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs",
+   "exit": null,
+   "signal": "SIGTERM",
+   "timedOut": true,
+   "seconds": 270,
+   "pass": null,
+   "fail": null,
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs",
+   "exit": null,
+   "signal": "SIGTERM",
+   "timedOut": true,
+   "seconds": 270,
+   "pass": null,
+   "fail": null,
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 165,
+   "pass": "ℹ pass 5",
+   "fail": "ℹ fail 51",
+   "failedCases": [
+    "✖ stagedPaths: lists a newly staged file relative to HEAD (1981.914ms)",
+    "✖ stagedPaths: falls back to the empty-tree comparison before any commit exists (1892.6921ms)",
+    "✖ stagedPaths: nothing staged yields an empty array, not null (1951.7045ms)",
+    "✖ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (1852.9446ms)",
+    "✖ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (1940.146ms)",
+    "✖ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (1876.0997ms)",
+    "✖ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (1856.1767ms)",
+    "✖ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (1868.022ms)",
+    "✖ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (1900.3824ms)",
+    "✖ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (1866.4261ms)",
+    "✖ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (1879.6441ms)",
+    "✖ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (1866.96ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 202,
+   "pass": "ℹ pass 6",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/project-uninstall.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 90,
+   "pass": "ℹ pass 3",
+   "fail": "ℹ fail 4",
+   "failedCases": [
+    "✖ UC02C001 default transaction preserves content/history and foreign bytes; retirement permits ordinary real commit and local bare push (8319.6532ms)",
+    "✖ UC02C005 partial shim interruption resumes by exact original entry and private journal survives removal (8170.0439ms)",
+    "✖ UC02C006 post-decline crash is durable; repeated new-controller resume is idempotent and CLI reads the same completion (8148.0649ms)",
+    "✖ UC02C007 re-enrollment contract retains historical scope identity and does not retire unrelated approval-store bytes (8482.5798ms)"
+   ],
+   "firstError": "Error: EPERM: operation not permitted, fsync"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/project-uninstall-contract.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 58,
+   "pass": "ℹ pass 7",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ UC01C001 closed uninstall schemas admit actual plans/journals and byte-identical mirrors; CLI rejects undeclared request fields (2616.2945ms)"
+   ],
+   "firstError": "Error: ENOENT: no such file or directory, open '<path>'"
+  }
+ ]
+}

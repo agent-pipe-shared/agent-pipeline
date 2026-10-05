@@ -1,0 +1,43 @@
+{
+ "label": "sst2c-wsl2",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 199,
+   "pass": "ℹ pass 46",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10014.64701ms)",
+    "✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10013.81966ms)",
+    "✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10013.478546ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr:"
+  },
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 117,
+   "pass": "ℹ pass 15",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 3,
+   "pass": "ℹ pass 13",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "✔ fully and partially sparse sample arrays are rejected before calibration (0.149999ms)"
+  }
+ ]
+}

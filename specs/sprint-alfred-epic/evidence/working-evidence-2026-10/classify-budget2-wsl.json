@@ -1,0 +1,50 @@
+{
+ "label": "budget2-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "harness/scripts/check-consumer-safe-paths.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 5,
+   "pass": "ℹ pass 9",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-core.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 11",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 8",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 107,
+   "pass": "ℹ pass 12",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  }
+ ]
+}

@@ -1,0 +1,89 @@
+{
+ "label": "sst2-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 8",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-policy.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1,
+   "pass": "ℹ pass 38",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "✔ DPT25 DP18j rejected candidate paths identify only a bounded index, never private names (6.863511ms)"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-core.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 11",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 6",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": "✔ fully and partially sparse sample arrays are rejected before calibration (1.042904ms)"
+  },
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 198,
+   "pass": "ℹ pass 46",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10014.683284ms)",
+    "✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10013.932284ms)",
+    "✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10015.167581ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr:"
+  },
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 103,
+   "pass": "ℹ pass 12",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1,
+   "pass": "ℹ pass 0",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (1074.413261ms)"
+   ],
+   "firstError": "FAIL GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports: Error: plugins/pipeline-core/scripts/commit-msg-hook-install.mjs declares 3 dynamic-import edge(s) in DYNAMIC_IMPORT_EDGES but its source ac"
+  }
+ ]
+}

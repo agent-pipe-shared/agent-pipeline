@@ -1,0 +1,42 @@
+{
+ "label": "head2",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 188,
+   "pass": "ℹ pass 20",
+   "fail": "ℹ fail 2",
+   "failedCases": [
+    "✖ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (0.8286ms)",
+    "✖ CMI018 generated hook fails closed when Git's message file is unreadable (6917.1896ms)"
+   ],
+   "firstError": "Error: ENOENT: no such file or directory, mkdtemp '<path> path ' $(touch${IFS}SHIM_SENTINEL) `touch${IFS}BACKTICK_SENTINEL` $SHIM_EXPANSION line"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 160,
+   "pass": "ℹ pass 26",
+   "fail": "ℹ fail 10",
+   "failedCases": [
+    "✖ installed hook: no manifest at all -> allow (opt-in feature, not a 'cannot evaluate' case) (6700.5212ms)",
+    "✖ installed hook: push gate mode off -> allow (6641.8838ms)",
+    "✖ installed hook: manifest present but unparseable -> BLOCK (fail-closed, diverges from guard-push.mjs's WARN) (6862.1896ms)",
+    "✖ installed hook: verify evidence missing -> BLOCK (7036.5337ms)",
+    "✖ installed hook: push approval state missing (approval required, not standing-approved) -> BLOCK (7180.8608ms)",
+    "✖ installed hook: fresh verify evidence + standing-approved -> ALLOW, record written (7151.5335ms)",
+    "✖ installed hook: linked worktree reads fresh canonical evidence (7374.7045ms)",
+    "✖ installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (7375.7931ms)",
+    "✖ installed hook: fresh verify evidence + recorded approval (general mode) -> ALLOW (7251.1041ms)",
+    "✖ installed hook: ref deletion is blocked without evidence evaluation, and recorded (7335.3306ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  }
+ ]
+}

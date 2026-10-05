@@ -1,0 +1,130 @@
+{
+ "label": "head",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/lib/windows-private-state.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 1,
+   "pass": "ℹ pass 12",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (907.0876ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/project-reset-git-hooks.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 0",
+   "fail": "ℹ fail 1",
+   "failedCases": [
+    "✖ plugins\\pipeline-core\\scripts\\project-reset-git-hooks.test.mjs (60.7863ms)"
+   ],
+   "firstError": "Error: ENOENT: no such file or directory, open '<path>'"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 178,
+   "pass": "ℹ pass 20",
+   "fail": "ℹ fail 2",
+   "failedCases": [
+    "✖ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (0.9359ms)",
+    "✖ CMI018 generated hook fails closed when Git's message file is unreadable (6541.7883ms)"
+   ],
+   "firstError": "Error: ENOENT: no such file or directory, mkdtemp '<path> path ' $(touch${IFS}SHIM_SENTINEL) `touch${IFS}BACKTICK_SENTINEL` $SHIM_EXPANSION line"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 152,
+   "pass": "ℹ pass 26",
+   "fail": "ℹ fail 10",
+   "failedCases": [
+    "✖ installed hook: no manifest at all -> allow (opt-in feature, not a 'cannot evaluate' case) (6680.8731ms)",
+    "✖ installed hook: push gate mode off -> allow (6647.1281ms)",
+    "✖ installed hook: manifest present but unparseable -> BLOCK (fail-closed, diverges from guard-push.mjs's WARN) (6650.3726ms)",
+    "✖ installed hook: verify evidence missing -> BLOCK (6613.6115ms)",
+    "✖ installed hook: push approval state missing (approval required, not standing-approved) -> BLOCK (6616.0095ms)",
+    "✖ installed hook: fresh verify evidence + standing-approved -> ALLOW, record written (6612.489ms)",
+    "✖ installed hook: linked worktree reads fresh canonical evidence (6688.7098ms)",
+    "✖ installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (6716.0655ms)",
+    "✖ installed hook: fresh verify evidence + recorded approval (general mode) -> ALLOW (6625.786ms)",
+    "✖ installed hook: ref deletion is blocked without evidence evaluation, and recorded (6586.5589ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 111,
+   "pass": "ℹ pass 5",
+   "fail": "ℹ fail 51",
+   "failedCases": [
+    "✖ stagedPaths: lists a newly staged file relative to HEAD (1889.1073ms)",
+    "✖ stagedPaths: falls back to the empty-tree comparison before any commit exists (1805.6982ms)",
+    "✖ stagedPaths: nothing staged yields an empty array, not null (1860.3553ms)",
+    "✖ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (1805.5811ms)",
+    "✖ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (1873.8688ms)",
+    "✖ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (1849.4906ms)",
+    "✖ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (1879.2068ms)",
+    "✖ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (1883.8995ms)",
+    "✖ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (1875.4924ms)",
+    "✖ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (1871.2918ms)",
+    "✖ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (1879.3267ms)",
+    "✖ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (1872.3297ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/project-uninstall.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 62,
+   "pass": "ℹ pass 3",
+   "fail": "ℹ fail 4",
+   "failedCases": [
+    "✖ UC02C001 default transaction preserves content/history and foreign bytes; retirement permits ordinary real commit and local bare push (5638.6518ms)",
+    "✖ UC02C005 partial shim interruption resumes by exact original entry and private journal survives removal (5554.0373ms)",
+    "✖ UC02C006 post-decline crash is durable; repeated new-controller resume is idempotent and CLI reads the same completion (5553.759ms)",
+    "✖ UC02C007 re-enrollment contract retains historical scope identity and does not retire unrelated approval-store bytes (5879.3029ms)"
+   ],
+   "firstError": "Error: EPERM: operation not permitted, fsync"
+  },
+  {
+   "file": "plugins/pipeline-core/lib/project-uninstall-contract.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 39,
+   "pass": "ℹ pass 8",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 51,
+   "pass": "ℹ pass 6",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  }
+ ]
+}

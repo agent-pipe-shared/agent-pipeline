@@ -1,0 +1,21 @@
+{
+ "label": "sst2-wsl-guard",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 209,
+   "pass": "ℹ pass 46",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10015.554246ms)",
+    "✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10014.502565ms)",
+    "✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10014.88932ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr:"
+  }
+ ]
+}

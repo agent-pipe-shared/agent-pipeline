@@ -1,0 +1,54 @@
+{
+ "label": "budget-wsl",
+ "cwdRel": ".",
+ "rows": [
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+   "exit": 1,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 204,
+   "pass": "ℹ pass 46",
+   "fail": "ℹ fail 3",
+   "failedCases": [
+    "✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10015.040805ms)",
+    "✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10010.892194ms)",
+    "✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10013.230873ms)"
+   ],
+   "firstError": "AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr:"
+  },
+  {
+   "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 106,
+   "pass": "ℹ pass 12",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-core.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 11",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  },
+  {
+   "file": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
+   "exit": 0,
+   "signal": null,
+   "timedOut": false,
+   "seconds": 0,
+   "pass": "ℹ pass 8",
+   "fail": "ℹ fail 0",
+   "failedCases": [],
+   "firstError": null
+  }
+ ]
+}
