@@ -1605,13 +1605,16 @@ check("two genuinely different working copies still yield different fingerprints
   assert.notEqual(lower, upper, "a plain POSIX path must be hashed byte-for-byte, case included, never folded");
 });
 
-check("a plain POSIX repository path is unaffected by the fix (no migration needed for that majority case)", () => {
+const skipOnWin32 = (name) => process.stdout.write(`[skip] ${name}: POSIX-host formula; covered on Linux/WSL\n`);
+const checkPosixHostFormula = (name, fn) => (process.platform === "win32" ? skipOnWin32(name) : check(name, fn));
+
+checkPosixHostFormula("a plain POSIX repository path is unaffected by the fix (no migration needed for that majority case)", () => {
   const current = derivePoGateRepositoryFingerprint({ gitCommonDir: "/home/user/repo/.git", primaryRoot: "/home/user/repo" });
   const legacy = derivePoGateRepositoryFingerprintLegacy({ gitCommonDir: "/home/user/repo/.git", primaryRoot: "/home/user/repo" });
   assert.equal(current, legacy, "outside the WSL-mount/Windows-drive-letter world the new and pre-fix formulas must agree byte-for-byte");
 });
 
-check("a receipt fingerprint published under the pre-fix formula for a WSL-mount checkout is still found", () => {
+checkPosixHostFormula("a receipt fingerprint published under the pre-fix formula for a WSL-mount checkout is still found", () => {
   // `derivePoGateRepositoryFingerprintLegacy` reproduces the OLD, platform-bound
   // formula exactly (raw `normalizeAbsolute`, native `node:path` `isAbsolute`/
   // `resolve`): on a win32 host it accepts a `C:\...` string, and on a POSIX
