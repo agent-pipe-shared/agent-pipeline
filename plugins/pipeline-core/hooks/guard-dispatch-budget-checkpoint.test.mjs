@@ -10,16 +10,16 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
 import { persistPendingDispatchBudgetBindings, readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetBinding, dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 import { applyGovernanceScopeDecision, planGovernanceScopeDecision } from "../lib/governance-scope.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import {
   DENIAL_CODE,
   MAX_GRANT_ENTRIES,
@@ -36,6 +36,12 @@ const GUARD = fileURLToPath(new URL("./guard-dispatch-budget.mjs", import.meta.u
 const GRANT_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-budget-grant.mjs", import.meta.url));
 const roots = [];
 process.on("exit", () => { for (const root of roots) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } } });
+
+// Cases are declared with stable ids and registered together through the completion protocol at the end of the file.
+const cases = [];
+function register(id, name, run) {
+  cases.push({ id, name, run });
+}
 
 // A consumer-style repository: governance-enrolled, with NO plugins/pipeline-core of its own.
 function consumerRoot(prefix) {
@@ -96,7 +102,7 @@ const RESOLVE_RUNNER_SOURCE = [
   "}));",
 ].join("\n");
 
-test("consumer repo: no plugins/pipeline-core under the project root, and the guard still enforces the plugin's own tier", () => {
+register("GDBC01", "consumer repo: no plugins/pipeline-core under the project root, and the guard still enforces the plugin's own tier", () => {
   assert.ok(Number.isSafeInteger(DEEP_MAX_TURNS) && DEEP_MAX_TURNS > 0, "the plugin's own goldfish-deep definition resolves");
   const root = consumerRoot("consumer");
   assert.equal(existsSync(join(root, "plugins")), false);
@@ -107,7 +113,7 @@ test("consumer repo: no plugins/pipeline-core under the project root, and the gu
   assert.equal(existsSync(join(budgetDir(root), "unresolved-observations")), false, "the call must not be recorded as max-turns-unresolved");
 });
 
-test("consumer repo, Critic first call: a project-root copy of the definition at another tier is never read; the plugin's own tier binds", () => {
+register("GDBC02", "consumer repo, Critic first call: a project-root copy of the definition at another tier is never read; the plugin's own tier binds", () => {
   const root = consumerRoot("critic-binding");
   const decoyAgents = join(root, "plugins", "pipeline-core", "agents");
   mkdirSync(decoyAgents, { recursive: true });
@@ -134,7 +140,7 @@ test("consumer repo, Critic first call: a project-root copy of the definition at
   assert.equal(counter.count, 1);
 });
 
-test("resolveMaxTurns: an injected plugin root wins; the default is the guard's own plugin, never the project root", () => {
+register("GDBC03", "resolveMaxTurns: an injected plugin root wins; the default is the guard's own plugin, never the project root", () => {
   const root = consumerRoot("resolve");
   const altPlugin = join(root, "alt-plugin");
   mkdirSync(join(altPlugin, "agents"), { recursive: true });
@@ -166,13 +172,13 @@ test("resolveMaxTurns: an injected plugin root wins; the default is the guard's 
 
 // ---------------------------------------------------------------- pure core
 
-test("core: checkpoint threshold is ceil(0.8 x cap) in integer arithmetic", () => {
+register("GDBC04", "core: checkpoint threshold is ceil(0.8 x cap) in integer arithmetic", () => {
   assert.deepEqual([35, 20, 65, 15, 3, 1].map(dispatchCheckpointThreshold), [28, 16, 52, 12, 3, 1]);
   assert.equal(dispatchCheckpointThreshold(0), null);
   assert.equal(dispatchCheckpointThreshold(1.5), null);
 });
 
-test("core: the notice fires at the threshold and on the last 3 working calls, never below, never on closing/denied calls", () => {
+register("GDBC05", "core: the notice fires at the threshold and on the last 3 working calls, never below, never on closing/denied calls", () => {
   const fired = (workingCap, decision = "working") => Array.from({ length: workingCap + 2 }, (_, i) => i + 1)
     .filter((nextCount) => dispatchCheckpointDecision({ workingCap, nextCount, decision }).notice);
   assert.deepEqual(fired(20), [16, 18, 19, 20]);
@@ -183,7 +189,7 @@ test("core: the notice fires at the threshold and on the last 3 working calls, n
   assert.equal(dispatchCheckpointDecision({ workingCap: 20, nextCount: 18 }).remainingWorkingCalls, 2);
 });
 
-test("core: a grant raises the working cap, never beyond maxTurns - closing allowance - 1", () => {
+register("GDBC06", "core: a grant raises the working cap, never beyond maxTurns - closing allowance - 1", () => {
   assert.equal(effectiveDispatchWorkingCap(20, 80, 0), 20);
   assert.equal(effectiveDispatchWorkingCap(20, 80, 10), 30);
   assert.equal(effectiveDispatchWorkingCap(20, 80, 1000), 74);
@@ -198,7 +204,7 @@ test("core: a grant raises the working cap, never beyond maxTurns - closing allo
   assert.equal(decideDispatchBudgetCall({ maxTurns: 80, baseCalls: 20, currentCount: 20, isClosingAct: false, grantedCalls: -1 }).decision, "invalid-input");
 });
 
-test("core: grant records reject malformed, oversized, tampered and duplicate-digest histories", () => {
+register("GDBC07", "core: grant records reject malformed, oversized, tampered and duplicate-digest histories", () => {
   const first = appendGrant({ agentId: "ag1", extra: 5, reason: "continue", grantedAt: "2026-10-05T10:00:00.000Z" });
   assert.equal(first.ok, true);
   const second = appendGrant({ record: first.record, agentId: "ag1", extra: 7, reason: "again", grantedAt: "2026-10-05T11:00:00.000Z" });
@@ -233,7 +239,7 @@ test("core: grant records reject malformed, oversized, tampered and duplicate-di
 
 // -------------------------------------------------------------- hook, black-box
 
-test("hook: checkpoint notice at exactly ceil(0.8 x cap) and on the last 3 working calls; allow JSON shape; denial at the cap unchanged", () => {
+register("GDBC08", "hook: checkpoint notice at exactly ceil(0.8 x cap) and on the last 3 working calls; allow JSON shape; denial at the cap unchanged", () => {
   const root = activeRoot("notice");
   seed(root, { agentId: "n1", count: 13 });
   const outcomes = Array.from({ length: 8 }, () => read(root, "n1"));
@@ -270,13 +276,13 @@ test("hook: checkpoint notice at exactly ceil(0.8 x cap) and on the last 3 worki
   });
 });
 
-test("hook: the orchestrator is never given a notice or counted", () => {
+register("GDBC09", "hook: the orchestrator is never given a notice or counted", () => {
   const root = activeRoot("orch");
   const result = callGuard(root, { session_id: "s", transcript_path: join(root, "top.jsonl"), tool_name: "Read", tool_input: { file_path: join(root, "x.txt") } });
   assert.deepEqual([result.status, result.stdout], [0, ""]);
 });
 
-test("hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file", () => {
+register("GDBC10", "hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file", () => {
   const root = activeRoot("critic");
   seed(root, { agentId: "cn", agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 11 });
   const notice = read(root, "cn", CRITIC);
@@ -320,7 +326,7 @@ test("hook: a Critic notice names critic-notes.md; the closing lane admits only 
   assert.doesNotMatch(callGuard(root, subagentCall(root, "gf", GOLDFISH, "Read", { file_path: "x" })).stderr, /critic-notes/u, "non-Critic denial text is unchanged");
 });
 
-test("hook: a grant lets the same agent state continue where an ungranted agent is denied", () => {
+register("GDBC11", "hook: a grant lets the same agent state continue where an ungranted agent is denied", () => {
   const root = activeRoot("grant");
   seed(root, { agentId: "plain", count: 20 });
   seed(root, { agentId: "granted", count: 20 });
@@ -333,7 +339,7 @@ test("hook: a grant lets the same agent state continue where an ungranted agent 
   assert.deepEqual([resumed.status, resumed.stdout, resumed.stderr], [0, "", ""]);
 });
 
-test("hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {
+register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {
   const root = activeRoot("bound");
   seed(root, { agentId: "b1", count: 0 });
   const grant = (extra) => grantDispatchBudget(["--agent-id", "b1", "--extra", String(extra), "--reason", "bounded", "--root", root]);
@@ -353,7 +359,7 @@ test("hook: the granted cap is bounded by maxTurns - 1 including the closing all
   assert.equal(74 + 5, 80 - 1);
 });
 
-test("hook: a malformed or tampered grant record on disk grants nothing", () => {
+register("GDBC13", "hook: a malformed or tampered grant record on disk grants nothing", () => {
   const root = activeRoot("tamper");
   seed(root, { agentId: "t1", count: 20 });
   assert.equal(grantDispatchBudget(["--agent-id", "t1", "--extra", "10", "--reason", "ok", "--root", root]).status, "granted");
@@ -368,7 +374,7 @@ test("hook: a malformed or tampered grant record on disk grants nothing", () => 
   assert.equal(read(root, "t2").status, 2, "garbage record is ignored");
 });
 
-test("hook: a dispatched agent cannot reach the grant script or the grant store; the orchestrator can", () => {
+register("GDBC14", "hook: a dispatched agent cannot reach the grant script or the grant store; the orchestrator can", () => {
   const root = activeRoot("forbid");
   seed(root, { agentId: "f1", count: 0 });
   const command = `node plugins/pipeline-core/scripts/dispatch-budget-grant.mjs --agent-id f1 --extra 5 --reason self-grant`;
@@ -388,7 +394,7 @@ test("hook: a dispatched agent cannot reach the grant script or the grant store;
 
 // ------------------------------------------------------------- grant script
 
-test("grant script: refuses malformed arguments, an unknown agent and an unverifiable record; resolves the repo of its working directory", () => {
+register("GDBC15", "grant script: refuses malformed arguments, an unknown agent and an unverifiable record; resolves the repo of its working directory", () => {
   const root = activeRoot("script");
   seed(root, { agentId: "s1", count: 3 });
   const base = ["--agent-id", "s1", "--reason", "why", "--root", root];
@@ -427,3 +433,9 @@ test("grant script: refuses malformed arguments, an unknown agent and an unverif
 function readdirSafe(dir) {
   try { return readFileSync(dir); } catch { return null; }
 }
+
+assert.equal(cases.length, 15, "the complete dispatch-budget checkpoint corpus must register before execution");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(devNull, "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

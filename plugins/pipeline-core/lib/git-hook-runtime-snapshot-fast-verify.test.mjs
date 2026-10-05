@@ -5,19 +5,28 @@
 // tampered file, source edit) is removed before a test ends.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import fs, { mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 
 import { physicalFootprintPath } from "./git-hook-footprint.mjs";
 import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "./git-hook-runtime-snapshot.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { assessWindowsPrivatePaths, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 const WIN = process.platform === "win32";
 const WIN_ONLY = WIN ? false : "native Windows DACL observation exists only on win32";
+
+// Cases are declared with stable ids and registered together through the completion protocol at the end of the file.
+// `{ skip: reason }` is the node:test option; the completion protocol carries it as its closed `mode: "skip"` (the
+// reason string itself is not carried, it stays documented in WIN_ONLY above).
+const cases = [];
+function register(id, name, optionsOrRun, maybeRun) {
+  const [options, run] = typeof optionsOrRun === "function" ? [{}, optionsOrRun] : [optionsOrRun, maybeRun];
+  cases.push(options.skip ? { id, name, run, mode: "skip" } : { id, name, run });
+}
 
 function fixture(t) {
   const base = mkdtempSync(join(tmpdir(), "ghs-fast-"));
@@ -48,20 +57,20 @@ function verifyInFreshProcess(snapshot) {
   return spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8" }).stdout.trim();
 }
 
-test("a published snapshot verifies, and a repeat verify in the same process stays verified", (t) => {
+register("GHRSF01", "a published snapshot verifies, and a repeat verify in the same process stays verified", (t) => {
   const f = fixture(t), snapshot = publish(f);
   assert.equal(verifyGitHookRuntimeSnapshot({ snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 }).status, "verified");
   assert.equal(verifyGitHookRuntimeSnapshot({ snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 }).status, "verified");
   assert.equal(verifyInFreshProcess(snapshot), "OK");
 });
 
-test("tampered content in a reused snapshot is refused by a process that has not memo-verified it", (t) => {
+register("GHRSF02", "tampered content in a reused snapshot is refused by a process that has not memo-verified it", (t) => {
   const f = fixture(t), snapshot = publish(f);
   tamper(join(snapshot.root, "lib", "sub", "inner.mjs"));
   assert.equal(verifyInFreshProcess(snapshot), "ERR:GHS-CONTENT");
 });
 
-test("tampered content is refused by the same process that memo-verified the snapshot (no stale memo)", (t) => {
+register("GHRSF03", "tampered content is refused by the same process that memo-verified the snapshot (no stale memo)", (t) => {
   const f = fixture(t), snapshot = publish(f);
   assert.equal(verifyGitHookRuntimeSnapshot({ snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 }).status, "verified");
   tamper(join(snapshot.root, "hooks", "h.mjs"));
@@ -70,7 +79,7 @@ test("tampered content is refused by the same process that memo-verified the sna
   assert.equal(codeOf(() => publish(f)), "GHS-CONTENT");
 });
 
-test("an extra or a missing public file is refused after the snapshot was verified in-process", (t) => {
+register("GHRSF04", "an extra or a missing public file is refused after the snapshot was verified in-process", (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified");
   writeFileSync(join(snapshot.root, "lib", "extra.mjs"), "export const extra = 1;\n");
@@ -81,7 +90,7 @@ test("an extra or a missing public file is refused after the snapshot was verifi
   assert.equal(codeOf(() => verifyGitHookRuntimeSnapshot(args)), "GHS-CONTENT");
 });
 
-test("a link or junction planted below the snapshot root is refused, in-process and fresh", (t) => {
+register("GHRSF05", "a link or junction planted below the snapshot root is refused, in-process and fresh", (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified");
   const real = join(f.base, "elsewhere");
@@ -98,7 +107,7 @@ test("a link or junction planted below the snapshot root is refused, in-process 
   }
 });
 
-test("source drift while the snapshot is being published is refused", (t) => {
+register("GHRSF06", "source drift while the snapshot is being published is refused", (t) => {
   const f = fixture(t);
   const drift = () => publishGitHookRuntimeSnapshot({
     pluginLibDir: f.lib,
@@ -120,8 +129,8 @@ function plantSameSizeSameMtimeEdit(path) {
   return { planted: true, sizeKept: after.size === before.size, mtimeKept: Math.abs(after.mtimeMs - before.mtimeMs) < 2, bytesChanged: readFileSync(path, "utf8") !== original };
 }
 
-for (const editPhase of ["copy", "verify"]) {
-  test(`a same-size, same-mtime source edit during publish (${editPhase} phase) is refused as GHS-SOURCE-DRIFT`, (t) => {
+for (const [id, editPhase] of [["GHRSF07", "copy"], ["GHRSF08", "verify"]]) {
+  register(id, `a same-size, same-mtime source edit during publish (${editPhase} phase) is refused as GHS-SOURCE-DRIFT`, (t) => {
     const f = fixture(t);
     // Temporary-tree cleanup fails closed unless the state directory itself is private (as an installed state dir is).
     if (WIN) assert.equal(hardenWindowsPrivateDirectory(f.state).status, "secure");
@@ -151,7 +160,7 @@ function countOpens(t, root) {
   return counts;
 }
 
-test("a publish reads and hashes the whole source tree exactly twice, fresh and on reuse", (t) => {
+register("GHRSF09", "a publish reads and hashes the whole source tree exactly twice, fresh and on reuse", (t) => {
   const f = fixture(t), counts = countOpens(t, f.plugin);
   publish(f);
   assert.equal(counts.size, 6, "the six public source files of the fixture were read");
@@ -162,7 +171,7 @@ test("a publish reads and hashes the whole source tree exactly twice, fresh and 
   for (const [path, reads] of counts) assert.equal(reads, 2, `${path}: inventory pass + post-copy pass (existing snapshot reused)`);
 });
 
-test("an in-process memo hit still reads and hashes every snapshot file", (t) => {
+register("GHRSF10", "an in-process memo hit still reads and hashes every snapshot file", (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   const counts = countOpens(t, snapshot.root);
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified");
@@ -177,7 +186,7 @@ test("an in-process memo hit still reads and hashes every snapshot file", (t) =>
 // when the memo is recorded, and the recorded entry is older than it when the memo is consulted.
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-test("an aged in-process memo entry (older than a 250 ms racy window) still reads and hashes every snapshot file", async (t) => {
+register("GHRSF11", "an aged in-process memo entry (older than a 250 ms racy window) still reads and hashes every snapshot file", async (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   await sleep(350);
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo is recorded over files that are now older than the window
@@ -188,7 +197,7 @@ test("an aged in-process memo entry (older than a 250 ms racy window) still read
   for (const [path, reads] of counts) assert.equal(reads, 1, `${path} read in full exactly once on an aged memo hit`);
 });
 
-test("a same-size, same-mtime snapshot content change after an in-process verify is refused in the same process", (t) => {
+register("GHRSF12", "a same-size, same-mtime snapshot content change after an in-process verify is refused in the same process", (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo now holds this entry's recorded fingerprint
   const file = join(snapshot.root, "lib", "sub", "inner.mjs"), before = statSync(file), original = readFileSync(file, "utf8");
@@ -207,13 +216,13 @@ test("a same-size, same-mtime snapshot content change after an in-process verify
   }
 });
 
-test("the install time budget is enforced", (t) => {
+register("GHRSF13", "the install time budget is enforced", (t) => {
   const f = fixture(t);
   assert.equal(codeOf(() => publishGitHookRuntimeSnapshot({ pluginLibDir: f.lib, stateDir: f.state, timeBudgetMs: 0 })), "GHS-TIME-BUDGET");
   assert.equal(codeOf(() => publishGitHookRuntimeSnapshot({ pluginLibDir: f.lib, stateDir: f.state, timeBudgetMs: 80001 })), "GHS-TIME-BUDGET");
 });
 
-test("win32: a foreign ACE on a snapshot file is refused, in-process after memo and in a fresh process", { skip: WIN_ONLY }, (t) => {
+register("GHRSF14", "win32: a foreign ACE on a snapshot file is refused, in-process after memo and in a fresh process", { skip: WIN_ONLY }, (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified");
   const file = join(snapshot.root, "hooks", "h.mjs");
@@ -227,7 +236,7 @@ test("win32: a foreign ACE on a snapshot file is refused, in-process after memo 
   assert.equal(verifyInFreshProcess(snapshot), "OK");
 });
 
-test("win32: a foreign ACE on a snapshot subdirectory is refused", { skip: WIN_ONLY }, (t) => {
+register("GHRSF15", "win32: a foreign ACE on a snapshot subdirectory is refused", { skip: WIN_ONLY }, (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   const dir = join(snapshot.root, "lib", "sub");
   execFileSync("icacls", [dir, "/grant", "*S-1-1-0:(R)"], { stdio: "ignore" });
@@ -240,7 +249,7 @@ test("win32: a foreign ACE on a snapshot subdirectory is refused", { skip: WIN_O
 
 // The two memo-hit checks below plant a NON-inheriting grant (no (OI)/(CI)), so only the named object's own DACL changes.
 // NTFS bumps its ctime, the memo's recorded fingerprint no longer matches, and the memo path must re-read that one DACL.
-test("win32: a foreign ACE on the snapshot root is refused on a memo hit (GHS-MODE)", { skip: WIN_ONLY }, (t) => {
+register("GHRSF16", "win32: a foreign ACE on the snapshot root is refused on a memo hit (GHS-MODE)", { skip: WIN_ONLY }, (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo now holds the root as private
   execFileSync("icacls", [snapshot.root, "/grant", "*S-1-1-0:(R)"], { stdio: "ignore" });
@@ -252,7 +261,7 @@ test("win32: a foreign ACE on the snapshot root is refused on a memo hit (GHS-MO
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified", "the snapshot verifies again once the grant is removed");
 });
 
-test("win32: a foreign ACE on snapshot.json is refused on a memo hit (GHS-MANIFEST)", { skip: WIN_ONLY }, (t) => {
+register("GHRSF17", "win32: a foreign ACE on snapshot.json is refused on a memo hit (GHS-MANIFEST)", { skip: WIN_ONLY }, (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   const manifest = join(snapshot.root, "snapshot.json");
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo now holds the manifest as private
@@ -265,7 +274,7 @@ test("win32: a foreign ACE on snapshot.json is refused on a memo hit (GHS-MANIFE
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified", "the snapshot verifies again once the grant is removed");
 });
 
-test("win32: disabled inheritance plus a foreign ACE on a descendant is refused", { skip: WIN_ONLY }, (t) => {
+register("GHRSF18", "win32: disabled inheritance plus a foreign ACE on a descendant is refused", { skip: WIN_ONLY }, (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   const file = join(snapshot.root, "config", "c.json");
   execFileSync("icacls", [file, "/inheritance:d"], { stdio: "ignore" });
@@ -277,7 +286,7 @@ test("win32: disabled inheritance plus a foreign ACE on a descendant is refused"
   }
 });
 
-test("win32: the batched native reader returns one verdict per path in a single call and flags a foreign ACE", { skip: WIN_ONLY }, (t) => {
+register("GHRSF19", "win32: the batched native reader returns one verdict per path in a single call and flags a foreign ACE", { skip: WIN_ONLY }, (t) => {
   const f = fixture(t), dir = join(f.base, "acl");
   mkdirSync(dir);
   assert.equal(hardenWindowsPrivateDirectory(dir).status, "secure");
@@ -295,3 +304,9 @@ test("win32: the batched native reader returns one verdict per path in a single 
     execFileSync("icacls", [paths[77], "/remove", "*S-1-1-0"], { stdio: "ignore" });
   }
 });
+
+assert.equal(cases.length, 19, "the complete git-hook runtime snapshot fast-verify corpus must register before execution");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(devNull, "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

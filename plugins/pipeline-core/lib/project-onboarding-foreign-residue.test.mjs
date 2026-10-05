@@ -11,11 +11,12 @@
 // written to the real repository's private state.
 
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, openSync } from "node:fs";
+import { devNull } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
 import { inspectProjectOnboardingV3 } from "./project-onboarding-v3.mjs";
 import { validForeignCleanupResidueWarning } from "./project-onboarding-ready-gate.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { listActiveSessionDescriptors, registerTemporaryIntent, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 import {
   clearRuntimeBarrier, completeKickoff, dispose, fakeDeps, initializeRestartRequiredRoot, root,
@@ -26,6 +27,12 @@ const KILLED_VERIFY = "session-4a4b3cc55b3eaefdac609226"; // killed Verify after
 const STOPPED_VERIFY = "session-886584b7b8b438f5dfd1cb45"; // stopped Verify; plan-archive-orphan refused it (AUTHORITY)
 const OWN = "session-0a0a0a0a0a0a0a0a0a0a0a0a";
 const BARE_ORPHAN = "session-0b0b0b0b0b0b0b0b0b0b0b0b";
+
+// Cases are declared with stable ids and registered together through the completion protocol at the end of the file.
+const cases = [];
+function register(id, name, run) {
+  cases.push({ id, name, run });
+}
 
 function seed(path, sessionId, { manifest }) {
   const started = startSessionDescriptor(path, { sessionId, ownerPid: DEAD_PID });
@@ -68,7 +75,9 @@ function assertForeignWarning(observed, path, label) {
   assert.equal(validForeignCleanupResidueWarning(warning, observed.root), true, `${label}: the ready gate must admit the warning`);
 }
 
-test("foreign session descriptors never lock session readiness; the requester's own descriptor still does", () => {
+// One case: the incident steps below are sequential and share one fixture root (each step seeds a further descriptor
+// on top of the previous ones), so they are not independent scenarios.
+register("PFR01", "foreign session descriptors never lock session readiness; the requester's own descriptor still does", () => {
   const previousNonce = process.env.PIPELINE_SESSION_OWNER_NONCE;
   delete process.env.PIPELINE_SESSION_OWNER_NONCE;
   const path = root();
@@ -105,3 +114,9 @@ test("foreign session descriptors never lock session readiness; the requester's 
     dispose(path);
   }
 });
+
+assert.equal(cases.length, 1, "the complete foreign-residue corpus must register before execution");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(devNull, "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
