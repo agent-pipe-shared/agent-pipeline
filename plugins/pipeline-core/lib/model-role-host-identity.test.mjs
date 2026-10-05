@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { openSync } from "node:fs";
 import { resolveModelRoleHostSessionIdentity } from "./model-role-host-identity.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 function test(name, run) { cases.push({ id: `MRI${String(cases.length + 1).padStart(2, "0")}`, name, run }); }
@@ -33,7 +34,7 @@ test("Antigravity requires the host hook or execution stream conversation key", 
 
 assert.equal(cases.length, 3);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

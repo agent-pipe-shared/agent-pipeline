@@ -9,7 +9,7 @@ function test(name, run) {
   completionCases.push({ id: "RC15C" + String(completionCases.length + 1).padStart(3, "0"), name, run });
 }
 import {mkdtempSync,writeFileSync,readFileSync,rmSync,readdirSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {dirname,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
@@ -31,7 +31,7 @@ test('HGO-SCAN: corrupt authenticated audit still fails globally before later va
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 3) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { openSync } from "node:fs";
 import { computeEffectiveCapacity, createLocalWorkerPool, localWorkerPoolDigest, reduceLocalWorkerPool, selectLocalWorkerPoolReferenceAdapter, validateLocalWorkerPool } from "./local-worker-pool.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), O = "1".repeat(40);
 const bounds = (certified = 3, pressure = 5) => ({ configured:{concurrentTasks:8,required:true}, operator:{concurrentTasks:6,required:true}, certified:{concurrentTasks:certified,required:true}, observed:{concurrentTasks:4,required:true}, pressure:{concurrentTasks:pressure,required:false}, reserved:{elephant:1,verify:1,critic:0}, effective:{status:"available",concurrentTasks:Math.max(0,Math.min(8,6,certified,4,pressure)-2),reasonCodes:[]} });
@@ -26,7 +27,7 @@ check("invalidates stale candidates and leaves result import unavailable until B
 
 assert.equal(cases.length, 6, "the complete LWP corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

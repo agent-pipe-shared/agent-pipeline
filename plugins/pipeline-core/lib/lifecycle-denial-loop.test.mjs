@@ -9,7 +9,7 @@ function test(name, run) {
 }
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {join} from 'node:path';
 import {observeReturnedActionDenial, resetLifecycleDenial} from './lifecycle-denial-loop.mjs';
 
@@ -160,7 +160,7 @@ test('saved bytes contain only closed metadata and keyed fingerprints', () => fi
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 20) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

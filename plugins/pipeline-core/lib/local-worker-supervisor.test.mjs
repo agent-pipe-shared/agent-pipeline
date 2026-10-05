@@ -25,6 +25,7 @@ import {
   validateLocalWorkerSupervisorResult,
   validateLocalWorkerSupervisorCancel,
 } from "./local-worker-supervisor.mjs";
+import { devNull } from "node:os";
 
 const A = "a".repeat(64);
 const B = "b".repeat(64);
@@ -534,7 +535,7 @@ check("pins observeRunner's Codex --version and --help probe argument vectors to
 
 assert.equal(cases.length, 15, "the complete LWS corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

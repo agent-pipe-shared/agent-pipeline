@@ -5,6 +5,7 @@ import { bindModelRoleTaskDispatch } from "./model-role-dispatch.mjs";
 import { resolveModelRoleSession } from "./model-role-session.mjs";
 import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 function test(name, run) { cases.push({ id: `MRD${String(cases.length + 1).padStart(2, "0")}`, name, run }); }
@@ -54,7 +55,7 @@ test("unknown and unavailable task routes fail before a model launch", () => {
 
 assert.equal(cases.length, 3);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

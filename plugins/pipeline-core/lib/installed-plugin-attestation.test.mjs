@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { cpSync, chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { validateInstalledProtectedFiles, verifyInstalledPluginAttestation } from "./installed-plugin-attestation.mjs";
 import { createProvenanceAttestationPayload } from "./provenance-envelope.mjs";
@@ -302,7 +302,7 @@ check("the structural schema explicitly delegates protected-file key uniqueness 
 
 assert.equal(cases.length, 9, "the complete installed-plugin-attestation corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

@@ -5,6 +5,7 @@ import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from ".
 import { admitModelRoleHostBootstrap, bindStoredModelRoleDispatch,
   prepareModelRoleHostBootstrap, selectStoredModelRoleDispatch } from "./model-role-host-session.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 function test(name, run) { cases.push({ id: `MRH${String(cases.length + 1).padStart(2, "0")}`, name, run }); }
@@ -109,7 +110,7 @@ test("pre-packet selection reads one admitted runner and refuses unknown or fore
 
 assert.equal(cases.length, 4);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

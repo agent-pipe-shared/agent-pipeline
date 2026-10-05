@@ -4,6 +4,7 @@ import { openSync } from "node:fs";
 import { deriveV3BaselinePolicies, verifyV3BaselineAuthority } from "./model-role-v3-baseline.mjs";
 import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 function test(name, run) { cases.push({ id: `MVB${String(cases.length + 1).padStart(2, "0")}`, name, run }); }
@@ -52,7 +53,7 @@ test("a stored V3 baseline is rederived from the current governed source", () =>
 
 assert.equal(cases.length, 4);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
