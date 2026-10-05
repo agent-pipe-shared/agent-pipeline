@@ -1,0 +1,56 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -8,4 +8,4 @@
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { APP_SERVER_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { APP_SERVER_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS, sameSanctionedScriptPath } from "./constants.mjs";
+ import { exactRoot, simpleWords } from "./shell-grammar.mjs";
+@@ -142,6 +142,6 @@
+       && args[4] === "--activate" && args.length === 5;
+   }
+   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+-  if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
++  if (sameSanctionedScriptPath(script, START_PREFLIGHT_SCRIPT, options.platform ?? process.platform)) return args.length === 0;
+   if (script === PRE_PUSH_HOOK_INSTALL_SCRIPT) return args[0] === "--install" && args.length === 1;
+   if (script === OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -146,6 +146,16 @@
+ export const APP_SERVER_SCRIPT = fileURLToPath(new URL("../../scripts/codex-app-server-health.mjs", import.meta.url));
+
+ export const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../../scripts/pipeline-start-preflight.mjs", import.meta.url));
++
++// win32 spellings of the same path (separator and case) compare equal; dot segments
++// and any other path still miss, so this never widens the sanctioned script set.
++export function sameSanctionedScriptPath(spelled, sanctioned, platform = process.platform) {
++  if (typeof spelled !== "string" || typeof sanctioned !== "string") return false;
++  if (spelled === sanctioned) return true;
++  if (platform !== "win32") return false;
++  const fold = (value) => value.replaceAll("/", "\\").toLowerCase();
++  return fold(spelled) === fold(sanctioned);
++}
+
+ // A stale pipeline-owned hook must be able to invoke only its own exact updater.
+ export const PRE_PUSH_HOOK_INSTALL_SCRIPT = fileURLToPath(new URL("../../scripts/pre-push-hook-install.mjs", import.meta.url));
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -6,7 +6,7 @@
+ import { basename, isAbsolute, join, resolve } from "node:path";
+ import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
+ import { USER_SOURCE_PATH, readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
+-import { HEX, START_PREFLIGHT_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { HEX, START_PREFLIGHT_SCRIPT, VALID_RUNNERS, sameSanctionedScriptPath } from "./constants.mjs";
+ import { isRealpathedWithinBoundary, pathInside } from "./path-containment.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+
+@@ -600,5 +600,5 @@
+  */
+ export function isSanctionedStartPreflightInvocation(command, root, options = {}) {
+   const resolved = resolveSanctionedScriptInvocation(command, root, options);
+-  return resolved !== null && resolved.script === START_PREFLIGHT_SCRIPT && resolved.args.length === 0;
++  return resolved !== null && sameSanctionedScriptPath(resolved.script, START_PREFLIGHT_SCRIPT, options.platform ?? process.platform) && resolved.args.length === 0;
+ }
