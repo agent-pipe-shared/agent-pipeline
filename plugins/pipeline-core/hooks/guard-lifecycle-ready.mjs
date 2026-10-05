@@ -843,6 +843,9 @@ function rejectedGrammarElement(code, command, parsed, root) {
 import { readFileSync as w04ReadFileSync, realpathSync as w04RealpathSync } from "node:fs";
 import { dirname as w04Dirname } from "node:path";
 
+// ALFRED-QP3 (W0-4 F-2): the lane admits EXACTLY these three first path segments -- backlog, docs AND scratch -- and no
+// other. The earlier prose named two; the tracked tests (QP3-4*) now pin all three, including that a traversal out of
+// scratch/ ("scratch/../project/...") is refused.
 const W04_RECORD_PREFIXES = Object.freeze(["backlog", "docs", "scratch"]);
 
 function w04NormalizeRelative(value) {
@@ -888,11 +891,16 @@ function w04IsNonAuthorityRecordWrite(input, toolName, root, dependencies = {}) 
     const absolute = resolve(root, target);
     const rel = relative(root, absolute).split(sep).join("/");
     if (w04RecordSegments(rel) === null) return false;
-    const realRoot = w04RealpathSync(root);
+    const realpath = dependencies.w04RealpathSyncFn ?? w04RealpathSync;
+    const realRoot = realpath(root);
     let current = absolute;
     const tail = [];
     for (;;) {
-      try { current = w04RealpathSync(current); break; } catch {
+      try { current = realpath(current); break; } catch (error) {
+        // ALFRED-QP3 (W0-4 hardening F-1): only "this component does not exist yet" may continue upward. Any other fault
+        // (EACCES, EPERM, ELOOP, EIO ...) means the physical location cannot be established, and a record lane that cannot
+        // prove where a write lands must refuse, never guess.
+        if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return false;
         const parent = w04Dirname(current);
         if (parent === current) return false;
         tail.unshift(basename(current));
@@ -1617,17 +1625,58 @@ export const GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS = Object.freeze([
  * trusted merely for sharing a relative path; only the installed copy actually running
  * this check is.
  */
+/**
+ * ALFRED-QP3 (G8): on native Windows every path word of this lane (node executable, script, root, intent, proof, policy)
+ * contains backslashes, so the former blanket backslash refusal made the lane unreachable there. A backslash is admitted
+ * ONLY when the platform is win32 AND the raw command text is exactly the canonical rendering of the parsed words -- each
+ * word bare (no backslash), single-quoted, or double-quoted with every backslash doubled, joined by single spaces. A
+ * backslash anywhere else (an escape outside a path word, before a quote, trailing, unquoted) never matches a rendering,
+ * so what the guard parsed is provably what the shell receives. Every other metacharacter stays refused on every platform.
+ */
+function win32CanonicalWordRendering(command, words) {
+  let at = 0;
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index];
+    const candidates = [];
+    if (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(word)) candidates.push(word);
+    if (!word.includes("'")) candidates.push("'" + word + "'");
+    if (!word.includes('"')) candidates.push('"' + word.replaceAll("\\", "\\\\") + '"');
+    const hit = candidates.find((candidate) => command.startsWith(candidate, at));
+    if (hit === undefined) return false;
+    at += hit.length;
+    if (index < words.length - 1) {
+      if (command[at] !== " ") return false;
+      at += 1;
+    }
+  }
+  return at === command.length;
+}
+
 /** Write-capable signed-package lane: skips ONLY the basename classifier. */
 export function signedQualityPackageCommandAdmission(command, root, dependencies = {}) {
-  if (typeof command !== "string" || /[\\$\x60;&|<>\r\n]/u.test(command)) return false;
-  const words = simpleWords(command, root);
+  const nativeWin32 = (dependencies.platform ?? process.platform) === "win32";
+  if (typeof command !== "string" || (nativeWin32 ? /[$\x60;&|<>\r\n]/u : /[\\$\x60;&|<>\r\n]/u).test(command)) return false;
+  // win32: Claude's Bash tool executes through Git-Bash, so the command is tokenized with the POSIX dialect (CLAUDE_BASH_SHELL_DIALECT_PLATFORM:
+  // a double-quoted doubled backslash collapses to one backslash); the host default would keep it doubled and no native path word could match.
+  const words = simpleWords(command, root, nativeWin32 ? { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM } : {});
   if (!words || words.length !== 7) return false;
-  const directNode = (dependencies.platform ?? process.platform) === "win32" ? ["node", "node.exe"] : ["node"];
+  if (nativeWin32 && command.includes("\\") && !win32CanonicalWordRendering(command, words)) return false;
+  const directNode = nativeWin32 ? ["node", "node.exe"] : ["node"];
   if (![...directNode, dependencies.processExecPath ?? process.execPath].includes(words[0])) return false;
   try {
     const pluginRoot = realpathSync(PLUGIN_ROOT);
     const script = join(pluginRoot, "scripts", "quality-package-materializer.mjs");
-    if (words[1] !== script || !physicalQualityPackageFile(script, pluginRoot, 1024 * 1024)) return false;
+    // win32 (ALFRED-QP3B F-B): the script is matched by PHYSICAL identity, never by a case-folded string. The native realpath
+    // of the spelled script must be the native realpath of the sanctioned script, so a spelling that differs only by the
+    // letter case NTFS ignores (drive letter, directory or file name) is the same file, while a same-named file in another
+    // directory has another realpath and is refused. A real file reached through a link is not the sanctioned spelling
+    // either: the spelling itself must pass the closed physical-file grammar (no symlink/junction component, one link, under
+    // the plugin root). POSIX keeps the exact string comparison.
+    const sameScript = nativeWin32
+      ? isAbsolute(words[1]) && realpathSync.native(words[1]) === realpathSync.native(script)
+        && physicalQualityPackageFile(words[1], pluginRoot, 1024 * 1024)
+      : words[1] === script;
+    if (!sameScript || !physicalQualityPackageFile(script, pluginRoot, 1024 * 1024)) return false;
     return validateQualityPackageCommandArgs(words.slice(2), root);
   } catch { return false; }
 }
@@ -4799,7 +4848,7 @@ function sanctionedMigrationArgs(args, root) {
 function sanctionedSessionCleanupArgs(args, root) {
   const exactRunnerTail = (index) => args[index] === "--runner"
     && (args[index + 1] === "claude" || args[index + 1] === "codex");
-  if (["start", "status", "release-binding", "plan-recovery", "plan-human-recovery", "plan-privatization"].includes(args[0])) {
+  if (["start", "status", "release-binding", "plan-recovery", "plan-human-recovery", "plan-privatization", "plan-archive-orphan"].includes(args[0])) {
     const base = args[1] === "--repo" && args[2] === root;
     return base && (args.length === 3 || (exactRunnerTail(3) && args.length === 5));
   }
@@ -4812,6 +4861,23 @@ function sanctionedSessionCleanupArgs(args, root) {
       && args[3] === "--by" && validBy(args[4])
       && args[5] === "--reason" && validReason(args[6]);
     return base && (args.length === 7 || (exactRunnerTail(7) && args.length === 9));
+  }
+  // ALFRED-QP3: archive-orphan (scripts/session-cleanup.mjs, commit 7fa9c77cf) -- a zero-authority archive of ONE foreign
+  // orphan descriptor. Exact closed argv exactly like release-orphan-binding above plus the cleanup branch's descriptor
+  // id and digest pair; --owner-nonce-file is deliberately NOT admitted (a plain archive of a zero-authority orphan needs
+  // no owner secret, and the guard must not become a route for a nonce file).
+  if (args[0] === "archive-orphan") {
+    const validBy = (value) => typeof value === "string"
+      && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
+    const validReason = (value) => typeof value === "string"
+      && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 2000;
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--session-descriptor"
+      && /^[A-Za-z0-9._-]{1,80}$/u.test(args[4] ?? "") && !/^\.{1,2}$/u.test(args[4])
+      && args[5] === "--expected-descriptor-sha256" && HEX.test(args[6] ?? "")
+      && args[7] === "--by" && validBy(args[8])
+      && args[9] === "--reason" && validReason(args[10]);
+    return base && (args.length === 11 || (exactRunnerTail(11) && args.length === 13));
   }
   if (args[0] === "confirm-privatization") {
     const base = args[1] === "--repo" && args[2] === root

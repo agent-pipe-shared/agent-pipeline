@@ -10696,7 +10696,7 @@ process.on("exit", () => {
 });
 
 
-test("SIGNED-AGENT closed enforcing origin and filesystem grammar", async () => {
+test("SIGNED-AGENT closed enforcing origin and filesystem grammar", async (t) => {
   const mod = await import("./guard-lifecycle-ready.mjs");
   const admit = mod.signedQualityPackageCommandAdmission ?? (() => false);
   const path = realpathSync(root());
@@ -10709,16 +10709,30 @@ test("SIGNED-AGENT closed enforcing origin and filesystem grammar", async () => 
     const command=(words)=>words.map(w=>JSON.stringify(w)).join(" ");
     for(const mode of ["verify","apply","authorize-commit"]) assert.equal(admit(command([process.execPath,script,...args.slice(0,4),mode]),path),true,mode);
     const good=command([process.execPath,script,...args]);
-    for(const bad of [good+" extra",good+" ; echo x",good+" > result",good+" && echo x",good+" | cat",good.replace('verify','VERIFY'),command([process.execPath,"--import",script,...args]),command(["env",process.execPath,script,...args]),command([process.execPath,script,...args.slice(0,3),intent,"verify"]),good.replace(intent,path+"/./intent.json"),good.replace(intent,path+"/../intent.json")]) assert.equal(admit(bad,path),false,bad);
+    const nativeSep=process.platform==="win32"?"\\":"/";
+    // A host that cannot create a symlink (win32 without the privilege) skips ONLY the sub-case that needs one, as a node:test SUBTEST
+    // with an explicit skip reason. A top-level t.skip() would mark the whole test skipped and, measured on this host, make any later
+    // assertion failure exit 0 (scratch/qp3/instrument-run.log), so it is deliberately not used.
+    const tryLink=(target,file)=>{try{symlinkSync(target,file);return true;}catch(error){if(error?.code!=="EPERM"&&error?.code!=="EACCES")throw error;return false;}};
+    const noLinkReason="symlink creation not permitted on this host";
+    const variants=[good+" extra",good+" ; echo x",good+" > result",good+" && echo x",good+" | cat",
+      command([process.execPath,script,...args.slice(0,4),"VERIFY"]),
+      command([process.execPath,"--import",script,...args]),command(["env",process.execPath,script,...args]),
+      command([process.execPath,script,...args.slice(0,3),intent,"verify"]),
+      command([process.execPath,script,path,path+"/./intent.json",proof,policy,"verify"]),
+      command([process.execPath,script,path,path+"/../intent.json",proof,policy,"verify"]),
+      command([process.execPath,script,path,path+nativeSep+"."+nativeSep+"intent.json",proof,policy,"verify"]),
+      command([process.execPath,script,path,path+nativeSep+".."+nativeSep+"intent.json",proof,policy,"verify"])];
+    for(const bad of variants){assert.notEqual(bad,good,"every refusal variant must differ from the sanctioned command: "+bad);assert.equal(admit(bad,path),false,bad);}
     const copied=join(path,"copied.mjs");writeFileSync(copied,readFileSync(script));
     const vendored=join(path,"plugins/pipeline-core/scripts");mkdirSync(vendored,{recursive:true});writeFileSync(join(vendored,"quality-package-materializer.mjs"),readFileSync(script));
     assert.equal(admit(command([process.execPath,copied,...args]),path),false);
     assert.equal(admit(command([process.execPath,join(vendored,"quality-package-materializer.mjs"),...args]),path),false);
-    const link=join(path,"linked.mjs");symlinkSync(script,link);
-    assert.equal(admit(command([process.execPath,link,...args]),path),false);
-    const inputLink=join(path,"link.json");symlinkSync(intent,inputLink);
-    assert.equal(admit(command([process.execPath,script,path,inputLink,proof,policy,"verify"]),path),false);
-    rmSync(inputLink);linkSync(intent,inputLink);
+    const link=join(path,"linked.mjs");const linked=tryLink(script,link);
+    await t.test("SIGNED-AGENT symlinked script is refused",{skip:!linked&&noLinkReason},()=>{assert.equal(admit(command([process.execPath,link,...args]),path),false);});
+    const inputLink=join(path,"link.json");const inputLinked=tryLink(intent,inputLink);
+    await t.test("SIGNED-AGENT symlinked input is refused",{skip:!inputLinked&&noLinkReason},()=>{assert.equal(admit(command([process.execPath,script,path,inputLink,proof,policy,"verify"]),path),false);});
+    rmSync(inputLink,{force:true});linkSync(intent,inputLink);
     assert.equal(admit(good,path),false,"hardlinked input");rmSync(inputLink);
     writeFileSync(proof," ".repeat(32769));assert.equal(admit(good,path),false,"bounded proof");
   } finally {rmSync(path,{recursive:true,force:true});}
@@ -10950,4 +10964,257 @@ test("QW04-8 GL-09 fault injection: an exception inside the record lane's own ev
   assert.ok(fired >= 1, "the fault must actually fire inside the record lane (the injection point moved if this fails)");
   assert.equal(faulted.exitCode, 2, `a throwing lane must block, not admit: ${faulted.stderr}`);
   assert.match(faulted.stderr, /BLOCKED \(guard-lifecycle-ready/u);
+});
+
+// ALFRED-QP3-BUILD: tests for the third signed quality package (appended to the HEAD test file; ALFRED-QP3B additionally makes the
+// pre-existing "SIGNED-AGENT closed enforcing origin and filesystem grammar" test win32-safe -- see stage.mjs `testEdits`).
+//   QP3-2c/2d (ALFRED-QP3B F-B) the sanctioned script is matched by physical identity: same-named file elsewhere / link refused,
+//          letter-case variant of the real file admitted (win32).
+//   QP3-1  zero-authority orphan archive verbs of scripts/session-cleanup.mjs are admitted in exact closed argv, also while
+//          readiness is `partial`; --owner-nonce-file and every other deviation stay refused.
+//   QP3-2  G8: the signed-package lane admits a native-Windows invocation (backslash path words) ONLY on win32 and ONLY as the
+//          canonical rendering of the validated path words; every forbidden metacharacter and every other backslash use is refused.
+//   QP3-3  W0-4 hardening F-1: the record lane's realpath walk continues only on ENOENT/ENOTDIR and refuses on any other fault.
+//   QP3-4  W0-4 F-2: the record lane admits exactly THREE prefixes -- backlog/, docs/ and scratch/ -- and refuses a traversal
+//          out of scratch/ ("scratch/../project/...").
+const QP3_GUARD_MODULE = "./guard-lifecycle-ready.mjs";
+
+test("QP3-1 non-ready session-cleanup admits the zero-authority orphan archive verbs only in their exact closed argv (also while partial)", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const digest = "a".repeat(64);
+    const script = `node '${SESSION_CLEANUP_SCRIPT}'`;
+    const plan = `${script} plan-archive-orphan --repo '${path}'`;
+    const archive = `${script} archive-orphan --repo '${path}' --session-descriptor orphan-01 --expected-descriptor-sha256 ${digest} --by operator --reason 'foreign zero-authority orphan'`;
+    const admitted = [
+      plan, `${plan} --runner claude`, `${plan} --runner codex`,
+      archive, `${archive} --runner claude`, `${archive} --runner codex`,
+      `${script} archive-orphan --repo '${path}' --session-descriptor Orphan_1.x --expected-descriptor-sha256 ${digest} --by 'a b' --reason 'a reason with spaces'`,
+    ];
+    for (const status of ["partial", "continuity-damaged"]) {
+      for (const command of admitted) {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+        assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+        }).exitCode, 0, `${status}: ${command}`);
+      }
+    }
+    const rejected = [
+      `${script} plan-archive-orphan --repo /tmp/other`,
+      `${plan} --owner-nonce-file '${path}/nonce'`,
+      `${plan} --force`,
+      `${plan} --runner cursor`,
+      `${plan} --runner`,
+      `${plan} --runner claude --runner codex`,
+      `${plan} --session-descriptor orphan-01`,
+      `${script} plan-archive-orphan '${path}'`,
+      `${script} plan-archive-orphan --repo '${path}' && touch bypass`,
+      `${archive} --force`,
+      `${archive} --owner-nonce-file '${path}/nonce'`,
+      `${archive} --runner cursor`,
+      `${archive} --runner claude --runner codex`,
+      `${archive} --runner claude --owner-nonce-file '${path}/nonce'`,
+      archive.replace(`'${path}'`, "/tmp/other"),
+      archive.replace("--by operator ", ""),
+      archive.replace("--by operator", "--by ''"),
+      archive.replace(" --reason 'foreign zero-authority orphan'", ""),
+      archive.replace(" --reason 'foreign zero-authority orphan'", " --reason ''"),
+      archive.replace("--session-descriptor orphan-01 ", ""),
+      archive.replace(`--expected-descriptor-sha256 ${digest} `, ""),
+      archive.replace(digest, "z".repeat(64)),
+      archive.replace(digest, "a".repeat(63)),
+      archive.replace(digest, "A".repeat(64)),
+      archive.replace("orphan-01", "../foreign"),
+      archive.replace("orphan-01", "a/b"),
+      archive.replace("orphan-01", "'a b'"),
+      archive.replace("orphan-01", ".."),
+      archive.replace("orphan-01", "."),
+      archive.replace("orphan-01", "o".repeat(81)),
+      `${script} archive-orphan --repo '${path}' --expected-descriptor-sha256 ${digest} --session-descriptor orphan-01 --by operator --reason orphan`,
+      archive.replace("node '", "node '/tmp/other/scripts/session-cleanup.mjs' archive-orphan --repo '/tmp/x' ; node '"),
+      archive.replace(`'${SESSION_CLEANUP_SCRIPT}'`, "'/tmp/other/scripts/session-cleanup.mjs'"),
+      `${archive} && touch bypass`,
+    ];
+    for (const status of ["partial", "continuity-damaged"]) {
+      for (const command of rejected) {
+        assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+        assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+        }).exitCode, 2, `${status}: ${command}`);
+      }
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+const QP3_METACHARACTERS = ["$", "`", ";", "&", "|", "<", ">", "\r", "\n"];
+
+function qp3SignedFixture() {
+  const path = realpathSync(root());
+  mkdirSync(join(path, "project"));
+  const intent = join(path, "intent.json");
+  const proof = join(path, "proof.json");
+  const policy = join(path, "project", "critical-human-proof.json");
+  for (const file of [intent, proof, policy]) writeFileSync(file, "{}");
+  const script = realpathSync(fileURLToPath(new URL("../scripts/quality-package-materializer.mjs", import.meta.url)));
+  return { path, intent, proof, policy, script };
+}
+
+test("QP3-2a G8 on native Windows the signed-package lane admits backslash path words only as their canonical rendering", { skip: process.platform !== "win32" && "native Windows path words exist only on a win32 host" }, async () => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const f = qp3SignedFixture();
+  try {
+    const single = (word) => `'${word}'`;
+    const render = (mode, quote, script = f.script) => [process.execPath, script, f.path, f.intent, f.proof, f.policy].map(quote).join(" ") + ` ${mode}`;
+    for (const mode of ["verify", "apply", "authorize-commit"]) {
+      assert.equal(admit(render(mode, single), f.path), true, `single-quoted ${mode}`);
+      assert.equal(admit(render(mode, JSON.stringify), f.path), true, `json double-quoted ${mode}`);
+      assert.equal(admit(render(mode, single), f.path, { platform: "win32" }), true, `platform win32 injected ${mode}`);
+    }
+    const good = render("verify", single);
+    assert.equal(admit(good.replace(single(process.execPath), "node.exe"), f.path), true, "bare node.exe");
+    assert.equal(admit(render("verify", single, f.script.toLowerCase()), f.path), true, "script compared by physical identity: letter case is irrelevant on win32");
+    assert.equal(admit(render("verify", single, f.script.toUpperCase()), f.path), true, "upper-cased script spelling");
+    assert.equal(admit(good, f.path, { platform: "linux" }), false, "a backslash stays refused when the platform is not win32");
+    assert.equal(admit(good, f.path, { platform: "darwin" }), false, "darwin too");
+    // every forbidden metacharacter stays refused beside native backslash paths: trailing word and inside each path word
+    for (const meta of QP3_METACHARACTERS) {
+      assert.equal(admit(`${good} ${meta} echo x`, f.path), false, `trailing ${JSON.stringify(meta)}`);
+      assert.equal(admit(good + meta, f.path), false, `glued ${JSON.stringify(meta)}`);
+      for (const word of [f.intent, f.proof, f.policy, f.path, f.script]) {
+        assert.equal(admit(good.replace(single(word), `'${word}${meta}x'`), f.path), false, `inside ${word} ${JSON.stringify(meta)}`);
+      }
+    }
+    // a backslash anywhere other than inside a canonically rendered path word is refused
+    assert.equal(admit(`${good}\\`, f.path), false, "trailing backslash");
+    assert.equal(admit(good.replace(" verify", " verify\\"), f.path), false, "backslash glued to the mode word");
+    assert.equal(admit(good.replace(single(f.intent), f.intent), f.path), false, "unquoted native path word");
+    assert.equal(admit(good.replace(single(f.intent), `"${f.intent}"`), f.path), false, "double-quoted word with undoubled backslashes");
+    assert.equal(admit(good.replace(single(f.intent), `'${f.intent}'\\`), f.path), false, "backslash after a closing quote");
+    assert.equal(admit(good.replace(`'${f.proof}'`, `\\'${f.proof}'`), f.path), false, "escaped opening quote");
+    assert.equal(admit(good.replace(`'${f.proof}' `, `'${f.proof}'  `), f.path), false, "two spaces");
+    assert.equal(admit(good.replace(single(f.intent), `'${f.path}\\.\\intent.json'`), f.path), false, "non-canonical dot segment");
+    assert.equal(admit(good.replace(single(f.intent), `'${f.path}\\..\\${f.path.split("\\").pop()}\\intent.json'`), f.path), false, "non-canonical dot-dot segment");
+    assert.equal(admit(good.replace("verify", "VERIFY"), f.path), false, "mode case");
+  } finally { rmSync(f.path, { recursive: true, force: true }); }
+});
+
+test("QP3-2b G8 a backslash path word beside any forbidden metacharacter is refused on every platform (host independent)", async () => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const base = "node 'C:\\repo\\plugins\\pipeline-core\\scripts\\quality-package-materializer.mjs' 'C:\\repo' 'C:\\repo\\i.json' 'C:\\repo\\p.json' 'C:\\repo\\project\\critical-human-proof.json' verify";
+  for (const platform of ["win32", "linux", "darwin"]) {
+    assert.equal(admit(base, "C:\\repo", { platform }), false, `${platform}: nonexistent paths are never admitted`);
+    for (const meta of QP3_METACHARACTERS) {
+      assert.equal(admit(`${base} ${meta} echo x`, "C:\\repo", { platform }), false, `${platform} ${JSON.stringify(meta)}`);
+      assert.equal(admit(base.replace("C:\\repo\\i.json", `C:\\repo\\i${meta}.json`), "C:\\repo", { platform }), false, `${platform} in-word ${JSON.stringify(meta)}`);
+    }
+  }
+  assert.equal(admit(42, "C:\\repo", { platform: "win32" }), false, "non-string command");
+});
+
+// ALFRED-QP3B F-B: the sanctioned script is matched by physical identity (native realpath of the spelling == native realpath of the
+// sanctioned script, plus the closed physical-file grammar on the spelling itself), not by a case-folded string comparison.
+test("QP3-2c F-B the sanctioned script is matched by physical identity: a same-named file in another directory and a link to the real script are refused", async (t) => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const f = qp3SignedFixture();
+  try {
+    const render = (script) => [process.execPath, script, f.path, f.intent, f.proof, f.policy, "verify"].map((word) => JSON.stringify(word)).join(" ");
+    assert.equal(admit(render(f.script), f.path), true, "control: the real script in its canonical spelling");
+    for (const dir of [join(f.path, "plugins", "pipeline-core", "scripts"), join(f.path, "other")]) {
+      mkdirSync(dir, { recursive: true });
+      const sameName = join(dir, "quality-package-materializer.mjs");
+      writeFileSync(sameName, readFileSync(f.script));
+      assert.equal(admit(render(sameName), f.path), false, `same file name in another directory: ${dir}`);
+      assert.equal(admit(render(sameName.toUpperCase()), f.path), false, "a case variant of a DIFFERENT file is still a different file");
+    }
+    // Links: each sub-case is a SUBTEST that skips ONLY itself, with an explicit reason, when the host cannot create the link (a file
+    // symlink needs a privilege on win32; a directory junction does not, so the reparse-point spelling stays covered on such a host).
+    // A top-level t.skip() is deliberately not used: it marks the whole test skipped and lets a later assertion failure exit 0.
+    const tryLink = (target, file, type) => {
+      try { symlinkSync(target, file, type); return true; } catch (error) {
+        if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+        return false;
+      }
+    };
+    const noLinkReason = "symlink creation not permitted on this host";
+    const junction = join(f.path, "scripts-junction");
+    const junctionMade = tryLink(dirname(f.script), junction, process.platform === "win32" ? "junction" : "dir");
+    await t.test("QP3-2c directory link to the real scripts directory is not the sanctioned spelling", { skip: !junctionMade && noLinkReason }, () => {
+      assert.equal(admit(render(join(junction, "quality-package-materializer.mjs")), f.path), false, "the real script reached through a directory link has the same realpath but is not the sanctioned spelling");
+    });
+    const link = join(f.path, "link-to-script.mjs");
+    const linkMade = tryLink(f.script, link, "file");
+    await t.test("QP3-2c file symlink to the real script is not the sanctioned spelling", { skip: !linkMade && noLinkReason }, () => {
+      assert.equal(admit(render(link), f.path), false, "a symlink to the real script is not the sanctioned spelling");
+    });
+  } finally { rmSync(f.path, { recursive: true, force: true }); }
+});
+
+test("QP3-2d F-B on native Windows a letter-case variant of the real script is admitted because it is the same physical file", { skip: process.platform !== "win32" && "letter case is irrelevant only on a case-insensitive win32 filesystem" }, async () => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const f = qp3SignedFixture();
+  try {
+    const render = (script) => [process.execPath, script, f.path, f.intent, f.proof, f.policy, "verify"].map((word) => JSON.stringify(word)).join(" ");
+    const swapped = (f.script[0] === f.script[0].toUpperCase() ? f.script[0].toLowerCase() : f.script[0].toUpperCase()) + f.script.slice(1);
+    const variants = [swapped, f.script.toLowerCase(), f.script.toUpperCase()].filter((variant) => variant !== f.script);
+    assert.ok(variants.length >= 2, "at least two spellings differ from the real script only by letter case");
+    for (const variant of variants) assert.equal(admit(render(variant), f.path), true, `case variant ${variant}`);
+    assert.equal(admit(render(f.script + "x"), f.path), false, "a different name is never a case variant");
+  } finally { rmSync(f.path, { recursive: true, force: true }); }
+});
+
+test("QP3-3 W0-4 hardening F-1: the record lane's realpath walk continues only on ENOENT/ENOTDIR and refuses on any other fault", () => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  const target = "docs/qp3-f1/not-yet.md";
+  const run = (w04RealpathSyncFn) => evaluateLifecycleReadyGuard({ tool_name: "Write", tool_input: { file_path: target } }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn: QW04_OUTCOMES.invalid, w04RealpathSyncFn,
+  });
+  const faultAt = (suffix, code) => (candidate) => {
+    if (String(candidate).endsWith(suffix)) {
+      const error = new Error(`injected ${code} at ${suffix}`);
+      error.code = code;
+      throw error;
+    }
+    return realpathSync(candidate);
+  };
+  assert.equal(run(realpathSync).exitCode, 0, "control: the unfaulted walk admits the record");
+  for (const suffix of ["qp3-f1", "not-yet.md"]) {
+    for (const code of ["ENOENT", "ENOTDIR"]) {
+      assert.equal(run(faultAt(suffix, code)).exitCode, 0, `${code} at ${suffix} still means "does not exist yet" and continues`);
+    }
+    for (const code of ["EACCES", "EPERM", "ELOOP", "EIO", "EMFILE", undefined]) {
+      const result = run(faultAt(suffix, code));
+      assert.equal(result.exitCode, 2, `${code} at ${suffix} must refuse`);
+      assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, `${code}/${suffix}`);
+    }
+  }
+  for (const code of ["EACCES", "EPERM"]) {
+    assert.equal(run(faultAt("docs", code)).exitCode, 2, `${code} on an existing ancestor component refuses`);
+    assert.equal(run(faultAt(path.split(/[\\/]/u).pop(), code)).exitCode, 2, `${code} on the project root component refuses`);
+  }
+});
+
+test("QP3-4 W0-4 F-2: the record lane admits exactly backlog/, docs/ and scratch/ and refuses a traversal out of scratch/", () => {
+  for (const [status, state] of Object.entries(QW04_STATES)) {
+    const path = qw04GuardRoot(state);
+    for (const toolName of ["Write", "Edit"]) {
+      for (const target of ["backlog/items/qp3-defect.md", "docs/qp3-note.md", "scratch/qp3-note.md", "scratch/qp3/deeper/not-yet-created.md"]) {
+        const result = qw04Run(path, toolName, { file_path: target });
+        assert.equal(result.exitCode, 0, `${status}/${toolName}/${target}: ${result.stderr}`);
+      }
+    }
+    const notebook = qw04Run(path, "NotebookEdit", { notebook_path: "scratch/qp3.ipynb" });
+    assert.equal(notebook.exitCode, 0, `${status}/NotebookEdit/scratch/qp3.ipynb: ${notebook.stderr}`);
+  }
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  assert.equal(qw04Run(path, "Write", { file_path: "scratch/qp3-note.md" }).exitCode, 0, "lane control");
+  qw04AssertRefused(path, [
+    "scratch/../project/pipeline-state.json", "scratch/../project/pipeline.json", "scratch/../src/app.js",
+    "scratch/../.claude/pipeline-state.json", "scratch/../docs/../src/app.js", "scratch", "scratch/..",
+  ], "scratch traversal and bare prefix");
+  const notebookTraversal = qw04Run(path, "NotebookEdit", { notebook_path: "scratch/../project/qp3.ipynb" });
+  assert.equal(notebookTraversal.exitCode, 2, "NotebookEdit traversal out of scratch/ refused");
 });
