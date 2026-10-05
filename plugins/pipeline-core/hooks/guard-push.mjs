@@ -142,6 +142,7 @@ import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
 import { checkpointAuditRecord, recordCheckpointPushAttempt } from "../lib/checkpoint-push-audit.mjs";
+import { checkCheckpointPushApproval, checkpointApprovalMode, classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs";
 import { inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
@@ -1944,13 +1945,25 @@ function resolvedPushSourceRef(binding) {
  * checked-out candidate in its own attached worktree, whose whole tree is
  * clean. The one committed intent trailer is an immutable human statement and
  * the local git-common-dir ledger records the exact attempted delivery.
+ *
+ * PUSHSIG (design 3.4): in `signature` mode (and only there) the whole tree may be clean OR
+ * carry exactly one dirty entry, the tracked state record modified in the work tree. That is
+ * what `approve-push` leaves behind AFTER it signed the subject, so the record can never be
+ * inside the commit it covers and committing it would move HEAD and stale the approval.
+ * `stateRelPath` is the record this guard itself reads the approval from; it is null outside
+ * `signature` mode, so any other mode keeps the strict clean-tree check byte for byte.
  */
-function checkpointEligibility({ binding, commit, projectDir }) {
+function checkpointEligibility({ binding, commit, projectDir, signatureMode = false, stateRelPath = null }) {
   const failures = [];
   const head = spawnSync("git", ["-C", projectDir, "rev-parse", "--verify", "HEAD^{commit}"], { encoding: "utf8", timeout: 5000 });
   if (head.status !== 0 || head.stdout?.trim() !== commit) failures.push("checkpoint source is not the clean checked-out candidate");
   const status = spawnSync("git", ["-C", projectDir, "status", "--porcelain"], { encoding: "utf8", timeout: 5000 });
-  if (status.status !== 0 || status.stdout?.trim() !== "") failures.push("checkpoint working tree is not clean");
+  // The UNTRIMMED text: porcelain entries begin with a significant space, and a trim would
+  // turn ` M <state>` into what reads as a staged `M <state>` (checkpoint-push-approval.mjs).
+  const porcelain = status.status === 0
+    ? classifyCheckpointPorcelain(status.stdout, stateRelPath === null ? [] : [stateRelPath])
+    : { clean: false, approvalRecordOnly: false };
+  if (!(porcelain.clean || (signatureMode && porcelain.approvalRecordOnly))) failures.push("checkpoint working tree is not clean");
   const trailers = spawnSync(
     "git",
     ["-C", projectDir, "show", "-s", "--format=%(trailers:key=Checkpoint-Intent,valueonly)", commit],
@@ -1997,10 +2010,34 @@ if (!pushGate || pushGate.mode === "off") {
 }
 
 if (pushDestination.lane === CHECKPOINT_LANE) {
+  // PUSHSIG (design 3.3): in `signature` mode a checkpoint push additionally needs a current
+  // Ed25519 `push` approval bound to this exact commit, remote and destination. `chat` and
+  // `standing-approved` keep today's behaviour. No Verify/security/Critic evidence is read.
+  // The waiver is read from the GOVERNED SESSION ROOT, never the pushed repository (T6 F1: the
+  // target must not be able to stand its own gate down). A fault in that read answers `null`,
+  // which the classifier resolves to `signature`, so a fault can only tighten. It is caught
+  // here because an uncaught throw exits 1, which this hook's harness treats as ALLOW.
+  let checkpointWaiver = null;
+  try {
+    checkpointWaiver = criticalProofWaiverFor(fallbackProjectDir(), "push");
+  } catch {
+    checkpointWaiver = null;
+  }
+  const checkpointSignatureMode = checkpointApprovalMode({ pushGate, waiver: checkpointWaiver }) === "signature";
+  let checkpointStateRelPath = null;
+  if (checkpointSignatureMode) {
+    try {
+      checkpointStateRelPath = projectStateRelPath(projectDir);
+    } catch {
+      checkpointStateRelPath = null; // no exempt path, and no state to read: strict
+    }
+  }
   const checkpoint = checkpointEligibility({
     binding: pushBinding,
     commit: sourceCommit,
     projectDir: evidenceProjectDir,
+    signatureMode: checkpointSignatureMode,
+    stateRelPath: checkpointStateRelPath,
   });
   if (!checkpoint.ok) {
     emit(2, [
@@ -2008,7 +2045,54 @@ if (pushDestination.lane === CHECKPOINT_LANE) {
       ...checkpoint.failures.map((failure) => `Reason: ${failure}.`),
     ]);
   }
-  const audit = recordCheckpointPushAttempt({ projectDir: evidenceProjectDir, record: checkpoint.record });
+  if (checkpointSignatureMode) {
+    // Same state source as the protected lane's approval check (the pushed repository's own
+    // state record); the trust anchor comes from the governed session root. An unreadable or
+    // malformed record is `null`, which the shared verifier refuses as STATE-MISSING.
+    let checkpointState = null;
+    try {
+      checkpointState = JSON.parse(readFileSync(join(projectDir, checkpointStateRelPath), "utf8"));
+    } catch {
+      checkpointState = null;
+    }
+    // The tree comes from the eligibility result, which resolved `<commit>^{tree}` in the same
+    // source worktree. `resolveSourceTree()` is deliberately NOT used: it is declared further
+    // down this file and reading it from here is a temporal-dead-zone ReferenceError.
+    const checkpointTree = typeof checkpoint.record?.tree === "string" ? checkpoint.record.tree : null;
+    let checkpointApproval;
+    try {
+      checkpointApproval = checkpointTree === null
+        ? { ok: false, code: "PUSH-PROOF-CANDIDATE-UNRESOLVED", reason: "the pushed candidate's tree cannot be resolved" }
+        : checkCheckpointPushApproval({
+          projectDir,
+          anchorDir: fallbackProjectDir(), // governed session root -- see attestedMainPublication
+          state: checkpointState,
+          candidate: { commit: sourceCommit, tree: checkpointTree },
+          remote: pushBinding.remote,
+          destination: pushBinding.destination,
+          now: new Date().toISOString(),
+        });
+    } catch {
+      // The shared verifier never throws, but this hook's own exit-1-is-allow harness makes any
+      // escaped exception a silent admit; convert it to a refusal instead.
+      checkpointApproval = {
+        ok: false,
+        code: "CHECKPOINT-APPROVAL-VERIFIER-FAULT",
+        reason: "the approval check could not complete, so it refuses rather than guesses",
+      };
+    }
+    if (!checkpointApproval.ok) {
+      // Operand text is deliberately NOT interpolated (SEC-01): `remote` is any positional the
+      // command supplied and can be a credential-bearing URL. The code and its fixed reason
+      // are all the operator needs; the command they just ran names the rest.
+      emit(2, [
+        "BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.",
+        `Reason: ${checkpointApproval.code} (${checkpointApproval.reason}).`,
+        "Run: push-init.mjs --checkpoint prints the single attended authorize-critical command for this commit; record the result with approve-push, then retry the push.",
+      ]);
+    }
+  }
+  const audit =recordCheckpointPushAttempt({ projectDir: evidenceProjectDir, record: checkpoint.record });
   if (!audit.ok) {
     emit(2, [
       "BLOCKED (guard-push feature checkpoint): the required local audit record could not be written.",
