@@ -357,11 +357,7 @@ const GUARD_PLUGIN_ROOT = (() => {
  * (the maxTurns read and the budget-contract lookup both call it, so they cannot disagree).
  * Resolution order:
  *   1. `dependencies.pluginRoot`: an explicitly injected plugin root (test seam) always wins.
- *   2. A hermetic harness that injects its own filesystem (`existsSyncFn` / `readFileSyncFn`)
- *      without a plugin root owns the layout of that fake filesystem, which lays definitions out
- *      under the project root, so `<rootDir>/plugins/pipeline-core` is used there. The hook
- *      entrypoint passes no options at all, so production never takes this rung.
- *   3. The plugin this guard ships in (module-relative): the installed plugin that Claude
+ *   2. The plugin this guard ships in (module-relative): the installed plugin that Claude
  *      actually dispatches with. It exists in a consumer repository, which has no
  *      `plugins/pipeline-core/` under its project root, and it cannot drift from the hook that
  *      is enforcing the cap the way a checkout's copy of the definition can.
@@ -369,8 +365,6 @@ const GUARD_PLUGIN_ROOT = (() => {
 export function resolveAgentPluginRoot(rootDir, dependencies = {}) {
   const injected = dependencies?.pluginRoot;
   if (typeof injected === "string" && injected !== "") return injected;
-  const injectedFilesystem = typeof dependencies?.existsSyncFn === "function" || typeof dependencies?.readFileSyncFn === "function";
-  if (injectedFilesystem && typeof rootDir === "string" && rootDir !== "") return join(rootDir, "plugins", "pipeline-core");
   return GUARD_PLUGIN_ROOT;
 }
 

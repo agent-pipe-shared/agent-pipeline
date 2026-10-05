@@ -148,7 +148,10 @@ test("resolveMaxTurns: an injected plugin root wins; the default is the guard's 
       ...process.env,
       RESOLVE_CASE: JSON.stringify({
         guardUrl: pathToFileURL(GUARD).href, agentType: GOLDFISH, rootDir: root, pluginRoot: altPlugin,
-        files: { [harnessDefinition]: "---\nname: goldfish-deep\nmaxTurns: 77\n---\nbody\n" },
+        files: {
+          [harnessDefinition]: "---\nname: goldfish-deep\nmaxTurns: 77\n---\nbody\n",
+          [join(PLUGIN_ROOT, "agents", "goldfish-deep.md")]: "---\nname: goldfish-deep\nmaxTurns: 55\n---\nbody\n",
+        },
       }),
     },
   });
@@ -158,7 +161,7 @@ test("resolveMaxTurns: an injected plugin root wins; the default is the guard's 
   const result = JSON.parse(line.slice("RESULT: ".length));
   assert.equal(result.injectedRoot, 33, "an explicitly injected plugin root wins");
   assert.equal(result.moduleRelative, DEEP_MAX_TURNS, "the default is the guard's own plugin, not <rootDir>/plugins/pipeline-core");
-  assert.equal(result.injectedFilesystem, 77, "a hermetic harness that injects its own filesystem keeps its project-root layout");
+  assert.equal(result.injectedFilesystem, 55,"an injected filesystem without pluginRoot resolves to the guard's own plugin, never under the project root");
 });
 
 // ---------------------------------------------------------------- pure core
