@@ -5,7 +5,8 @@
 // tampered file, source edit) is removed before a test ends.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -135,6 +136,58 @@ for (const editPhase of ["copy", "verify"]) {
     assert.deepEqual(readdirSync(f.state), [], "nothing was published and the exact owned temporary was removed");
   });
 }
+
+// Counts every open() of a file below `root` made through node:fs by any module (the footprint reader opens each file it
+// hashes exactly once per read). Installed through the builtin-module export sync, so production code needs no seam.
+function countOpens(t, root) {
+  const counts = new Map(), original = fs.openSync;
+  fs.openSync = function (path, ...rest) {
+    const name = String(path);
+    if (name.startsWith(root)) counts.set(name, (counts.get(name) ?? 0) + 1);
+    return original.call(this, path, ...rest);
+  };
+  syncBuiltinESMExports();
+  t.after(() => { fs.openSync = original; syncBuiltinESMExports(); });
+  return counts;
+}
+
+test("a publish reads and hashes the whole source tree exactly twice, fresh and on reuse", (t) => {
+  const f = fixture(t), counts = countOpens(t, f.plugin);
+  publish(f);
+  assert.equal(counts.size, 6, "the six public source files of the fixture were read");
+  for (const [path, reads] of counts) assert.equal(reads, 2, `${path}: inventory pass + post-copy pass`);
+  counts.clear();
+  publish(f);
+  assert.equal(counts.size, 6);
+  for (const [path, reads] of counts) assert.equal(reads, 2, `${path}: inventory pass + post-copy pass (existing snapshot reused)`);
+});
+
+test("an in-process memo hit still reads and hashes every snapshot file", (t) => {
+  const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
+  const counts = countOpens(t, snapshot.root);
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified");
+  assert.equal(counts.size, 7, "six public files and the manifest were read");
+  for (const [path, reads] of counts) assert.equal(reads, 1, `${path} read in full exactly once`);
+});
+
+test("a same-size, same-mtime snapshot content change after an in-process verify is refused in the same process", (t) => {
+  const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo now holds this entry's recorded fingerprint
+  const file = join(snapshot.root, "lib", "sub", "inner.mjs"), before = statSync(file), original = readFileSync(file, "utf8");
+  const edited = original.replace("'inner'", "'innex'");
+  assert.notEqual(edited, original);
+  assert.equal(edited.length, original.length);
+  writeFileSync(file, edited);
+  utimesSync(file, before.atimeMs / 1000, before.mtimeMs / 1000);
+  const after = statSync(file);
+  assert.equal(after.size, before.size);
+  assert.ok(Math.abs(after.mtimeMs - before.mtimeMs) < 2, "mtime is forged back to the recorded value");
+  try {
+    assert.equal(codeOf(() => verifyGitHookRuntimeSnapshot(args)), "GHS-CONTENT");
+  } finally {
+    writeFileSync(file, original);
+  }
+});
 
 test("the install time budget is enforced", (t) => {
   const f = fixture(t);
