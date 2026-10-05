@@ -25,10 +25,15 @@ const OWNER_REMEDY = "Remedy: an existing insecure private directory must be rem
 const UNAVAILABLE_REMEDY = "Remedy: the Windows assurance could not be performed; the installer can be re-run once that is resolved.";
 const INSECURE_REMEDY = "Remedy: the new directory did not end private; the installer can be re-run after checking the inherited permissions of its parent.";
 
-/** Nothing is left behind after a created-and-removed segment, so the remedy names the observed cause. */
+/**
+ * The remedy follows the observed status first: an unavailable assurance was never a verdict on the
+ * directory, so nothing about removing it is offered, whether this call created it or not. A segment
+ * this call created but could not remove, or a pre-existing insecure one, still needs its owner.
+ */
 function remedyFor(created, removed, status) {
-  if (!(created && removed)) return OWNER_REMEDY;
-  return status === "insecure" ? INSECURE_REMEDY : UNAVAILABLE_REMEDY;
+  if (created && !removed) return OWNER_REMEDY;
+  if (status === "insecure") return created ? INSECURE_REMEDY : OWNER_REMEDY;
+  return UNAVAILABLE_REMEDY;
 }
 
 function fail(code, message) {

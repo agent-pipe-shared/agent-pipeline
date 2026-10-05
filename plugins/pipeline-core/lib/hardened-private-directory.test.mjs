@@ -226,6 +226,26 @@ test("win32 removes a created segment when the hardening primitive throws, and r
   });
 });
 
+// WINACLFIX-H: a pre-existing segment whose assurance is unavailable was never judged insecure,
+// so the owner remedy ("remove or re-secure") must not be offered; the unavailable remedy is.
+test("win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy", () => {
+  withTemp("hpd-existing-unavailable-", (anchor) => {
+    const existing = join(anchor, "agent-pipeline");
+    mkdirSync(existing);
+    const message = refusalMessage(() => ensureHardenedPrivateDirectory(anchor, join(existing, "hook-state"), {
+      platform: "win32",
+      assess: () => ({ status: "unavailable", reason: "PowerShell missing" }),
+      harden: unreachable("harden"),
+    }));
+    assert.equal(existsSync(existing), true, "an existing directory is refused, never removed");
+    assert.ok(message.includes("unavailable") && message.includes("PowerShell missing"), message);
+    assert.ok(message.includes("The directory already existed and was left untouched."), message);
+    assert.ok(message.includes(REMEDY_UNAVAILABLE), message);
+    assert.equal(message.includes(REMEDY), false, message);
+    assert.equal(message.includes("must be removed or re-secured"), false, message);
+  });
+});
+
 test("win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy", () => {
   withTemp("hpd-existing-message-", (anchor) => {
     const existing = join(anchor, "agent-pipeline");
