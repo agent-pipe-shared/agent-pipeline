@@ -40,7 +40,10 @@ Assure the ledger's private directory once (at queue validation or on first use 
 of the directory), not on every append; on the hot Stop path only re-check cheap facts (`lstat`, owner via the
 cached assessment). Let the fan-out config carry `requiresEnforcement` explicitly (written by whoever writes the
 config) so the governance observation never runs git at turn end. Keep fail-open on any error (rule 1). Add a
-real-process spawn test on Windows that asserts zero spawns per Stop after the first.
+real-process spawn test on Windows that asserts zero spawns per Stop after the first. Due before slice S8 wires the
+hook (and in any case before the 0.7.0 release candidate); until then SF22 must pin the ledger-side spawns exactly
+(executable, call chain, count) rather than tolerate them unbounded (FANOUT category-7 Critic F1,
+`specs/sprint-alfred-epic/evidence/critic-2026-10-05/fanout-category7.md`).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
