@@ -35,7 +35,11 @@ function seed(path, sessionId, { manifest }) {
   const started = startSessionDescriptor(path, { sessionId, ownerPid: DEAD_PID });
   if (manifest) {
     const runDirectory = join(started.repo.commonDir, "agent-pipeline", "verify", "runs", `${sessionId}-run`);
-    mkdirSync(runDirectory, { recursive: true });
+    // Owner-private (0700) on every created component: registerTemporaryIntent("verify-run-directory")
+    // refuses a run root whose mode is group/other accessible on POSIX (ignored on native Windows,
+    // where the production check hardens the DACL itself). The default 0777 & ~umask = 0755 failed
+    // that check on Unix.
+    mkdirSync(runDirectory, { recursive: true, mode: 0o700 });
     registerTemporaryIntent(path, {
       sessionId, ownerNonce: started.ownerNonce, resourceId: `verify-${sessionId.slice(-12)}`,
       type: "verify-run-directory", path: runDirectory, contentClass: "verify-recovery",
