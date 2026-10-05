@@ -1,0 +1,41 @@
+{
+  "iterations": 60,
+  "counts": {
+    "ready": 58,
+    "partial": 2
+  },
+  "samples": [
+    {
+      "i": 18,
+      "ms": 4691,
+      "status": "partial",
+      "diagnostics": [
+        {
+          "path": "$.authority.sessionCleanup",
+          "code": "cleanup_recovery_observation_unavailable",
+          "message": "cleanup recovery authority could not be observed safely",
+          "guidance": "repair private cleanup-state read access before retrying"
+        }
+      ],
+      "nextAction": {
+        "kind": "command"
+      }
+    },
+    {
+      "i": 58,
+      "ms": 4711,
+      "status": "partial",
+      "diagnostics": [
+        {
+          "path": "$.authority.sessionCleanup",
+          "code": "cleanup_recovery_observation_unavailable",
+          "message": "cleanup recovery authority could not be observed safely",
+          "guidance": "repair private cleanup-state read access before retrying"
+        }
+      ],
+      "nextAction": {
+        "kind": "command"
+      }
+    }
+  ]
+}
