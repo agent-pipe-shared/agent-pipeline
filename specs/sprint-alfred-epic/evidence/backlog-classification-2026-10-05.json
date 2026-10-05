@@ -1,0 +1,1266 @@
+[
+ {
+  "id": "pipeline.authority-decision-candidate-is-a-literal",
+  "theme": "signing-and-po-steps",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Minor presentation defect in authority decision plan; deferred, no usability blocker."
+ },
+ {
+  "id": "pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module",
+  "theme": "install-and-bootstrap",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Skill-size hygiene idea; no direct usability impact."
+ },
+ {
+  "id": "pipeline.agents-read-the-source-because-nothing-describes-the-interface",
+  "theme": "other",
+  "target": "after-0.7",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Interface-documentation idea; overhead, not a blocker. Nearest in-scope alternative would be R3."
+ },
+ {
+  "id": "pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Constraints learned only via live rejection; onboarding usability."
+ },
+ {
+  "id": "pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-1",
+  "reason": "Guard lifecycle denials on benign commands; covered by the W1-1 command catalogue."
+ },
+ {
+  "id": "pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Promote apply partial with no agent recovery; onboarding usability."
+ },
+ {
+  "id": "pipeline.two-minor-happy-path-retries-in-the-final-codex-run",
+  "theme": "other",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Two single-retry frictions; low impact."
+ },
+ {
+  "id": "pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy",
+  "theme": "signing-and-po-steps",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Sibling-repo checkout drift in ceremony; edge case."
+ },
+ {
+  "id": "pipeline.enforce-kickoff-po-questions",
+  "theme": "onboarding-and-intake",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Technical enforcement of PO questions for weaker models; not blocking."
+ },
+ {
+  "id": "pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Existing repos drift on ruleset update without migration; install usability."
+ },
+ {
+  "id": "pipeline.a-runner-improvised-the-po-signature-instructions",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "Wrong/invented PO signing commands; PO step truthfulness."
+ },
+ {
+  "id": "pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Stale version stamp makes reload a no-op; agent-operable install route."
+ },
+ {
+  "id": "pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "Plugin update derails next session into repair; hook refresh/install route."
+ },
+ {
+  "id": "pipeline.pretooluse-guards-do-not-fire-in-dispatched-subagents",
+  "theme": "dispatch-and-budget",
+  "target": "likely-stale",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Guards demonstrably fire in dispatched subagents now (bootstrap-receipt guard); re-check."
+ },
+ {
+  "id": "pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Installed agent copy shadows source; agent-operable install route."
+ },
+ {
+  "id": "pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R4",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Concurrent write into a running dispatch tree; worktree-per-Goldfish isolation topic."
+ },
+ {
+  "id": "pipeline.delivery-is-not-always-a-git-push",
+  "theme": "other",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Release model idea beyond git push."
+ },
+ {
+  "id": "pipeline.every-small-correction-costs-a-new-human-interaction",
+  "theme": "signing-and-po-steps",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Idea on preimage invalidation; no usability blocker."
+ },
+ {
+  "id": "pipeline.guard-bypass-paths-have-no-negative-regression-suite",
+  "theme": "guard-and-shell-grammar",
+  "target": "after-0.7",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Negative regression suite; test hardening, not usability."
+ },
+ {
+  "id": "pipeline.remote-side-enforcement-is-the-last-instance",
+  "theme": "signing-and-po-steps",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Remote-side enforcement; out of 0.7 scope with remote signing."
+ },
+ {
+  "id": "pipeline.two-signature-ceremonies-overwrite-each-others-proof",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Two signatures overwrite each other; PO step reduction."
+ },
+ {
+  "id": "pipeline.verify-evidence-is-trusted-on-read-and-was-forged",
+  "theme": "verify-and-tests",
+  "target": "after-0.7",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Verify evidence trust-on-read; security hardening beyond usability."
+ },
+ {
+  "id": "pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance",
+  "theme": "other",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Overhead variance observation; idea."
+ },
+ {
+  "id": "pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn",
+  "theme": "codex-antigravity-parity",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Codex worker sandbox mode; deferred, worker supervisor niche."
+ },
+ {
+  "id": "pipeline.selected-critic-lane-contracts-unpinned",
+  "theme": "critic-and-review",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Codex critic lane contract pinning; deferred hardening."
+ },
+ {
+  "id": "pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses",
+  "theme": "critic-and-review",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "T1 fallback consumer; deferred, no usability impact."
+ },
+ {
+  "id": "pipeline.author-repair-route-has-no-signed-event-chain",
+  "theme": "signing-and-po-steps",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Signed event chain for author repair; hardening."
+ },
+ {
+  "id": "pipeline.advisor-prompt-is-emitted-before-host-route-admission",
+  "theme": "readiness-and-session",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-2",
+  "reason": "Named in W2-2 (role-route preflight and Advisor routes)."
+ },
+ {
+  "id": "pipeline.architecture-design-errors-omit-field-paths",
+  "theme": "architecture",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Validation errors omit field path; design-course usability."
+ },
+ {
+  "id": "pipeline.architecture-fitness-model-repeats-module-fields",
+  "theme": "architecture",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Redundant fitness-model fields; editing cost only."
+ },
+ {
+  "id": "pipeline.architecture-materialization-requires-premature-code",
+  "theme": "architecture",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Named in W3-3."
+ },
+ {
+  "id": "pipeline.bounded-reader-terminal-binding",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Named in W3-3."
+ },
+ {
+  "id": "pipeline.browser-preflight-misses-missing-host-library",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.claude-bootstrap-action-rejected-by-guard",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-1",
+  "reason": "Named in W1-1; blocks Claude onboarding."
+ },
+ {
+  "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-4",
+  "reason": "Named in W2-4."
+ },
+ {
+  "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Verify contract before design presentation is a W3-3 item."
+ },
+ {
+  "id": "pipeline.design-generator-repeats-large-source-material",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-R3",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Design generation repeats source; proportionality, nearest W3-3 theme."
+ },
+ {
+  "id": "pipeline.fresh-preflight-hides-onboarding-action",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Preflight does not surface onboarding action; agent-operable install route."
+ },
+ {
+  "id": "pipeline.git-apply-bypasses-draft-source-guard",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-3",
+  "reason": "Named in W1-3."
+ },
+ {
+  "id": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-2",
+  "reason": "Named in W3-2."
+ },
+ {
+  "id": "pipeline.greenfield-handover-claims-absent-supersession-marker",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-R3",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Generated handover claims a nonexistent marker; misleading text."
+ },
+ {
+  "id": "pipeline.hgo-patch-preflight-before-signature",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1."
+ },
+ {
+  "id": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Named in W3-3."
+ },
+ {
+  "id": "pipeline.onboarding-spec-marker-has-no-preapproval-reconcile",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-4",
+  "reason": "Named in W1-4."
+ },
+ {
+  "id": "pipeline.powershell-bypasses-onboarding-read-boundary",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-3",
+  "reason": "Named in W1-3."
+ },
+ {
+  "id": "pipeline.reopened-approved-plan-blocks-po-acknowledgement",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-4",
+  "reason": "Named in W1-4."
+ },
+ {
+  "id": "pipeline.repeated-lifecycle-denials-are-not-counted",
+  "theme": "guard-and-shell-grammar",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Deadlock signal for repeated refusals; observability idea."
+ },
+ {
+  "id": "pipeline.restart-barrier-can-precede-verbatim-intake-capture",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-R3",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Intake capture ordering around restart; rare onboarding path."
+ },
+ {
+  "id": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-2",
+  "reason": "Named in W1-2."
+ },
+ {
+  "id": "pipeline.zero-open-design-questions-force-fabricated-answer",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Forces fabricated design answer; onboarding usability."
+ },
+ {
+  "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+  "theme": "readiness-and-session",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Advisor consultation bound across course; cost control idea."
+ },
+ {
+  "id": "pipeline.advisor-evidence-read-enforces-size-limit-after-allocation",
+  "theme": "readiness-and-session",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Size check after allocation; hardening."
+ },
+ {
+  "id": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+  "theme": "readiness-and-session",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Initial Advisor question and final binding conflict; could stall design course."
+ },
+ {
+  "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-3",
+  "reason": "Named in W2-3."
+ },
+ {
+  "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "Fresh repo on Codex rejects Advisor namespace; blocks Codex design course."
+ },
+ {
+  "id": "pipeline.codex-compact-sessionstart-json-rejects-measurement-fields",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-4",
+  "reason": "Named in W2-4."
+ },
+ {
+  "id": "pipeline.codex-design-readiness-child-rejects-valid-review",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-4",
+  "reason": "Named in W2-4."
+ },
+ {
+  "id": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+  "theme": "codex-antigravity-parity",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Receipt output custody hardening."
+ },
+ {
+  "id": "pipeline.declared-system-skill-read-requires-human-override",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-5",
+  "reason": "Same class as W1-5 lifecycle-read-scope-blocks-host-declared-system-skill."
+ },
+ {
+  "id": "pipeline.default-claude-readiness-route-rejects-registered-alias",
+  "theme": "readiness-and-session",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-2",
+  "reason": "Named in W2-2."
+ },
+ {
+  "id": "pipeline.design-approval-validator-rejects-json-key-reordering",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-2",
+  "reason": "Named in W3-2."
+ },
+ {
+  "id": "pipeline.design-workflow-package-omits-contract",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-2",
+  "reason": "Named in W3-2."
+ },
+ {
+  "id": "pipeline.design-workflow-signing-request-schema-drift",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-2",
+  "reason": "Named in W3-2."
+ },
+ {
+  "id": "pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.hgo-stale-capability-shadows-current-authorization",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Stale capability hides valid authorization; wasted PO signature."
+ },
+ {
+  "id": "pipeline.historical-plan-cancellation-blocks-current-withdrawal",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-4",
+  "reason": "Named in W1-4."
+ },
+ {
+  "id": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Inspect disagrees with guard on plan state; confusing session state."
+ },
+ {
+  "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-5",
+  "reason": "Named in W1-5."
+ },
+ {
+  "id": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1."
+ },
+ {
+  "id": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+  "theme": "onboarding-and-intake",
+  "target": "after-0.7",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Dependency seam override; test-seam hygiene."
+ },
+ {
+  "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5; hooks acting in non-opted-in repos affects other repos."
+ },
+ {
+  "id": "pipeline.plan-submission-must-not-require-separate-po-approval",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "PO two-approvals happy path; PO step reduction."
+ },
+ {
+  "id": "pipeline.readiness-input-omits-current-advisor-observation",
+  "theme": "readiness-and-session",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Readiness lacks Advisor observation; flapping readiness area."
+ },
+ {
+  "id": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+  "theme": "windows-platform",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-1",
+  "reason": "Named in W2-1."
+ },
+ {
+  "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-3",
+  "reason": "Covered by W2-3 managed refresh and attestation."
+ },
+ {
+  "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-3",
+  "reason": "Named in W2-3."
+ },
+ {
+  "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-5",
+  "reason": "Named in W2-5."
+ },
+ {
+  "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-4",
+  "reason": "Named in W2-4."
+ },
+ {
+  "id": "pipeline.codex-own-session-audit-export-missing",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-4",
+  "reason": "Named in W2-4."
+ },
+ {
+  "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Named in W3-3."
+ },
+ {
+  "id": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Named in W3-3."
+ },
+ {
+  "id": "pipeline.design-package-parent-metadata-false-drift",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "False drift rejects approved design package; design-course usability."
+ },
+ {
+  "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1."
+ },
+ {
+  "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1; key-reuse deadlock blocks onboarding."
+ },
+ {
+  "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+  "theme": "onboarding-and-intake",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-4",
+  "reason": "Named in W3-4."
+ },
+ {
+  "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Named in W3-3."
+ },
+ {
+  "id": "pipeline.greenfield-machine-output-and-skill-budget",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Named in W3-3."
+ },
+ {
+  "id": "pipeline.native-patch-rename-drops-protected-content-markers",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+  "theme": "verify-and-tests",
+  "target": "0.7-plan",
+  "priority": "low",
+  "planRef": "W3-6",
+  "reason": "Named in W3-6."
+ },
+ {
+  "id": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+  "theme": "verify-and-tests",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-6",
+  "reason": "Named in W3-6."
+ },
+ {
+  "id": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-5",
+  "reason": "Named in W2-5."
+ },
+ {
+  "id": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.security-scanner-failure-provenance",
+  "theme": "verify-and-tests",
+  "target": "0.7-verify-fix",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "security-scan suite red in ic2b-candidate (semgrep scanner error); provenance aids diagnosis."
+ },
+ {
+  "id": "pipeline.semgrep-offline-default-version-check",
+  "theme": "verify-and-tests",
+  "target": "0.7-verify-fix",
+  "priority": "high",
+  "planRef": null,
+  "reason": "security-scan suite red (semgrep timeout); env flag fix proposed."
+ },
+ {
+  "id": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-2",
+  "reason": "Named in W3-2."
+ },
+ {
+  "id": "pipeline.windows-greenfield-scratch-write-denied",
+  "theme": "windows-platform",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-2",
+  "reason": "Named in W1-2."
+ },
+ {
+  "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+  "theme": "windows-platform",
+  "target": "0.7-R3",
+  "priority": "blocks-use-in-other-repos",
+  "planRef": null,
+  "reason": "Windows fresh-project seed rolls back; blocks onboarding on Windows."
+ },
+ {
+  "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+  "theme": "windows-platform",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-1",
+  "reason": "Named in W2-1."
+ },
+ {
+  "id": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-5",
+  "reason": "Named in W3-5."
+ },
+ {
+  "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+  "theme": "other",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-7",
+  "reason": "Named in W3-7."
+ },
+ {
+  "id": "pipeline.read-only-guard-admits-execution-and-output-options",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-3",
+  "reason": "Named in W1-3; security closure."
+ },
+ {
+  "id": "pipeline.hooks-enforce-available-parallel-dispatch",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R4",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Elephant-load enforcement via hooks; excluded as very large."
+ },
+ {
+  "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-5",
+  "reason": "Named in W1-5."
+ },
+ {
+  "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-3",
+  "reason": "Named in W2-3."
+ },
+ {
+  "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+  "theme": "codex-antigravity-parity",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-5",
+  "reason": "Named in W2-5."
+ },
+ {
+  "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+  "theme": "windows-platform",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W2-5",
+  "reason": "Named in W2-5; Claude Windows greenfield not walkable."
+ },
+ {
+  "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+  "theme": "windows-platform",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-5",
+  "reason": "Named in W1-5."
+ },
+ {
+  "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+  "theme": "windows-platform",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W2-1",
+  "reason": "Named in W2-1."
+ },
+ {
+  "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-2",
+  "reason": "Named in W2-2."
+ },
+ {
+  "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-1",
+  "reason": "Named in W1-1."
+ },
+ {
+  "id": "pipeline.feature-branch-push-admitted-without-signature-approval",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1; push gate without signature."
+ },
+ {
+  "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+  "theme": "other",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-4",
+  "reason": "Named in W3-4."
+ },
+ {
+  "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-3",
+  "reason": "Named in W1-3."
+ },
+ {
+  "id": "pipeline.guard-override-request-digest-drifts-after-arming",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1."
+ },
+ {
+  "id": "pipeline.handover-doc-committed-without-governance-classification",
+  "theme": "backlog-and-docs",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-4",
+  "reason": "Named in W3-4 (unclassified docs refused at commit)."
+ },
+ {
+  "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-1",
+  "reason": "Named in W1-1."
+ },
+ {
+  "id": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-5",
+  "reason": "Named in W1-5."
+ },
+ {
+  "id": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+  "theme": "readiness-and-session",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W2-2",
+  "reason": "Named in W2-2."
+ },
+ {
+  "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+  "theme": "readiness-and-session",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-1",
+  "reason": "Named in W1-1; PO also wants flapping readiness instrumented."
+ },
+ {
+  "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1."
+ },
+ {
+  "id": "pipeline.three-runner-happy-path-with-two-po-approvals",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W3-1",
+  "reason": "Named in W3-1."
+ },
+ {
+  "id": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W0-4",
+  "reason": "Named in W0-4."
+ },
+ {
+  "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "blocks-use-in-other-repos",
+  "planRef": "S2+R1+R2",
+  "reason": "Brownfield cannot enter implementation; implementation-entry rule owned by S2 library."
+ },
+ {
+  "id": "pipeline.claude-design-readiness-cannot-start-on-windows",
+  "theme": "windows-platform",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": "W0-3",
+  "reason": "Claude readiness fails on Windows; hotfixes K3-17/K5-10/K5-12 may cover, re-check."
+ },
+ {
+  "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Design-course run-v2 contract; W3-3 course coordinator."
+ },
+ {
+  "id": "pipeline.design-trailer-verifier-lost-after-closure",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "One trailer grammar is a W3-3 item."
+ },
+ {
+  "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "Stale hook snapshots after plugin change; hook refresh in bootstrap."
+ },
+ {
+  "id": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+  "theme": "verify-and-tests",
+  "target": "0.7-verify-fix",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "guard-lifecycle-ready-tests red in ic2b-candidate; stale fixture assumptions."
+ },
+ {
+  "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Dispatch-record collision after commit; may belong to R4 isolation, check scope."
+ },
+ {
+  "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "high",
+  "planRef": "W1-5",
+  "reason": "Credential list and rg -L closure are W1-5 content."
+ },
+ {
+  "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+  "theme": "design-and-lifecycle-state",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W3-3",
+  "reason": "Revise-path design course is W3-3."
+ },
+ {
+  "id": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+  "theme": "windows-platform",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "sign-intent latency and wrong labelling; PO step reduction on Windows."
+ },
+ {
+  "id": "pipeline.signing-prompt-prints-the-whole-review-package",
+  "theme": "signing-and-po-steps",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "S4/S5+R3",
+  "reason": "Compact signing prompt is an S4/S5+R3 item."
+ },
+ {
+  "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+  "theme": "backlog-and-docs",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Doc stricter than guard; agents avoid valid form. Cheap doc fix."
+ },
+ {
+  "id": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+  "theme": "install-and-bootstrap",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "PO-stated: bootstrap must refresh hooks; agent-operable install route."
+ },
+ {
+  "id": "pipeline.capability-inventory-checker-is-red-at-head",
+  "theme": "verify-and-tests",
+  "target": "0.7-verify-fix",
+  "priority": "high",
+  "planRef": null,
+  "reason": "product-capability-inventory-tests red in ic2b-candidate; blocks stamp."
+ },
+ {
+  "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Unsorted path refusals burn tool cap; Goldfish usability."
+ },
+ {
+  "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+  "theme": "critic-and-review",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "Critic budget guard false refusals; Critic guard false positives in scope."
+ },
+ {
+  "id": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R3",
+  "priority": "low",
+  "planRef": null,
+  "reason": "Dispatch record log not filled; progress trail missing."
+ },
+ {
+  "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "F-3 in bounded form without worktree design is R3 scope."
+ },
+ {
+  "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R4",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Elephant-load enforcement; excluded as very large."
+ },
+ {
+  "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "Bootstrap receipt via SubagentStart is in R3 list."
+ },
+ {
+  "id": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "False-positive refusal of read-only git grep; read-refusal class."
+ },
+ {
+  "id": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+  "theme": "verify-and-tests",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "S6+recovery",
+  "reason": "Recovery verbs for orphan descriptors belong to S6 recovery."
+ },
+ {
+  "id": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+  "theme": "guard-and-shell-grammar",
+  "target": "likely-stale",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Commit 866be2139 subject names kernel-closure fixes; re-check whether GMWKC01 is green."
+ },
+ {
+  "id": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+  "theme": "windows-platform",
+  "target": "likely-stale",
+  "priority": "low",
+  "planRef": null,
+  "reason": "ALFRED-NULSWEEP codemod removed literal NUL sinks 2026-10-05; re-check."
+ },
+ {
+  "id": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Named in PO R3 list: outside-root label for ignore-file/exclude-from."
+ },
+ {
+  "id": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+  "theme": "windows-platform",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Bootstrap receipt not recorded with forward-slash path; receipt fix in R3."
+ },
+ {
+  "id": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-plan",
+  "priority": "normal",
+  "planRef": "W1-2",
+  "reason": "Script execution fail-closed is W1-2; nearest in-scope."
+ },
+ {
+  "id": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "False positive on heredoc body text; guard false-positive class."
+ },
+ {
+  "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+  "theme": "guard-and-shell-grammar",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "RGGRAM, named in PO R3 list."
+ },
+ {
+  "id": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+  "theme": "dispatch-and-budget",
+  "target": "0.7-R3",
+  "priority": "high",
+  "planRef": null,
+  "reason": "Source agent change locks Critic dispatch; Critic guard false positive family."
+ },
+ {
+  "id": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+  "theme": "windows-platform",
+  "target": "0.7-R3",
+  "priority": "normal",
+  "planRef": null,
+  "reason": "Windows test fixtures fail on temp DACL; Verify on Windows host."
+ }
+]

@@ -1,0 +1,6883 @@
+[
+ {
+  "suite": "harness-lib-plan-spec-state-v2-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "state-budget-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "tmp-leak-enumerate-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "auth-gate-inventory-drift-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 35",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ clean fixture set (mirrors the real, accurate inventory) passes with zero findings (1.041774ms)"
+ },
+ {
+  "suite": "native-goldfish-host-finalizer-regression-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "critic-diagnostic-evidence-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ producer captures real failed targeted result while full Verify remains explicitly not-run (99.831034ms)"
+ },
+ {
+  "suite": "runner-profile-migration-v2-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  source classification: malformed, unknown, wrong-runner, unsupported, and duplicate legacy routes fail before planning"
+ },
+ {
+  "suite": "rotate-handover-sections-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ planRotation is fail-safe: an entry is retained unless ALL three conditions for archiving hold (0.168112ms)"
+ },
+ {
+  "suite": "git-hook-runtime-snapshot-fast-verify-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "credential-lease-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CLS05 an early failed case still emits dispositions for the complete declared corpus (49.308384ms)"
+ },
+ {
+  "suite": "guard-el01-tripwire-tests",
+  "exitCode": 0,
+  "seconds": 5.8,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "project-onboarding-e2e-tests",
+  "exitCode": 0,
+  "seconds": 58.3,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "toolchain-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 33",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "PASS TCP03 browser evidence preflight reports unavailable browser separately from a test failure"
+ },
+ {
+  "suite": "stack-adapter-contract-tests",
+  "exitCode": 0,
+  "seconds": 3.8,
+  "pass": "ℹ pass 23",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ SAC14 invalid adapter and malformed evidence are rejected fail closed (0.289304ms)"
+ },
+ {
+  "suite": "guard-handover-size-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "runtime-projection-v2-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  compiler invalid baselines: absent owned YAML baseline fails closed"
+ },
+ {
+  "suite": "backlog-state-check",
+  "exitCode": 2,
+  "seconds": 2.3,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "FAIL backlog state: items: pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt has no transition-ledger entry",
+   "FAIL backlog state: items: pipeline.script-mediated-writes-bypass-protected-test-paths has no transition-ledger entry",
+   "FAIL backlog state: items: pipeline.shell-classifier-faults-on-heredoc-body-text has no transition-ledger entry",
+   "FAIL backlog state: items: pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement has no transition-ledger entry",
+   "FAIL backlog state: items: pipeline.source-agent-definition-change-locks-that-agent-until-install has no transition-ledger entry",
+   "FAIL backlog state: items: pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures has no transition-ledger entry"
+  ],
+  "firstError": "FAIL backlog state: items: pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments has no transition-ledger entry"
+ },
+ {
+  "suite": "security-scan-v2-integration-tests",
+  "exitCode": 0,
+  "seconds": 1.7,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ per-capability RUN_OUTCOMES mapping: pass, findings, required-capability-missing (294.47171ms)"
+ },
+ {
+  "suite": "sbom-discovery-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "design-advisor-provenance-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC10C002 forged structurally linked revision with no actual Git parent fails (187.954377ms)"
+ },
+ {
+  "suite": "document-hooks-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 18",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "dispatch-policy-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 38",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ DPT05 DP5 a missing ruleset SHA is a finding on its own (0.463146ms)"
+ },
+ {
+  "suite": "onboarding-first-restart-intake-tests",
+  "exitCode": 0,
+  "seconds": 11.6,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "security-scanner-diagnostics-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 24",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "spec-retention-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "pipeline-state-observer-conformance-tests",
+  "exitCode": 1,
+  "seconds": 1.4,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 2",
+  "failed": [
+   "✖ conformance: submit-plan verb produces state accepted by both observers (43.442626ms)",
+   "✖ conformance: cancel-submitted-plan returns the active feature to a state accepted by both observers (42.900156ms)"
+  ],
+  "firstError": "ℹ fail 2"
+ },
+ {
+  "suite": "critic-export-policy-tests",
+  "exitCode": 0,
+  "seconds": 3,
+  "pass": "ℹ pass 23",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ unclassified packets and explicit external denial fail closed (0.351434ms)"
+ },
+ {
+  "suite": "license-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "external-reference-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "governance-export-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-push-promotion-tests",
+  "exitCode": 0,
+  "seconds": 2.3,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "antigravity-native-dispatch-coordinator-tests",
+  "exitCode": 0,
+  "seconds": 10.4,
+  "pass": "ℹ pass 20",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ ANDC13 a forged artifact digest fails closed (59.243238ms)"
+ },
+ {
+  "suite": "spec-retention-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "organization-architecture-source-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ #9 inherited ADR source fails closed on stale, malformed, unsorted and false-supersession data (0.867102ms)"
+ },
+ {
+  "suite": "pipeline-start-preflight-antigravity-hard-enforcement-tests",
+  "exitCode": 1,
+  "seconds": 5,
+  "pass": "ℹ pass 19",
+  "fail": "ℹ fail 4",
+  "failed": [
+   "✖ the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready (87.311476ms)",
+   "✖ a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready (482.645058ms)",
+   "✖ a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready (367.008592ms)",
+   "✖ Codex preflight output keys and status are unchanged by this addition (byte-identical surface) (14.292612ms)"
+  ],
+  "firstError": "✔ an injected scan failure folds into not-observed rather than throwing (fail-open) (0.262664ms)"
+ },
+ {
+  "suite": "stack-discovery-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "codex-sandbox-preflight-plugin-tests",
+  "exitCode": 0,
+  "seconds": 2.3,
+  "pass": "ℹ pass 26",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ platform classification fails closed on unmatched or ambiguous mount evidence [platform-unknown] (0.141692ms)"
+ },
+ {
+  "suite": "model-family-main-prelaunch-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "critical-action-authorization-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok PPA16 a malformed trust anchor fails closed"
+ },
+ {
+  "suite": "guard-git-tests",
+  "exitCode": 0,
+  "seconds": 53.4,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  OV-AC5 block  ledger not appendable (.claude missing) -> override not applied, fail-closed"
+ },
+ {
+  "suite": "design-advisory-coordinator-v2-tests",
+  "exitCode": 0,
+  "seconds": 20,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "push-release-flow-docs-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ documented `approve-push` argv (six flags) is accepted by the real flag parser and fails only on missing proof content (13.915427ms)"
+ },
+ {
+  "suite": "route-receipt-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS RR04 omitting required receipt field schema fails closed"
+ },
+ {
+  "suite": "section-citation-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ checkSectionCitations: hard-fails a nonexistent section and a nonexistent subsection (0.720559ms)"
+ },
+ {
+  "suite": "close-coordinator-audit-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 9.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "control-execution-exchange-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "browser-evidence-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC20C002 missing shared library fails before product test (22.856269ms)"
+ },
+ {
+  "suite": "stack-capability-plan-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "onboarding-consent-marker-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "claude-intake-prompt-capture-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CIP003 Claude first prompt pointer fails closed on unavailable, ambiguous, and nonhuman transcript rows (68.483266ms)"
+ },
+ {
+  "suite": "governance-export-view-status-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ real failureCount and quarantineCount reflect per-entry outbox state after an unacknowledged attempt (1.616882ms)"
+ },
+ {
+  "suite": "claude-critic-host-tests",
+  "exitCode": 0,
+  "seconds": 2.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS CLH04 optional Claude selector failure uses only the exact validated V3 route"
+ },
+ {
+  "suite": "backlog-item-strip-for-dispatch-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "project-authority-tests",
+  "exitCode": 0,
+  "seconds": 12.9,
+  "pass": "ℹ pass 36",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ PAT02 classification is versioned and provenance drift fails closed (7.394859ms)"
+ },
+ {
+  "suite": "section-citation-check",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "publication-bundle-v2-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "backlog-done-predicate-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 50",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ checkBacklogDonePredicate: manual produces no finding for an open item (1.147716ms)"
+ },
+ {
+  "suite": "security-readiness-harness-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS STR05 prepared run fails closed before spawn after executable substitution"
+ },
+ {
+  "suite": "model-role-dispatch-select-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MDS09 active or uncertain family failures never contain legacy selectors, including identity and source failures (0.481527ms)"
+ },
+ {
+  "suite": "verify-selection-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "architecture-design-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed) (2.746167ms)"
+ },
+ {
+  "suite": "project-onboarding-foreign-residue-tests",
+  "exitCode": 0,
+  "seconds": 4.1,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pre-commit-hook-install-tests",
+  "exitCode": 0,
+  "seconds": 56.3,
+  "pass": "ℹ pass 56",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size (482.880426ms)"
+ },
+ {
+  "suite": "print-verify-failures-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 1 - public failure contains only the positive allow-list and a digest reference"
+ },
+ {
+  "suite": "pipeline-start-preflight-pre-push-observation-tests",
+  "exitCode": 1,
+  "seconds": 5.4,
+  "pass": "ℹ pass 18",
+  "fail": "ℹ fail 10",
+  "failed": [
+   "✖ wired: the ready path is unchanged when the hook is installed-and-current (816.183588ms)",
+   "✖ wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command (274.638178ms)",
+   "✖ wired: a declined repository is ready, and the result still shows the decline with its timestamp (283.688139ms)",
+   "✖ wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1) (280.171812ms)",
+   "✖ wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged (",
+   "✖ wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either (278.203165ms)",
+   "✖ wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value (10.185378ms)",
+   "✖ wired: an unseen push never gates readiness or the exit code, and is still visible in the result (316.173417ms)"
+  ],
+  "firstError": "✔ an injected planInstallFn failure folds into repository-unresolved rather than throwing (0.244154ms)"
+ },
+ {
+  "suite": "critic-review-scope-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ Critic findings stay bound to the candidate diff and direct regressions (0.622338ms)"
+ },
+ {
+  "suite": "guard-dispatch-native-worker-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ GDW01 GD15n prepare a native pending binding for a complete dispatched Codex briefing and block failed preparation (451.98233ms)"
+ },
+ {
+  "suite": "antigravity-pretool-guard-tests",
+  "exitCode": 0,
+  "seconds": 75.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 11 - Antigravity run_command fails closed for a malformed explicit Cwd"
+ },
+ {
+  "suite": "organization-architecture-source-store-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "gate-strength-guard-tests",
+  "exitCode": 0,
+  "seconds": 37.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "guard-gate-strength: 40 passed, 0 failed"
+ },
+ {
+  "suite": "dispatch-budget-core-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "review-economy-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  RE04 failure signature is deterministic SHA-256"
+ },
+ {
+  "suite": "codex-advisory-bootstrap-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ executable-resolution failure precedes consent read and evidence-bundle assembly (0.254533ms)"
+ },
+ {
+  "suite": "release-promotion-envelope-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "provenance-release-binding-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "nova-execution-plane-real-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS EPCR02 normalizes a real failed worker as failed and a timed-out worker as timed-out"
+ },
+ {
+  "suite": "verify-suite-append-history-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ missing public proof and wrong commit, parent, or registry preimage bindings fail closed (0.186903ms)"
+ },
+ {
+  "suite": "model-family-route-source-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-host-repository-init-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 34",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a marker publication failure retains only the reserved retryable Git transaction (6.978294ms)"
+ },
+ {
+  "suite": "dispatch-record-write-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 19",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ DRW04 malformed, missing, computed and mismatched records fail before publication (6.103832ms)"
+ },
+ {
+  "suite": "security-evidence-evaluator-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 46",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ real evaluator: blocking+non-blocking findings resolves focus capability \"secrets\" to its expectedOutcome (0.299094ms)"
+ },
+ {
+  "suite": "advisory-coordinator-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ Claude falls through failed native adapters only to a fresh read-only Claude consult (5.533865ms)"
+ },
+ {
+  "suite": "trust-anchor-bootstrap-circularity-repro-tests",
+  "exitCode": 0,
+  "seconds": 1.9,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "po-language-projection-check",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "test-tmpdir-budget-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS TB05 an unreadable directory is reported as a finding, not thrown"
+ },
+ {
+  "suite": "installed-plugin-attestation-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "project-uninstall-contract-tests",
+  "exitCode": 0,
+  "seconds": 2.2,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-start-v3-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "hook-governance-scope-tests",
+  "exitCode": 1,
+  "seconds": 12.4,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.109395ms)"
+  ],
+  "firstError": "ℹ fail 1"
+ },
+ {
+  "suite": "check-evidence-drift-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ 2026-08-27 incident replay: post-close amendment emits CLOSED-EVIDENCE-DRIFT diagnostic on active branch, and fails closed on inactive branch (44.185995ms)"
+ },
+ {
+  "suite": "change-control-core-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 33",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ C-AC-05 publishes an external update only after its local deployment event and preserves failed attempts (0.929583ms)"
+ },
+ {
+  "suite": "agents-adapter-migration-check",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "pipeline-state-approve-announce-tests",
+  "exitCode": 1,
+  "seconds": 0.2,
+  "pass": "ℹ pass 0",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ approve-plan success output announces the required set-phase --phase implementation step (16.939788ms)"
+  ],
+  "firstError": "ℹ fail 1"
+ },
+ {
+  "suite": "nova-critic-lineage-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS CRL04 keeps empty/no-result/timeout/child/malformed/incomplete/drift/internal distinct from No findings"
+ },
+ {
+  "suite": "forge-capability-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS B4F04 all root omissions and additions fail closed"
+ },
+ {
+  "suite": "design-course-session-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "project-onboarding-v3-pre-push-hook-offer-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "test-tmpdir-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "check-critic-contract-citations-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "design-advisory-transaction-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ native-capable Claude may publish a consulted fallback only with native failure in its receipt (3.949403ms)"
+ },
+ {
+  "suite": "runtime-projection-removal-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "advisory-lifecycle-v2-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 16",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "epic-ac02-publication-check-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "epic-ac02-publication-check: 8 passed, 0 failed"
+ },
+ {
+  "suite": "native-goldfish-host-finalizer-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-readiness-finalization-tests",
+  "exitCode": 0,
+  "seconds": 53.9,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "nova-verify-resume-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ interrupted, failed, missing and corrupt artifacts rerun without prose inference (5.531904ms)"
+ },
+ {
+  "suite": "native-goldfish-host-commit-execution-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "public-baseline-diagnose-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "provenance-envelope-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "elephant-implementation-dispatch-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ absence, stale session, altered route, scope and request binding fail on the selected route before a model launch (27.951056ms)"
+ },
+ {
+  "suite": "private-overlay-bootstrap-status-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ consumer failure, async callback and forged consume success never report activated (4.592212ms)"
+ },
+ {
+  "suite": "provenance-local-builder-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "governance-authority-resolver-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "setup-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  PO profile receipt: source/runtime disagreement fails before common-dir mutation"
+ },
+ {
+  "suite": "codex-goal-host-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 15 - failed clear and non-null final readback never claim success"
+ },
+ {
+  "suite": "signing-ceremony-tests",
+  "exitCode": 0,
+  "seconds": 1.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "plan-spec-state-retirement-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "stop-suggest-tests",
+  "exitCode": 0,
+  "seconds": 8.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  writeMarkerSafe: unwritable target reports failure"
+ },
+ {
+  "suite": "github-actions-permissions-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "codex-sandbox-preflight-host-control-tests",
+  "exitCode": 0,
+  "seconds": 2.1,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "afk-ledger-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 14",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ competing valid non-prefix generations fail closed (1.225587ms)"
+ },
+ {
+  "suite": "threat-model-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "no-autoupdate-key-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "lifecycle-ready-enforcement-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "goldfish-antigravity-host-tests",
+  "exitCode": 0,
+  "seconds": 1.3,
+  "pass": "ℹ pass 15",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "governance-export-outbox-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "trusted-tool-resolution-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "intake-material-reference-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-design-readiness-host-store-tests",
+  "exitCode": 0,
+  "seconds": 10.7,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ receipt hardlinks and nonprivate modes fail closed on read (2244.086061ms)"
+ },
+ {
+  "suite": "check-directory-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 20",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a file under an undeclared top-level directory is one finding (0.181962ms)"
+ },
+ {
+  "suite": "session-cleanup-power-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "verify-topology-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS insufficient history and baseline drift produce typed topology failures"
+ },
+ {
+  "suite": "design-course-command-admission-tests",
+  "exitCode": 0,
+  "seconds": 32.2,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "artifact-topology-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "artifact-topology: 10 passed, 0 failed"
+ },
+ {
+  "suite": "control-catalog-schema-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 33",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CCS07 rejects a control ID grammar violation (0.327974ms)"
+ },
+ {
+  "suite": "pipeline-state-approve-push-argv-closure-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "architecture-entry-readiness-tests",
+  "exitCode": 0,
+  "seconds": 1.9,
+  "pass": "ℹ pass 18",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ unreadable checkpoint debt fails closed with a typed repair route (35.73667ms)"
+ },
+ {
+  "suite": "nova-invocation-reliability-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS A3R02 command arguments are typed argv tokens and request shape/digest are fail-closed"
+ },
+ {
+  "suite": "governance-action-artifact-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-state-discard-feature-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ discard-feature commits public State first and reports orphan-cleanup-required when private apply fails (4.294568ms)"
+ },
+ {
+  "suite": "state-numeric-claims-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ (a) a current-state claim matching the live count produces no findings (2.370873ms)"
+ },
+ {
+  "suite": "neutral-range-plan-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "osv-scanner-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CAPABILITY_CONTRACT_V2.evidenceFields matches the real extractFindings() finding-object shape (0.129032ms)"
+ },
+ {
+  "suite": "critic-lifecycle-admission-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fails closed for a current failed Critic even when a Verify receipt is green (0.323995ms)"
+ },
+ {
+  "suite": "guard-gate-strength-ledger-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "stack-run-outcome-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "bootstrap-source-attestation-acceptance-tests",
+  "exitCode": 1,
+  "seconds": 1.3,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 2",
+  "failed": [
+   "✖ PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness compares the loaded plugin identity (466.91929ms)",
+   "✖ PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and stays distinct from absence (654.633102ms)"
+  ],
+  "firstError": "✔ PX0-AC-09: an unavailable Codex registry fails closed to null instead of falling back to another source (0.123831ms)"
+ },
+ {
+  "suite": "evidence-view-model-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ E-AC-19 accepts observed failure/quarantine counts and rejects malformed ones (1.159836ms)"
+ },
+ {
+  "suite": "check-ownership-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 2 - OW02 rejects missing mandatory check fail-closed"
+ },
+ {
+  "suite": "security-evidence-fixture-matrix-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 16",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fixture: blocking+non-blocking findings resolves through the real evaluator (0.067791ms)"
+ },
+ {
+  "suite": "verify-case-completion-check",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "entrypoint-reachability-tests",
+  "exitCode": 0,
+  "seconds": 24.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "entrypoint: 10 passed, 0 failed"
+ },
+ {
+  "suite": "dispatch-authorship-verify-tests",
+  "exitCode": 0,
+  "seconds": 1.3,
+  "pass": "ℹ pass 64",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ (b) trailer present, no record file -> FAIL record-missing (0.319134ms)"
+ },
+ {
+  "suite": "guard-human-override-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ publish-consumption-action refuses before readback on bad output and returns an event-only retry after a write failure (0.550468ms)"
+ },
+ {
+  "suite": "ruleset-source-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "private-overlay-activation-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS consumer failure and async return are typed, opaque, single-use rejections"
+ },
+ {
+  "suite": "repository-path-identity-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "portable-critic-export-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "architecture-decision-waiver-store-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "suite-registration-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "git-cmd-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  PUSHCLASS \"git --config-env=core.sshCommand=VAR push origin HEAD\"  --config-env is an unrecognized global option before the subcommand: fail-closed"
+ },
+ {
+  "suite": "governance-scope-tests",
+  "exitCode": 0,
+  "seconds": 8.5,
+  "pass": "ℹ pass 23",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC14C006 canonical V3 owned projection qualifies existing enrollment without invented receipt; drift fails closed (350.426424ms)"
+ },
+ {
+  "suite": "network-lockdown-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "claude-native-capture-entry-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "agent-model-registry-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 16",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ compareRecordedModel: agentType present but unresolvable -> agent-definition-unresolved, not a fail (0.089651ms)"
+ },
+ {
+  "suite": "design-readiness-host-evidence-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ DWH03 host-observed receipts fail closed on missing local readback and repository mismatch (0.899662ms)"
+ },
+ {
+  "suite": "capture-observation-intake-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 20",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ repository references fail closed unless they match the resolved public target (0.401395ms)"
+ },
+ {
+  "suite": "codex-compact-session-output-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC02C001 stopped Compact preserves exact fail-closed context and does not change fixture state (29.344465ms)"
+ },
+ {
+  "suite": "obligations-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "security-scan-tests",
+  "exitCode": 0,
+  "seconds": 2.4,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  gitleaks run: clean fixture -> PASS, 0 findings"
+ },
+ {
+  "suite": "review-retry-planner-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ bullet 1c: a retained receipt must remain within its declared freshness window, and a clock inversion fails closed rather than reading as very fresh (1.059004ms)"
+ },
+ {
+  "suite": "publication-executor-v2-tests",
+  "exitCode": 0,
+  "seconds": 3.5,
+  "pass": "ℹ pass 14",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ PEV05 prepare rejects failed gate outcomes, missing capability extension, and escaped preflight paths (502.227245ms)"
+ },
+ {
+  "suite": "dispatch-provenance-tests",
+  "exitCode": 0,
+  "seconds": 2,
+  "pass": "ℹ pass 36",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ok 4 - stage0CapsMet: exactly-at-cap passes, one over either cap fails"
+ },
+ {
+  "suite": "security-readiness-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ AC2: disclosure, restricted response and canonical findings remain distinct (0.143992ms)"
+ },
+ {
+  "suite": "guard-push-attestation-diagnostics-tests",
+  "exitCode": 0,
+  "seconds": 2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  MB1 block  TOFU-ready main-boundary refusal carries the record failure and qualified missing-committed-anchor fact"
+ },
+ {
+  "suite": "sbom-release-binding-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "codex-critic-shadow-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ finding set, severity and invalid results are distinct (0.221013ms)"
+ },
+ {
+  "suite": "source-observation-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS SO03 classifies timeout and Git failure without guessing a source"
+ },
+ {
+  "suite": "nova-b2-gitlab-ci-broker-core-tests",
+  "exitCode": 0,
+  "seconds": 1.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS provider cancellation metadata without a sealed local intent fails closed"
+ },
+ {
+  "suite": "codex-sandbox-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ stdio mismatch and canary drift fail closed (5.255621ms)"
+ },
+ {
+  "suite": "po-guarded-push-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "audit-pack-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-state-rebind-runner-tests",
+  "exitCode": 0,
+  "seconds": 2.6,
+  "pass": "ℹ pass 18",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ rebind-plan (V4-SCHEMA): a v4-schema planApproval that is NOT stale still fails PO-REBIND-NOT-STALE, not PO-REBIND-APPROVAL (1.659162ms)"
+ },
+ {
+  "suite": "design-workflow-package-builder-tests",
+  "exitCode": 0,
+  "seconds": 87.2,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "run-codex-critic-probe-split-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "install-agy-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": "ℹ pass 14",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "staleness-check-tests",
+  "exitCode": 0,
+  "seconds": 1.5,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ offline/timeout is visible unknown and fail-open without false freshness (265.658053ms)"
+ },
+ {
+  "suite": "nova-sandbox-disposition-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS A2S10 semantic record chains bind the exact prior digest and fail closed on replay/digest drift"
+ },
+ {
+  "suite": "model-family-execution-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 19",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFE004 codex: capability absence and exact request/config contradictions fail independently (2.248561ms)"
+ },
+ {
+  "suite": "protected-delta-check-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "generate-vendored-canon-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "model-family-codex-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFCA005 Codex main-session source port is distinct and absent defaults fail closed (0.518857ms)"
+ },
+ {
+  "suite": "pre-push-hook-install-tests",
+  "exitCode": 0,
+  "seconds": 22.6,
+  "pass": "ℹ pass 36",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ installed hook: manifest present but unparseable -> BLOCK (fail-closed, diverges from guard-push.mjs's WARN) (1212.178318ms)"
+ },
+ {
+  "suite": "wsl-ipc-compatibility-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 24",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ sandbox failure projection is closed, sanitized, ordered and capped (1.189156ms)"
+ },
+ {
+  "suite": "guard-dispatch-budget-tests",
+  "exitCode": 0,
+  "seconds": 14,
+  "pass": "ℹ pass 49",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ evaluateDispatchBudgetGuard: malformed persisted counts fail closed without being reset or overwritten (671.441139ms)"
+ },
+ {
+  "suite": "protected-baseline-tests",
+  "exitCode": 0,
+  "seconds": 1.5,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ A3 keeps an unreadable lifecycle state fail-closed (0.678689ms)"
+ },
+ {
+  "suite": "verify-evidence-producer-tests",
+  "exitCode": 0,
+  "seconds": 22.4,
+  "pass": "ℹ pass 33",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a failing verify command produces no artifact at all (450.910003ms)"
+ },
+ {
+  "suite": "model-family-invocation-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 14",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFI013 missing native request port and non-JSON request fail before any launch (17.926562ms)"
+ },
+ {
+  "suite": "continuity-host-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 7 - different prior acknowledgement fails closed"
+ },
+ {
+  "suite": "scripts-pipeline-state-tests",
+  "exitCode": 0,
+  "seconds": 5.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "\"findings\": ["
+ },
+ {
+  "suite": "check-runner-manifest-parity",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "wire-dispatch-budget-hook-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "[FAIL] both target files are unmodified in git -- refusing to overwrite: plugins/pipeline-core/hooks/hooks.json"
+ },
+ {
+  "suite": "codex-sandbox-select-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ post-compatibility failures retain the factual preflight and scratch evidence (4.803214ms)"
+ },
+ {
+  "suite": "project-onboarding-v3-argv-closure-tests",
+  "exitCode": 0,
+  "seconds": 1.7,
+  "pass": "ℹ pass 21",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "runner-profiles-v2-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "agy-host-commit-admission-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "sbom-fixture-matrix-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "check-completeness-vocabulary-doclint-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS CVD05 reports a missing scanned file as a finding rather than throwing"
+ },
+ {
+  "suite": "nova-a8-benchmark-runner-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS NVA03 review workload finds zero violations in the clean-by-construction sample tree"
+ },
+ {
+  "suite": "session-power-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS disabled projection fails closed on a mismatched stop proof"
+ },
+ {
+  "suite": "resume-consumption-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "doc-contract-check",
+  "exitCode": 2,
+  "seconds": 1,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "DOC-CONTRACT generated-enforcement: docs/enforcement.md: document bytes differ from a fresh generation -- run: node harness/scripts/generate-enforcement-doc.mjs --write",
+   "Documentation contracts failed: 1 finding(s)."
+  ],
+  "firstError": "Documentation contracts failed: 1 finding(s)."
+ },
+ {
+  "suite": "afk-claude-host-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ stale definition/current and missing A3 integration fail closed (1.584931ms)"
+ },
+ {
+  "suite": "codex-critic-host-tests",
+  "exitCode": 0,
+  "seconds": 28.7,
+  "pass": "ℹ pass 137",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "agy-session-consent-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "critic-skip-decision-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "afk-review-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "control-evaluation-receipt-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "ai-assisted-hardening-gate-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ runIndependentChecks: a self-excluded guard check stays missing when the candidate-revision suite itself fails, regardless of reviewer source (40.785339ms)"
+ },
+ {
+  "suite": "guard-push-release-tag-ancestry-tests",
+  "exitCode": 0,
+  "seconds": 5.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "protected-test-paths-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 37",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ NVA-B-OPAQUELANE-1: a shape this lane cannot resolve into a call structure stays refused (fail-closed) -- variable indirection (0.215613ms)"
+ },
+ {
+  "suite": "check-private-identifiers-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "lifecycle-gate-satisfiability-tests",
+  "exitCode": 0,
+  "seconds": 16.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "lifecycle-gate-satisfiability: 13 passed, 0 failed"
+ },
+ {
+  "suite": "lifecycle-denial-loop-guard-tests",
+  "exitCode": 0,
+  "seconds": 22.5,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC04C005 actual guard preserves refusal on telemetry failure and mismatched/invalid observation (20861.874993ms)"
+ },
+ {
+  "suite": "critic-dispatch-preflight-tests",
+  "exitCode": 0,
+  "seconds": 3.6,
+  "pass": "ℹ pass 39",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ first Critic admits actual failed targeted diagnostics with full Verify not-run; arbitrary JSON and tampering fail (264.570579ms)"
+ },
+ {
+  "suite": "project-activation-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "antigravity-topology-integration-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "external-command-offer-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 50",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ retains failed, partial, cancelled, mismatch and unknown outcomes distinctly (0.463686ms)"
+ },
+ {
+  "suite": "model-family-latest-selection-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 16",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFLS014 conflicting duplicate exact IDs, malformed tuples, and caller admission booleans fail closed (0.384455ms)"
+ },
+ {
+  "suite": "audit-bundle-core-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 18",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ P-AC-06 fails the build when a planned artifact goes stale before the bundle is written (4.225303ms)"
+ },
+ {
+  "suite": "check-backlog-sprint-assignment-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ checkBacklogSprintAssignment: an unrecognized sprint value is a finding and fails (1.358679ms)"
+ },
+ {
+  "suite": "lifecycle-denial-loop-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 20",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC16C013 busy lock fails without mutation (2.20116ms)"
+ },
+ {
+  "suite": "document-identifier-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "manual-check-logic-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ placeholder-only declared value fails, never silently passes (F19) (0.115171ms)"
+ },
+ {
+  "suite": "nova-benchmark-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "governance-replay-view-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ v2 view fails closed on an incomplete checkpoint (0.876692ms)"
+ },
+ {
+  "suite": "governance-replay-core-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ candidate invalidation remains visible and duplicate sequences fail closed (0.359825ms)"
+ },
+ {
+  "suite": "continuity-result-case-migration-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ win32: a POSIX-insecure private case-migration directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (16.522656ms)"
+ },
+ {
+  "suite": "guard-handoff-offer-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "backlog-ledger-reconciliation-tests",
+  "exitCode": 1,
+  "seconds": 1.4,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "PASS RBL28 a reconciliation replay is a no-op and does not emit another action",
+   "PASS RBL29 an unavailable pre-action Git candidate refuses the event before source mutation",
+   "PASS RBL30 the reconciliation request digest changes with either the closed plan or target set",
+   "32 passed, 1 failed",
+   "FAIL RBL01 this repository needs no reconciliation: unexpected drift: pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments, pipeline.bootstrap-should-refresh-hooks-when-the-p",
+   "20 !== 0"
+  ],
+  "firstError": "PASS RBL17 (D6) the writer refuses to append an event that would fail the checker's own event validator"
+ },
+ {
+  "suite": "report-interruptions-tests",
+  "exitCode": 0,
+  "seconds": 1.3,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "model-family-authority-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "po-gate-authority-fixture-tests",
+  "exitCode": 1,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "actual: 2,",
+   "expected: 0,",
+   "operator: 'strictEqual',",
+   "diff: 'simple'",
+   "}",
+   "Node.js v24.15.0"
+  ],
+  "firstError": "ok 7 - profile-only failures and evidence never expose machine-local paths or raw profile bytes"
+ },
+ {
+  "suite": "local-worker-supervisor-cli-tests",
+  "exitCode": 0,
+  "seconds": 15.4,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ LWSC06 keeps a failed real child attributable and does not convert nonzero exit into success (1036.628588ms)"
+ },
+ {
+  "suite": "model-family-runtime-host-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "routing-projection-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS RP12 unsupported Codex identity fails closed"
+ },
+ {
+  "suite": "verify-suite-append-policy-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-testpath-gmw-tests",
+  "exitCode": 0,
+  "seconds": 1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "guard-testpath-gmw: 2 passed, 0 failed"
+ },
+ {
+  "suite": "codex-critic-session-route-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "sbom-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS malformed facts fail closed and inputs remain unchanged"
+ },
+ {
+  "suite": "governance-export-outbox-store-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-devplan-tests",
+  "exitCode": 0,
+  "seconds": 31.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  DP27 block  legacy/v2 approval + present-but-unresolvable decision reference fails closed"
+ },
+ {
+  "suite": "resume-hint-tests",
+  "exitCode": 0,
+  "seconds": 1.7,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "github-actions-permissions-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "\"findings\": []"
+ },
+ {
+  "suite": "pipeline-commit-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "control-catalog-migration-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "model-role-session-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 39",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MRS05 no approved compatible available model fails closed (0.324235ms)"
+ },
+ {
+  "suite": "enforcement-conformance-tests",
+  "exitCode": 0,
+  "seconds": 2.8,
+  "pass": "ℹ pass 25",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ offline CLI fails closed for missing metadata, malformed records, missing version and privacy errors (1170.861992ms)"
+ },
+ {
+  "suite": "session-power-controller-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "release-version-plan-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS prerelease, build metadata, and substituted tag fail closed"
+ },
+ {
+  "suite": "workflow-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ complete reopens ordinary gates while malformed receipts fail closed (0.180743ms)"
+ },
+ {
+  "suite": "portable-agy-authorship-export-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-maintenance-window-cli-tests",
+  "exitCode": 0,
+  "seconds": 4.2,
+  "pass": "ℹ pass 16",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ prepare with --authorship-mode elephant-direct and a non-qualifying stage-0 self-check still fails, with the library's own not-qualified code (33.867605ms)"
+ },
+ {
+  "suite": "notebook-write-coverage-tests",
+  "exitCode": 0,
+  "seconds": 3.6,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS NB05 a NotebookEdit with no usable path fails closed rather than allowing"
+ },
+ {
+  "suite": "observe-critic-preflight-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "local-worker-pool-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-readiness-shared-parent-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "consumer-baseline-verify-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "hooks-manifest-shape-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "design-workflow-package-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 21",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "verify-suite-registration-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 4 - a declared exclusion is accepted without a finding"
+ },
+ {
+  "suite": "governance-event-projection-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "push-init-tests",
+  "exitCode": 0,
+  "seconds": 5.6,
+  "pass": "ℹ pass 32",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ driveCheckpointPushInit: absent or off push gate fails closed (0.248983ms)"
+ },
+ {
+  "suite": "session-cleanup-owner-nonce-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ win32: a POSIX-insecure owner-nonce file is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (7.340739ms)"
+ },
+ {
+  "suite": "public-core-observation-tests",
+  "exitCode": 0,
+  "seconds": 0.8,
+  "pass": "ℹ pass 15",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "language-canon-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "runner-design-readiness-bootstrap-tests",
+  "exitCode": 0,
+  "seconds": 4.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "goldfish-antigravity-live-host-tests",
+  "exitCode": 0,
+  "seconds": 2.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "plan-authority-staging-guard-tests",
+  "exitCode": 0,
+  "seconds": 3,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ refusePlanAuthorityStagingPath fails closed for unreadable authority files (235.57988ms)"
+ },
+ {
+  "suite": "physical-scratch-boundary-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC18C006 file ancestors and IO errors fail closed (0.565618ms)"
+ },
+ {
+  "suite": "native-goldfish-host-state-regression-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "observation-governance-bootstrap-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS OGB04 source checkout with a genuinely missing checker still fails"
+ },
+ {
+  "suite": "afk-transaction-host-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ production defaults fail closed before WAL when the protected projection writer is not integrated (22.880828ms)"
+ },
+ {
+  "suite": "session-cleanup-binding-tests",
+  "exitCode": 1,
+  "seconds": 10.3,
+  "pass": "ℹ pass 62",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ unbound recovery refuses multiple or replaced active descriptors (153.87567ms)"
+  ],
+  "firstError": "✔ start derives the boundary runner from CLAUDECODE when --runner is absent, and fails closed on an invalid explicit value (80.780076ms)"
+ },
+ {
+  "suite": "sbom-node-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS missing transitive node and malformed graph fail closed"
+ },
+ {
+  "suite": "signed-quality-package-tests",
+  "exitCode": 0,
+  "seconds": 4.4,
+  "pass": "ℹ pass 43",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ quality package fails closed on tamper, unsafe paths, proof failure, and base drift (37.673178ms)"
+ },
+ {
+  "suite": "plan-spec-state-v2-legacy-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "codex-design-readiness-host-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ source edits and stale dispatch fail before store or model effects (4.48647ms)"
+ },
+ {
+  "suite": "model-family-approval-request-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFA008 request, predecessor, floor, and contract tampering fail exact disclosure binding (11.380364ms)"
+ },
+ {
+  "suite": "close-coordinator-tests",
+  "exitCode": 0,
+  "seconds": 5.2,
+  "pass": "ℹ pass 34",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ process: authorization, failed publication, exact readback and cleanup stay distinct (2433.553849ms)"
+ },
+ {
+  "suite": "deferred-backlog-check",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "guard-git-phoenix-authority-grant-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-user-v3-drift-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "release-preflight-cli-tests",
+  "exitCode": 0,
+  "seconds": 4.8,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS RPC-reader a missing local checker is normalized to the reader-binding failure"
+ },
+ {
+  "suite": "pre-commit-hook-install-trust-anchor-bootstrap-tests",
+  "exitCode": 0,
+  "seconds": 8.6,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "check-clone-provisioning-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "model-role-host-observations-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MRO02 incomplete or API-only Claude observations fail without partial admission (0.257003ms)"
+ },
+ {
+  "suite": "requirement-traceability-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "post-compact-reground-tests",
+  "exitCode": 0,
+  "seconds": 2.6,
+  "pass": "ℹ pass 28",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ok 6 - loadStateNarrativeExcerptSafe fails closed on a missing path, never throws"
+ },
+ {
+  "suite": "codex-onboarding-app-server-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok - CAS-DAEMON-RECOVERY-FAILED maps to unavailable"
+ },
+ {
+  "suite": "backlog-done-predicate-check",
+  "exitCode": 1,
+  "seconds": 0.4,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "- stale-open (status open/in_progress, predicate already satisfied): 0",
+   "- regression (status closed, predicate not satisfied): 1",
+   "- undeclared (no done_when at all, any status): 430",
+   "- undeclared and open/in_progress (fatal): 0",
+   "Findings (1):",
+   "- REGRESSION backlog/items/2026-08-29-approve-announce-test-fixture-missing-present-plan-step.md: expected script-exit-zero plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs to ho"
+  ],
+  "firstError": "Findings (1):"
+ },
+ {
+  "suite": "runner-profiles-v3-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "lifecycle-recovery-contract-tests",
+  "exitCode": 1,
+  "seconds": 4.4,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ every offered PO-authority-rebind-planner nextAction is admitted by the real guard (1881.829406ms)"
+  ],
+  "firstError": "ℹ fail 1"
+ },
+ {
+  "suite": "guard-git-phoenix-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "publication-gate-evidence-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS PGE03 a failed verify run cannot be turned into a pass"
+ },
+ {
+  "suite": "architecture-decision-continuity-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-sandbox-compatibility-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ newer attested versions pass while binary drift and stale/foreign-boot evidence fail closed (1.864215ms)"
+ },
+ {
+  "suite": "remote-provisional-receipt-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "control-execution-lifecycle-event-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "enrollment-retirement-git-creation-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ EGR07 writer handoff failure keeps a durable removal barrier and resumes the same request without reinitializing Git (22.129417ms)"
+ },
+ {
+  "suite": "human-governance-ledger-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 24",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fails closed for repository/candidate drift, expiry, and consuming disposition (0.211673ms)"
+ },
+ {
+  "suite": "design-advisory-admission-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ Claude accepts a real consult fallback after native failure, not direct consult or foreign native (1.453841ms)"
+ },
+ {
+  "suite": "advisory-receipt-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a recorded native failure can bind a later consult fallback without a route switch (0.264033ms)"
+ },
+ {
+  "suite": "codex-onboarding-runtime-tests",
+  "exitCode": 0,
+  "seconds": 7.4,
+  "pass": "ℹ pass 24",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ COR005 unavailable or insecure Windows private-state assurance fails before barrier publication (263.524776ms)"
+ },
+ {
+  "suite": "advisory-receipt-assurance-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ recursive Windows private directories harden each created component and fail closed for a raced-in one (1.195056ms)"
+ },
+ {
+  "suite": "p3b-runner-conformance-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "dispatch-budget-binding-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "po-language-projection-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "local-worker-supervisor-core-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 15",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-state-inspect-tests",
+  "exitCode": 0,
+  "seconds": 3,
+  "pass": "ℹ pass 26",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "reference-catalog-views-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-push-external-ledger-tests",
+  "exitCode": 0,
+  "seconds": 3.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "claude-intake-reference-admission-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "commit-msg-hook-signed-integration-tests",
+  "exitCode": 0,
+  "seconds": 26.8,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "gitleaks-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 23",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CAPABILITY_CONTRACT_V2.evidenceFields matches the real findings.map(...) object shape (0.083051ms)"
+ },
+ {
+  "suite": "governance-gate-action-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ GGA03 invalid digest, action and candidate fail closed (0.254564ms)"
+ },
+ {
+  "suite": "guard-push-scratch-advisory-tests",
+  "exitCode": 0,
+  "seconds": 1.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "check-review-retry-plan-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a missing --review-retry-input path fails closed with a repository-relative-file finding (1.599192ms)"
+ },
+ {
+  "suite": "product-capability-inventory-tests",
+  "exitCode": 1,
+  "seconds": 7.2,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 3",
+  "failed": [
+   "✖ PCI03 HAW-A02 accepts an attested receipt and an honest inventory-phase pending gate (43.003579ms)",
+   "✖ PCI18 HAW-A05a CLI discovery is bound to the committed baseline and rejects a later uncommitted assignment (2561.990549ms)",
+   "✖ PCI30 an early failed case still emits dispositions for the complete declared corpus (3587.136196ms)"
+  ],
+  "firstError": "✔ PCI25 HAW-B02 a consumer-shaped root with no plugins/pipeline-core tree degrades to zero findings, never a crash (0.338924ms)"
+ },
+ {
+  "suite": "cli-help-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "onboarding-runner-identity-tests",
+  "exitCode": 0,
+  "seconds": 13,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "onboarding-runner-identity: 8 passed, 0 failed"
+ },
+ {
+  "suite": "ai-assisted-hardening-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 34",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ AC33: omitting the reviewer source entirely fails closed, not open (the default counts nothing) (0.101901ms)"
+ },
+ {
+  "suite": "human-role-rendering-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS invalid calibration label fails as a typed display error"
+ },
+ {
+  "suite": "governance-replay-viewer-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "lifecycle-governance-events-schema-parity-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "po-approval-proof-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "check-suite-registration-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 32",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ compareSuiteRegistration: an unregistered-and-unlisted file fails and is named (0.187052ms)"
+ },
+ {
+  "suite": "test-case-completion-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fails closed when the explicitly configured inherited descriptor is missing (0.342664ms)"
+ },
+ {
+  "suite": "verify-run-record-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "claude-task-output-read-scope-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CTOS004 output parent aliases and oversized files fail closed (11.709439ms)"
+ },
+ {
+  "suite": "private-overlay-activation-e2e-tests",
+  "exitCode": 0,
+  "seconds": 0.8,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "design-workflow-package-v2-tests",
+  "exitCode": 0,
+  "seconds": 162.3,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (162101.223631ms)"
+ },
+ {
+  "suite": "critic-t1-po-override-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ only allowlisted technical failures before verdict and cleanup permit one weak fallback (0.774761ms)"
+ },
+ {
+  "suite": "sbom-manifest-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS unpinned and structurally malformed profiles fail closed"
+ },
+ {
+  "suite": "self-application-attestation-gate-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ SAA-1: no .git two levels above pluginRoot -> not attempted, not failed, observer never invoked (1.246307ms)"
+ },
+ {
+  "suite": "critic-skip-coverage-check",
+  "exitCode": 2,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "Critic-skip coverage: 9 applicable v3/v4, 2 skipped, 0 required-pending, 7 evidenced, 13 legacy (schema pipeline.critic-skip-decision.v1) -- 1 dispatch/evidence validation finding(s); 0 applicable v3/",
+   "CRITIC-SKIP-COVERAGE evidence/abandoned-v3-dispatch-recovery-index.json: invalid or unauthorized abandoned-v3 recovery index (evidence/abandoned-v3-dispatch-recovery-index.json: entries[0].recordPath:"
+  ],
+  "firstError": "Critic-skip coverage: 9 applicable v3/v4, 2 skipped, 0 required-pending, 7 evidenced, 13 legacy (schema pipeline.critic-skip-decision.v1) -- 1 dispatch/evidence validation finding(s); 0 applicable v3/v4 record(s) remain uncovered"
+ },
+ {
+  "suite": "check-release-state-consistency-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "check-resume-consumption-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": "ℹ pass 26",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "feature-close-audit-receipt-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "agy-final-return-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 16",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ AFR12 never turns a failed final, changed role or malformed input into an authored draft (1.578592ms)"
+ },
+ {
+  "suite": "verify-case-completion-registry-tests",
+  "exitCode": 1,
+  "seconds": 4.4,
+  "pass": "ℹ pass 31",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (850.491747ms)"
+  ],
+  "firstError": "✔ VCR03 missing, new, duplicate, and stale registry entries fail closed (1.005463ms)"
+ },
+ {
+  "suite": "guard-devplan-policy-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ staged lifecycle policy independently refuses disabling hooks and fails closed on incomplete observations (2.386672ms)"
+ },
+ {
+  "suite": "governance-recovery-reconciliation-action-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ GRRA03 invalid plan digests, candidates, and cross-kind source schemas fail closed (0.313804ms)"
+ },
+ {
+  "suite": "live-runner-certification-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS preflight rejection stays a typed failed result and input parsing is closed"
+ },
+ {
+  "suite": "guard-testpath-override-tests",
+  "exitCode": 0,
+  "seconds": 11.6,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS OT13 an in-session write drifts the repository an armed capability is bound to, which fails closed with HGO-DRIFT"
+ },
+ {
+  "suite": "antigravity-alpha-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS B3A04 selection is a typed fail-closed non-success"
+ },
+ {
+  "suite": "error-register-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 10 - missing authority rejects fail-closed"
+ },
+ {
+  "suite": "provenance-fixture-matrix-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "control-catalog-drift-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "host-advisor-status-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "runner-profile-migration-v3-tests",
+  "exitCode": 0,
+  "seconds": 9.1,
+  "pass": "ℹ pass 56",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed (40.438903ms)"
+ },
+ {
+  "suite": "continuity-result-rebind-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "copy-safe-command-tests",
+  "exitCode": 0,
+  "seconds": 2.2,
+  "pass": "ℹ pass 34",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "project-reset-git-hooks-tests",
+  "exitCode": 0,
+  "seconds": 74,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "onboarding-init-tests",
+  "exitCode": 1,
+  "seconds": 66.3,
+  "pass": "ℹ pass 51",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ host-managed consent CLI routes its later explicit language into private intake state (1502.863384ms)"
+  ],
+  "firstError": "✔ recovery reports source complete if audit fails, without pretending the setup rolled back (0.561227ms)"
+ },
+ {
+  "suite": "semgrep-default-rules-tests",
+  "exitCode": 0,
+  "seconds": 7.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  shipped ruleset reports zero findings on a clean fixture"
+ },
+ {
+  "suite": "antigravity-native-dispatch-pretool-tests",
+  "exitCode": 0,
+  "seconds": 7,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "afk-activation-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ missing protected projection writer and A3 failure are explicit and fail closed (2.18562ms)"
+ },
+ {
+  "suite": "tmp-leak-guard-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-state-gate-action-event-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ PSG05 event-requested physical state readback failure publishes no event (28.88984ms)"
+ },
+ {
+  "suite": "nova-runner-capability-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS A2R02 omitting root schema fails closed"
+ },
+ {
+  "suite": "guard-push-decision-reference-tests",
+  "exitCode": 0,
+  "seconds": 3.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  GPDR05 block  malformed decisionReference fails closed"
+ },
+ {
+  "suite": "critic-fail-closed-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 20 - inline dispatch and claims placeholders fail closed"
+ },
+ {
+  "suite": "critical-human-proof-gate-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof. The three proof flags are demanded because gates.push_approval is \"signature\" (its default, and this project's configured value). Th"
+ },
+ {
+  "suite": "session-cleanup-recovery-tests",
+  "exitCode": 0,
+  "seconds": 2.7,
+  "pass": "ℹ pass 38",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ backupBeforeMutation fails closed on a live symlinked source instead of silently skipping it (13.543302ms)"
+ },
+ {
+  "suite": "backlog-sprint-assignment-check",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "- undeclared and open (failing): 0"
+ },
+ {
+  "suite": "execution-plane-launch-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS zero selects the authorized-write fixture while the failure default remains unchanged"
+ },
+ {
+  "suite": "recovery-preview-attestation-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 14",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ malformed acknowledgements fail closed (0.262044ms)"
+ },
+ {
+  "suite": "reference-path-check",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "REFERENCE-PATH reach: NOT detected -- test suites (*.test.mjs) are not scanned: their path strings are synthetic fixture data, and a genuinely stale import fails when the suite runs"
+ },
+ {
+  "suite": "guard-maintenance-window-tests",
+  "exitCode": 0,
+  "seconds": 5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS signature/default/uncommitted/invalid human approval remains fail-closed without an anchor"
+ },
+ {
+  "suite": "publication-close-audit-binding-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "passive-read-policy-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "review-retry-plan-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "control-waiver-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "agy-session-authority-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "rigor-floor-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 16",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ Git observation failures and untracked paths cannot masquerade as an empty mini surface (3.65953ms)"
+ },
+ {
+  "suite": "doc-contract-tests",
+  "exitCode": 1,
+  "seconds": 15.2,
+  "pass": "ℹ pass 73",
+  "fail": "ℹ fail 3",
+  "failed": [
+   "✖ stateful design checklist is complete on both required documentation surfaces (1433.419622ms)",
+   "✖ current repository integration passes and excludes the instruction path (1085.941912ms)",
+   "✖ successful CLI output exposes the immutable snapshot exclusion count (1189.194804ms)"
+  ],
+  "firstError": "✔ a link into the German half of a bilingual doc fails the anchor check (3.930534ms)"
+ },
+ {
+  "suite": "check-doc-reconciliation-tests",
+  "exitCode": 0,
+  "seconds": 1.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 15 - usage: --base and --candidate are both required; missing either is a findings-carrying failure, never a default range"
+ },
+ {
+  "suite": "sdlc-efficiency-metrics-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 3 - ME03 rejects unknown metric field fail-closed"
+ },
+ {
+  "suite": "model-family-claude-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFCLA003 Claude main-session source port is distinct and absent defaults fail closed (0.452797ms)"
+ },
+ {
+  "suite": "organization-policy-cli-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "continuity-status-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "ruleset-update-policy-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "epic-file-contract-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 2 - a declared path that does not exist on disk is a finding and fails the check"
+ },
+ {
+  "suite": "migrate-backlog-state-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "transfer-classification-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS TC06 fails closed when the spec-retention inventory itself is missing"
+ },
+ {
+  "suite": "scoped-verify-registration-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS SVR02 missing top-level schema fails closed"
+ },
+ {
+  "suite": "afk-capability-worker-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ unknown or process-shaped fields fail the closed result (3.417416ms)"
+ },
+ {
+  "suite": "design-advisor-course-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "finish-feature-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ unsafe request paths and unbound final actions fail before State close (0.329494ms)"
+ },
+ {
+  "suite": "security-evidence-v1-migration-fixture-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "spec-readiness-host-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "native-goldfish-host-state-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "model-family-host-store-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": "ℹ pass 28",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFHS001 activation marker plus generation index qualify a fresh invocation; failed launch retains its watermark (18.917845ms)"
+ },
+ {
+  "suite": "v3-bootstrap-authority-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok - an unknown or null runner stays on the fail-closed Codex path"
+ },
+ {
+  "suite": "bound-design-line-endings-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-host-advisor-route-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ malformed and non-Codex input fails closed without platform inspection (0.216673ms)"
+ },
+ {
+  "suite": "antigravity-topology-refresh-host-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC05C007 unknown pipeline-shaped wiring, shell expansion, alias and oversized configuration fail closed without destructive CLI (15.372167ms)"
+ },
+ {
+  "suite": "nova-sandbox-launch-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS A29L02 probe-start -> genuine non-zero exit reaches a real probe-failure, never a fabricated success"
+ },
+ {
+  "suite": "codex-readiness-app-server-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ Codex app-server adapter classifies a synchronous selected-launch failure as no child (3.549698ms)"
+ },
+ {
+  "suite": "chat-gate-ceremony-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "language-canon-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "model-role-dispatch-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MRD02 unadmitted, different-session and different-model dispatches fail closed (0.312934ms)"
+ },
+ {
+  "suite": "phase26-invariants-tests",
+  "exitCode": 0,
+  "seconds": 1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 5 - identical failure signatures cannot be split into different similarity groups"
+ },
+ {
+  "suite": "advisory-route-selection-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "check-commit-type-range",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "nova-backlog-reconciliation-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS BDR03 root and reusable nested records reject every additional key with domain-prefixed findings"
+ },
+ {
+  "suite": "security-policy-resolver-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "elephant-agy-implementation-dispatch-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "gate-estimate-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "setup-check-tests",
+  "exitCode": 1,
+  "seconds": 5.1,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "PASS  (d) unconfigured markers: the hook never claims authority over readiness",
+   "70 passed, 3 failed",
+   "Failures:",
+   "- (a) preflight reports ready while pipeline.user.yaml is absent: hook-provisioning-required",
+   "- (b) setup complete: preflight is ready: hook-provisioning-required",
+   "- (c) preflight status is ready: hook-provisioning-required"
+  ],
+  "firstError": "PASS  CLI: malformed/unsupported YAML -> exit 0 (fail-open, never blocks)"
+ },
+ {
+  "suite": "organization-policy-activation-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ P-AC-09 the consent subject is deterministic, window-bound, and fails closed on malformed input (0.387155ms)"
+ },
+ {
+  "suite": "pipeline-state-external-push-ledger-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS PSXL04 approve-push refuses with WRITE-FAILED on a genuine filesystem condition, and the success line is not reached"
+ },
+ {
+  "suite": "codex-isolation-control-decomposition-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "runtime-handover-writer-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "reference-path-tests",
+  "exitCode": 0,
+  "seconds": 2.8,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a reference to a missing path fails (0.243034ms)"
+ },
+ {
+  "suite": "lib-plan-spec-state-v2-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ submission fails closed for malformed, busy, overflow, path, and State-CAS inputs (1.190716ms)"
+ },
+ {
+  "suite": "pipeline-state-late-verify-tests",
+  "exitCode": 1,
+  "seconds": 0.2,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ baseline-only implementation exposes and completes the typed late verify recovery (8.154399ms)"
+  ],
+  "firstError": "✔ late verify recovery fails closed for malformed twins and non-implementing lifecycle (3.940033ms)"
+ },
+ {
+  "suite": "workflow-runner-boundary-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 21 - batch adapter failure stops the remainder and reports actual calls without leaking the error"
+ },
+ {
+  "suite": "pipeline-state-revocation-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "enrollment-retirement-coordinator-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-advisory-app-server-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ wrong model, protocol failure, write attempt, incomplete stdio/exit or cleanup never becomes success (6.335976ms)"
+ },
+ {
+  "suite": "verify-case-completion-augmentation-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "afk-git-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "nova-backlog-reconciler-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fails closed when authority is absent, stale, or does not authorize the operation (1.55315ms)"
+ },
+ {
+  "suite": "generate-elephant-role-prohibitions-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "ruleset-freshness-tests",
+  "exitCode": 0,
+  "seconds": 2.3,
+  "pass": "ℹ pass 26",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ beta reports missing tag, missing main, tag outside main, and remote failure as unknown (105.472906ms)"
+ },
+ {
+  "suite": "threat-model-fixture-matrix-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "codex-critic-probe-split-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  unknown task types and malformed parent nonce fail closed"
+ },
+ {
+  "suite": "goldfish-commit-command-flow-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "install-snapshot-progress-tests",
+  "exitCode": 0,
+  "seconds": 1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "model-role-host-session-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "agent-decision-journal-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 52",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ A-AC-10 declares an explicit fail-open/fail-closed disposition for every event class, with no implicit default (0.318664ms)"
+ },
+ {
+  "suite": "guard-authority-ledger-intake-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 19",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ U-1 every builder output validates, and one extra key fails HGL-SHAPE (4.955716ms)"
+ },
+ {
+  "suite": "architecture-fitness-tests",
+  "exitCode": 0,
+  "seconds": 1.3,
+  "pass": "ℹ pass 48",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ downgrades prompt-only claimed compliance to finding, never pass (0.129092ms)"
+ },
+ {
+  "suite": "codex-critic-packet-host-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "architecture-adoption-tests",
+  "exitCode": 0,
+  "seconds": 2.4,
+  "pass": "ℹ pass 33",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fails planning check if disposition is unconfigured (adoption-required) (0.900982ms)"
+ },
+ {
+  "suite": "project-onboarding-ready-gate-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ the gate never reads process.env; a missing runner fails closed as PORG-RUNNER even with CLAUDECODE=1 set (regression pin for ready-gate-env-var-runner-authority) (0.447427ms)"
+ },
+ {
+  "suite": "advisory-host-bridge-tests",
+  "exitCode": 0,
+  "seconds": 1,
+  "pass": "ℹ pass 21",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ workspace observation failure remains typed no-child evidence (9.61589ms)"
+ },
+ {
+  "suite": "phase3-sdlc-coherence-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 25 - the sanitized Phase-2.6 seven-vs-ten delivery regression fails closed"
+ },
+ {
+  "suite": "check-state-phase-consistency-tests",
+  "exitCode": 1,
+  "seconds": 0.2,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ the marker stays atomic with a real design -> implementation transition (21.71151ms)"
+  ],
+  "firstError": "ℹ fail 1"
+ },
+ {
+  "suite": "human-decision-attribution-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "check-commit-type-range-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ auditCommitTypeRange: non-conventional commit type produces finding (0.144542ms)"
+ },
+ {
+  "suite": "push-prepare-tests",
+  "exitCode": 0,
+  "seconds": 0.8,
+  "pass": "ℹ pass 65",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ checkWorkingTreeClean: git failure -> ok:false with remedy (0.101322ms)"
+ },
+ {
+  "suite": "evidence-viewer-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "validate-manifest-tests",
+  "exitCode": 0,
+  "seconds": 2.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  RELEASE executor enum violation"
+ },
+ {
+  "suite": "change-control-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fails closed before evaluating legacy pipeline authority when the ledger scope is absent or mismatched (0.175002ms)"
+ },
+ {
+  "suite": "publication-bundle-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "verify-evidence-writer-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "publication-executor-tests",
+  "exitCode": 0,
+  "seconds": 1.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  wrong authority CAS and approval digest fail closed"
+ },
+ {
+  "suite": "document-hooks-manifest-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ valid-shaped digest, class, and ordering drift fail closed (1.675553ms)"
+ },
+ {
+  "suite": "claude-intake-prompt-hook-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "nova-b2-gitlab-ci-broker-cli-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "governance-verification-action-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ GVA04 malformed digest, outcome, candidate, and source correlation fail closed (0.252514ms)"
+ },
+ {
+  "suite": "repair-map-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "nova-invocation-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "windows-private-state-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.274304ms)"
+ },
+ {
+  "suite": "publication-executor-productive-flow-tests",
+  "exitCode": 0,
+  "seconds": 1.8,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  a genuinely failing example test blocks the real prepare step -- the real result is consulted downstream, not merely present"
+ },
+ {
+  "suite": "nova-candidate-freeze-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "clone-hook-readiness-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "check-adr-consistency-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "regression finding (a), 1 of 3: DUPLICATE-NUMBER 0047-governance-event-kernel.md:1 -- number 0047 is also claimed by 0047-governance-event-kernel.md, 0047-local-supervisor-state-authority.md, 0047-model-free-advisor-preflight-v2.md"
+ },
+ {
+  "suite": "check-protected-path-integrity-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 26",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ compareAgainstBaseline: a matching CONSUMED capability suppresses the finding (21.606721ms)"
+ },
+ {
+  "suite": "external-push-ledger-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS EPL09 a write failure that is not EEXIST surfaces as WRITE-FAILED, not ALREADY-CONSUMED"
+ },
+ {
+  "suite": "governance-review-action-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ accepted pass and findings map to the two closed ADR-0083 review facts (2.053477ms)"
+ },
+ {
+  "suite": "security-scan",
+  "exitCode": 2,
+  "seconds": 12.6,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "semgrep: ERROR [scanner_error] (0 findings) -- semgrep JSON contains an error payload",
+   "license-check: OK [success] (0 findings)",
+   "Verdict: BLOCKING (thresholds: critical, high) -> exit 2",
+   "Evidence written: <clone>/evidence/security-latest.json",
+   "v2 evidence written: <clone>/evidence/security-latest.v2.json",
+   "v2 policy-complete verdict (reporting-only, does NOT affect exit 2): BLOCKING (1 offending required capabilities)"
+  ],
+  "firstError": "gitleaks: FINDINGS [findings] (2 findings)"
+ },
+ {
+  "suite": "continuity-status-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "verify-suite-append-history-check",
+  "exitCode": 1,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "{\"ok\":false,\"code\":\"VSA-PRIOR-ENTRY-CHANGED\",\"detail\":\"b7c660282e168051455fab83c37c7261a83cc71d\"}"
+  ],
+  "firstError": null
+ },
+ {
+  "suite": "check-gitignore-anchoring-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "interaction-continuity-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 14 - invalid or ambiguous decision schemas fail closed"
+ },
+ {
+  "suite": "nova-release-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "design-course-coordinator-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "feature-close-audit-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ missing package, empty Result and malformed policy remain preparation failures (20.874351ms)"
+ },
+ {
+  "suite": "capture-evidence-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 40",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ captureEvidence: a failing command with the repo root in both plain and fil<clone>/ form is fully redacted, and the exit code is recorded and preserved (23.452387ms)"
+ },
+ {
+  "suite": "runtime-handover-projection-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "runner-usage-v1-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS U42 malformed embedded envelopes fail validation without identity dereference"
+ },
+ {
+  "suite": "session-critic-finalizer-tests",
+  "exitCode": 0,
+  "seconds": 5.9,
+  "pass": "ℹ pass 18",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a schema-invalid or contradictory verdict fails before packet or event publication (128.157892ms)"
+ },
+ {
+  "suite": "parallel-sprint-integration-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS PSI10 makes every fail-closed family repairable and confirmed"
+ },
+ {
+  "suite": "artifact-topology-check",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "{\"ok\":true,\"status\":\"valid\",\"findings\":[],\"mode\":\"compatibility\",\"packages\":{\"inventory\":{\"packages\":[\"specs/cyb-4/lifecycle.json\",\"specs/sprint-nova-epic/lifecycle.json\",\"specs/sprint-phoenix-epic/lifecycle.json\"],\"legacy\":[\"specs/2026-07-"
+ },
+ {
+  "suite": "auth-gate-inventory-drift-check",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "architecture-map-scaffold-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "feature-close-audit-executor-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ preflight/digest/activation failures write no bundle or coordinator state (24.915674ms)"
+ },
+ {
+  "suite": "verify-evidence-root-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "bootstrap-payload-measure-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-gate-strength-origin-attestation-tests",
+  "exitCode": 0,
+  "seconds": 12.5,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "guard-gate-strength-origin-attestation: 7 passed, 0 failed"
+ },
+ {
+  "suite": "stack-dynamic-boundary-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS candidate, target, and scope drift each fail closed"
+ },
+ {
+  "suite": "model-family-discovery-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 23",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFD005 account, installation and process mismatch fail independently (0.797031ms)"
+ },
+ {
+  "suite": "check-session-bootstrap-directory-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "doc-reader-terminal-binding-tests",
+  "exitCode": 0,
+  "seconds": 17.6,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC01C004 unresolved finding and invented resolution cannot close the course (2096.874895ms)"
+ },
+ {
+  "suite": "nova-scheduling-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS SLC08 propagates failure, cancellation and invalidation transitively to the original terminal root"
+ },
+ {
+  "suite": "guard-dispatch-budget-checkpoint-tests",
+  "exitCode": 0,
+  "seconds": 10,
+  "pass": "ℹ pass 15",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "human-guard-override-tests",
+  "exitCode": 0,
+  "seconds": 22.4,
+  "pass": "ℹ pass 148",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ Part C: prepareHumanGuardOverrideForSignature() fails closed on the global-plugin-install denial class with HGO-SIGNATURE-INTENT-INVALID (not a silent pass-through) (56.398553ms)"
+ },
+ {
+  "suite": "project-uninstall-tests",
+  "exitCode": 0,
+  "seconds": 7,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "dispatch-record-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ DRC09 missing, unknown and malformed fields fail closed (0.609819ms)"
+ },
+ {
+  "suite": "pipeline-state-lifecycle-event-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "Error: dispatch lifecycle event refused (PS-LIFECYCLE-EVENT-EXISTS); zero mutation."
+ },
+ {
+  "suite": "guard-testpath-tests",
+  "exitCode": 0,
+  "seconds": 7.3,
+  "pass": "ℹ pass 18",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "design-readiness-runner-host-store-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "check-vendored-template-sync-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "private-overlay-runtime-projection-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ successful activation consumes the exact reviewed plan and replay fails closed (8.873939ms)"
+ },
+ {
+  "suite": "main-session-route-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "artifact-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS AL19 lifecycle derivation is total and fails closed on malformed or contradictory input"
+ },
+ {
+  "suite": "native-plugin-readback-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "model-role-bootstrap-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 19",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MRB03 missing policy offers read-only exact-model discovery, while an invalid session ID fails before probes (2.731918ms)"
+ },
+ {
+  "suite": "phoenix-governance-threat-model-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "quality-package-windows-path-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "bootstrap-trust-recovery-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ recovery reports source complete if audit fails, without pretending the setup rolled back (0.609348ms)"
+ },
+ {
+  "suite": "architecture-remedy-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "▶ 1. Remedy comparison for contract violations (AC-22)"
+ },
+ {
+  "suite": "design-workflow-signing-default-tests",
+  "exitCode": 0,
+  "seconds": 1.9,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "settings-allowlist-merge-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ partial current or historical cache families fail closed without a proposed replacement (0.283484ms)"
+ },
+ {
+  "suite": "observation-governance-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a new document fails closed until explicitly classified (4.047695ms)"
+ },
+ {
+  "suite": "authority-revision-proof-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ trustPolicy with a required field missing still fails closed, humanName present or not (0.443635ms)"
+ },
+ {
+  "suite": "afk-assumption-mode-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 29",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ missing, unknown and noncanonical instruction input fails closed (0.502477ms)"
+ },
+ {
+  "suite": "state-numeric-claims-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "po-approval-gate-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "bootstrap-env-check-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "lifecycle-governance-events-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "phase3-sdlc-coherence-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "license-check-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CAPABILITY_CONTRACT_V2.evidenceFields matches the real findings.push(...) object shape (0.207903ms)"
+ },
+ {
+  "suite": "pipeline-start-scratch-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ the lifecycle is fail-open: an unusable root is a typed fault, never a throw (0.309634ms)"
+ },
+ {
+  "suite": "codex-design-advisor-host-tests",
+  "exitCode": 0,
+  "seconds": 3.8,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-update-channel-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 28",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ writer lock identity loss fails closed without removing a foreign lock (1.346219ms)"
+ },
+ {
+  "suite": "statusline-context-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  buildStatus: missing pct -> null (fail-open)"
+ },
+ {
+  "suite": "session-power-core-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "publication-close-journal-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "governance-event-store-tests",
+  "exitCode": 0,
+  "seconds": 5,
+  "pass": "ℹ pass 57",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ exact idempotency is a zero-write replay while a conflicting key fails closed (79.110824ms)"
+ },
+ {
+  "suite": "sandboxed-readonly-host-bridge-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "critic-verify-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ refuses failed, stale, or forged Critic/Verify bindings (0.977514ms)"
+ },
+ {
+  "suite": "windows-assurance-verify-registration-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS WAVR02 missing top-level schema fails closed"
+ },
+ {
+  "suite": "security-capability-plan-builder-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a capability root named by two differently-attributed resolved controls with mixed failure-mode signals ends up required (required wins ties) (0.199033ms)"
+ },
+ {
+  "suite": "sandboxed-readonly-duty-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": "ℹ pass 15",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ native Critic consumer fails closed for old wire shapes, tool evidence drift, verdicts, writes, and bounded transport failures (216.393019ms)"
+ },
+ {
+  "suite": "model-role-approved-policy-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MRP02 task remapping, policy edits, missing anchors and proof replacement fail closed (1.227417ms)"
+ },
+ {
+  "suite": "model-role-host-identity-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "native-goldfish-host-return-regression-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "critic-course-admission-tests",
+  "exitCode": 0,
+  "seconds": 0.8,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CCA08 a retained registration fails if the evidence bytes drift (57.287344ms)"
+ },
+ {
+  "suite": "provenance-attestation-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "external-reference-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 39",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "run-codex-isolation-control-decomposition-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "architecture-baseline-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 21",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "backlog-state-tests",
+  "exitCode": 0,
+  "seconds": 3.9,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS BS24 a closure citing evidence that is present but untracked is a finding, cleared by staging it"
+ },
+ {
+  "suite": "antigravity-execution-host-tests",
+  "exitCode": 0,
+  "seconds": 2.4,
+  "pass": "ℹ pass 24",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ EPH06 invalid packet shape fails under five seconds with zero spawn (16.945999ms)"
+ },
+ {
+  "suite": "governance-authority-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-session-start-hint-tests",
+  "exitCode": 0,
+  "seconds": 2.2,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ SSH005 compact without continuity fails closed (15.39267ms)"
+ },
+ {
+  "suite": "nova-verify-journal-tests",
+  "exitCode": 1,
+  "seconds": 12.6,
+  "pass": "ℹ pass 82",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner (273.556179ms)"
+  ],
+  "firstError": "✔ a required suite with a missing completion terminal fails closed even when its process exits zero (102.090423ms)"
+ },
+ {
+  "suite": "governance-event-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "push-batch-execution-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ journals a preimage failure and never attempts a later destination (1.367349ms)"
+ },
+ {
+  "suite": "project-authority-migration-cli-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "project-authority-cli: 21 passed, 0 failed"
+ },
+ {
+  "suite": "pre-gate-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ one check failing: exits non-zero, names which check and which obligation is unmet, and still runs the rest (36.015567ms)"
+ },
+ {
+  "suite": "codex-pretool-guard-tests",
+  "exitCode": 1,
+  "seconds": 66.1,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "at JSON.parse (<anonymous>)",
+   "at decision (fil<clone>/pipeline-core/hooks/codex-pretool-guard.test.mjs:447:15)",
+   "at fil<clone>/pipeline-core/hooks/codex-pretool-guard.test.mjs:1218:20",
+   "at check (fil<clone>/pipeline-core/hooks/codex-pretool-guard.test.mjs:429:5)",
+   "at fil<clone>/pipeline-core/hooks/codex-pretool-guard.test.mjs:1209:1",
+   "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)"
+  ],
+  "firstError": "not ok 19 - override persistence failure remains a sanitized fail-closed denial"
+ },
+ {
+  "suite": "push-gate-satisfiability-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 36",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ checkVerifyEvidenceBound: non-zero exitCode -> status verify-failed, ok:false (2.25767ms)"
+ },
+ {
+  "suite": "semgrep-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CAPABILITY_CONTRACT_V2.exitCodeMapping transcribes the real fail-closed exit-code/body policy (0.264544ms)"
+ },
+ {
+  "suite": "guard-apply-patch-tests",
+  "exitCode": 1,
+  "seconds": 56.7,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "+ actual - expected",
+   "+ 'command'",
+   "- 'architecture-design-required'",
+   "at fil<clone>/pipeline-core/hooks/guard-apply-patch.test.mjs:525:12",
+   "at check (fil<clone>/pipeline-core/hooks/guard-apply-patch.test.mjs:282:5)",
+   "at fil<clone>/pipeline-core/hooks/guard-apply-patch.test.mjs:472:1"
+  ],
+  "firstError": "ok 18 - EOF02 orphan Add Delete and empty Update EOF markers fail closed"
+ },
+ {
+  "suite": "artifact-lifecycle-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "deferred-backlog-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ checkDeferredBacklog fails only for an invalid date or malformed item input (0.530437ms)"
+ },
+ {
+  "suite": "machine-plane-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 30",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MACHPLANE-1: an absent, empty, relative, throwing, or unresolvable home directory fails closed to null rather than guessing (0.719329ms)"
+ },
+ {
+  "suite": "runner-native-continuation-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 25 - terminal clear is evidence-bound and failed clear is typed unavailable"
+ },
+ {
+  "suite": "pipeline-state-reopen-design-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-host-output-custody-tests",
+  "exitCode": 0,
+  "seconds": 5,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-critic-isolation-tests",
+  "exitCode": 0,
+  "seconds": 4.8,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  trace store fails closed on event, byte and backward-clock bounds"
+ },
+ {
+  "suite": "codex-private-overlay-activation-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 17",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ malformed and oversized JSON fail with the same sanitized result (0.211243ms)"
+ },
+ {
+  "suite": "local-supervisor-setup-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "governance-replay-cli-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "backlog-dispatch-reference-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 19",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-gate-strength-gmw-tests",
+  "exitCode": 0,
+  "seconds": 1.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "guard-gate-strength-gmw: 1 passed, 0 failed"
+ },
+ {
+  "suite": "repository-freshness-tests",
+  "exitCode": 0,
+  "seconds": 2.4,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  invalid repository mode is fail-closed without a remote probe"
+ },
+ {
+  "suite": "guard-dispatch-tests",
+  "exitCode": 1,
+  "seconds": 7.3,
+  "pass": "ℹ pass 49",
+  "fail": "ℹ fail 0",
+  "failed": [
+   "ℹ fail 0",
+   "ℹ cancelled 0",
+   "ℹ skipped 0",
+   "ℹ todo 0",
+   "ℹ duration_ms 7126.165676",
+   "[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION"
+  ],
+  "firstError": "✔ GD19 GD2k audit failure remains blocked before a model call (21.516647ms)"
+ },
+ {
+  "suite": "delivery-course-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS DC01 first classified retryable delivery failure admits only exact second attempt"
+ },
+ {
+  "suite": "parallel-dispatch-planner-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS PDP10 fails closed for unknown dependencies, cycles, and malformed package contracts"
+ },
+ {
+  "suite": "authority-tier-agreement-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "critical-action-authorization-chat-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "github-issue-operations-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ missing, malformed, or unsupported targets and writes fail closed (0.220533ms)"
+ },
+ {
+  "suite": "organization-policy-core-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "threat-model-approval-request-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "codex-app-server-health-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS CAS04 failed recovery does not loop and names the recovery failure"
+ },
+ {
+  "suite": "check-close-security-completeness-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS gate active, HEAD evidence absent -> not skipped, fails closed"
+ },
+ {
+  "suite": "recovery-bridge-approval-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "push-destination-policy-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "authority-tier-agreement-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS ATA03 a stale compiler-owned key is a finding"
+ },
+ {
+  "suite": "async-execution-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ AEX05 an early failed case still emits dispositions for the complete declared corpus (54.17797ms)"
+ },
+ {
+  "suite": "architecture-adoption-orientation-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "sdlc-run-graph-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 5 - an unrelated package course cannot satisfy alpha's recurring product failure"
+ },
+ {
+  "suite": "advisor-capability-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ malformed or additional CLI input fails before output (0.597698ms)"
+ },
+ {
+  "suite": "codex-advisor-execution-tests",
+  "exitCode": 0,
+  "seconds": 31,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC06C003 Advisor unowned JSON, foreign executable, malformed custody and cross-citations fail (6938.411825ms)"
+ },
+ {
+  "suite": "measure-tofu-push-e2e-tests",
+  "exitCode": 1,
+  "seconds": 8.6,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ full TOFU measurement follows Driver-provided design answers through to a recorded signed push (8389.819532ms)"
+  ],
+  "firstError": "ℹ fail 1"
+ },
+ {
+  "suite": "codex-native-critic-host-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "commit-message-policy-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 39",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ok CMP4 a human co-author is not a violation"
+ },
+ {
+  "suite": "publication-capability-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "guard-maintenance-window-kernel-closure-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)"
+ },
+ {
+  "suite": "worktree-target-binding-tests",
+  "exitCode": 0,
+  "seconds": 1.6,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "handover-rotation-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "codex-plugin-validator-parity-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "human-authority-grant-tests",
+  "exitCode": 0,
+  "seconds": 1.1,
+  "pass": "ℹ pass 14",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "native-goldfish-host-return-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "onboarding-consent-guard-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ ONCG003 leaves Bash and missing-session writes fail-open in ungoverned folders (10.005004ms)"
+ },
+ {
+  "suite": "bootstrap-payload-budget-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ BPB10 an early failed case still emits dispositions for the complete declared corpus (46.341543ms)"
+ },
+ {
+  "suite": "continuity-result-bootstrap-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ win32: a POSIX-insecure private result-bootstrap directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (14.820953ms)"
+ },
+ {
+  "suite": "license-contract-check",
+  "exitCode": 1,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "FAIL: plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs lacks an SPDX SUL-1.0 header in its first three lines",
+   "FAIL: plugins/pipeline-core/lib/bound-design-line-endings.mjs lacks an SPDX SUL-1.0 header in its first three lines",
+   "FAIL: plugins/pipeline-core/lib/bound-design-line-endings.test.mjs lacks an SPDX SUL-1.0 header in its first three lines",
+   "FAIL: plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs lacks an SPDX SUL-1.0 header in its first three lines"
+  ],
+  "firstError": "FAIL: plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs lacks an SPDX SUL-1.0 header in its first three lines"
+ },
+ {
+  "suite": "human-role-label-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "guard-slicing-tests",
+  "exitCode": 0,
+  "seconds": 9.5,
+  "pass": "ℹ pass 53",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ GS12: an unreadable transcript file fails open -- no crash, no nudge (12.577528ms)"
+ },
+ {
+  "suite": "pipeline-state-inspection-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "architecture-effective-decisions-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "design-authoring-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "clean-candidate-run-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "run-codex-critic-isolation-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  short, upper-case, extra and unknown arguments fail closed"
+ },
+ {
+  "suite": "agents-adapter-migration-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 3 - missing adapter rejects fail-closed"
+ },
+ {
+  "suite": "po-human-approval-tests",
+  "exitCode": 0,
+  "seconds": 1.7,
+  "pass": "ℹ pass 122",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ sign-intent fails closed before setup (no key material present) (2.174349ms)"
+ },
+ {
+  "suite": "epic-ac02-publication-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "epic-ac02-publication: 3 package(s) checked, 0 failed"
+ },
+ {
+  "suite": "host-advisor-workspace-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-design-readiness-bootstrap-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "verify-case-completion-receipt-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ accepts a complete red case while preserving its failed disposition (0.276834ms)"
+ },
+ {
+  "suite": "critic-diagnostic-packet-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose (157.58663ms)"
+ },
+ {
+  "suite": "verify-suite-registration-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "model-family-antigravity-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFAGA003 Antigravity main-session source port is distinct and absent defaults fail closed (0.522887ms)"
+ },
+ {
+  "suite": "governance-event-core-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "module-inventory-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "advisory-decision-event-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ A-AC-05 distinguishes a route that succeeded only after an earlier failure (6.090402ms)"
+ },
+ {
+  "suite": "portable-critic-export-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ PCE03 no committed anchor, wrong anchor and forged signature fail closed (0.951822ms)"
+ },
+ {
+  "suite": "decision-reference-dual-evaluation-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ reference present and readers disagree in either direction: fails closed (0.135502ms)"
+ },
+ {
+  "suite": "nova-increment-receipt-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "public-core-origin-allowlist-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "evidence-view-renderer-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ E-AC-19 renders failure/quarantine counts and integrity gaps as assumptions when observed and unavailable when absent (0.300614ms)"
+ },
+ {
+  "suite": "local-supervisor-state-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 10 - group or world writable state roots fail closed before create, noop or recovery"
+ },
+ {
+  "suite": "usage-ledger-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "antigravity-start-hint-tests",
+  "exitCode": 0,
+  "seconds": 2.7,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ antigravity-start-hint: relative workspace paths fail-closed (216.100057ms)"
+ },
+ {
+  "suite": "pr-contributor-gate-tests",
+  "exitCode": 0,
+  "seconds": 1.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok - unchecked current acceptance fails closed"
+ },
+ {
+  "suite": "consumer-safe-paths-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 9",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a fixture naming a source-only path fails (0.839391ms)"
+ },
+ {
+  "suite": "worktree-create-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ win32: a POSIX-insecure owner-nonce file is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (1.666912ms)"
+ },
+ {
+  "suite": "codex-tool-free-design-readiness-tests",
+  "exitCode": 0,
+  "seconds": 8.4,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ model tool attempt remains a distinct transport failure with no report (741.620577ms)"
+ },
+ {
+  "suite": "portable-agy-authorship-export-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "handover-rotate-tests",
+  "exitCode": 0,
+  "seconds": 1.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "security-completeness-gate-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fresh+bound+non-blocking pair is a pass (empty failure array) (2.132339ms)"
+ },
+ {
+  "suite": "continuity-result-close-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-state-tests",
+  "exitCode": 1,
+  "seconds": 0.2,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "fil<clone>/scripts/pipeline-state.test.mjs:1221",
+   "priorInvalidationSha256: _ignored,",
+   "^",
+   "TypeError: Cannot destructure property 'priorInvalidationSha256' of 'legacy.planApproval' as it is undefined.",
+   "at fil<clone>/scripts/pipeline-state.test.mjs:1221:30",
+   "Node.js v24.15.0"
+  ],
+  "firstError": "FAIL  PS06a0 submit-plan exit 0 -- got 2"
+ },
+ {
+  "suite": "guard-push-architecture-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "design-readiness-course-e2e-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "plugins-pipeline-core-scripts-pipeline-commit-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "resume-hint-scripts-tests",
+  "exitCode": 0,
+  "seconds": 5.2,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a card that fails validation AFTER contextCard() (invalid materialInput) also survives --consume-card (156.855122ms)"
+ },
+ {
+  "suite": "human-guard-override-capability-scan-tests",
+  "exitCode": 0,
+  "seconds": 1.5,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC15C003 HGO-SCAN: corrupt authenticated audit still fails globally before later valid candidates (286.137491ms)"
+ },
+ {
+  "suite": "threat-model-discovery-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "guard-onboarding-consent-lock-tests",
+  "exitCode": 0,
+  "seconds": 1.6,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "onboarding-consent-mark-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "governance-export-delivery-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 20",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ forged or out-of-batch acknowledgements fail before a local outbox transition (0.686849ms)"
+ },
+ {
+  "suite": "document-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "guard-git-signed-integration-tests",
+  "exitCode": 0,
+  "seconds": 2.9,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-isolated-critic-protected-preimage-tests",
+  "exitCode": 1,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "],",
+   "expected: [],",
+   "operator: 'deepStrictEqual',",
+   "diff: 'simple'",
+   "}",
+   "Node.js v24.15.0"
+  ],
+  "firstError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+ },
+ {
+  "suite": "codex-isolated-critic-claims-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 4 - F1 empty proven and evidenced not-proven states fail closed"
+ },
+ {
+  "suite": "claude-goal-host-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "guard-lifecycle-ready-tests",
+  "exitCode": 1,
+  "seconds": 110.4,
+  "pass": "ℹ pass 304",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, and every mandatory flag is load-bearing (0.656679ms)"
+  ],
+  "firstError": "✔ governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws (0.260843ms)"
+ },
+ {
+  "suite": "routing-projection-check",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "model-family-acceptance-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MFAC002 absent installation never excuses missing/duplicate/failed source contracts (0.72419ms)"
+ },
+ {
+  "suite": "control-placement-tests",
+  "exitCode": 1,
+  "seconds": 0,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ ships a syntactically complete but deliberately unqualified table until A1 evidence exists (1.746334ms)"
+  ],
+  "firstError": "✔ fails closed without a usable A1 record and rejects contradicted runner-hook claims (1.150766ms)"
+ },
+ {
+  "suite": "private-document-binding-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS different immutable bytes and non-owner-only file modes fail closed"
+ },
+ {
+  "suite": "push-batch-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-state-close-audit-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-isolated-critic-contract-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 22",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication (4.331459ms)"
+ },
+ {
+  "suite": "codex-host-process-journal-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "schema-lite-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  TYPE mismatch  a number fails a {type: string} schema and names the expected/actual type"
+ },
+ {
+  "suite": "runner-contracts.schema-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "design-advisor-course-store-tests",
+  "exitCode": 0,
+  "seconds": 1.9,
+  "pass": "ℹ pass 10",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC08C005 oversized or permission-drifted private metadata fails before any budget reuse (6.990414ms)"
+ },
+ {
+  "suite": "publication-state-authority-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "yaml-lite-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "project-onboarding-v3-unborn-head-tests",
+  "exitCode": 0,
+  "seconds": 16,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "push-batch-executor-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "onboarding-continuity-tests",
+  "exitCode": 0,
+  "seconds": 20.7,
+  "pass": "ℹ pass 298",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ OBC005 object-shaped configured handover ({ path, maxBytes }) is observed instead of failing unavailable (9.939014ms)"
+ },
+ {
+  "suite": "guard-push-v2-tests",
+  "exitCode": 0,
+  "seconds": 4.6,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  PGV2-02 block  v2 blocking verdict produces one failure line per offending capability"
+ },
+ {
+  "suite": "feature-package-topology-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "feature-package-topology: 13 passed, 0 failed"
+ },
+ {
+  "suite": "critic-fail-closed-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "Critic fail-closed contract valid."
+ },
+ {
+  "suite": "rebase-authority-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "project-onboarding-foreign-residue-unit-tests",
+  "exitCode": 0,
+  "seconds": 0.6,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ PFRU03 no descriptor at all, or an unreadable inventory, yields no warning (fail closed) (9.292334ms)"
+ },
+ {
+  "suite": "design-advisory-enforcement-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ fails closed for no Advisor, forged receipt, and package drift (0.559928ms)"
+ },
+ {
+  "suite": "initial-answers-state-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "architecture-design-test-fixture-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "worktree-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 6.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS D0-03 symlink parents and case-fold aliases fail before creation"
+ },
+ {
+  "suite": "phase26-invariants-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "guard-push-tests",
+  "exitCode": 0,
+  "seconds": 75.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  PG17e block  unresolvable source fails closed"
+ },
+ {
+  "suite": "nova-b4-github-forge-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS ambiguous hosts, paths, and credential-shaped input fail closed"
+ },
+ {
+  "suite": "private-overlay-activation-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 20",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ load-context fails closed on drift, callback failure, oversize, or incomplete consumption (0.749311ms)"
+ },
+ {
+  "suite": "governance-onboarding-tests",
+  "exitCode": 0,
+  "seconds": 1.3,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "interruption-receipts-tests",
+  "exitCode": 0,
+  "seconds": 4,
+  "pass": "ℹ pass 93",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "claude-task-output-scope-posttool-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "continuity-state-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 1 - failure disposition derives one runner-neutral product retry and generic CAS cannot forge counters"
+ },
+ {
+  "suite": "nova-critic-packet-tests",
+  "exitCode": 0,
+  "seconds": 2.6,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CPP06 fails closed on expiry before a claim (71.590513ms)"
+ },
+ {
+  "suite": "project-reset-tests",
+  "exitCode": 0,
+  "seconds": 2.5,
+  "pass": "ℹ pass 44",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "publication-authority-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "symlink-capability-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "error-register-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "sbom-discovery-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "critic-route-v3-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ RC07C005 malformed committed source and unavailable duty lookup fail without fallback (40.184831ms)"
+ },
+ {
+  "suite": "architecture-inherited-sources-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "codex-onboarding-capabilities-tests",
+  "exitCode": 0,
+  "seconds": 1.4,
+  "pass": "ℹ pass 33",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a writable, nonempty, symlinked, or incomplete declared host-control layout fails closed (1.543901ms)"
+ },
+ {
+  "suite": "critic-route-activation-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ win32: a POSIX-insecure activation journal is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (6.282894ms)"
+ },
+ {
+  "suite": "model-role-v3-baseline-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ MVB03 missing incumbent effort availability fails before a session receipt exists (0.432775ms)"
+ },
+ {
+  "suite": "pipeline-state-rebind-mutable-tests",
+  "exitCode": 0,
+  "seconds": 0.2,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ feature-package-rebind-mutable refuses fail-closed naming a missing --manifest argument (0.422705ms)"
+ },
+ {
+  "suite": "module-cluster-reachability-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 15",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ generic sandboxed-readonly and WSL IPC modules remain Nova-B readiness findings (0.531347ms)"
+ },
+ {
+  "suite": "pipeline-state-decision-reference-tests",
+  "exitCode": 0,
+  "seconds": 0.7,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS PSDR05 approve-push with a malformed --decision-reference fails closed"
+ },
+ {
+  "suite": "initial-answers-transaction-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "self-verify-selection-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "dispatch-record-strip-for-critic-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 11",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ DRS06 stripDispatchRecordForCritic fails closed on unsafe object paths while retaining only a safe legacy string path (0.256444ms)"
+ },
+ {
+  "suite": "runner-transcript-recovery-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ recovery fails closed for no current identity, unknown runners, malformed metadata, and symlinked candidates (0.671289ms)"
+ },
+ {
+  "suite": "design-advisory-coordinator-tests",
+  "exitCode": 0,
+  "seconds": 0.5,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ a native-capable Claude session retains its failed-native then answered-consult route (52.903771ms)"
+ },
+ {
+  "suite": "design-advisory-admission-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "nova-macos-acceptance-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS B5M02 closed root and digest binding fail hostile mutations"
+ },
+ {
+  "suite": "governance-action-events-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "runtime-projection-v3-tests",
+  "exitCode": 0,
+  "seconds": 0.4,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS V3 rejects role-label violations before baseline access"
+ },
+ {
+  "suite": "check-audit-evidence-overview-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ audit-evidence-overview: covers waivers, exceptions and fail-closed posture (0.143582ms)"
+ },
+ {
+  "suite": "nova-b4-gitlab-forge-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS B4G03 ambiguous, non-canonical, insecure, or local hosts fail closed"
+ },
+ {
+  "suite": "stack-fuzz-replay-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS candidate and oracle drift fail closed"
+ },
+ {
+  "suite": "po-gate-profile-publisher-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 7 - cleans an unpublished temporary after a pre-rename write failure"
+ },
+ {
+  "suite": "phoenix-authority-approval-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 2",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "agy-host-commit-execution-tests",
+  "exitCode": 0,
+  "seconds": 1.2,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ AHE06 a commit written before a failed process response stays recovery-required, never no-delivery (81.795171ms)"
+ },
+ {
+  "suite": "critic-packet-governance-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS CPG04 fails closed when required candidate content is absent or unreadable"
+ },
+ {
+  "suite": "advisor-consult-v3-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 4",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "critical-human-proof-policy-tests",
+  "exitCode": 0,
+  "seconds": 0.9,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "35 passed, 0 failed"
+ },
+ {
+  "suite": "nova-b4-git-transport-contract-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "workflow-writer-preflight-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "ok 25 - batch preflight fails closed on unsafe paths, malformed envelopes and missing member capabilities"
+ },
+ {
+  "suite": "plan-spec-state-v2-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 27",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ submission fails closed for malformed, busy, overflow, path, and State-CAS inputs (0.872732ms)"
+ },
+ {
+  "suite": "reference-catalog-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "worktree-count-check-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  WTC9 non-repo path fails open (ok:false, never throws)"
+ },
+ {
+  "suite": "nova-execution-plane-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS EPC10 covers duplicate, out-of-order, stale candidate, failure, timeout, cancellation, lost heartbeat and completed-undelivered without false success"
+ },
+ {
+  "suite": "validate-manifest",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "check-critic-skip-coverage-tests",
+  "exitCode": 0,
+  "seconds": 0.8,
+  "pass": "ℹ pass 32",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ legacy reconciliation fails closed on source drift, duplicate record paths, and disposition digest drift (1.345798ms)"
+ },
+ {
+  "suite": "commit-msg-hook-install-tests",
+  "exitCode": 0,
+  "seconds": 28.4,
+  "pass": "ℹ pass 22",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ CMI011 off policy does not produce provenance findings (1323.459053ms)"
+ },
+ {
+  "suite": "critical-action-approval-request-tests",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "state-budget-check",
+  "exitCode": 0,
+  "seconds": 0,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": null
+ },
+ {
+  "suite": "project-onboarding-v3-tests",
+  "exitCode": 1,
+  "seconds": 39.5,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "chunk 0 shard 1: exit 1",
+   "chunk 0 shard 2: exit 1",
+   "chunk 0 shard 3: exit 1",
+   "chunk 0 shard 4: exit 1",
+   "chunk 0 shard 5: exit 1",
+   "[verify-case-completion-error] VERIFY-CASE-COMPLETION-TERMINAL"
+  ],
+  "firstError": "project-onboarding-v3 controller: malformed coordinates, partition coverage, and child failure outcomes fail closed"
+ },
+ {
+  "suite": "governance-export-adapter-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "installed-plugin-attestation-host-tests",
+  "exitCode": 1,
+  "seconds": 1.8,
+  "pass": "ℹ pass 8",
+  "fail": "ℹ fail 1",
+  "failed": [
+   "✖ IPH09 an exact Codex local registry/cache binding needs no receipt and a divergent cache stays closed (321.308518ms)"
+  ],
+  "firstError": "✔ IPH06 dirty source, stale copy, and embedded credential origin fail before a receipt survives (113.58408ms)"
+ },
+ {
+  "suite": "check-backlog-state-tests",
+  "exitCode": 1,
+  "seconds": 6.8,
+  "pass": null,
+  "fail": null,
+  "failed": [
+   "PASS CBS14 an item carrying a valid done_when value validates cleanly",
+   "PASS CBS15 an item carrying a genuinely unsupported field is still rejected -- widened by exactly one key, not disabled",
+   "PASS CBS17 event 403 acceptance is bound to the exact immutable ledger entry and does not admit lookalikes",
+   "16 passed, 1 failed",
+   "FAIL CBS16 the real event 403 format and closure drift are explicitly accepted while all current drift is dispositioned: items: pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-se",
+   "false !== true"
+  ],
+  "firstError": "PASS CBS09 applyBacklogItemHashRescopeAmendment succeeds when the only outstanding finding is the stale pin it resolves"
+ },
+ {
+  "suite": "architecture-push-currency-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 6",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ approved or malformed adoption state without a map fails closed (51.819474ms)"
+ },
+ {
+  "suite": "dispatch-budget-calibration-tests",
+  "exitCode": 0,
+  "seconds": 0.3,
+  "pass": "ℹ pass 13",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "pipeline-start-preflight-tests",
+  "exitCode": 1,
+  "seconds": 32.3,
+  "pass": "ℹ pass 67",
+  "fail": "ℹ fail 8",
+  "failed": [
+   "✖ preflight reports exact identity and no-handoff without secret fields (3.67485ms)",
+   "✖ an unattested origin keeps plugin refresh required and returns a non-executable advisory (263.044694ms)",
+   "✖ a rejected observation keeps plugin refresh required and returns a non-executable advisory (256.959048ms)",
+   "✖ F2: attestation is skipped entirely (not attempted, not failed) for a real installed-plugin-cache-style layout with no .git at all (296.137326ms)",
+   "✖ F4(c): the .git-presence gate skips real attestation for a no-.git fixture without injecting any observe stub (294.486503ms)",
+   "✖ F4(a): runner claude reaches the real observePublicCoreIdentity default path, without any observe stub (368.495735ms)",
+   "✖ F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub (5322.666528ms)",
+   "✖ PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulesetSource classed marketplace-public with honestly-unavailable identities that still validate (288.637458m"
+  ],
+  "firstError": "✔ missing or malformed manifest fails identity closed (127.656189ms)"
+ },
+ {
+  "suite": "codex-sandbox-runtime-tests",
+  "exitCode": 0,
+  "seconds": 2.8,
+  "pass": "ℹ pass 15",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ selection.runPreflight() and selection.observeHost() make a real, unmocked call into codex-sandbox-preflight.mjs's runCodexSandboxPreflight(), and a real TERMINAL_CODES failure receipt is consumed via the runtime module's own return value"
+ },
+ {
+  "suite": "agy-session-dispatch-tests",
+  "exitCode": 0,
+  "seconds": 2.8,
+  "pass": "ℹ pass 7",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ no consent and invalid session fail before any model call (4.950047ms)"
+ },
+ {
+  "suite": "critic-bare-tests",
+  "exitCode": 0,
+  "seconds": 2.1,
+  "pass": null,
+  "fail": null,
+  "failed": [],
+  "firstError": "PASS  SCHEMA missing-pass  a verdict without `pass` fails validation and names the field"
+ },
+ {
+  "suite": "checkpoint-push-audit-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 1",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "finding-lifecycle-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 12",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "✔ AC3: untyped or unauthorized transitions fail closed (0.225943ms)"
+ },
+ {
+  "suite": "audit-bundle-cli-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 3",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ },
+ {
+  "suite": "model-role-host-store-tests",
+  "exitCode": 0,
+  "seconds": 0.1,
+  "pass": "ℹ pass 5",
+  "fail": "ℹ fail 0",
+  "failed": [],
+  "firstError": "ℹ fail 0"
+ }
+]
