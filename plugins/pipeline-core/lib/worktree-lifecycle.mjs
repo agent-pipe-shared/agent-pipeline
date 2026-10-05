@@ -598,6 +598,15 @@ function assertPrivateRegularFile(path, code, label) {
   }
 }
 
+/**
+ * Deterministic-test seam (FLAPW): `options.descriptorStageHook(stage, path)` runs at exact points of
+ * the list-then-load sequence ("listed", "before-check", "before-read") so a test can retire a
+ * descriptor at the precise instant a concurrent owner would. Production callers pass no hook.
+ */
+function descriptorStage(options, stage, path) {
+  if (typeof options?.descriptorStageHook === "function") options.descriptorStageHook(stage, path);
+}
+
 function validSessionDescriptor(value, repo, sessionId) {
   const common = value !== null && typeof value === "object" && !Array.isArray(value)
     && value.sessionId === sessionId
@@ -646,12 +655,30 @@ export function loadSessionDescriptor(startPath, sessionId, options = {}) {
   const repo = discoverRepository(startPath, options);
   ensureSafeId(sessionId, "session ID");
   const path = sessionDescriptorPath(repo, sessionId);
-  if (!existsSync(path)) fail("WT-SESSION-MISSING", "session descriptor is missing");
-  assertPrivateRegularFile(path, "WT-SESSION-DESCRIPTOR", "session descriptor");
+  const missing = () => fail("WT-SESSION-MISSING", "session descriptor is missing");
+  if (!existsSync(path)) missing();
+  // A published descriptor is immutable (the writer publishes it by an atomic rename), but its owner
+  // may retire it at ANY instant. Every step below can then fail only because the name is gone: that
+  // is re-observed AFTER the failing step and reported as "missing", never as "malformed" or "not a
+  // private single-link regular file". A descriptor that is still present keeps its fail-closed
+  // verdict unchanged. The bytes are read once, so the parse and the digest describe the same file.
+  descriptorStage(options, "before-check", path);
+  try {
+    assertPrivateRegularFile(path, "WT-SESSION-DESCRIPTOR", "session descriptor");
+  } catch (error) {
+    if (!existsSync(path)) missing();
+    throw error;
+  }
+  descriptorStage(options, "before-read", path);
+  let bytes;
+  try { bytes = readFileSync(path); } catch {
+    if (!existsSync(path)) missing();
+    fail("WT-SESSION-DESCRIPTOR", "session descriptor is unreadable");
+  }
   let descriptor;
-  try { descriptor = JSON.parse(readFileSync(path, "utf8")); } catch { fail("WT-SESSION-DESCRIPTOR", "session descriptor is malformed"); }
+  try { descriptor = JSON.parse(bytes.toString("utf8")); } catch { fail("WT-SESSION-DESCRIPTOR", "session descriptor is malformed"); }
   if (!validSessionDescriptor(descriptor, repo, sessionId)) fail("WT-SESSION-BINDING", "session descriptor binding is invalid");
-  const descriptorSha256 = rawSha256(readFileSync(path));
+  const descriptorSha256 = rawSha256(bytes);
   if (options.expectedDescriptorSha256 !== undefined) {
     if (typeof options.expectedDescriptorSha256 !== "string" || !SHA256.test(options.expectedDescriptorSha256)
       || !timingSafeEqual(Buffer.from(descriptorSha256), Buffer.from(options.expectedDescriptorSha256))) {
@@ -837,18 +864,35 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
   const entries = readdirSync(directory, { withFileTypes: true })
     .filter((entry) => !(entry.isFile() && !entry.isSymbolicLink() && entry.name.startsWith(".") && entry.name.endsWith(".tmp")))
     .sort((left, right) => left.name.localeCompare(right.name, "en"));
-  return entries.map((entry) => {
+  return entries.flatMap((entry) => {
     if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".json")) {
       fail("WT-SESSION-DESCRIPTOR-DIRECTORY", "session descriptor directory contains an unexpected entry");
     }
     const sessionId = entry.name.slice(0, -".json".length);
     ensureSafeId(sessionId, "session ID");
-    const loaded = loadSessionDescriptor(repo.primaryRoot, sessionId, options);
-    return {
+    descriptorStage(options, "listed", join(directory, entry.name));
+    const loaded = loadListedSessionDescriptor(repo.primaryRoot, sessionId, options);
+    // Retired by its owner between the directory read and this load: absent, not an error.
+    if (loaded === null) return [];
+    return [{
       sessionId: loaded.sessionId,
       descriptorSha256: loaded.descriptorSha256,
-    };
+    }];
   });
+}
+
+/**
+ * List-all paths ONLY (never a load of one specific, required descriptor): a descriptor whose name
+ * vanished between being listed and being loaded was retired by its owner, so it is absent. Every
+ * other failure -- malformed, multi-linked, binding or digest mismatch -- still throws.
+ */
+function loadListedSessionDescriptor(startPath, sessionId, options) {
+  try {
+    return loadSessionDescriptor(startPath, sessionId, options);
+  } catch (error) {
+    if (error instanceof WorktreeLifecycleError && error.code === "WT-SESSION-MISSING") return null;
+    throw error;
+  }
 }
 
 /**
@@ -864,10 +908,11 @@ export function classifyActiveSessionDescriptors(startPath, options = {}) {
   const own = [];
   const foreign = [];
   for (const entry of listActiveSessionDescriptors(startPath, loadOptions)) {
-    const loaded = loadSessionDescriptor(startPath, entry.sessionId, {
+    const loaded = loadListedSessionDescriptor(startPath, entry.sessionId, {
       ...loadOptions,
       expectedDescriptorSha256: entry.descriptorSha256,
     });
+    if (loaded === null) continue;
     const isOwn = hasNonce && timingSafeEqual(
       Buffer.from(rawSha256(Buffer.from(requesterOwnerNonce))),
       Buffer.from(rawSha256(Buffer.from(loaded.ownerNonce))),

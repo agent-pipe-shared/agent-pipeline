@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
@@ -1189,6 +1189,100 @@ function readdirJson(path) {
   assert.equal(lstatSync(path).isSymbolicLink(), false);
   return readdirSync(path).filter((name) => name.endsWith(".json")).sort();
 }
+
+// FLAPW (ALFRED-FLAPW-20261005): a published session descriptor must never be reported as malformed,
+// "not a private single-link regular file" or an unexpected entry merely because its owner retired it
+// while another session was listing or loading it. The writer is already atomic (temp file + fsync +
+// rename, temp names skipped by the lister), so the only observable race is a descriptor that vanishes
+// between listing and load. `descriptorStageHook` retires it at the exact point a concurrent owner would.
+function flapwActiveDir(primary) {
+  return join(discoverRepository(primary).commonDir, "agent-pipeline", "session-descriptors", "active");
+}
+
+function flapwStart(primary, id) {
+  return startSessionDescriptor(primary, { sessionId: id, ownerNonce: `owner-nonce-${id}-000001`, ownerPid: -1 });
+}
+
+function flapwRetireAt(wanted, id, { onNth = 1 } = {}) {
+  let seen = 0;
+  return (stage, path) => {
+    if (stage !== wanted || !path.endsWith(`${id}.json`)) return;
+    seen += 1;
+    if (seen === onNth) unlinkSync(path);
+  };
+}
+
+check("FLAPW list-all skips a descriptor retired between listing and its load and still returns the survivors", () => {
+  const { primary } = repoFixture();
+  flapwStart(primary, "flapw-list-a");
+  flapwStart(primary, "flapw-list-b");
+  const listed = listActiveSessionDescriptors(primary, { descriptorStageHook: flapwRetireAt("listed", "flapw-list-a") });
+  assert.deepEqual(listed.map((entry) => entry.sessionId), ["flapw-list-b"]);
+  assert.equal(existsSync(join(flapwActiveDir(primary), "flapw-list-a.json")), false);
+});
+
+for (const stage of ["before-check", "before-read"]) {
+  check(`FLAPW list-all treats a descriptor that vanishes at ${stage} as absent, never as malformed or non-private`, () => {
+    const { primary } = repoFixture();
+    flapwStart(primary, `flapw-${stage}-a`);
+    flapwStart(primary, `flapw-${stage}-b`);
+    const listed = listActiveSessionDescriptors(primary, { descriptorStageHook: flapwRetireAt(stage, `flapw-${stage}-a`) });
+    assert.deepEqual(listed.map((entry) => entry.sessionId), [`flapw-${stage}-b`]);
+  });
+
+  check(`FLAPW a required load of a descriptor that vanishes at ${stage} is still WT-SESSION-MISSING, never an absent result`, () => {
+    const { primary } = repoFixture();
+    flapwStart(primary, `flapw-req-${stage}`);
+    assertLifecycleError(
+      () => loadSessionDescriptor(primary, `flapw-req-${stage}`, { descriptorStageHook: flapwRetireAt(stage, `flapw-req-${stage}`) }),
+      "WT-SESSION-MISSING",
+    );
+  });
+}
+
+check("FLAPW classifyActiveSessionDescriptors skips a descriptor retired between its listing pass and its classification load", () => {
+  const { primary } = repoFixture();
+  flapwStart(primary, "flapw-class-a");
+  const kept = flapwStart(primary, "flapw-class-b");
+  const result = archiveApi.classifyActiveSessionDescriptors(primary, {
+    requesterOwnerNonce: kept.ownerNonce,
+    descriptorStageHook: flapwRetireAt("before-read", "flapw-class-a", { onNth: 2 }),
+  });
+  assert.deepEqual(result.own.map((entry) => entry.sessionId), ["flapw-class-b"]);
+  assert.deepEqual(result.foreign, []);
+});
+
+check("FLAPW a published descriptor that is still present fails closed when malformed, in the loader and in list-all", () => {
+  const { primary } = repoFixture();
+  const started = flapwStart(primary, "flapw-malformed");
+  flapwStart(primary, "flapw-healthy");
+  writeFileSync(started.path, "{\"schema\": \"pipeline.session-descr", { mode: 0o600 });
+  const malformed = (error) => error instanceof WorktreeLifecycleError && error.code === "WT-SESSION-DESCRIPTOR" && /malformed/.test(error.message);
+  assert.throws(() => loadSessionDescriptor(primary, "flapw-malformed"), malformed);
+  assert.throws(() => listActiveSessionDescriptors(primary), malformed);
+});
+
+check("FLAPW a published descriptor that is still present fails closed when multi-linked, in the loader and in list-all", () => {
+  const { primary } = repoFixture();
+  const started = flapwStart(primary, "flapw-multilink");
+  const extra = join(dirname(flapwActiveDir(primary)), "flapw-extra-link");
+  linkSync(started.path, extra);
+  try {
+    const nonPrivate = (error) => error instanceof WorktreeLifecycleError && error.code === "WT-SESSION-DESCRIPTOR" && /single-link/.test(error.message);
+    assert.throws(() => loadSessionDescriptor(primary, "flapw-multilink"), nonPrivate);
+    assert.throws(() => listActiveSessionDescriptors(primary), nonPrivate);
+  } finally {
+    unlinkSync(extra);
+  }
+});
+
+check("FLAPW an in-flight atomic-write temporary file holding partial bytes is never listed or loaded", () => {
+  const { primary } = repoFixture();
+  const started = flapwStart(primary, "flapw-inflight");
+  writeFileSync(join(flapwActiveDir(primary), ".flapw-next.json.4242.0a1b2c3d4e5f.tmp"), "{\"schema\": \"pipeline.session-descr");
+  assert.deepEqual(listActiveSessionDescriptors(primary).map((entry) => entry.sessionId), [started.sessionId]);
+  assert.equal(archiveApi.classifyActiveSessionDescriptors(primary, {}).foreign.length, 1);
+});
 
 for (const root of fixtureRoots) rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed}/${passed + failed} checks passed.`);
