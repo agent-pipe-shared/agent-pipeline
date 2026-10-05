@@ -609,6 +609,46 @@ for (const [cmd, expected, why] of GPGL6_CLASSIFIER_TABLE) {
   );
 }
 
+// ---- commandIsGitPush: text executed by PowerShell fails closed (GPGL-7, Critic finding F1) ------------
+// In PowerShell a backslash is an ordinary character everywhere (inside double quotes the escape is the
+// backtick), so `\<space>` ends a word and `\"` closes a double-quoted span. Both POSIX-based readings read the
+// same text the other way (`\<space>` is one escaped space, `\"` an escaped quote): a drive path ending in a
+// backslash swallowed `push` into the `-C` value, and a `"x\"; git push ...; echo \"y"` string became one
+// blanked span, so a real PowerShell push was classified "not a push" (guard-push's fast path then exits).
+// The classifier now adds a third reading with a literal backslash and fails closed when ANY reading pushes.
+// A `<drive>` drive letter plus `repo` is a neutral fixture path.
+const GPGL7_POWERSHELL_PUSH_TABLE = [
+  [String.raw`git -C C:\repo\ push origin main`, "F1 (a): a drive path ending in a backslash and a space; PowerShell reads the space as a separator"],
+  [String.raw`echo "x\"; git push origin main; echo \"y"`, 'F1 (b): `"x\\"` closes the span in PowerShell, so the push after it is executed'],
+  [String.raw`git -C 'C:\repo\' push origin main`, "the drive path quoted in single quotes (backslash literal in every shell), then push"],
+  [String.raw`echo "a\"; git push origin HEAD:refs/heads/feat/x; echo \"b"`, "the escaped-quote shape again, the middle segment a push with a remote and a refspec"],
+  [String.raw`git -c a=b -C C:\repo\ push origin main`, "a recognised -c option before the drive path: the `\\<space>` token must not swallow the push word"],
+  [String.raw`git -C C:\a\ -C C:\b\ push origin main`, "repeated -C drive paths, each ending in a backslash and a space"],
+  [String.raw`& git -C C:\repo\ push origin main`, "PowerShell call operator in front of git, then a drive path ending in a backslash"],
+  [String.raw`cd C:\repo\ ; git -C C:\repo\ push origin main`, "a drive path ending in a backslash on a preceding command, then the push"],
+  [String.raw`echo "x\"; git -c a=b -C C:\repo\ push origin main; echo \"y"`, "the span-closing shape and the swallowing path together"],
+  [String.raw`echo "x\"; git push --force origin main; echo \"y"`, "the span-closing shape around a force push with a flag"],
+];
+for (const [cmd, why] of GPGL7_POWERSHELL_PUSH_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL7-POWERSHELL-PUSH ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
+// The third reading must not turn ordinary read-only commands that carry the same backslash shapes into pushes.
+const GPGL7_NEGATIVE_TABLE = [
+  [String.raw`git -C C:\repo\ status`, "a drive path ending in a backslash and a space, read-only subcommand"],
+  [String.raw`git -c a=b -C C:\repo\ status`, "a recognised -c option, a drive path ending in a backslash, read-only subcommand"],
+  [String.raw`git -C 'C:\repo\' log --oneline`, "the single-quoted drive path with a read-only subcommand"],
+  [String.raw`echo "x\"; git status; echo \"y"`, "the span-closing shape around a read-only git command"],
+  [String.raw`git commit -m "see C:\repo\ for details"`, "a drive path with a backslash and a space inside a double-quoted message"],
+  [String.raw`echo "C:\repo\ push"`, "a drive path and the word push inside one double-quoted argument, no git word"],
+  [String.raw`git log --grep "a \"push\" word"`, "the GPGL-5 negative stays negative under the third reading"],
+];
+for (const [cmd, why] of GPGL7_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL7-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);

@@ -95,13 +95,15 @@ function readAnsiCQuoted(cmd, open) {
  * non-blank text of the whole command (a Windows path such as `"C:\repo\"`) closes the span with the backslash
  * kept literal. POSIX would call that span unterminated, but nothing follows it, so no command can hide behind
  * it under either reading and the command is not routed to the push gate for it.
+ * `literalBackslash` selects the PowerShell reading (GPGL-7): a backslash is an ordinary character inside
+ * the span (PowerShell escapes with the backtick), so `\"` closes the span.
  */
-function readDoubleQuoted(cmd, open) {
+function readDoubleQuoted(cmd, open, literalBackslash = false) {
   let content = "";
   for (let i = open + 1; i < cmd.length; i += 1) {
     const ch = cmd[i];
     if (ch === '"') return { end: i, content };
-    if (ch !== "\\") {
+    if (ch !== "\\" || literalBackslash) {
       content += ch;
       continue;
     }
@@ -121,7 +123,7 @@ function readDoubleQuoted(cmd, open) {
 }
 
 /**
- * scanShell(cmd, pathBackslash) -- one POSIX pass over `cmd` that returns what the classifier needs:
+ * scanShell(cmd, reading) -- one shell pass over `cmd` that returns what the classifier needs:
  *   words: the argv-style words (split on unquoted whitespace only, operators stay glued), dequoted;
  *   view: the command text for regex detection -- structure (whitespace, operators, newlines) kept as
  *     written, every quoted or escaped part replaced by its dequoted content (`pu"sh"` reads `push`), except
@@ -129,10 +131,26 @@ function readDoubleQuoted(cmd, open) {
  *     blanks quoted prose, so `echo "git push"` is not a push;
  *   unterminated: an unclosed quote or a trailing lone backslash -- the text cannot be parsed with certainty;
  *   escapedQuoteOutsideQuotes: a backslash-escaped quote outside every quote, the shape that used to fake a span.
- * `pathBackslash` selects the other reading of an unquoted backslash before an ordinary character: a Windows
- * path separator (`C:\Git\bin\git.exe`) kept literally instead of a POSIX escape.
+ * `reading` picks how a backslash is read (three readings, GPGL-7):
+ *   READING_POSIX (default): an unquoted backslash escapes the next character; inside double quotes it escapes
+ *     only `"`, `\`, `$`, a backtick and a newline.
+ *   READING_WINDOWS_PATH: as POSIX, except an unquoted backslash before an ORDINARY character is a Windows path
+ *     separator (`C:\Git\bin\git.exe`) kept literally; before a structural character it still escapes.
+ *   READING_POWERSHELL: a backslash is ALWAYS an ordinary character -- unquoted and inside double quotes alike
+ *     (PowerShell escapes with the backtick, not the backslash), so `\<space>` ends the word and `\"` closes a
+ *     double-quoted span. `$'` is not ANSI-C quoting there: the `$` is literal and `'` opens a plain single-quoted
+ *     span. The detection view renders such a backslash as `/` (a path separator, accepted at every boundary the
+ *     classifier tests) so the option-value token of `normalizeGlobalGitOptions`, which reads `\<space>` as ONE
+ *     escaped space, cannot swallow the push word that follows a drive path ending in a backslash. Not modelled
+ *     (see `commandIsGitPush`): the backtick escape, here-strings, `$(...)` inside double quotes.
  */
-function scanShell(cmd, pathBackslash = false) {
+const READING_POSIX = "posix";
+const READING_WINDOWS_PATH = "windows-path";
+const READING_POWERSHELL = "powershell";
+
+function scanShell(cmd, reading = READING_POSIX) {
+  const pathBackslash = reading === READING_WINDOWS_PATH;
+  const powershell = reading === READING_POWERSHELL;
   const words = [];
   let view = "";
   let word = "";
@@ -155,6 +173,15 @@ function scanShell(cmd, pathBackslash = false) {
     if (/\s/u.test(ch)) {
       endWord();
       view += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "\\" && powershell) {
+      // PowerShell: an ordinary character. The next character is NOT consumed -- a space ends the word, a quote
+      // opens a span, `;` separates commands. The view shows `/` (see `scanShell`'s header for why).
+      word += ch;
+      view += "/";
+      sawAny = true;
       i += 1;
       continue;
     }
@@ -186,9 +213,9 @@ function scanShell(cmd, pathBackslash = false) {
       continue;
     }
     let span = null;
-    if (ch === "$" && cmd[i + 1] === "'") span = readAnsiCQuoted(cmd, i + 1);
+    if (ch === "$" && cmd[i + 1] === "'" && !powershell) span = readAnsiCQuoted(cmd, i + 1);
     else if (ch === "'") span = readSingleQuoted(cmd, i);
-    else if (ch === '"') span = readDoubleQuoted(cmd, i);
+    else if (ch === '"') span = readDoubleQuoted(cmd, i, powershell);
     if (span !== null) {
       sawAny = true;
       word += span.content;
@@ -310,7 +337,7 @@ export function decodeBashAnsiCEscape(source, index) {
  * removed.
  *
  * ONE deliberate exception (GPGL-6): an UNQUOTED backslash before an ordinary character is
- * kept LITERALLY, the Windows-path-separator reading of `scanShell` (`pathBackslash`), so
+ * kept LITERALLY, the Windows-path-separator reading of `scanShell` (`READING_WINDOWS_PATH`), so
  * `git -C C:\Users\x\repo push origin main` yields the path `C:\Users\x\repo` and `p\ush`
  * stays `p\ush`. guard-push parses push targets and refspecs from this function's tokens
  * on native Windows, where those backslashes are separators; the POSIX reading (GPGL-5)
@@ -328,7 +355,7 @@ export function decodeBashAnsiCEscape(source, index) {
  * plain token list this function returns.
  */
 export function tokenizeArgv(cmd) {
-  return scanShell(cmd, true).words;
+  return scanShell(cmd, READING_WINDOWS_PATH).words;
 }
 
 const REGEX_SPECIAL_CHAR_RE = /[.*+?^${}()|[\]\\]/;
@@ -489,10 +516,16 @@ const GIT_EXECUTABLE_THEN_OPTION_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b\s+-\S
  *      `git commit -m "say \"hi\""` and `git log --grep "a \"push\" word"` out of the push gate.
  *      Detection itself (the three branches and checks #2/#4) runs on the DEQUOTED words and
  *      view, never on raw text: `git pu"sh"`, `g"it" push` and `git p\ush` all read `git push`.
- *      An unquoted backslash is read both as a POSIX escape and as a Windows path separator;
- *      either reading classifying as a push is enough. An unterminated quote or a trailing lone
- *      backslash fails closed under #1 as well. PowerShell quoting (backtick escapes, doubled
- *      quotes) follows neither reading and is NOT covered.
+ *      A backslash is read three ways and ANY reading classifying as a push is enough (GPGL-7):
+ *      as a POSIX escape, as a Windows path separator before an ordinary character, and as the
+ *      ordinary character PowerShell takes it for (`\<space>` ends a word, `\"` closes a
+ *      double-quoted span, so `git -C <drive>:\repo\ push` and `echo "x\"; git push; echo \"y"`
+ *      both classify). An unterminated quote or a trailing lone backslash fails closed under #1
+ *      as well. COVERED for PowerShell: the literal backslash only. NOT modelled, still open
+ *      (report GPGL-7; QG-06 needs an owner and an expiry set by the dispatcher): the backtick
+ *      escape (`` `" ``) outside and inside double quotes, here-strings (`@"..."@`), and a
+ *      `$(...)` subexpression inside a double-quoted string, which any shell runs. Doubled
+ *      quotes (`""`, `''`) need no model: they toggle the span twice and so hide the same text.
  *   4. A QUOTED git executable name (`"git"`, `'git.exe'`, a quoted path ending in git)
  *      with a push word later in the command (GPGL-3). Quote-stripping blanks `"git"`, so
  *      neither the whole-string branch nor the global-option collapse ever sees the
@@ -504,15 +537,18 @@ const GIT_EXECUTABLE_THEN_OPTION_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b\s+-\S
  */
 export function commandIsGitPush(cmd) {
   if (typeof cmd !== "string" || cmd === "") return false;
-  // An unquoted backslash has two readings: a POSIX escape (`p\ush` is `push`) and a Windows path
-  // separator (`C:\Git\bin\git.exe push`). Which one a runner's shell applies is not known here, so
-  // classify under both and fail closed when either reading is a push (GPGL-5).
-  return classifyPush(cmd, false) || classifyPush(cmd, true);
+  // A backslash has three readings: a POSIX escape (`p\ush` is `push`), a Windows path separator
+  // (`C:\Git\bin\git.exe push`) and the ordinary character PowerShell takes it for (`\"` closes a
+  // double-quoted span, `\ ` ends a word). Which shell a runner applies is not known here, so classify
+  // under all three and fail closed when ANY reading is a push (GPGL-5, GPGL-7).
+  return (
+    classifyPush(cmd, READING_POSIX) || classifyPush(cmd, READING_WINDOWS_PATH) || classifyPush(cmd, READING_POWERSHELL)
+  );
 }
 
-/** One reading of `cmd` (see `scanShell` for `pathBackslash`); detection runs on the dequoted view and words. */
-function classifyPush(cmd, pathBackslash) {
-  const scan = scanShell(cmd, pathBackslash);
+/** One reading of `cmd` (see `scanShell` for `reading`); detection runs on the dequoted view and words. */
+function classifyPush(cmd, reading) {
+  const scan = scanShell(cmd, reading);
   const view = scan.view;
   // Fail-closed checks #1 and #3 (NVA-PUSHCLASS-1, GPGL-3, GPGL-5) and #4 (GPGL-3), independent of the branches below.
   if (scan.unterminated && (GIT_WORD_RE.test(cmd) || GIT_WORD_RE.test(view))) return true;
