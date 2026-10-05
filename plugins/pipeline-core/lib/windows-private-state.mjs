@@ -84,7 +84,16 @@ const OBSERVE_BATCH_SCRIPT = [
   "$json=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload))",
   "$paths=ConvertFrom-Json -InputObject $json",
   "$rows=[System.Collections.Generic.List[object]]::new()",
-  "foreach($p in @($paths)){try{$i=Get-Item -LiteralPath $p -Force;$a=Get-Acl -LiteralPath $p;$me=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name;$principals=@($a.Access | ForEach-Object { $_.IdentityReference.Value });$rows.Add([pscustomobject]@{path=[string]$p;currentOwner=$me;owner=$a.Owner;reparsePoint=[bool]($i.Attributes -band [IO.FileAttributes]::ReparsePoint);principals=$principals})}catch{$rows.Add([pscustomobject]@{path=[string]$p;error=$true})}}",
+  // One process observes every path with the .NET security API: the exact owner / DACL / reparse facts the per-path
+  // cmdlets reported (same row shape, same policy evaluator), without the per-path cmdlet and provider overhead that
+  // made 64 paths cost seconds. SIDs are translated once per distinct SID; an untranslatable SID keeps its raw value,
+  // which can never equal the current principal, so it fails closed as a foreign ACE.
+  "$me=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name",
+  "$names=@{}",
+  "function N($s){$v=$s.Value;if(-not $names.ContainsKey($v)){try{$names[$v]=$s.Translate([System.Security.Principal.NTAccount]).Value}catch{$names[$v]=$v}};return $names[$v]}",
+  "$sections=[System.Security.AccessControl.AccessControlSections]'Access,Owner'",
+  "$sidType=[System.Security.Principal.SecurityIdentifier]",
+  "foreach($p in @($paths)){try{$at=[IO.File]::GetAttributes($p);$sec=if($at -band [IO.FileAttributes]::Directory){[IO.Directory]::GetAccessControl($p,$sections)}else{[IO.File]::GetAccessControl($p,$sections)};$principals=@(foreach($r in $sec.GetAccessRules($true,$true,$sidType)){N $r.IdentityReference});$rows.Add([pscustomobject]@{path=[string]$p;currentOwner=$me;owner=(N ($sec.GetOwner($sidType)));reparsePoint=[bool]($at -band [IO.FileAttributes]::ReparsePoint);principals=$principals})}catch{$rows.Add([pscustomobject]@{path=[string]$p;error=$true})}}",
   "ConvertTo-Json -InputObject @($rows.ToArray()) -Compress -Depth 5",
 ].join(";");
 
@@ -169,7 +178,7 @@ export function assessWindowsPrivatePaths(paths, options = {}) {
     || paths.some((path) => typeof path !== "string" || path.length === 0 || path.length > 32768)) {
     return (Array.isArray(paths) ? paths : []).map(() => unavailable("private path batch is invalid"));
   }
-  const batchSize = Number.isInteger(options.batchSize) ? Math.max(1, Math.min(64, options.batchSize)) : 64;
+  const batchSize = Number.isInteger(options.batchSize) ? Math.max(1, Math.min(4096, options.batchSize)) : 64;
   const results = [];
   for (let offset = 0; offset < paths.length; offset += batchSize) {
     const batch = paths.slice(offset, offset + batchSize);
