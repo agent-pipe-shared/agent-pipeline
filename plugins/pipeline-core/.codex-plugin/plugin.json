@@ -1,6 +1,6 @@
 {
   "name": "pipeline-core",
-  "version": "0.7.0+codex.20261005050809.dd1fb3ea",
+  "version": "0.7.0+codex.20261005111746.3b05196c",
   "description": "Provider-aware Agent-Pipeline operating model with session skills, independent review, and command safety hooks.",
   "hooks": "./hooks/codex-hooks.json",
   "author": {
