@@ -170,6 +170,24 @@ test("an in-process memo hit still reads and hashes every snapshot file", (t) =>
   for (const [path, reads] of counts) assert.equal(reads, 1, `${path} read in full exactly once`);
 });
 
+// The memo may skip only the native DACL read. An entry that is merely OLD (recorded long ago, untouched since) is no more
+// trustworthy than a fresh one, so a memo hit reads and hashes every file in full at any age. A memo that trusted a stat
+// fingerprint once an entry outlived a "racy clean" window (250 ms) would skip the read below, which the test above cannot
+// see because it consults the memo right after publish. Both waits exceed the window: the snapshot files are older than it
+// when the memo is recorded, and the recorded entry is older than it when the memo is consulted.
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("an aged in-process memo entry (older than a 250 ms racy window) still reads and hashes every snapshot file", async (t) => {
+  const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
+  await sleep(350);
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo is recorded over files that are now older than the window
+  await sleep(350);
+  const counts = countOpens(t, snapshot.root);
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified");
+  assert.equal(counts.size, 7, "six public files and the manifest were read although the memo entry is aged");
+  for (const [path, reads] of counts) assert.equal(reads, 1, `${path} read in full exactly once on an aged memo hit`);
+});
+
 test("a same-size, same-mtime snapshot content change after an in-process verify is refused in the same process", (t) => {
   const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
   assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo now holds this entry's recorded fingerprint
@@ -218,6 +236,33 @@ test("win32: a foreign ACE on a snapshot subdirectory is refused", { skip: WIN_O
   } finally {
     execFileSync("icacls", [dir, "/remove", "*S-1-1-0"], { stdio: "ignore" });
   }
+});
+
+// The two memo-hit checks below plant a NON-inheriting grant (no (OI)/(CI)), so only the named object's own DACL changes.
+// NTFS bumps its ctime, the memo's recorded fingerprint no longer matches, and the memo path must re-read that one DACL.
+test("win32: a foreign ACE on the snapshot root is refused on a memo hit (GHS-MODE)", { skip: WIN_ONLY }, (t) => {
+  const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo now holds the root as private
+  execFileSync("icacls", [snapshot.root, "/grant", "*S-1-1-0:(R)"], { stdio: "ignore" });
+  try {
+    assert.equal(codeOf(() => verifyGitHookRuntimeSnapshot(args)), "GHS-MODE");
+  } finally {
+    execFileSync("icacls", [snapshot.root, "/remove", "*S-1-1-0"], { stdio: "ignore" });
+  }
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified", "the snapshot verifies again once the grant is removed");
+});
+
+test("win32: a foreign ACE on snapshot.json is refused on a memo hit (GHS-MANIFEST)", { skip: WIN_ONLY }, (t) => {
+  const f = fixture(t), snapshot = publish(f), args = { snapshotRoot: snapshot.root, manifestSha256: snapshot.manifestSha256 };
+  const manifest = join(snapshot.root, "snapshot.json");
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified"); // the memo now holds the manifest as private
+  execFileSync("icacls", [manifest, "/grant", "*S-1-1-0:(R)"], { stdio: "ignore" });
+  try {
+    assert.equal(codeOf(() => verifyGitHookRuntimeSnapshot(args)), "GHS-MANIFEST");
+  } finally {
+    execFileSync("icacls", [manifest, "/remove", "*S-1-1-0"], { stdio: "ignore" });
+  }
+  assert.equal(verifyGitHookRuntimeSnapshot(args).status, "verified", "the snapshot verifies again once the grant is removed");
 });
 
 test("win32: disabled inheritance plus a foreign ACE on a descendant is refused", { skip: WIN_ONLY }, (t) => {
