@@ -20,10 +20,17 @@ export const CLONE_PROVISIONING_REPORT_SCHEMA = "pipeline.clone-provisioning-rep
 export function assessMandatoryHookReadiness(report) {
   const checks = Array.isArray(report?.checks) ? report.checks : [];
   const byId = new Map(checks.map((entry) => [entry.id, entry]));
-  const required = ["pre-commit-hook", "commit-msg-hook"].map((id) => byId.get(id));
-  if (required.some((entry) => !entry)) return { status: "unresolved", code: "HOOK-READINESS-OBSERVATION-INCOMPLETE", required: [] };
-  const projection = required.map(({ id, status, repairAction, path }) => ({ id, status, path, repairAction }));
-  if (required.every((entry) => entry.status === "current")) return { status: "ready", code: null, required: projection };
+  const observed = ["pre-commit-hook", "commit-msg-hook"].map((id) => byId.get(id));
+  if (observed.some((entry) => !entry)) return { status: "unresolved", code: "HOOK-READINESS-OBSERVATION-INCOMPLETE", required: [] };
+  const projection = observed.map(({ id, status, repairAction, path }) => ({ id, status, path, repairAction }));
+  // `refresh` (HOOKREFRESH-S1) is an installed, still-owned hook bound to an older plugin snapshot. It
+  // keeps enforcing its older rules, so for readiness it counts as `current` and is only listed: it
+  // must never turn a mixed current+stale pair into `blocked / HOOK-READINESS-STATE-UNSUPPORTED`.
+  const refreshAvailable = projection.filter((entry) => entry.status === "refresh").map((entry) => entry.id);
+  const required = observed.map((entry) => (entry.status === "refresh" ? { ...entry, status: "current" } : entry));
+  if (required.every((entry) => entry.status === "current")) {
+    return { status: "ready", code: null, required: projection, ...(refreshAvailable.length > 0 ? { refreshAvailable } : {}) };
+  }
   if (required.some((entry) => entry.status === "foreign-owner" || entry.status === "decline")) {
     return { status: "blocked", code: "HOOK-READINESS-OWNER-OR-DECLINE", required: projection };
   }
@@ -58,8 +65,12 @@ export function projectHookProvisioning({ spec, rootDir, commonDir = null } = {}
   const repairAction = `node plugins/pipeline-core/scripts/${spec.installer} --install`;
   switch (plan.status) {
     case "ready-to-upgrade":
-      // pre-push additionally distinguishes a valid but stale plugin binding.
-      // That still needs an explicit reinstall, not a misleading "current".
+      // A hook that is ours and intact but bound to an older plugin snapshot (every installer reports
+      // `updateRequired` since HOOKREFRESH-S1) is `refresh`: reported, never gating, never `install`
+      // (which would read as an absent hook) and never a block. Only the ready-to-upgrade state can be
+      // refreshable, so foreign, modified, declined and unresolved plans can never project to it.
+      if (plan.updateRequired === true) return { id: spec.id, status: "refresh", path: plan.hookPath, repairAction };
+      // A plan carrying only the older `current: false` still needs an explicit reinstall, not a misleading "current".
       if (plan.current === false) return { id: spec.id, status: "install", path: plan.hookPath, repairAction };
       return { id: spec.id, status: "current", path: plan.hookPath, repairAction: null };
     case "ready":
@@ -193,11 +204,14 @@ export function checkCloneProvisioning(rootDir = process.cwd()) {
     });
   }
 
-  const allReady = checks.every((c) => c.status === "present" || c.status === "current");
+  // `refresh` is detection only and never gates: a stale-but-owned hook still enforces its older rules.
+  const refreshAvailable = checks.filter((c) => c.status === "refresh").map((c) => c.id);
+  const allReady = checks.every((c) => c.status === "present" || c.status === "current" || c.status === "refresh");
   return {
     schema: CLONE_PROVISIONING_REPORT_SCHEMA,
     status: allReady ? "ready" : "provisioning-required",
     checks,
+    ...(refreshAvailable.length > 0 ? { refreshAvailable } : {}),
   };
 }
 

@@ -880,7 +880,10 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, pl
     if (sha256(current) !== marker.hookSha256) {
       return { status: "foreign-hook-present", hookPath, detail: "existing hook was modified after this installer wrote it" };
     }
-    return { status: "ready-to-upgrade", hookPath, commonDir, pluginLibDir, pluginHooksDir, pluginScriptsDir };
+    // HOOKREFRESH-S1: same currentness reading as pre-push (lib/hook-currentness.mjs). Detection
+    // only: `current` / `updateRequired` are reported, nothing is written and the marker is unchanged.
+    const currentness = assessHookCurrentness({ recordedPluginLibDir: marker.pluginLibDir, pluginLibDir });
+    return { status: "ready-to-upgrade", hookPath, commonDir, pluginLibDir, pluginHooksDir, pluginScriptsDir, ...currentness };
   }
   const decline = readDeclineMarker(commonDir);
   if (decline) {
@@ -888,6 +891,8 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, pl
   }
   return { status: "ready", hookPath, commonDir, pluginLibDir, pluginHooksDir, pluginScriptsDir };
 }
+// ESM hoists this import; it sits beside its only use so the change stays one local edit.
+import { assessHookCurrentness } from "../lib/hook-currentness.mjs";
 
 /** Read-only: whether a decline can be recorded (mirrors `planInstall`'s fail-closed root
  * resolution; declining never inspects hook content). */

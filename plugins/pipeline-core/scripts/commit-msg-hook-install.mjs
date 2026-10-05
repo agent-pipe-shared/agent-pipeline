@@ -398,10 +398,19 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
     return { status: "ready", ...paths, pluginLibDir };
   }
   if (inspected.status === "verified") {
-    return { status: "ready-to-upgrade", ...paths, pluginLibDir };
+    // HOOKREFRESH-S1: same currentness reading as pre-push (lib/hook-currentness.mjs). Detection
+    // only: `current` / `updateRequired` are reported, nothing is written and the marker is unchanged.
+    return {
+      status: "ready-to-upgrade",
+      ...paths,
+      pluginLibDir,
+      ...assessHookCurrentness({ recordedPluginLibDir: inspected.marker.pluginLibDir, pluginLibDir }),
+    };
   }
   return inspected;
 }
+// ESM hoists this import; it sits beside its only use so the change stays one local edit.
+import { assessHookCurrentness } from "../lib/hook-currentness.mjs";
 
 /** Records a reversible local decision not to install this optional hook.  The
  * marker never wins over an actual hook: `planInstall` inspects the hook first,

@@ -42,7 +42,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { inspectGitHookSourceSnapshot, publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
+import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
 import { ensureHardenedPrivateDirectory } from "../lib/hardened-private-directory.mjs";
 function decorateInstalledImpl(content, pluginLibDir, deadline) {
@@ -653,24 +653,16 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
         detail: "existing hook, implementation, or install marker was modified after this installer wrote it",
       };
     }
-    let current = recordedPluginLibDir === pluginLibDir;
-    if (!current) {
-      // The installed implementation points at an immutable runtime snapshot,
-      // while callers present the source plugin path. Compare its exact
-      // content digest without publishing or mutating anything during plan.
-      const match = recordedPluginLibDir.replaceAll("\\", "/").match(/\/runtime-([a-f0-9]{64})\/lib$/u);
-      if (match) {
-        try { current = inspectGitHookSourceSnapshot({ pluginLibDir }).manifestSha256 === match[1]; }
-        catch { current = false; }
-      }
-    }
+    // Currentness is the shared reading (lib/hook-currentness.mjs): the recorded lib path is the
+    // loaded one, or its runtime snapshot digest equals the loaded tree's. Never publishes.
+    const { current, updateRequired } = assessHookCurrentness({ recordedPluginLibDir, pluginLibDir });
     return {
       status: "ready-to-upgrade",
       hookPath,
       commonDir,
       pluginLibDir,
       current,
-      updateRequired: !current,
+      updateRequired,
     };
   }
   const decline = readDeclineMarker(commonDir);
@@ -679,6 +671,8 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
   }
   return { status: "ready", hookPath, commonDir, pluginLibDir };
 }
+// ESM hoists this import; it sits beside its only use so the extraction stays one local change.
+import { assessHookCurrentness } from "../lib/hook-currentness.mjs";
 
 /** Read-only: whether a decline can be recorded (mirrors `planInstall`'s
  * fail-closed root resolution; declining never inspects hook content). */
