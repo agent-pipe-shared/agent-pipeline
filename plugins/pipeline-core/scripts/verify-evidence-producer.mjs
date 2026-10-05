@@ -67,8 +67,8 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt,
   readCriticVerifyLifecycle, recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
-import { runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
-import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource, releaseCompletedVerifyRunSession, retireSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import { ensureVerifyRunRecordsDirectory, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
+import { defaultProcessStartIdentity, registerVerifyRunRecord, settleVerifyRunRecord } from "../lib/verify-run-record.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
@@ -363,29 +363,38 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   }
   const selected = new Set(selection.selectedSuiteIds);
   const suites = registry.filter((suite) => selected.has(suite.name));
-  let registration;
-  const run = await runVerifyJournal({
-    repoRoot: root,
-    gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
-    candidate: { commit: started.commit, tree: started.tree },
-    suites, policyInputs: { ...policyInputs, selectionSha256: selection.selectionSha256 }, allowCrossCandidateReuse: selection.execution === "impacted", reuseReceipts,
-    registerRun({ runId, runPath }) {
-      const descriptor = startSessionDescriptor(root);
-      const resourceId = `consumer-${attempt}`;
-      registration = {
-        sessionId: descriptor.sessionId,
-        ownerNonce: descriptor.ownerNonce,
-        descriptorSha256: descriptor.descriptorSha256,
-        resourceId,
-      };
-      registerTemporaryIntent(root, { ...registration, type: "verify-run-directory", path: runPath, contentClass: "verify-recovery", soleCopy: false, cleanupPolicy: "remove-directory" });
-      return sealVerifyCleanupRegistration({ status: "registered", runId, runPath, sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, resourceId, registeredAt: new Date().toISOString() });
-    },
-  });
-  // A process interruption before this point retains the creating intent for
-  // recovery. Once a terminal run was returned, drain its private run
-  // directory and retire the exact descriptor before evaluating its outcome.
-  finalizeTemporaryResource(root, { ...registration, canaryRelative: "terminal.json" });
+  // ALFRED-RDY-20261005 (PO decision "Readiness root fix", 2026-10-05): this producer is a tool run,
+  // not a session. It records its cleanup duty in a private Verify run record (PID + process start
+  // evidence) instead of starting a session descriptor and a cleanup manifest, so a killed run can
+  // never lock a later session's readiness; the next Verify run settles its stale record unsigned.
+  let registration = null;
+  let run;
+  try {
+    run = await runVerifyJournal({
+      repoRoot: root,
+      gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
+      candidate: { commit: started.commit, tree: started.tree },
+      suites, policyInputs: { ...policyInputs, selectionSha256: selection.selectionSha256 }, allowCrossCandidateReuse: selection.execution === "impacted", reuseReceipts,
+      registerRun({ runId, runPath }) {
+        // runPath is <git-common-dir>/agent-pipeline/verify/runs/<runId>
+        const gitCommonDir = dirname(dirname(dirname(dirname(runPath))));
+        const resourceId = `consumer-${attempt}`;
+        const written = registerVerifyRunRecord({ gitCommonDir, runId, runPath, processStartId: defaultProcessStartIdentity(process.pid), ensureDirectory: ensureVerifyRunRecordsDirectory });
+        registration = { gitCommonDir, runId };
+        return sealVerifyCleanupRegistration({ status: "registered", runId, runPath, sessionId: `verify-run-${runId.slice(0, 40)}`, descriptorSha256: written.recordSha256, resourceId, registeredAt: new Date().toISOString() });
+      },
+    });
+  } finally {
+    // Every exit path settles the record: an unsealed run directory is drained, a sealed one is
+    // retained evidence. A settle failure after a thrown run never masks that run's own error (the
+    // stale record is then settled by the next Verify run).
+    if (registration !== null && !(run === undefined)) {
+      try { settleVerifyRunRecord(registration); }
+      catch (error) { fail("VEP-CLEANUP-FAILED", `Completed Verify run could not be retired safely: ${error?.code ?? error?.message ?? error}`); }
+    } else if (registration !== null) {
+      try { settleVerifyRunRecord(registration); } catch { /* the next Verify run settles the stale record */ }
+    }
+  }
   const failures = run.terminal.status === "passed" ? null : summarizeVerifyFailures(run);
   let terminalSource = run.terminal;
   let terminalReadbackFailure = null;
@@ -396,9 +405,6 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
       terminalReadbackFailure = "Terminal Verify evidence readback did not match the completed run.";
     }
   }
-  const cleanup = releaseCompletedVerifyRunSession(root, registration);
-  if (!cleanup.ok) fail("VEP-CLEANUP-FAILED", `Completed Verify run could not be retired safely: ${JSON.stringify(cleanup.receipt.outcomes)}`);
-  retireSessionDescriptor(root, registration);
   if (terminalReadbackFailure !== null) fail("VEP-SOURCE-READBACK", terminalReadbackFailure);
   if (run.terminal.status !== "passed" && eventPlan === null) {
     fail("VEP-VERIFY-FAILED", `Required consumer Verify checks failed; no success evidence was written. Private diagnostic run: ${run.runId}. Failed checks: ${JSON.stringify(failures)}`);

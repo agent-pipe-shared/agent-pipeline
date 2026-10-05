@@ -100,6 +100,7 @@ import {
   planSessionCleanupRecovery,
   SessionCleanupRecoveryError,
 } from "./session-cleanup-recovery.mjs";
+import { classifyActiveSessionDescriptors } from "./worktree-lifecycle.mjs";
 import {
   LEGACY_CALIBRATION,
   LEGACY_STATE,
@@ -1685,7 +1686,67 @@ function foreignOrphanResidueWarning({ root, deps = {} }) {
   }
 }
 
-function partialCleanupRecoveryResult({
+// ALFRED-RDY-20261005 (PO decision "Readiness root fix", 2026-10-05, superseding RF2B's "descriptors
+// with resources keep blocking"): SESSION readiness depends only on the requesting session's own
+// descriptor. A FOREIGN descriptor -- any producer, live or dead, with or without resources or a
+// cleanup manifest, owner observable or not -- never makes the session `partial`; it is one typed
+// `cleanup_residue_foreign` warning on the ready result, carrying the read-only plan-archive-orphan
+// action plus one digest-bound archive-orphan action per descriptor the zero-authority tier may clear
+// (an authority-bearing foreign descriptor has none: its own signed route stays the only way to clear it).
+// The requester is identified by PIPELINE_SESSION_OWNER_NONCE (or `deps.requesterOwnerNonce`); with no
+// nonce no descriptor is the requester's own, exactly as in RF2B. The requester's own descriptor, a mix
+// containing it, and every unobservable case (any read failure) keep today's blocking result.
+const FOREIGN_RESIDUE_DOWNGRADABLE_ACTIONS = new Set(["plan-human-recovery", "cleanup"]);
+const FOREIGN_RESIDUE_KEPT_CODES = new Set(["cleanup_recovery_observation_unavailable"]);
+
+// Exported only as the unit-test seam of the decision (real descriptors, no onboarding fixture).
+export function foreignDescriptorResidueWarning({ root, deps = {} }) {
+  try {
+    const nonce = deps.requesterOwnerNonce ?? process.env.PIPELINE_SESSION_OWNER_NONCE ?? null;
+    const requesterOwnerNonce = typeof nonce === "string" && nonce !== "" ? nonce : null;
+    const classify = deps.classifyActiveSessionDescriptors ?? classifyActiveSessionDescriptors;
+    const { own, foreign } = classify(root, { requesterOwnerNonce });
+    if (!Array.isArray(own) || !Array.isArray(foreign) || own.length !== 0 || foreign.length === 0) return null;
+    let archiveActions = [];
+    try {
+      const planArchive = deps.planOrphanDescriptorArchive ?? planOrphanDescriptorArchive;
+      const offer = planArchive({ rootDir: root, scriptPath: SESSION_CLEANUP_SCRIPT, requesterOwnerNonce });
+      if (Array.isArray(offer?.candidates) && offer.observationCode === undefined) {
+        archiveActions = offer.candidates.map((candidate) => candidate.action);
+      }
+    } catch { archiveActions = []; }
+    return {
+      ...lifecycleDiagnostic(
+        "$.authority.sessionCleanup",
+        "cleanup_residue_foreign",
+        "retained cleanup residue belongs to a foreign session and does not block this session",
+        "inspect it with the read-only plan-archive-orphan action; archive a zero-authority orphan with its exact digest-bound archive-orphan action; an authority-bearing one is cleared only through its own signed route",
+      ),
+      severity: "warning",
+      nextAction: orphanArchivePlanAction(root),
+      archiveActions,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function partialCleanupRecoveryResult(args) {
+  const result = partialCleanupRecoveryResultCore(args);
+  const { root, intent, observation = null, deps = {} } = args;
+  if (result === null || intent !== "session" || observation === null) return result;
+  // Only a descriptor-caused block (the typed human-recovery / cleanup actions) is downgraded; a
+  // binding-hygiene action (release-binding, release-orphan-binding) or an unobservable cleanup state
+  // stays exactly as it was.
+  if (!FOREIGN_RESIDUE_DOWNGRADABLE_ACTIONS.has(result.nextAction?.argv?.[1])
+    || FOREIGN_RESIDUE_KEPT_CODES.has(result.diagnostics?.[0]?.code)) return result;
+  const warning = foreignDescriptorResidueWarning({ root, deps });
+  if (warning === null) return result;
+  observation.warnings.push(warning);
+  return null;
+}
+
+function partialCleanupRecoveryResultCore({
   root,
   runner,
   intent,

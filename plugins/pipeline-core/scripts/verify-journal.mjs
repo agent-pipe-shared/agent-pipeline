@@ -18,6 +18,7 @@ import { parseVerifyCaseCompletion, validateVerifyCaseCompletionPolicy } from ".
 import { bindEphemeralPrivateCleanup, readOnboardingSessionCleanupBinding, releaseOnboardingSessionCleanup } from "../lib/onboarding-continuity.mjs";
 import { cleanupSession, finalizeTemporaryResource, inspectSessionClosure, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, releaseCompletedVerifyRunSession, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { registerVerifyRunRecord, settleVerifyRunRecord, sweepStaleVerifyRunRecords } from "../lib/verify-run-record.mjs";
 
 const MAX_LOG_BYTES = 16 * 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -211,99 +212,80 @@ function validateCleanupRegistration(receipt, { runId, runPath }) {
   } catch { return false; }
 }
 
-// A session-less checkout (a GitHub Actions runner, in particular: no Pipeline session ever
-// started there, and the ENTIRE checkout including `.git` is discarded when the job ends, so
-// there is genuinely nothing later to leak) has no existing bound cleanup to read. Rather than
-// abort with zero suites started, establish a real, narrowly-scoped session descriptor and a
-// PRIVATE (never tracked -- bindEphemeralPrivateCleanup refuses outright otherwise) cleanup
-// binding for exactly this run, satisfying the SAME registration contract this function already
-// enforces for an ordinary bound session. Never a forged or unsealed receipt, never a skipped
-// registration: every precondition failure here falls back to the original
-// VERIFY-CLEANUP-REGISTRATION-REQUIRED unchanged, including when a binding of any status other
-// than exactly "unbound" already exists, or another active session descriptor is already
-// present. The created descriptor and exact binding preimage are returned as private teardown
-// authority for this invocation only; an existing bound tuple is borrowed and never released.
-function establishSessionLessCleanupBinding({ repoRoot, priorBinding }) {
-  if (priorBinding.status !== "unbound") throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
-  if (listActiveSessionDescriptors(repoRoot).length !== 0) throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
-  let started;
-  try { started = startSessionDescriptor(repoRoot, {}); }
-  catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
-  let binding;
-  try {
-    binding = bindEphemeralPrivateCleanup({
-      rootDir: repoRoot,
-      sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 },
-    });
-  } catch {
-    try { retireSessionDescriptor(repoRoot, started); } catch { /* best-effort rollback, never mask the original refusal */ }
-    throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
-  }
-  if (binding.status !== "bound" || binding.mutated !== true
-    || binding.sessionCleanup?.sessionId !== started.sessionId
-    || binding.sessionCleanup?.descriptorSha256 !== started.descriptorSha256) {
-    throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
-  }
-  return { binding, descriptor: started, created: true };
+// ALFRED-RDY-20261005 (PO decision "Readiness root fix", 2026-10-05): Verify is a tool run, not a
+// session. A session-less checkout (no bound session cleanup to borrow -- a CI runner, or a repository
+// whose session never bound one) no longer starts a session descriptor or a cleanup binding for the
+// run. The run records its own cleanup duty ("remove the unsealed run directory") in a separate private
+// run record (lib/verify-run-record.mjs) with PID and process start evidence. A killed run leaves a
+// STALE record that the next Verify (or a typed sweep) settles without a signature, and no run record
+// is ever visible to session readiness. An existing bound session cleanup is still BORROWED for the
+// run directory intent exactly as before and is never released here.
+export function ensureVerifyRunRecordsDirectory(directory) {
+  for (const path of [dirname(dirname(directory)), dirname(directory), directory]) ensurePrivateDirectory(path);
 }
 
-function registerBoundVerifyRun({ repoRoot, runId, runPath }) {
+function registerRunRecordOwner({ gitCommonDir, runId, runPath }) {
+  let written;
+  try {
+    written = registerVerifyRunRecord({
+      gitCommonDir,
+      runId,
+      runPath,
+      processStartId: processStartIdentity(process.pid),
+      ensureDirectory: ensureVerifyRunRecordsDirectory,
+    });
+  } catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
+  return {
+    descriptor: null,
+    owner: null,
+    runRecord: { gitCommonDir, runId },
+    receipt: sealVerifyCleanupRegistration({
+      status: "registered",
+      runId,
+      runPath,
+      sessionId: `verify-run-${sha(runId).slice(0, 32)}`,
+      descriptorSha256: written.recordSha256,
+      resourceId: `verify-${sha(runId).slice(0, 32)}`,
+      registeredAt: new Date().toISOString(),
+    }),
+  };
+}
+
+function registerBoundVerifyRun({ repoRoot, gitCommonDir, runId, runPath }) {
   let binding;
-  let owner = null;
   try { binding = readOnboardingSessionCleanupBinding({ rootDir: repoRoot }); }
   catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
   if (binding.status !== "bound" || binding.sessionCleanup === null) {
-    owner = establishSessionLessCleanupBinding({ repoRoot, priorBinding: binding });
-    binding = owner.binding;
+    return registerRunRecordOwner({ gitCommonDir, runId, runPath });
   }
-  try {
-    const descriptor = loadSessionDescriptor(repoRoot, binding.sessionCleanup.sessionId, {
-      expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
-    });
-    const resourceId = `verify-${sha(runId).slice(0, 32)}`;
-    registerTemporaryIntent(repoRoot, {
+  const descriptor = loadSessionDescriptor(repoRoot, binding.sessionCleanup.sessionId, {
+    expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+  });
+  const resourceId = `verify-${sha(runId).slice(0, 32)}`;
+  registerTemporaryIntent(repoRoot, {
+    sessionId: descriptor.sessionId,
+    ownerNonce: descriptor.ownerNonce,
+    resourceId,
+    type: "verify-run-directory",
+    path: runPath,
+    contentClass: "verify-recovery",
+    soleCopy: false,
+    cleanupPolicy: "remove-directory",
+  });
+  return {
+    descriptor,
+    owner: null,
+    runRecord: null,
+    receipt: sealVerifyCleanupRegistration({
+      status: "registered",
+      runId,
+      runPath,
       sessionId: descriptor.sessionId,
-      ownerNonce: descriptor.ownerNonce,
+      descriptorSha256: descriptor.descriptorSha256,
       resourceId,
-      type: "verify-run-directory",
-      path: runPath,
-      contentClass: "verify-recovery",
-      soleCopy: false,
-      cleanupPolicy: "remove-directory",
-    });
-    return {
-      descriptor,
-      owner: owner?.created === true ? {
-        stateSha256: binding.stateSha256,
-        revision: binding.revision,
-        sessionCleanup: structuredClone(binding.sessionCleanup),
-      } : null,
-      receipt: sealVerifyCleanupRegistration({
-        status: "registered",
-        runId,
-        runPath,
-        sessionId: descriptor.sessionId,
-        descriptorSha256: descriptor.descriptorSha256,
-        resourceId,
-        registeredAt: new Date().toISOString(),
-      }),
-    };
-  } catch (error) {
-    // A failure between creating OUR OWN owner and handing it to the run must not strand it.
-    if (owner?.created === true) {
-      try {
-        retireInvocationOwner({
-          repoRoot,
-          runPath,
-          descriptor: owner.descriptor,
-          owner: { stateSha256: owner.binding.stateSha256, revision: owner.binding.revision, sessionCleanup: structuredClone(owner.binding.sessionCleanup) },
-        });
-      } catch (cleanupError) {
-        throw new AggregateError([error, cleanupError], `VERIFY-OWNER-CLEANUP-REQUIRED:${runId}: ${error?.message ?? error}`);
-      }
-    }
-    throw error;
-  }
+      registeredAt: new Date().toISOString(),
+    }),
+  };
 }
 
 function pathPresent(path) {
@@ -1125,9 +1107,12 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
   const runPath = join(common, "agent-pipeline", "verify", "runs", runId);
   // ALFRED-RF1: refuse a reused run id BEFORE any owner exists, so retirement can only ever drain a
   // run directory this invocation itself created.
+  // ALFRED-RDY-20261005: settle the stale run records of killed runs first (typed sweep, no signature,
+  // never any session state), so this run's own record is the only live one.
+  sweepStaleVerifyRunRecords({ gitCommonDir: common, exceptRunId: runId, processAlive: processIdentityAlive });
   if (typeof registerRun !== "function" && pathPresent(runPath)) throw new Error(`VERIFY-JOURNAL-RUN-EXISTS:${runId}`);
-  const automaticRegistration = typeof registerRun === "function" ? null : registerBoundVerifyRun({ repoRoot, runId, runPath });
-  const ownsSession = automaticRegistration !== null && automaticRegistration.owner !== null;
+  const automaticRegistration = typeof registerRun === "function" ? null : registerBoundVerifyRun({ repoRoot, gitCommonDir: common, runId, runPath });
+  const ownsSession = automaticRegistration !== null && automaticRegistration.runRecord !== null;
   let cleanupRegistration;
   let run = null;
   let terminalWritten = false;
@@ -1152,7 +1137,9 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
   const retireOwner = () => {
     if (ownerRetired) return;
     if (run !== null) closeRunLock(run, runId, clock);
-    retireInvocationOwner({ repoRoot, runPath, descriptor: automaticRegistration.descriptor, owner: automaticRegistration.owner });
+    // `ownsSession` now means "this invocation owns a run record" (no session descriptor exists).
+    // Drains the unsealed run directory only; a sealed run is retained evidence.
+    settleVerifyRunRecord({ gitCommonDir: automaticRegistration.runRecord.gitCommonDir, runId });
     ownerRetired = true;
   };
   const guard = ownsSession ? guardInvocationOwnerExit({ callerSignal: signal, cancellation, retire: retireOwner }) : null;
@@ -1217,19 +1204,18 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
         retireOwner();
       } else if ((terminalWritten || interruptionWritten) && automaticRegistration !== null) {
         const canaryRelative = interruptionWritten ? "interruption.json" : "terminal.json";
-        if (automaticRegistration.owner === null) {
+        if (automaticRegistration.runRecord === null) {
           finalizeTemporaryResource(repoRoot, {
             sessionId: automaticRegistration.descriptor.sessionId,
             ownerNonce: automaticRegistration.descriptor.ownerNonce,
             resourceId: cleanupRegistration.resourceId,
             canaryRelative,
           });
-        } else if (terminalWritten && childCloseProved) {
-          finalizeAndReleaseInvocationOwner({ repoRoot, runId, cleanupRegistration, automaticRegistration, canaryRelative });
-        } else if (interruptionWritten) {
-          if (childCloseProved) finalizeAndReleaseInvocationOwner({ repoRoot, runId, cleanupRegistration, automaticRegistration, canaryRelative });
-          else finalizeTemporaryResource(repoRoot, { sessionId: automaticRegistration.descriptor.sessionId, ownerNonce: automaticRegistration.descriptor.ownerNonce, resourceId: cleanupRegistration.resourceId, canaryRelative });
-        } else {
+        } else if (childCloseProved) {
+          // The run sealed: its directory is retained evidence, only the run record is retired.
+          settleVerifyRunRecord({ gitCommonDir: automaticRegistration.runRecord.gitCommonDir, runId });
+          ownerRetired = true;
+        } else if (terminalWritten) {
           throw new Error("numeric child close was not proved for every executed suite");
         }
       }

@@ -343,8 +343,9 @@ export function validForeignCleanupResidueWarning(value, root) {
     && typeof value.message === "string" && value.message.length > 0
     && typeof value.guidance === "string"
     && validOrphanArchivePlanAction(value.nextAction, root)
+    // ALFRED-RDY-20261005: an authority-bearing or observable-owner foreign descriptor has no
+    // zero-authority archive action, so the list may be empty; every action present is still validated.
     && Array.isArray(value.archiveActions)
-    && value.archiveActions.length > 0
     && value.archiveActions.every((action) => validOrphanArchiveApplyAction(action, root));
 }
 

@@ -851,6 +851,32 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
   });
 }
 
+/**
+ * Read-only (ALFRED-RDY-20261005): split the active descriptors into the requesting session's OWN
+ * descriptor(s) and FOREIGN ones. A descriptor is the requester's own only when its owner nonce
+ * equals `requesterOwnerNonce` (PIPELINE_SESSION_OWNER_NONCE); with no nonce nothing is the
+ * requester's own -- the same rule the zero-authority archive tier applies. Exposes no nonce.
+ * Any unreadable or invalid descriptor throws its loader's typed code, so a caller fails closed.
+ */
+export function classifyActiveSessionDescriptors(startPath, options = {}) {
+  const { requesterOwnerNonce, ...loadOptions } = options;
+  const hasNonce = typeof requesterOwnerNonce === "string" && requesterOwnerNonce !== "";
+  const own = [];
+  const foreign = [];
+  for (const entry of listActiveSessionDescriptors(startPath, loadOptions)) {
+    const loaded = loadSessionDescriptor(startPath, entry.sessionId, {
+      ...loadOptions,
+      expectedDescriptorSha256: entry.descriptorSha256,
+    });
+    const isOwn = hasNonce && timingSafeEqual(
+      Buffer.from(rawSha256(Buffer.from(requesterOwnerNonce))),
+      Buffer.from(rawSha256(Buffer.from(loaded.ownerNonce))),
+    );
+    (isOwn ? own : foreign).push({ sessionId: entry.sessionId, descriptorSha256: entry.descriptorSha256 });
+  }
+  return { own, foreign };
+}
+
 /** Remove a descriptor only after the exact holder has finished cleanup. */
 export function retireSessionDescriptor(startPath, fields, options = {}) {
   const loaded = loadSessionDescriptor(startPath, fields.sessionId, {
