@@ -34,3 +34,10 @@ Remaining gap: a Bash-based notes write is not admitted in the closing lane; dec
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Observed again 2026-10-05
+
+Critic guard false positives consumed about 40 % of the Critic budget. The
+observed classes: counter-lock-busy on parallel calls, rg/Glob/Grep refusals,
+no write route for critic-notes.md, and no CSPRNG primitive available to the
+Critic. Deferred from round 3 of the signed bundle (commit `866be2139`).

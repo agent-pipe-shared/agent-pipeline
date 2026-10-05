@@ -53,3 +53,9 @@ read-only calls see one consistent readiness snapshot.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Observed again 2026-10-05
+
+Flapping readiness `partial` was seen again in the Alfred session. It is not
+caused by GUARD-READ-TARGET (the Explore lookup). Hypothesis: concurrent
+preflights rewrite authority state. Not measured. Instrument first, then fix.

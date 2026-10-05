@@ -65,3 +65,16 @@ signing prompts.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Observed again 2026-10-05
+
+PO, 2026-10-05, on the `sign-intent` confirmation text (verbatim, German):
+"dieser text läßt einen auch jedes mal mit staunen zurück … kann man sich
+sparen". For a `pipeline.signed-quality-package.v1` request the confirmation
+prints HGO-RECORD-DIGEST-MISMATCH and says it "signs a one-time
+guard-lift/guard-override ... for whatever was recorded against this exact
+digest elsewhere": the wrong kind of request, and no description of what is
+signed. It must recognise the request it was given and show its members,
+paths and base commit. Signing also took about 4 minutes wall-clock; measure
+where the time goes. See also
+`2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.md`.

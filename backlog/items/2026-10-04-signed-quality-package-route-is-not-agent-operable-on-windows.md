@@ -82,3 +82,12 @@ the pre-commit hook backstop.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Observed again 2026-10-05 (materializer steps)
+
+After the PO's signature, the materializer `apply` and `authorize-commit`
+steps are not agent-runnable, because GUARD-GATE-STRENGTH-SHELL refuses any
+shell command that names `critical-human-proof.json`. The PO must therefore
+also run `apply` and `authorize-commit` by hand, a second PO step per package.
+That contradicts "the PO signs once per candidate". Deferred from round 3 of
+the signed bundle (commit `866be2139`).
