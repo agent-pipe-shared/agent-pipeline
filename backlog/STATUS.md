@@ -663,6 +663,7 @@
 | pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | closed | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
 | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | closed | defect | pipeline | nova | 2026-08-08 | 2026-08-15 | — |
+| pipeline.scratch-has-no-retention-and-no-durability-check | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.scratch-must-remain-writable-across-lifecycle-states | open | requirement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.scratch-write-exemption-does-not-cover-restart-required | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.scratch-write-refused-during-intake-against-documented-exemption | closed | defect | pipeline | nova | 2026-08-28 | — | — |
@@ -791,6 +792,7 @@
 | pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | closed | workflow-improvement | pipeline | alfred | 2026-08-16 | — | — |
 | pipeline.verify-marketplace-attestation-blocks-normal-active-development | closed | defect | pipeline | — | 2026-08-24 | 2026-08-31 | — |
 | pipeline.verify-mjs-runs-385-suites-strictly-sequentially | closed | workflow-improvement | pipeline | — | 2026-08-24 | 2026-08-31 | — |
+| pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.verify-placeholder-manual-check-required-accepted-by-gate | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.verify-range-mode-registration-for-orchestrator-commit-control | closed | idea | pipeline | alfred | 2026-08-25 | — | — |
 | pipeline.verify-registration-check-fixtures-lack-real-git-topology | closed | defect | pipeline | — | 2026-08-19 | — | — |
@@ -823,7 +825,7 @@
 
 ## Counts
 
-- open: 158
+- open: 160
 - in_progress: 0
 - closed: 643
 - rejected: 3

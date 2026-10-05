@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fcaba08ce5fbfcef16904e4f7bd7a646321a9616508191e2fc2807fe6365328a"
+    "transitionHead": "89d017302a02eb6f9357e626205296afd02b015bec6c346eabaa2be7a6e0b3b4"
   },
   "counts": {
-    "open": 158,
+    "open": 160,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -8626,6 +8626,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/staleness-check.test.mjs"
     },
     {
+      "id": "pipeline.scratch-has-no-retention-and-no-durability-check",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed in the Windows checkout on 2026-10-05 (Alfred session, round 3b drafts); PO rule 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
       "status": "open",
       "type": "requirement",
@@ -10322,6 +10332,16 @@
       "closureRepository": "self",
       "closureCommit": "9b7b1d4df0c3b563c96a7afe5a87218125df82ee",
       "closureEvidence": "backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md"
+    },
+    {
+      "id": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Reproduced on two WSL checkouts under /mnt/<drive> on 2026-10-05 (Alfred session, round 3b drafts).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.verify-placeholder-manual-check-required-accepted-by-gate",
