@@ -30,6 +30,65 @@ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir:
 
 const OUTER_SCHEMA = "pipeline.state.v0";
 
+import { execFileSync } from "node:child_process";
+import { statSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
+import { liveSlices } from "../lib/fanout-ledger.mjs";
+import { resolveFanoutConfig } from "../lib/fanout-governor.mjs";
+import { loadSliceQueue, readyAndLive } from "../lib/slice-queue.mjs";
+
+const FANOUT_MAX_RECORD_BYTES = 1024 * 1024;
+const FANOUT_SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+
+/**
+ * FANOUT S9: one read-only summary line from the slice queue, or null. Mirrors the config/ledger
+ * resolution of hooks/stop-fanout.mjs (its helpers are not exported): env `PIPELINE_FANOUT_CONFIG`
+ * JSON with `queuePath` (relative to rootDir). Never writes; any fault yields null (fail open).
+ */
+function buildFanoutSummaryLine(input, rootDir, env) {
+  try {
+    const rawConfig = env?.PIPELINE_FANOUT_CONFIG;
+    if (typeof rawConfig !== "string" || rawConfig === "" || !rootDir) return null;
+    const config = JSON.parse(rawConfig);
+    if (!isObject(config) || typeof config.queuePath !== "string" || config.queuePath === "") return null;
+    const sessionId = input?.session_id;
+    if (typeof sessionId !== "string" || sessionId === "") return null;
+    const queue = loadSliceQueue(resolve(rootDir, config.queuePath), isObject(config.queueOptions) ? config.queueOptions : {});
+    if (queue.status !== "valid" || !Array.isArray(queue.raw?.slices)) return null;
+    const sliceIds = queue.raw.slices.map((slice) => slice?.id).filter((id) => typeof id === "string");
+    let commonDir = config.commonDir;
+    if (commonDir === undefined) {
+      commonDir = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+        cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000,
+      }).trim();
+    }
+    if (typeof commonDir !== "string" || !isAbsolute(commonDir)) return null;
+    const evidenceDir = join(rootDir, "evidence");
+    const now = Date.now();
+    const live = liveSlices({ commonDir, runner: "claude", sessionId, evidenceDir, sliceIds: sliceIds.filter((id) => FANOUT_SLICE_ID.test(id)), now });
+    const records = [];
+    for (const id of sliceIds) {
+      try {
+        const path = join(evidenceDir, `dispatch-record-${id}.json`);
+        const info = statSync(path);
+        if (!info.isFile() || info.size > FANOUT_MAX_RECORD_BYTES) continue;
+        const parsed = JSON.parse(readFileSync(path, "utf8"));
+        if (!isObject(parsed) || parsed.taskId !== id || typeof parsed.outcome !== "string") continue;
+        records.push({ taskId: parsed.taskId, outcome: parsed.outcome, outcomeClassification: parsed.outcomeClassification, mtimeMs: Math.round(info.mtimeMs) });
+      } catch { /* no usable record for this slice */ }
+    }
+    const derived = readyAndLive({ queue: queue.raw, records, live, now }, isObject(config.queueOptions) ? config.queueOptions : {});
+    if (derived.valid !== true) return null;
+    const { queuePath: _q, commonDir: _c, queueOptions: _o, ...governorConfig } = config;
+    const target = resolveFanoutConfig(governorConfig).effectiveTarget;
+    const free = Math.max(0, target - derived.live.length);
+    if (![derived.ready.length, derived.live.length, target].every(Number.isSafeInteger)) return null;
+    return `Fan-out: ${derived.ready.length} ready, ${derived.live.length} live, ${free} free of target ${target}.`;
+  } catch {
+    return null;
+  }
+}
+
 export const REGROUND_CODES = Object.freeze([
   "PCR-READY",
   "PCR-BLOCKED",
@@ -265,14 +324,16 @@ export function buildRegroundMessage(stateOrProjection, { stateNarrative = null 
  * it for the narrative excerpt; when omitted (existing callers), behavior
  * is unchanged -- no excerpt is attempted, matching prior output exactly.
  */
-export function decideOutput(input, state, { rootDir = null } = {}) {
+export function decideOutput(input, state, { rootDir = null, env = process.env } = {}) {
   if (!shouldActivate(input)) return { stdout: "", json: false };
   const projection = resolveRegroundProjection(state, input, { rootDir });
   const bounded = boundedPayload(projection, { mode: "compact" });
   const stateNarrative = rootDir
     ? loadStateNarrativeExcerptSafe(join(rootDir, "docs", "state.md"))
     : null;
-  const message = buildRegroundMessage(bounded.value, { stateNarrative });
+  const baseMessage = buildRegroundMessage(bounded.value, { stateNarrative });
+  const fanoutLine = projection.runtime === null ? null : buildFanoutSummaryLine(input, rootDir, env);
+  const message = fanoutLine === null ? baseMessage : `${baseMessage}\n${fanoutLine}`;
   const measurement = measureBootstrapPayload(message, { mode: "compact" });
   const payload = {
     systemMessage: message,
