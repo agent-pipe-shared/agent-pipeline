@@ -157,7 +157,7 @@ import { basename, dirname, isAbsolute, join, relative } from "node:path";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { consumePendingDispatchBudgetBinding, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
+import { consumePendingDispatchBudgetBinding, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
 import {
   CLOSING_ALLOWANCE,
@@ -350,25 +350,31 @@ export function resolveGitCommonDir(rootDir, dependencies = {}) {
  * `maxTurns` cannot be read as a positive integer.
  */
 export function resolveMaxTurns(agentType, rootDir, dependencies = {}) {
-  if (typeof agentType !== "string") return null;
-  const name = agentType.includes(":") ? agentType.slice(agentType.indexOf(":") + 1) : agentType;
-  if (!/^[a-zA-Z0-9_-]+$/u.test(name)) return null;
-  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
-  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
-  const defPath = join(rootDir, "plugins", "pipeline-core", "agents", `${name}.md`);
-  if (!existsSyncFn(defPath)) return null;
-  let content;
-  try {
-    content = readFileSyncFn(defPath, "utf8");
-  } catch {
-    return null;
+  if (typeof rootDir !== "string" || rootDir === "") return null;
+  return readAgentMaxTurns(agentType, join(rootDir, "plugins", "pipeline-core"), {
+    existsSyncFn: dependencies.existsSyncFn,
+    readFileSyncFn: dependencies.readFileSyncFn,
+  });
+}
+
+/**
+ * The options every budget-contract lookup in this guard passes to the policy: the SAME plugin
+ * root and fs seams `resolveMaxTurns` reads with (and, when a caller injected its own
+ * `resolveMaxTurnsFn`, that resolver itself). The contract's maxTurns and the guard's resolved
+ * maxTurns therefore come from one source, so `budget-tier-max-turns-conflict` cannot arise from
+ * two readers disagreeing; only a genuine installed-copy-vs-checkout drift
+ * (`pending-binding-tier-conflict`) can still separate a binding from this guard.
+ */
+function budgetContractOptions(rootDir, options) {
+  const contractOptions = {
+    pluginRoot: join(rootDir, "plugins", "pipeline-core"),
+    existsSyncFn: options.existsSyncFn,
+    readFileSyncFn: options.readFileSyncFn,
+  };
+  if (typeof options.resolveMaxTurnsFn === "function") {
+    contractOptions.readMaxTurnsFn = (role) => options.resolveMaxTurnsFn(role, rootDir, options);
   }
-  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/u);
-  const scope = frontmatterMatch ? frontmatterMatch[1] : content;
-  const turnsMatch = scope.match(/^maxTurns:\s*(\d+)\s*$/mu);
-  if (!turnsMatch) return null;
-  const value = Number(turnsMatch[1]);
-  return Number.isSafeInteger(value) && value > 0 ? value : null;
+  return contractOptions;
 }
 
 /**
@@ -836,7 +842,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   saveCounter(path, counter, dependencies);
   if (budget.allowed) {
     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
-    const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType);
+    const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
     const checkpoint = contract.applicable
       ? dispatchCheckpointDecision({ workingCap: budget.workingCap, nextCount: budget.nextCount, decision: budget.decision })
       : { notice: false };
@@ -1135,7 +1141,7 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
     return verdict(0);
   }
 
-  const contract = (options.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType);
+  const contract = (options.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, options));
   const path = counterPath(commonDir, identity.agentId);
   const existsSyncFn = options.existsSyncFn ?? existsSync;
   let baseCalls = dispatchWorkingCap(maxTurns);

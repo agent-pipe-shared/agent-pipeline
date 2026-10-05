@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   CLOSING_ALLOWANCE,
@@ -17,6 +18,51 @@ const LABEL = /^\s*-\s*(?:\*\*)?Tool budget(?:\s*\([^\n)]*\))?\s*:\s*(?:\*\*)?\s
 const VALUE = /^(?:≤|<=)?\s*([^\s]+)\s+tool uses\b/iu;
 const DECIMAL = /^(?:0|[1-9][0-9]*)$/u;
 const PENDING_SCHEMA = "pipeline.pending-dispatch-budget-binding.v1";
+const AGENT_DEFINITION_NAME = /^[a-zA-Z0-9_-]+$/u;
+const AGENT_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/u;
+const AGENT_MAX_TURNS_LINE = /^maxTurns:[ \t]*(\d+)[ \t\r]*$/mu;
+
+// The plugin root this module itself ships in (lib/ -> plugin root). Computed lazily and
+// defensively: a module-load throw here would take down every importer of this kernel entry.
+function modulePluginRoot() {
+  try { return fileURLToPath(new URL("..", import.meta.url)); }
+  catch { return null; }
+}
+
+/**
+ * The ONE reader of an agent's `maxTurns` (single source of truth: the `maxTurns:` line in the
+ * YAML frontmatter of `<pluginRoot>/agents/<name>.md`). Every consumer that needs a role's tier
+ * limit -- the budget policy, the budget guard, the calibration validator -- derives it here, so
+ * no second copy of the number can drift from the agent definition.
+ *
+ * `agentType` may carry a `<host>:` prefix (`pipeline-core:critic`) or be bare (`critic`).
+ * `pluginRoot` defaults to the plugin this module ships in; a caller that resolves agent
+ * definitions elsewhere (the guard resolves them under the project root) passes its own.
+ * `dependencies.existsSyncFn` / `readFileSyncFn` are injectable for tests.
+ * Returns a positive safe integer, or null (never throws) when the definition is missing,
+ * has no frontmatter, or carries no well-formed `maxTurns:` line.
+ */
+export function readAgentMaxTurns(agentType, pluginRoot = modulePluginRoot(), dependencies = {}) {
+  if (typeof agentType !== "string" || typeof pluginRoot !== "string" || pluginRoot === "") return null;
+  const name = agentType.includes(":") ? agentType.slice(agentType.indexOf(":") + 1) : agentType;
+  if (!AGENT_DEFINITION_NAME.test(name)) return null;
+  const existsSyncFn = dependencies?.existsSyncFn ?? existsSync;
+  const readFileSyncFn = dependencies?.readFileSyncFn ?? readFileSync;
+  try {
+    const definitionPath = join(pluginRoot, "agents", `${name}.md`);
+    if (!existsSyncFn(definitionPath)) return null;
+    const content = readFileSyncFn(definitionPath, "utf8");
+    if (typeof content !== "string") return null;
+    const frontmatter = AGENT_FRONTMATTER.exec(content);
+    if (frontmatter === null) return null;
+    const line = AGENT_MAX_TURNS_LINE.exec(frontmatter[1]);
+    if (line === null) return null;
+    const value = Number(line[1]);
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 function result(status, code, extra = {}) {
   return Object.freeze({ schema: DISPATCH_BUDGET_BINDING_SCHEMA, status, code, ...extra });

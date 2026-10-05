@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 
+import { readAgentMaxTurns } from "./dispatch-budget-binding.mjs";
 import { CLOSING_ALLOWANCE, dispatchWorkingCap } from "./dispatch-budget-core.mjs";
 
 export const DISPATCH_BUDGET_CALIBRATION_RULE_SCHEMA = "pipeline.dispatch-budget-calibration-rule.v1";
@@ -14,6 +15,13 @@ export const DISPATCH_BUDGET_TASK_CLASSES = Object.freeze([
   "investigation",
   "review",
 ]);
+
+/** Which shipped agent definition backs each calibration tier (the only tier -> role mapping). */
+export const DISPATCH_BUDGET_TIER_AGENTS = Object.freeze({
+  mechanic: "goldfish-mechanic",
+  implementor: "goldfish-implementor",
+  deep: "goldfish-deep",
+});
 
 const OUTCOMES = new Set(["terminal", "truncated"]);
 
@@ -56,6 +64,27 @@ function validateRule(rule) {
     || !exactNumericMap(rule.maxTurnsByTier, DISPATCH_BUDGET_TIERS, positive)) fail("DBC-RULE");
 }
 
+/**
+ * Derive the tier -> maxTurns map from the agent definitions (the single source of truth),
+ * never from a literal. `pluginRoot` defaults to the plugin this module ships in; `dependencies`
+ * are the reader's injectable fs seams. Fails closed (`DBC-MAXTURNS-UNRESOLVED`) when any tier's
+ * definition cannot be read.
+ */
+export function deriveMaxTurnsByTier({ pluginRoot, dependencies } = {}) {
+  const derived = {};
+  for (const tier of DISPATCH_BUDGET_TIERS) {
+    const maxTurns = readAgentMaxTurns(DISPATCH_BUDGET_TIER_AGENTS[tier], pluginRoot, dependencies);
+    if (!positive(maxTurns)) fail("DBC-MAXTURNS-UNRESOLVED");
+    derived[tier] = maxTurns;
+  }
+  return Object.freeze(derived);
+}
+
+function validateRuleAgainstDefinitions(rule, pluginRoot, dependencies) {
+  const derived = deriveMaxTurnsByTier({ pluginRoot, dependencies });
+  if (!DISPATCH_BUDGET_TIERS.every((tier) => rule.maxTurnsByTier[tier] === derived[tier])) fail("DBC-MAXTURNS-MISMATCH");
+}
+
 function validateSample(sample) {
   if (!exact(sample, ["schema", "tier", "taskClass", "fileCount", "observedCalls", "outcome"])
     || sample.schema !== DISPATCH_BUDGET_CALIBRATION_SAMPLE_SCHEMA
@@ -76,8 +105,11 @@ function validateSample(sample) {
  * usable estimate, so an unrealistically high formula cannot conceal a tier
  * that would still truncate the dispatch.
  */
-export function evaluateDispatchBudgetCalibration({ rule, samples } = {}) {
+export function evaluateDispatchBudgetCalibration({ rule, samples, pluginRoot, dependencies } = {}) {
   validateRule(rule);
+  // Opt-in: `maxTurnsByTier` stays what-if input data, but a caller that names a plugin root
+  // asserts it equals the agent definitions' real tier limits (fails closed otherwise).
+  if (pluginRoot !== undefined) validateRuleAgainstDefinitions(rule, pluginRoot, dependencies);
   if (!Array.isArray(samples) || samples.length === 0) fail("DBC-SAMPLES");
   for (let index = 0; index < samples.length; index += 1) {
     if (!Object.hasOwn(samples, index)) fail("DBC-SAMPLES");

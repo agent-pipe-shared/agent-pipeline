@@ -28,7 +28,7 @@
  * detect a determined one, and it is not a substitute for reading the template.
  */
 
-import { bindDispatchBudget } from "./dispatch-budget-binding.mjs";
+import { bindDispatchBudget, readAgentMaxTurns } from "./dispatch-budget-binding.mjs";
 
 const CRITIC_ROLES = /critic|readiness-reviewer|plan-verifier/i;
 const GOLDFISH_ROLES = /goldfish/i;
@@ -42,12 +42,14 @@ const PIPELINE_AGENT_TYPES = new Set([
   "plan-verifier",
   "readiness-reviewer",
 ]);
-const BUDGETED_ROLE_MAX_TURNS = Object.freeze({
-  critic: 30,
-  "goldfish-deep": 80,
-  "goldfish-implementor": 50,
-  "goldfish-mechanic": 50,
-});
+// Roles that carry a first-class budget contract. Names only: a role's maxTurns is never
+// restated here -- it is read from the agent definition (readAgentMaxTurns), the one source.
+const BUDGETED_ROLES = Object.freeze([
+  "critic",
+  "goldfish-deep",
+  "goldfish-implementor",
+  "goldfish-mechanic",
+]);
 const DEFAULT_DISPATCH_BASE_CALL_CAP = Object.freeze({
   critic: 24,
   "goldfish-deep": 45,
@@ -64,13 +66,26 @@ export function isShippedPipelineAgentType(subagentType) {
   return PIPELINE_AGENT_TYPES.has(bareType);
 }
 
-export function dispatchBudgetContractForRole(subagentType) {
+/**
+ * The budget contract of a role. `maxTurns` is derived from the agent definition through
+ * `readAgentMaxTurns`; `options` carries the same `{ pluginRoot, existsSyncFn, readFileSyncFn }`
+ * the caller resolves agent definitions with, so two call sites in one process cannot read two
+ * sources. `options.readMaxTurnsFn(bareRole)` lets a caller that already owns a resolver
+ * (the budget guard's injectable seam) hand it in instead. An unreadable definition yields
+ * `maxTurns: null`, which every consumer already refuses (DBB-TIER-INCOMPATIBLE at binding,
+ * a blocked call at the guard) -- the contract never invents a fallback number.
+ */
+export function dispatchBudgetContractForRole(subagentType, options = {}) {
   const type = typeof subagentType === "string" ? subagentType : "";
   const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;
-  if (!Object.hasOwn(BUDGETED_ROLE_MAX_TURNS, bareType)) {
+  if (!BUDGETED_ROLES.includes(bareType)) {
     return Object.freeze({ applicable: false, role: bareType });
   }
-  return Object.freeze({ applicable: true, role: bareType, maxTurns: BUDGETED_ROLE_MAX_TURNS[bareType] });
+  const { pluginRoot, existsSyncFn, readFileSyncFn, readMaxTurnsFn } = options ?? {};
+  const maxTurns = typeof readMaxTurnsFn === "function"
+    ? readMaxTurnsFn(bareType)
+    : readAgentMaxTurns(bareType, pluginRoot, { existsSyncFn, readFileSyncFn });
+  return Object.freeze({ applicable: true, role: bareType, maxTurns: Number.isSafeInteger(maxTurns) ? maxTurns : null });
 }
 
 /** Render the canonical first-class budget metadata consumed by PREPARE. */
@@ -83,8 +98,8 @@ export function dispatchBudgetLineForRole(subagentType) {
     : null;
 }
 
-export function dispatchBudgetBinding({ subagentType, prompt } = {}) {
-  const contract = dispatchBudgetContractForRole(subagentType);
+export function dispatchBudgetBinding({ subagentType, prompt, pluginRoot, existsSyncFn, readFileSyncFn, readMaxTurnsFn } = {}) {
+  const contract = dispatchBudgetContractForRole(subagentType, { pluginRoot, existsSyncFn, readFileSyncFn, readMaxTurnsFn });
   return bindDispatchBudget({ prompt, maxTurns: contract.maxTurns, applicable: contract.applicable });
 }
 
