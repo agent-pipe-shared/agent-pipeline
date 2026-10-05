@@ -8,7 +8,7 @@
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
-      "rawSha256": "4e7981c2bb55f1121687e880addbfc48ced7f60cef395cf62b65f2f60d5bb02e"
+      "rawSha256": "0a267a61e65d475cc8ba58733b5775235b441d8e65fe98fe98d566c14ffbeca2"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
@@ -40,7 +40,7 @@
     },
     {
       "path": "templates/prompts/critic-review.md",
-      "rawSha256": "3e6b503361b9f6ce708901477e0d541b56cd7c8102b5904739ccbabb5b674ac4"
+      "rawSha256": "de3f3cf4f349a5d5de361443557f83aaa634bcd3af98d815730dc66b03960481"
     }
   ]
 }
