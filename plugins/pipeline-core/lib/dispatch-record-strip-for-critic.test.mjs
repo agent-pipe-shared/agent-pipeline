@@ -8,6 +8,7 @@ import {
   DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS,
   stripDispatchRecordForCritic,
 } from "./dispatch-record-strip-for-critic.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 function check(id, name, run) {
@@ -201,7 +202,7 @@ check("DRS11", "stripDispatchRecordForCritic is a pure function that never mutat
 
 assert.equal(cases.length, 11, "the complete dispatch-record strip corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

@@ -4,6 +4,7 @@ import { openSync } from "node:fs";
 import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, reportSha256, validateDispatchRecord, validateLegacyDispatchRecord, validatePreviousDispatchRecord } from "./dispatch-record.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "./critic-skip-decision.mjs";
+import { devNull } from "node:os";
 
 const SHA = "a".repeat(40);
 const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
@@ -235,7 +236,7 @@ check("v4 authored reports accept bounded multiline prose while v3 metadata rule
 
 assert.equal(cases.length, 13, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

@@ -14,6 +14,7 @@ import { planFeatureCloseAudit } from "./feature-close-audit-preflight.mjs";
 import { executeFeatureCloseAudit } from "./feature-close-audit-executor.mjs";
 import { validateFeatureCloseAuditReceipt } from "./feature-close-audit-receipt.mjs";
 import { verifyAuditBundle, verifyAuditBundleSync } from "./audit-bundle.mjs";
+import { devNull } from "node:os";
 
 test("sync receipt readback requires external exact plan binding and matches async bundle verifier", async t => {
   const f = auditFixture(t), plan = await planFeatureCloseAudit(f.options), lifecycleId = "close-fixture";
@@ -36,7 +37,7 @@ test("sync receipt readback requires external exact plan binding and matches asy
 // Register each original sibling callback directly with the canonical recorder.
 if (completionCases.length !== 1) throw new Error("Required completion case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -10,6 +10,7 @@ function test(name, run) {
 import assert from 'node:assert/strict';
 import {createInitialAdvisorContext,validateInitialAdvisorContext,validateInitialToFinalBinding,buildInitialAdvisorQuestion,hashInitialAdvisorQuestion,designAdvisorValueSha256,designAdvisorBytesSha256,SOURCE_NAMES} from './design-advisor-course.mjs';
 import {advisoryEvidenceBundleSha256} from './advisory-lifecycle-v2.mjs';
+import { devNull } from 'node:os';
 const H='1'.repeat(64),I={commit:'a'.repeat(40),tree:'b'.repeat(40)},F={commit:'c'.repeat(40),tree:'d'.repeat(40)},DATE='2026-09-28T00:00:00.000Z';
 function fixture(){const sourceBytes=Object.fromEntries(SOURCE_NAMES.map(n=>[n,Buffer.from(`${n}: Ä\r\ncontrolled initial bytes\n`)])),sources=Object.fromEntries(SOURCE_NAMES.map(n=>[n,{path:`specs/feature/${n}.md`,sha256:designAdvisorBytesSha256(sourceBytes[n])}]));const built=createInitialAdvisorContext({repoFingerprint:H,featureId:'feature',authoringDispatchId:'author',initialCandidate:I,sources,sourceBytes,reason:'architecture-tradeoff',routePolicySha256:H,createdAt:DATE});assert.equal(built.ok,true);return {initial:built.context,sourceBytes};}
 function binding(){const {initial}=fixture(),courseId='dac_course',consultation={courseId,initialContextSha256:designAdvisorValueSha256(initial),dispatch:{dispatchId:'advisor',queueRevision:0,candidateCommit:I.commit,candidateTree:I.tree},questionSha256:initial.questionSha256,evidenceSha256:initial.evidenceSha256,receiptSha256:H,answerSha256:H,reportCanonicalSha256:H,proposalSetSha256:designAdvisorValueSha256([{proposalId:'p1',text:'Require preserved input.'}])};const disposition={schema:'pipeline.design-advisor-disposition.v1',courseId,consultationSha256:designAdvisorValueSha256(consultation),proposalSetSha256:consultation.proposalSetSha256,items:[{proposalId:'p1',decision:'adopt',rationale:'Preserves original requirement.',revisionCommit:F.commit}],ownerDispatchId:'owner',createdAt:DATE};const sources=structuredClone(initial.sources);sources.design.sha256='2'.repeat(64);const revisions=[{schema:'pipeline.design-advisor-revision.v1',courseId,seq:1,priorRevisionSha256:null,candidate:F,sources,parentCommit:I.commit,proposalIds:['p1'],reason:'advisor-disposition'}];return {initial,courseId,consultation,disposition,revisions,final:{candidate:F,sources}};}
@@ -23,7 +24,7 @@ test('unchanged sources allow empty revision chain with zero adopted proposals',
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 6) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

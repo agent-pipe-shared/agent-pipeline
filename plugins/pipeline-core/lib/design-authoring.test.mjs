@@ -4,6 +4,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
 import { parseArchitectureDesign } from "./architecture-design.mjs";
 import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, compactActionReadback } from "./design-authoring.mjs";
+import { devNull } from "node:os";
 const completionCases = [];
 function test(name, optionsOrRun, possibleRun) {
   const options = typeof optionsOrRun === "function" ? {} : optionsOrRun ?? {};
@@ -39,6 +40,6 @@ test("compact readback retains executable recovery and digests without copying d
 
 if (completionCases.length !== 2) throw new Error("case completion count drift: expected 2, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });

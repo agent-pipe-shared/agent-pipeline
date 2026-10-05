@@ -31,6 +31,7 @@ import {exportCodexDesignAdvisorArtifacts} from '../scripts/codex-design-advisor
 import {createDesignWorkflowPackageApprovalRequest,validateDesignWorkflowPackageApprovalRequest,verifyDesignWorkflowPackageApproval,verifyStoredDesignWorkflowPackageSignature} from './design-workflow-approval.mjs';
 import {readApprovedDesignWorkflowPackage} from './design-workflow-package.mjs';
 import {resolveV3DutyRoute} from './critic-route-v3.mjs';
+import { devNull } from 'node:os';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 
 test('genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail',async t=>{
@@ -154,7 +155,7 @@ test('genuine initial consultation survives an advised committed revision and fr
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 1) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

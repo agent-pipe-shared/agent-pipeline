@@ -11,7 +11,7 @@ function test(name, run) {
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {join} from 'node:path';
 import {createGovernanceScopeController,recordGovernanceEnrollmentAfterOnboarding} from './governance-scope.mjs';
 import {planProjectOnboardingV3,applyProjectOnboardingV3} from './project-onboarding-v3.mjs';
@@ -30,7 +30,7 @@ test('actual authenticated V3 apply integrates central enrollment with real loca
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 1) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

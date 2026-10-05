@@ -16,6 +16,7 @@ import {designAdvisorValueSha256} from './design-advisor-course.mjs';
 import {loadRunnerProfilesV3Registry} from './runner-profiles-v3.mjs';
 import {coordinateDesignAdvisory} from './design-advisory-coordinator.mjs';
 import {runDesignAdvisoryCoordinator} from '../scripts/design-advisory-coordinator.mjs';
+import { devNull } from 'node:os';
 const args=f=>({repoRoot:f.root,featureId:'advisor-feature',authoringDispatchId:'elephant-author',sources:f.sources,reason:'risk-review',profile:'feature',dispatch:f.args.dispatch,route:f.route,hostExecution:f.execution});
 
 test('actual managed unknown answer finalizes initial course and restart does not launch another consultation',async t=>{
@@ -112,7 +113,7 @@ test('caller supplied unbranded host object cannot mint a consultation course',a
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 3) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -13,6 +13,7 @@ import {
   dispatchWorkingCap,
   effectiveDispatchBaseCap,
 } from "./dispatch-budget-core.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 function check(name, run) {
@@ -188,7 +189,7 @@ check("decideDispatchBudgetCall denies invalid numeric and closing inputs with a
 
 assert.equal(cases.length, 11, "the complete dispatch-budget corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

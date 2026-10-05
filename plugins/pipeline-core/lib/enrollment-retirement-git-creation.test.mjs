@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import {join} from 'node:path';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {planEnrollmentGitCreation,applyEnrollmentGitCreation} from './project-onboarding-v3.mjs';
 import {resolveOnboardingIntakeScope} from './codex-onboarding-runtime.mjs';
@@ -24,5 +24,5 @@ test('EGR07','writer handoff failure keeps a durable removal barrier and resumes
 test('EGR08','no-history local root takes explicit canonical Git creation without a host private directory',()=>fixture(root=>{const a=adapter(root),p=plan(root,a);assert.equal(p.plan.retained.every(row=>row.status==='absent'),true);assert.equal(apply(p).status,'created');assert.equal(fs.existsSync(join(root,'.claude','.runtime')),false);}));
 test('EGR09','real consent CAS preserves fresh marker and retires only exact archived bytes',()=>fixture(root=>{recordConsentGiven({rootDir:root,now:new Date('2026-09-29T00:00:00.000Z')});const old=observeEnrollmentRetirementConsent({rootDir:root});fs.unlinkSync(old.path);recordConsentGiven({rootDir:root,now:new Date('2026-09-29T00:00:01.000Z')});const fresh=observeEnrollmentRetirementConsent({rootDir:root});assert.throws(()=>retireEnrollmentConsent({rootDir:root,expectedSha256:old.sha256}),/FRESH-DRIFT/);assert.deepEqual(fs.readFileSync(fresh.path),fresh.bytes);assert.equal(retireEnrollmentConsent({rootDir:root,expectedSha256:fresh.sha256}).sha256,null);assert.equal(retireEnrollmentConsent({rootDir:root,expectedSha256:fresh.sha256}).replayed,true);}));
 test('EGR10','real selected worktrees isolate current intake paths and preserve foreign exact bytes',()=>fixture(root=>{const main=join(root,'main'),other=join(root,'other');fs.mkdirSync(main);for(const args of [['init','--initial-branch=main'],['-c','user.name=offline-fixture','-c','user.email=offline@example.invalid','-c','commit.gpgsign=false','commit','--allow-empty','-m','offline fixture'],['worktree','add',other]]){const result=spawnSync('git',args,{cwd:main,encoding:'utf8'});assert.equal(result.status,0,result.stderr);}const a=resolveOnboardingIntakeScope(main,'local',{create:true}),b=resolveOnboardingIntakeScope(other,'local',{create:true});assert.notEqual(a.directory,b.directory);assert.equal(a.legacyDirectory,b.legacyDirectory);fs.writeFileSync(join(a.directory,'consumed-intake-fixture'),'exact foreign consumed consent bytes');const before=fs.readFileSync(join(a.directory,'consumed-intake-fixture'));resolveOnboardingIntakeScope(other,'local',{create:true});assert.deepEqual(fs.readFileSync(join(a.directory,'consumed-intake-fixture')),before);}));
-const fd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined?fs.openSync(process.platform==='win32'?'NUL':'/dev/null','w'):Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+const fd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined?fs.openSync(devNull,'w'):Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({cases,fd,maxBytes:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES??'131072')});

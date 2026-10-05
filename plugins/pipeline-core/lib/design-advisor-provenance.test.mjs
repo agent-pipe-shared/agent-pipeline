@@ -12,7 +12,7 @@ function test(name, run) {
 }
 import {execFileSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {join} from 'node:path';
 import {SOURCE_NAMES,createInitialAdvisorContext,designAdvisorValueSha256} from './design-advisor-course.mjs';
 import {observeAdvisorCandidate,observeInitialAdvisorSources,verifyAdvisorRevisionProvenance} from './design-advisor-provenance.mjs';
@@ -38,7 +38,7 @@ test('wrong initial question rejects before ancestry can qualify any revision',t
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 4) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
