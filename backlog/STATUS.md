@@ -125,6 +125,7 @@
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.browser-preflight-misses-missing-host-library | open | defect | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.budget-checkpoint-fires-below-the-briefed-cap | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.budget-guard-test-suite-silent-pass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation. |
 | pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes. |
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
@@ -246,6 +247,7 @@
 | pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.dispatch-record-ownership-binds-an-attempted-creation | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract. |
+| pipeline.dispatch-records-land-under-specs-evidence | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.dispatch-templates-cite-restructured-operating-model-sections | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin | closed | defect | pipeline | — | 2026-08-18 | — | — |
@@ -317,7 +319,9 @@
 | pipeline.git-stash-list-classified-as-working-tree-write | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.gitleaks-content-suppression-does-not-match-on-windows | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag | closed | defect | pipeline | — | 2026-08-19 | — | — |
+| pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | closed | requirement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | — | 2026-08-16 | — | — |
 | pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -361,6 +365,7 @@
 | pipeline.guard-override-message-misassigns-roles-and-omits-signing | closed | defect | pipeline | nova-b | 2026-09-07 | — | — |
 | pipeline.guard-override-request-digest-drifts-after-arming | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target | open | defect | pipeline | alfred | 2026-10-05 | — | — |
+| pipeline.guard-push-treats-gitleaks-as-a-git-command | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
@@ -825,7 +830,7 @@
 
 ## Counts
 
-- open: 160
+- open: 165
 - in_progress: 0
 - closed: 643
 - rejected: 3

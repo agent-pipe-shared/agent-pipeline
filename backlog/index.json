@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "89d017302a02eb6f9357e626205296afd02b015bec6c346eabaa2be7a6e0b3b4"
+    "transitionHead": "56b6b2363fa7e11925a949480f5df8558b31f1aa5c394120f978710fda4dc952"
   },
   "counts": {
-    "open": 160,
+    "open": 165,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -1580,6 +1580,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed live, Alfred session, 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.budget-guard-test-suite-silent-pass",
       "status": "closed",
       "type": "defect",
@@ -3132,6 +3142,16 @@
       "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md"
     },
     {
+      "id": "pipeline.dispatch-records-land-under-specs-evidence",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed live, Alfred session, 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",
       "status": "closed",
       "type": "defect",
@@ -4055,6 +4075,16 @@
       "closureEvidence": "plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs"
     },
     {
+      "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed live on native Windows, Alfred session, 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag",
       "status": "closed",
       "type": "defect",
@@ -4066,6 +4096,16 @@
       "closureRepository": "self",
       "closureCommit": "c3bf83b74b8a520633220c520703cbafb80f726f",
       "closureEvidence": ".gitleaksignore"
+    },
+    {
+      "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed live on native Windows, Alfred session, 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
@@ -4613,6 +4653,16 @@
       "owner": "pipeline",
       "created": "2026-10-05",
       "source": "Live observation 2026-10-05 (Alfred session): ALFRED-BACKLOG-20261005 defect 10.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed live, Alfred session, 2026-10-05.",
       "deferred": false,
       "sprint": "alfred"
     },
