@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "681ea8946c1118db6e4e416b14f408ea34e627df931ea893ab36b29e7cf13cc5"
+    "transitionHead": "71b76c9d4977b35f70c42560548e28f065570b4f5d777ae1dc9ba6a706bb98ad"
   },
   "counts": {
-    "open": 166,
+    "open": 167,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -7761,6 +7761,16 @@
       "closureRepository": "self",
       "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
       "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
+    },
+    {
+      "id": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Found by the GPGL-2 dispatch (code reading plus a regression case), Alfred session, 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
