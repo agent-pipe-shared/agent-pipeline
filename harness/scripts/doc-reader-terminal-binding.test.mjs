@@ -7,7 +7,7 @@ function test(name, run) {
   if (arguments.length !== 2 || typeof run !== "function") throw new TypeError("Required completion expects the preserved two-argument test registration");
   completionCases.push({ id: "RC01C" + String(completionCases.length + 1).padStart(3, "0"), name, run });
 }
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import assert from 'node:assert/strict';
 import {spawnSync,execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -115,7 +115,7 @@ test('historical 15-document scope expands to 16 without inventing an earlier re
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 9) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

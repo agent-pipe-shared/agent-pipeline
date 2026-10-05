@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync,openSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir, devNull} from 'node:os';
 import {join,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {registerTestCaseCompletion} from '../../plugins/pipeline-core/lib/test-case-completion.mjs';
@@ -109,5 +109,5 @@ check('VAC017','ordered superset may interleave new IDs while retaining every ol
   assert.equal(applyVerifyCaseCompletionAugmentations(rows,data).ok,true);
 });
 assert.equal(cases.length,17);
-const fd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined?openSync(process.platform==='win32'?'NUL':'/dev/null','w'):Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+const fd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined?openSync(devNull,'w'):Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({cases,fd,maxBytes:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES??'65536')});
