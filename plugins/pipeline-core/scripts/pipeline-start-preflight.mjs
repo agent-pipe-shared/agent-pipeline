@@ -1417,12 +1417,34 @@ export function observePipelineStartPreflight({
   // back to the pre-existing behaviour rather than guessing -- the same
   // fail-toward-the-status-quo posture every sibling observation in this file takes.
   let projectOnboardingNotReady = false;
+  // FLAPP1-R1: `bootstrap` is the preflight's default question, but it is not the one the
+  // lifecycle guard asks: guard-lifecycle-ready evaluates `intent: "session"` on every governed
+  // call, and the two intents differ (a bare cleanup residue is invisible to `bootstrap` and
+  // blocking for `session`). A project that is bootstrap-ready but not session-ready would
+  // otherwise get the plain ready action below while the guard stands at `partial`. So once
+  // the bootstrap probe has succeeded, ask the session question too; anything other than a
+  // clean answer -- a PORG-NOT-READY denial or the probe itself failing -- counts as "not
+  // session-ready" (fail closed: unknown readiness is never reported as the plain ready path),
+  // and the action below becomes the read-only `inspect --intent session`, which re-asks the
+  // same question and surfaces the typed way forward (or the real error) to the agent.
+  let sessionReadinessNotReady = false;
   if (status === "ready" || status === "plugin-refresh-required") {
+    let bootstrapProbeReady = false;
     try {
       requireProjectOnboardingReadyFn({ rootDir: cwd, intent: "bootstrap", runner });
+      bootstrapProbeReady = true;
     } catch (error) {
       projectOnboardingNotReady = error instanceof ProjectOnboardingReadyError
         && error.code === "PORG-NOT-READY";
+    }
+    // Only the `ready` status names the inspect action this probe re-targets; the
+    // plugin-refresh advisory is unchanged, so do not spend a second inspection there.
+    if (bootstrapProbeReady && status === "ready") {
+      try {
+        requireProjectOnboardingReadyFn({ rootDir: cwd, intent: "session", runner });
+      } catch {
+        sessionReadinessNotReady = true;
+      }
     }
   }
   // Bootstrap may never make architecture adoption a precondition: the PO must
@@ -1591,7 +1613,7 @@ export function observePipelineStartPreflight({
               "--root",
               resolve(cwd),
               "--intent",
-              "bootstrap",
+              sessionReadinessNotReady ? "session" : "bootstrap",
               "--runner",
               runner,
             ],
