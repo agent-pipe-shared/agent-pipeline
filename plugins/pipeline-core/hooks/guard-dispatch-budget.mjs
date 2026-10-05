@@ -157,7 +157,10 @@ import {
   SAFETY_MARGIN,
   classifyDispatchBudgetCaller,
   decideDispatchBudgetCall,
+  dispatchCheckpointDecision,
   dispatchWorkingCap,
+  isValidGrantAgentId,
+  validateGrantRecord,
 } from "../lib/dispatch-budget-core.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -178,7 +181,7 @@ function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, s
   const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
   const continuation = remainingClosingCalls > 0
     ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
-      + "Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) `git add` your own paths, (3) `git commit` your own paths.\n"
+      + `Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) \`git add\` your own paths, (3) \`git commit\` your own paths${closingNotesClause(agentType)}.\n`
       + "Stop working and emit the closing report when finished.\n"
     : `The closing allowance of ${CLOSING_ALLOWANCE} tool calls is exhausted. No further tool calls are permitted for this dispatch.\n`
       + "Emit the closing report without another tool call.\n";
@@ -367,13 +370,98 @@ export function resolveMaxTurns(agentType, rootDir, dependencies = {}) {
  * this guard verify; the other guards in the union (guard-git.mjs,
  * guard-testpath.mjs) already own that narrower question.
  */
-function isClosingAct(input, rootDir) {
+// ALFRED-BUDGET-20261005: the dispatching Critic hands back through its own
+// `scratch/dispatch/<subdir>/critic-notes.md` (critic-review.md CR-06-D). Exact
+// shape only: one safe subdirectory segment (never `.`/`..`, no separators) and
+// that one file name, admitted for the Critic agent type alone.
+const CRITIC_NOTES_PATTERN = /^scratch\/dispatch\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/critic-notes\.md$/u;
+export const GRANT_REFUSAL_CODE = "DISPATCH-BUDGET-GRANT-ORCHESTRATOR-ONLY";
+
+function isCriticAgentType(agentType) {
+  return normalizedAgentType(agentType) === "critic";
+}
+
+function closingNotesClause(agentType) {
+  return isCriticAgentType(agentType)
+    ? ", (4) write your own scratch/dispatch/<subdir>/critic-notes.md (that exact file name only)"
+    : "";
+}
+
+/**
+ * Does this call write to, or run the script that writes, the orchestrator's
+ * budget-grant store? Only the orchestrator may; a dispatched agent granting
+ * itself budget would turn the cap into a suggestion.
+ */
+function touchesGrantStore(input) {
+  const toolName = String(input?.tool_name ?? "");
+  let text = "";
+  if (WRITE_TOOLS.includes(toolName)) {
+    text = String(writeTargetPath(input?.tool_input, toolName) ?? "");
+  } else if (toolName === "Bash") {
+    const command = input?.tool_input?.command ?? input?.tool_input?.CommandLine;
+    text = typeof command === "string" ? command : "";
+  }
+  const normalized = text.replaceAll("\\", "/").toLowerCase();
+  return /dispatch-budget-grant\.mjs(?![a-z0-9._-])/u.test(normalized) || normalized.includes("dispatch-budget/grants");
+}
+
+function grantRefused({ agentId, agentType }) {
+  return verdict(
+    2,
+    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
+      + `${GRANT_REFUSAL_CODE}: this dispatch (${agentType}, agent ${agentId}) touched the dispatch-budget grant store or its grant script. `
+      + "Only the orchestrating session may grant budget; end your turn with your interim report and let the dispatcher decide.\n",
+  );
+}
+
+function grantPath(counterFilePath, agentId) {
+  return join(dirname(counterFilePath), "grants", `${agentId}.json`);
+}
+
+const MAX_GRANT_FILE_BYTES = 32768;
+
+/**
+ * Calls the orchestrator granted this exact agent id, or 0. Any unreadable,
+ * oversized, malformed or non-verifying record grants nothing (the safe direction).
+ */
+function readGrantedCalls(counterFilePath, agentId, dependencies) {
+  if (!isValidGrantAgentId(agentId)) return 0;
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  try {
+    const path = grantPath(counterFilePath, agentId);
+    if (!existsSyncFn(path)) return 0;
+    const text = readFileSyncFn(path, "utf8");
+    if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_GRANT_FILE_BYTES) return 0;
+    const checked = validateGrantRecord(JSON.parse(text), agentId);
+    return checked.ok ? checked.totalExtra : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** PreToolUse stdout whose `additionalContext` reaches the model on an `allow`; `permissionDecisionReason` would be user-only. */
+function checkpointNoticeStdout({ agentType, count, workingCap, remaining }) {
+  const critic = isCriticAgentType(agentType);
+  const calls = `${remaining} call${remaining === 1 ? "" : "s"}`;
+  const steps = critic
+    ? "(1) start no new review work; (2) write your interim notes (done / remaining / next step) into your own scratch/dispatch/<subdir>/critic-notes.md; (3) end your turn with that hand-back."
+    : "(1) commit what is already green now (never a known-red regression); (2) write an interim report (done / remaining / next step) into your dispatch record, evidence/dispatch-record-<TASK_ID>.json (log + report); (3) end your turn with that hand-back.";
+  const additionalContext = `DISPATCH-BUDGET-CHECKPOINT: ${calls} of your working budget remain after this call (counted call ${count} of ${workingCap}). `
+    + "Do not start new work. Hand back to the dispatcher now: "
+    + `${steps} `
+    + "The dispatcher decides: grant more budget and continue you, or dispatch a follow-up that builds on your interim report. "
+    + "Do not spend the closing allowance on further work.";
+  return `${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", additionalContext } })}\n`;
+}
+
+function isClosingAct(input, rootDir, agentType) {
   const toolName = String(input?.tool_name ?? "");
   if (WRITE_TOOLS.includes(toolName)) {
     const filePath = writeTargetPath(input?.tool_input, toolName);
     if (filePath === "") return false;
     const rel = (isAbsolute(filePath) ? relative(rootDir, filePath) : filePath).replaceAll("\\", "/");
-    return DISPATCH_RECORD_PATTERN.test(rel);
+    return DISPATCH_RECORD_PATTERN.test(rel) || (isCriticAgentType(agentType) && CRITIC_NOTES_PATTERN.test(rel));
   }
   if (toolName === "Bash") {
     const command = input?.tool_input?.command ?? input?.tool_input?.CommandLine;
@@ -725,17 +813,33 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   if (!bindingMatches) {
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: "counter-binding-mismatch" });
   }
-  const preliminaryBudget = decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: false });
+  // The small-role lane already spends maxTurns - CLOSING_ALLOWANCE, so it has no headroom to grant.
+  const grantedCalls = policyMaxTurns === maxTurns ? readGrantedCalls(path, identity.agentId, dependencies) : 0;
+  const preliminaryBudget = decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: false, grantedCalls });
   if (preliminaryBudget.decision === "invalid-input") {
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: preliminaryBudget.reason });
   }
-  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir)
-    ? decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: true })
+  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir, identity.agentType)
+    ? decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: true, grantedCalls })
     : preliminaryBudget;
   counter.count = budget.nextCount;
   counter.updatedAt = nowFn();
   saveCounter(path, counter, dependencies);
-  if (budget.allowed) return verdict(0);
+  if (budget.allowed) {
+    // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
+    const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType);
+    const checkpoint = contract.applicable
+      ? dispatchCheckpointDecision({ workingCap: budget.workingCap, nextCount: budget.nextCount, decision: budget.decision })
+      : { notice: false };
+    if (!checkpoint.notice) return verdict(0);
+    return {
+      exitCode: 0,
+      stderr: "",
+      stdout: checkpointNoticeStdout({
+        agentType: identity.agentType, count: budget.nextCount, workingCap: budget.workingCap, remaining: checkpoint.remainingWorkingCalls,
+      }),
+    };
+  }
   return blocked({
     agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls,
     workingCap: budget.workingCap, count: counter.count, smallRole: policyMaxTurns !== maxTurns,
@@ -950,6 +1054,12 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
     return verdict(0); // never limited, by construction
   }
 
+  // Grant store: orchestrator-only. Any non-orchestrator identity (resolved subagent,
+  // partial or malformed identity) touching it is refused before anything is counted.
+  if (touchesGrantStore(input)) {
+    return grantRefused({ agentId: identity.agentId ?? "unresolved", agentType: identity.agentType ?? "unresolved" });
+  }
+
   if (identity.kind === "unresolved") {
     recordUnresolved(commonDir, {
       ...identity, branch: "unresolved-identity", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, sessionId: input?.session_id, at: nowFn(),
@@ -1087,6 +1197,8 @@ if (isDirectInvocation(import.meta.url)) {
     }
     const result = evaluateDispatchBudgetGuard(input);
     if (result.stderr) process.stderr.write(result.stderr);
-    process.exit(result.exitCode);
+    // Flush stdout before exiting: process.exit() can truncate a pending pipe write.
+    if (result.stdout) process.stdout.write(result.stdout, () => process.exit(result.exitCode));
+    else process.exit(result.exitCode);
   });
 }
