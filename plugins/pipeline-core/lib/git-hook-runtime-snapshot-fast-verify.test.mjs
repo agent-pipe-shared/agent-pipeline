@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 // Security properties of the git-hook runtime snapshot that the fast verification paths (batched native DACL read,
-// below-root lstat walk, in-process verified memo, stat-validated source reuse) must keep. Fixtures live under
-// os.tmpdir(); everything planted (ACE, junction, tampered file) is removed before a test ends.
+// below-root lstat walk, in-process verified memo of the DESTINATION) must keep. The SOURCE tree has no stat shortcut:
+// it is re-read and hashed in full after the copy. Fixtures live under os.tmpdir(); everything planted (ACE, junction,
+// tampered file, source edit) is removed before a test ends.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -105,6 +106,35 @@ test("source drift while the snapshot is being published is refused", (t) => {
   });
   assert.equal(codeOf(drift), "GHS-SOURCE-DRIFT");
 });
+
+// A same-size edit whose mtime is restored afterwards: size and mtime (the stat facts a shortcut would trust) are
+// unchanged, only the bytes differ. Only the content hash of a full re-read can notice it. Errors thrown inside an
+// onProgress callback are swallowed by the publisher, so the outcome is recorded and asserted after the publish.
+function plantSameSizeSameMtimeEdit(path) {
+  const before = statSync(path), original = readFileSync(path, "utf8"), edited = original.replace("'inner'", "'innex'");
+  if (edited === original || edited.length !== original.length) return { planted: false };
+  writeFileSync(path, edited);
+  utimesSync(path, before.atimeMs / 1000, before.mtimeMs / 1000);
+  const after = statSync(path);
+  return { planted: true, sizeKept: after.size === before.size, mtimeKept: Math.abs(after.mtimeMs - before.mtimeMs) < 2, bytesChanged: readFileSync(path, "utf8") !== original };
+}
+
+for (const editPhase of ["copy", "verify"]) {
+  test(`a same-size, same-mtime source edit during publish (${editPhase} phase) is refused as GHS-SOURCE-DRIFT`, (t) => {
+    const f = fixture(t);
+    // Temporary-tree cleanup fails closed unless the state directory itself is private (as an installed state dir is).
+    if (WIN) assert.equal(hardenWindowsPrivateDirectory(f.state).status, "secure");
+    let outcome = null;
+    const drift = () => publishGitHookRuntimeSnapshot({
+      pluginLibDir: f.lib,
+      stateDir: f.state,
+      onProgress: ({ phase }) => { if (phase === editPhase && outcome === null) outcome = plantSameSizeSameMtimeEdit(join(f.lib, "sub", "inner.mjs")); },
+    });
+    assert.equal(codeOf(drift), "GHS-SOURCE-DRIFT");
+    assert.deepEqual(outcome, { planted: true, sizeKept: true, mtimeKept: true, bytesChanged: true });
+    assert.deepEqual(readdirSync(f.state), [], "nothing was published and the exact owned temporary was removed");
+  });
+}
 
 test("the install time budget is enforced", (t) => {
   const f = fixture(t);

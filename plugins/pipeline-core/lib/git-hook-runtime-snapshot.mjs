@@ -16,10 +16,12 @@ function publicPath(path){return typeof path==='string'&&!path.includes('\\')&&!
 function enumerate(root){physicalFootprintPath(root,{directory:true});const names=[];for(const path of PUBLIC_ROOT_FILES){const entry=physicalFootprintPath(join(root,path),{missing:true,within:root});if(!entry)footprintFail('GHS-BASELINE-MISSING');if(!entry.isFile())footprintFail('PU-FILE');names.push(path);}for(const dir of PUBLIC_DIRS){const base=join(root,dir);if(!physicalFootprintPath(base,{missing:true,directory:true,within:root}))continue;const walk=path=>{for(const entry of readdirSync(path,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const target=join(path,entry.name);if(entry.isSymbolicLink())footprintFail('PU-ALIAS');if(entry.isDirectory()){if(!entry.name.startsWith('.'))walk(target);}else if(publicPath(relative(root,target).split('\\').join('/')))names.push(relative(root,target).split('\\').join('/'));if(names.length>4096)footprintFail('GHS-COUNT');}};walk(base);}return names.sort();}
 function readInventory(root){const rootIdentity=footprintIdentity(physicalFootprintPath(root,{directory:true})),budget={used:0,max:67108864},paths=enumerate(root),items=paths.map(path=>{const read=readPhysicalFootprint(join(root,path),{max:4194304,budget,within:root});if(!read)footprintFail('GHS-MISSING');return {path,sha256:read.sha256,bytes:read.bytes,identity:read.identity,fingerprint:read.fingerprint,racy:read.racy};});if(JSON.stringify(paths)!==JSON.stringify(enumerate(root))||JSON.stringify(rootIdentity)!==JSON.stringify(footprintIdentity(physicalFootprintPath(root,{directory:true}))))footprintFail('GHS-DRIFT');return {rootIdentity,items};}
 export function inspectGitHookSourceSnapshot({pluginLibDir}){
- const sourceRoot=resolve(pluginLibDir,'..');physicalFootprintPath(sourceRoot,{directory:true});let cached=SOURCE_CACHE.get(sourceRoot)??null;if(cached&&!sourceStillCurrent(sourceRoot,cached)){SOURCE_CACHE.delete(sourceRoot);cached=null;}const first=cached??readInventory(sourceRoot),second=first;if(!cached&&!sourceStillCurrent(sourceRoot,first))footprintFail('GHS-SOURCE-DRIFT');const publicItems=value=>value.items.map(({path,sha256})=>({path,sha256}));if(JSON.stringify(publicItems(first))!==JSON.stringify(publicItems(second))||JSON.stringify(first.rootIdentity)!==JSON.stringify(second.rootIdentity))footprintFail('GHS-SOURCE-DRIFT');
+ // The SOURCE tree is never trusted by stat fingerprint: both passes read every file's bytes and hash them in full, so a
+ // same-size, same-mtime edit between (or during) the passes still changes a digest and is refused as GHS-SOURCE-DRIFT.
+ const sourceRoot=resolve(pluginLibDir,'..');physicalFootprintPath(sourceRoot,{directory:true});const first=readInventory(sourceRoot),second=readInventory(sourceRoot);const publicItems=value=>value.items.map(({path,sha256})=>({path,sha256}));if(JSON.stringify(publicItems(first))!==JSON.stringify(publicItems(second))||JSON.stringify(first.rootIdentity)!==JSON.stringify(second.rootIdentity))footprintFail('GHS-SOURCE-DRIFT');
  if(first.items.some((r,i)=>JSON.stringify(r.identity)!==JSON.stringify(second.items[i]?.identity)))footprintFail('GHS-SOURCE-DRIFT');
  const inventory=publicItems(first);if(!inventory.some(x=>x.path==='lib/governance-scope.mjs'))footprintFail('GHS-SCOPE-MISSING');const manifest={schema:SCHEMA,inventory},manifestBytes=JSON.stringify(manifest)+'\n',manifestSha256=footprintSha256(manifestBytes);
- if(!cached){SOURCE_CACHE.clear();SOURCE_CACHE.set(sourceRoot,first);}return {sourceRoot,first,manifestBytes,manifestSha256};
+ return {sourceRoot,first,manifestBytes,manifestSha256};
 }
 export function publishGitHookRuntimeSnapshot({pluginLibDir,stateDir,timeBudgetMs=DEFAULT_INSTALL_BUDGET_MS,onProgress}={}){
  if(!Number.isFinite(timeBudgetMs)||timeBudgetMs<=0||timeBudgetMs>80000)footprintFail('GHS-TIME-BUDGET');const state=resolve(stateDir),deadline=Date.now()+timeBudgetMs;physicalFootprintPath(state,{directory:true});const {first,manifestBytes,manifestSha256:digest}=inspectGitHookSourceSnapshot({pluginLibDir}),destination=join(state,'runtime-'+digest),temporary=join(state,'runtime-tmp-'+randomBytes(8).toString('hex'));
@@ -33,19 +35,11 @@ export function publishGitHookRuntimeSnapshot({pluginLibDir,stateDir,timeBudgetM
 // the full pass read each file, plus the root identity, the manifest bytes and a fresh directory enumeration. Any
 // difference -- modified, replaced, added or removed entry, or a changed DACL (NTFS bumps ctime) -- falls through to the
 // full per-file verification below, which still decides. A fresh process always starts with an empty memo.
-const VERIFIED=new Map(),MAX_VERIFIED=16,SOURCE_CACHE=new Map();
+const VERIFIED=new Map(),MAX_VERIFIED=16;
 // A file whose mtime/ctime is within RACY_MS of the moment it was read could be rewritten inside the same filesystem
 // clock tick without changing its fingerprint (the "racily clean" case); such an entry is never trusted by stat alone:
 // its bytes are re-read and re-hashed on every re-validation.
-// Source inventory reuse (same discipline): the SOURCE tree read in full by this process is reused by the next hook
-// install only while the root identity, the enumerated public paths and every file's stat fingerprint are unchanged.
-function sourceStillCurrent(root,inventory){
- try{const rootNow=physicalFootprintPath(root,{directory:true});if(JSON.stringify(footprintIdentity(rootNow))!==JSON.stringify(inventory.rootIdentity))return false;
-  if(JSON.stringify(inventory.items.map(item=>item.path))!==JSON.stringify(enumerate(root)))return false;
-  for(const item of inventory.items){const st=physicalFootprintPath(join(root,item.path),{missing:true,within:root});if(!st||!st.isFile()||st.nlink!==1||footprintFingerprint(st)!==item.fingerprint)return false;if(item.racy){const row=readPhysicalFootprint(join(root,item.path),{max:4194304,within:root});if(!row||row.sha256!==item.sha256)return false;}}
-  return JSON.stringify(footprintIdentity(physicalFootprintPath(root,{directory:true})))===JSON.stringify(inventory.rootIdentity);
- }catch{return false;}
-}
+// Deliberately NOT applied to the source tree: the source inventory has no such memo (see inspectGitHookSourceSnapshot).
 function adoptVerifiedSnapshot(from,to,digest){const fromKey=resolve(from)+'\n'+digest,memo=VERIFIED.get(fromKey);VERIFIED.delete(fromKey);if(!memo)return;try{memo.rootFp=footprintFingerprint(physicalFootprintPath(resolve(to),{directory:true}));VERIFIED.set(resolve(to)+'\n'+digest,memo);}catch{/* a root that cannot be re-fingerprinted is simply not remembered */}}
 function snapshotDirectoryRows(root,paths){const dirs=new Set();for(const p of paths){let d=p.lastIndexOf('/')>0?p.slice(0,p.lastIndexOf('/')):'';while(d&&!dirs.has(d)){dirs.add(d);d=d.lastIndexOf('/')>0?d.slice(0,d.lastIndexOf('/')):'';}}return [...dirs].sort().map(d=>{const st=physicalFootprintPath(join(root,d),{missing:true,directory:true,within:root});if(!st)footprintFail('GHS-CONTENT');return [d,footprintFingerprint(st)];});}
 function revalidateVerifiedSnapshot(root,manifestSha256,memo,deadline){
@@ -59,7 +53,7 @@ function revalidateVerifiedSnapshot(root,manifestSha256,memo,deadline){
 }
 export function verifyGitHookRuntimeSnapshot(options={}){
  const {snapshotRoot,manifestSha256}=options,deadline=options.deadline??Date.now()+DEFAULT_INSTALL_BUDGET_MS,root=resolve(snapshotRoot),key=root+'\n'+manifestSha256,memo=VERIFIED.get(key);
- if(memo&&revalidateVerifiedSnapshot(root,manifestSha256,memo,deadline))return {status:'verified',root,manifestSha256};
+ if(memo&&revalidateVerifiedSnapshot(root,manifestSha256,memo,deadline)){emitProgress(options.onProgress,'verify',memo.files.length,memo.files.length);return {status:'verified',root,manifestSha256};}
  VERIFIED.delete(key);const record={},result=verifyFullGitHookRuntimeSnapshot({...options,deadline,record});
  VERIFIED.set(key,record);if(VERIFIED.size>MAX_VERIFIED)VERIFIED.delete(VERIFIED.keys().next().value);return result;
 }
