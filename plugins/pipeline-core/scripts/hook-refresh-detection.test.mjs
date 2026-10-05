@@ -18,13 +18,13 @@
  *
  * Run: node --test plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs
  */
-import test from "node:test";
+import test, { after, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { inspectGitHookSourceSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import * as prePush from "./pre-push-hook-install.mjs";
@@ -40,15 +40,83 @@ const INSTALLERS = [
 
 const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
 
+// ---- isolation scaffolding -------------------------------------------------------------------------
+// Every directory this suite creates is registered the moment it exists, before anything is written
+// into it, and removed again unconditionally when the file's run ends (pass or fail).
+
+const temporaryDirectories = [];
+
+function makeTempDir(label) {
+  const dir = mkdtempSync(join(tmpdir(), `hook-refresh-${label}-`));
+  temporaryDirectories.push(dir);
+  return dir;
+}
+
+after(() => {
+  const leftovers = [];
+  for (const dir of temporaryDirectories) {
+    rmSync(dir, { recursive: true, force: true });
+    if (existsSync(dir)) leftovers.push(dir);
+  }
+  assert.deepEqual(leftovers, [], "every temporary directory this suite created must be removed again");
+});
+
+/** True when `candidate` is strictly below `base` (both resolved; case-insensitive on win32). */
+function isInside(base, candidate) {
+  const rel = relative(base, resolve(candidate));
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+/** Runs `run` with `overrides` applied to process.env and puts every touched variable back in `finally`. */
+function withProcessEnv(overrides, run) {
+  const previous = new Map(Object.keys(overrides).map((name) => [name, process.env[name]]));
+  try {
+    Object.assign(process.env, overrides);
+    return run();
+  } finally {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+/** The core.hooksPath git would honour for `cwd` under the CURRENT process environment ("" when none). */
+function visibleHooksPath(cwd) {
+  const result = spawnSync("git", ["config", "--get", "core.hooksPath"], { cwd, encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() : "";
+}
+
+const AMBIENT_GIT_VARIABLES = ["GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"];
+const isAmbientGitVariable = (name) => AMBIENT_GIT_VARIABLES.includes(name.toUpperCase());
+
+// The installers under test run their own `git rev-parse` with the inherited environment, so the
+// ambient repository variables are taken out of the process for the duration of every case and put
+// back afterwards, pass or fail (afterEach runs either way).
+let ambientBackup = [];
+beforeEach(() => {
+  ambientBackup = Object.entries(process.env).filter(([name]) => isAmbientGitVariable(name));
+  for (const [name] of ambientBackup) delete process.env[name];
+});
+afterEach(() => {
+  for (const [name, value] of ambientBackup) process.env[name] = value;
+  ambientBackup = [];
+});
+
+/** Every git call this suite makes itself starts without the ambient repository variables. */
+const cleanGitEnv = () => Object.fromEntries(Object.entries(process.env).filter(([name]) => !isAmbientGitVariable(name)));
+
 function git(cwd, ...args) {
-  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  const result = spawnSync("git", args, { cwd, encoding: "utf8", env: cleanGitEnv() });
   assert.equal(result.status, 0, result.stderr);
   return result.stdout.trim();
 }
 
 function freshRepo(prefix) {
-  const dir = mkdtempSync(join(tmpdir(), `hook-refresh-${prefix}-`));
+  const dir = makeTempDir(prefix);
   git(dir, "init", "-q", "-b", "main");
+  // Pin the hooks directory INSIDE the repository so no machine-level core.hooksPath can redirect a hook write.
+  git(dir, "config", "--local", "core.hooksPath", join(realpathSync.native(dir), ".git", "hooks").replaceAll("\\", "/"));
   return dir;
 }
 
@@ -56,13 +124,19 @@ function hookPaths(dir, name) {
   const commonDir = git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
   const hookPath = git(dir, "rev-parse", "--path-format=absolute", "--git-path", `hooks/${name}`);
   const state = join(commonDir, "agent-pipeline", `${name}-hook`);
-  return { commonDir, hookPath, state, implPath: join(state, "impl.mjs"), markerPath: join(state, "install-marker.json") };
+  const paths = { commonDir, hookPath, state, implPath: join(state, "impl.mjs"), markerPath: join(state, "install-marker.json") };
+  // Containment: no path a fixture may write to is ever handed out unless it lies inside the temporary repository.
+  const root = realpathSync.native(dir);
+  for (const [label, path] of Object.entries(paths)) {
+    assert.ok(isInside(root, path), `${name} ${label} resolves outside the temporary repository`);
+  }
+  return paths;
 }
 
 /** A tiny plugin tree: the minimum the snapshot inspection accepts (a public lib file that
  * proves scope, plus the shipped baseline). Different labels give different digests. */
 function fixturePluginLib(label) {
-  const root = mkdtempSync(join(tmpdir(), `hook-refresh-plugin-${label}-`));
+  const root = makeTempDir(`plugin-${label}`);
   const lib = join(root, "lib");
   mkdirSync(lib);
   writeFileSync(join(root, "protected-baseline.json"), "{}\n");
@@ -362,4 +436,75 @@ test("mixed repository: a stale pre-commit beside a foreign commit-msg is blocke
   const readiness = assessMandatoryHookReadiness({ checks });
   assert.equal(readiness.status, "blocked");
   assert.equal(readiness.code, "HOOK-READINESS-OWNER-OR-DECLINE");
+});
+
+// ---- isolation (Critic finding F1): a fixture write never leaves its own temporary repository -------
+
+const forwardSlashes = (path) => path.replaceAll("\\", "/");
+
+test("HRD-ISOLATION: hostile ambient git state never redirects a fixture hook write outside its temporary repository", () => {
+  // Everything a hostile run could be redirected to is a directory created right here. The machine's
+  // own git configuration is replaced in every scenario (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM), so
+  // even a failing run can only ever write into these decoys, never into a real hooks directory.
+  const decoyRoot = makeTempDir("decoy");
+  git(decoyRoot, "init", "-q", "-b", "main");
+  const decoyGitDir = join(realpathSync.native(decoyRoot), ".git");
+  mkdirSync(join(decoyGitDir, "hooks"), { recursive: true });
+  const machineHooks = join(decoyRoot, "machine-hooks");
+  mkdirSync(machineHooks);
+  const neutralConfig = join(decoyRoot, "neutral.gitconfig");
+  const hostileConfig = join(decoyRoot, "hostile.gitconfig");
+  writeFileSync(neutralConfig, "");
+  writeFileSync(hostileConfig, `[core]\n\thooksPath = ${forwardSlashes(machineHooks)}\n`);
+  const sameDirectory = (left, right) => left !== "" && relative(resolve(left), resolve(right)) === "";
+
+  const scenarios = [
+    {
+      name: "ambient repository variables",
+      slug: "ambient",
+      env: { GIT_DIR: decoyGitDir, GIT_COMMON_DIR: decoyGitDir, GIT_WORK_TREE: decoyRoot, GIT_INDEX_FILE: join(decoyGitDir, "index"), GIT_CONFIG_GLOBAL: neutralConfig },
+      guardedDir: join(decoyGitDir, "hooks"),
+      visible: null,
+    },
+    {
+      name: "machine-wide core.hooksPath",
+      slug: "machine",
+      env: { GIT_CONFIG_GLOBAL: hostileConfig },
+      guardedDir: machineHooks,
+      visible: machineHooks,
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    const guardedBefore = readdirSync(scenario.guardedDir).sort();
+    withProcessEnv({ GIT_CONFIG_NOSYSTEM: "1", ...scenario.env }, () => {
+      const seen = visibleHooksPath(decoyRoot);
+      if (scenario.visible === null) assert.equal(seen, "", `${scenario.name}: precondition - no hooks path may be visible to git`);
+      else assert.ok(sameDirectory(seen, scenario.visible), `${scenario.name}: precondition - the hostile hooks path must be the one git sees`);
+
+      const spec = INSTALLERS[0];
+      const dir = freshRepo(`isolation-${scenario.slug}`);
+      const paths = hookPaths(dir, spec.name);
+      installManaged(spec, dir, join(dir, "plugin-lib"));
+      const root = realpathSync.native(dir);
+      for (const path of [paths.commonDir, paths.hookPath, paths.state, paths.implPath, paths.markerPath]) {
+        assert.ok(isInside(root, path), `${scenario.name}: ${path} must stay inside the temporary repository`);
+      }
+      assert.deepEqual(readdirSync(scenario.guardedDir).sort(), guardedBefore, `${scenario.name}: nothing may be written to the redirect target`);
+    });
+  }
+
+  // An environment-level hooks path outranks the repository's own pin; the path helper must then
+  // refuse to hand out a location outside the repository rather than return it.
+  const guarded = freshRepo("isolation-guard");
+  withProcessEnv({
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: neutralConfig,
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "core.hooksPath",
+    GIT_CONFIG_VALUE_0: forwardSlashes(machineHooks),
+  }, () => {
+    assert.ok(sameDirectory(visibleHooksPath(guarded), machineHooks), "precondition: an environment-level hooks path outranks the local pin");
+    assert.throws(() => hookPaths(guarded, "pre-push"), /outside/);
+  });
 });
