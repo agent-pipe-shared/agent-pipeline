@@ -888,6 +888,71 @@ test("pushPrepareReport: HEAD unresolved + gates.security blocking -> security-e
 });
 
 // ---------------------------------------------------------------------------
+// PUSHSIG-S4c -- slim feature-checkpoint profile
+// ---------------------------------------------------------------------------
+
+const CHECKPOINT_ARGV = ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/feat/x"];
+const slimOptions = { profile: "feature-checkpoint", sourceRef: "refs/heads/feat/x" };
+const blockingSecurity = () => ({ gates: { security: { mode: "blocking" } } });
+
+test("PUSHSIG-S4c: slim profile omits both evidence ids and keeps every other check id", () => {
+  const deps = readyDeps({ loadManifestSafe: blockingSecurity });
+  const slim = pushPrepareReport(CHECKPOINT_ARGV, deps, slimOptions);
+  const full = pushPrepareReport(CHECKPOINT_ARGV, deps);
+  const slimIds = slim.report.checks.map((check) => check.id);
+  const fullIds = full.report.checks.map((check) => check.id);
+  assert.equal(slim.report.profile, "feature-checkpoint");
+  assert.equal(slim.report.ready, true);
+  assert.equal(slimIds.includes("verify-evidence"), false);
+  assert.equal(slimIds.includes("security-evidence"), false);
+  assert.deepEqual(slimIds, fullIds.filter((id) => id !== "verify-evidence" && id !== "security-evidence"));
+  assert.ok(slimIds.includes("working-tree-clean") && slimIds.includes("push-threat-model") && slimIds.includes("critical-human-proof-policy"));
+  // Value-less --checkpoint on argv selects the same profile.
+  const viaFlag = pushPrepareReport([...CHECKPOINT_ARGV, "--checkpoint"], deps);
+  assert.equal(viaFlag.report.profile, "feature-checkpoint");
+  assert.equal(viaFlag.report.checks.some((check) => check.id === "verify-evidence"), false);
+});
+
+test("PUSHSIG-S4c regression: default profile still has both evidence checks and an unchanged HEAD push line", () => {
+  const result = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ loadManifestSafe: blockingSecurity }));
+  const ids = result.report.checks.map((check) => check.id);
+  assert.ok(ids.includes("verify-evidence"));
+  assert.ok(ids.includes("security-evidence"));
+  assert.equal(result.report.profile, undefined);
+  assert.match(result.lines.gitPush, /git push origin HEAD:refs\/heads\/feat\/x/u);
+  assert.doesNotMatch(result.lines.gitPush, /-C/u);
+  // Stale Verify evidence still blocks the default profile.
+  const stale = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ readFile: (path) => (path.endsWith("verify-latest.json") ? JSON.stringify({ exitCode: 0, commit: "deadbeef" }) : readyDeps().readFile(path)) }));
+  assert.equal(stale.report.ready, false);
+});
+
+test("PUSHSIG-S4c: profile note and sourceRef push line appear only in the slim profile", () => {
+  const deps = readyDeps();
+  const slim = pushPrepareReport(CHECKPOINT_ARGV, deps, slimOptions);
+  const full = pushPrepareReport(CHECKPOINT_ARGV, deps);
+  assert.match(slim.lines.profileNote, /feature checkpoint: no Verify\/security\/Critic evidence/u);
+  assert.equal("profileNote" in full.lines, false);
+  assert.match(slim.lines.gitPush, /refs\/heads\/feat\/x:refs\/heads\/feat\/x/u);
+  assert.doesNotMatch(slim.lines.gitPush, /HEAD:refs/u);
+  let stderr = "";
+  printReport(slim, { write: () => {}, writeError: (text) => { stderr += text; } });
+  assert.match(stderr, /feature checkpoint: no Verify/u);
+  stderr = "";
+  printReport(full, { write: () => {}, writeError: (text) => { stderr += text; } });
+  assert.doesNotMatch(stderr, /feature checkpoint/u);
+});
+
+test("PUSHSIG-S4c: slim profile with unresolved HEAD -> failing head-commit check", () => {
+  const result = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ gitHead: () => null }), slimOptions);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.lines, null);
+  const head = result.report.checks.find((check) => check.id === "head-commit");
+  assert.equal(head.ok, false);
+  assert.match(head.message, /HEAD commit could not be determined/u);
+  assert.equal(result.report.checks.some((check) => check.id === "verify-evidence" || check.id === "security-evidence"), false);
+});
+
+// ---------------------------------------------------------------------------
 // D3 -- subjectSha256 equality against the real pipeline-state.mjs CLI
 // ---------------------------------------------------------------------------
 

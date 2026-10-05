@@ -61,8 +61,15 @@ export const PUSH_THREAT_MODEL_PATH = "project/push-threat-model.md";
 
 export function parseArgs(argv) {
   const values = {};
+  let checkpoint = false;
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
+    // `--checkpoint` is the one value-less flag (slim feature-checkpoint profile).
+    if (flag === "--checkpoint") {
+      checkpoint = true;
+      index -= 1;
+      continue;
+    }
     const value = argv[index + 1];
     if (typeof flag !== "string" || !flag.startsWith("--") || typeof value !== "string" || value.startsWith("--")) {
       return { error: USAGE };
@@ -72,7 +79,9 @@ export function parseArgs(argv) {
   if (typeof values.by !== "string" || values.by.trim() === "") return { error: `${USAGE}\n--by is required and must be non-empty.` };
   if (!REMOTE_RE.test(values.remote ?? "")) return { error: `${USAGE}\n--remote must be a safe remote name.` };
   if (!DESTINATION_RE.test(values.destination ?? "")) return { error: `${USAGE}\n--destination must be a full refs/heads/<branch> ref.` };
-  return { by: values.by, remote: values.remote, destination: values.destination };
+  const parsed = { by: values.by, remote: values.remote, destination: values.destination };
+  if (checkpoint) parsed.checkpoint = true;
+  return parsed;
 }
 
 function gitOutput(dir, args, deps) {
@@ -573,6 +582,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const parsed = parseArgs(argv);
   if (parsed.error) return { ok: false, error: parsed.error };
   const { by, remote, destination } = parsed;
+  const slim = (options.profile ?? (parsed.checkpoint ? "feature-checkpoint" : "default")) === "feature-checkpoint";
   const readHumanApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
   const humanApproval = readHumanApproval(dir, { legacyKind: "push" });
   const chatMode = humanApproval.mode === "chat";
@@ -603,7 +613,12 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   checks.push(checkWorkingTreeClean(dir, deps));
   const securityGateActive = isSecurityGateActive(dir, deps);
   const evidenceDir = resolveEvidenceProjectDir(dir, deps);
-  if (headCommit) {
+  if (slim) {
+    // feature-checkpoint profile: no Verify/security evidence is demanded.
+    if (!headCommit) {
+      checks.push({ id: "head-commit", ok: false, message: "HEAD commit could not be determined (git rev-parse HEAD failed).", remedy: "git rev-parse HEAD" });
+    }
+  } else if (headCommit) {
     checks.push(checkEvidenceFreshness("verify-evidence", VERIFY_EVIDENCE_DEFAULT_PATH, evidenceDir, headCommit, deps));
     if (securityGateActive) {
       checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", evidenceDir, headCommit, deps));
@@ -631,6 +646,15 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     checks: checks.map(({ directory, ...rest }) => rest),
     ready: checks.every((check) => check.ok),
   };
+  if (slim) report.profile = "feature-checkpoint";
+  // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
+  const sourceRef = slim
+    ? (options.sourceRef ?? gitOutput(dir, ["symbolic-ref", "-q", "HEAD"], deps) ?? "HEAD")
+    : "HEAD";
+  const profileNote = slim
+    ? "feature checkpoint: no Verify/security/Critic evidence is demanded or implied by this approval"
+    : null;
+  const withProfileNote = (lines) => (slim ? { ...lines, profileNote } : lines);
 
   if (!report.ready) return { ok: true, report, lines: null };
 
@@ -646,16 +670,16 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     const gitPushCommand = renderHumanCopySafeCommand({
       label: "agent push",
       executable: "git",
-      argv: ["push", remote, `HEAD:${destination}`],
+      argv: slim ? ["-C", dir, "push", remote, `${sourceRef}:${destination}`] : ["push", remote, `HEAD:${destination}`],
     });
     return {
       ok: true,
       report,
-      lines: {
+      lines: withProfileNote({
         authorize: [],
         approvePush: approveCommand.text.split("\n"),
         gitPush: gitPushCommand.text,
-      },
+      }),
     };
   }
 
@@ -713,14 +737,14 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const gitPushCommand = renderHumanCopySafeCommand({
     label: "agent push",
     executable: "git",
-    argv: ["push", remote, `HEAD:${destination}`],
+    argv: slim ? ["-C", dir, "push", remote, `${sourceRef}:${destination}`] : ["push", remote, `HEAD:${destination}`],
   });
 
   report.subjectSha256 = subjectSha256;
   return {
     ok: true,
     report,
-    lines: {
+    lines: withProfileNote({
       authorize: [
         "Human signature: authorizes only this prepared remote push.",
     "The configured approval directory is resolved automatically.",
@@ -729,7 +753,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
       ],
       approvePush: approveCommand.text.split("\n"),
       gitPush: gitPushCommand.text,
-    },
+    }),
   };
 }
 
@@ -741,6 +765,7 @@ export function printReport(result, io = {}) {
     writeError(`${result.lines.authorize.join("\n")}\n\n`);
     writeError(`${result.lines.approvePush.join("\n")}\n\n`);
     writeError(`${result.lines.gitPush}\n`);
+    if (result.lines.profileNote) writeError(`${result.lines.profileNote}\n`);
   }
 }
 
