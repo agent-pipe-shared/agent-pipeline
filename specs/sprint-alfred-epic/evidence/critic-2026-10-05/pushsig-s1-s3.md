@@ -36,6 +36,22 @@ this file is its durable record.
 - **Next Critic dispatch (scope only):** `f332d36aa` S1 test suite + the guardrail files above, plus the PUSHSIG-F12
   correction delta; base budget ≥ 32; supply suite-run artifact paths.
 
+## Review 3 — `f332d36aa` (S1 test suite) + `016417c9a` (PUSHSIG-F12 correction)
+
+- **Partial review; verdict withheld (inconclusive).** The budget hook enforces 24+1 working calls for the Critic
+  agent; the dispatch stated 32 (dispatcher error: the Critic base cap is `min(24, maxTurns − 15)`).
+- **Findings so far: none.** Cleared: S1 suite covers the §5 library list (CPM1-6, CPP1-12, CPA1-19 incl. SEC-01
+  CPA18); F1 fix reachability (exemption only when `sameRealDirectory`; different directory, realpath fault or
+  subdirectory `-C` stay strict); C14 premise against the real `approve-push` writer; tests additive only; C13a RED →
+  GREEN in the logs; no secrets, no new dependencies, trailers clean.
+- **Trajectory:** `016417c9a` consistent with `scratch/PUSHSIG-F12/{f1-red,green}.log` (41/2 → 43/0); `f332d36aa`
+  not verifiable (no artifact for "41 checks red before, green after"; the count matches).
+- **Open candidates, not reached:** whether C13c separates realpath from string equality (depends on
+  `parsePushBinding` normalisation, `guard-push.mjs` ~381-556); whether C14's in-process `approve-push` is isolated from
+  `CLAUDE_PROJECT_DIR` and the real home (`pipeline-state.mjs` `run()`).
+- **Not reached:** `guardrails/git.md`, `guardrails/security.md`, `docs/push-release-flow.md`, `CLAUDE.md` hard rules,
+  ADR-0063. Follow-up Critic dispatched with exactly that scope.
+
 ## Process observations
 
 - Both Critics spent budget on guard refusals (Glob `GUARD-READ-TARGET`, `rg` spellings). Critic notes are not
