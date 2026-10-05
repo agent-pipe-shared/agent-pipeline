@@ -15,8 +15,8 @@ import {
   validateVerifySuiteReceipt,
 } from "../lib/verify-resume.mjs";
 import { parseVerifyCaseCompletion, validateVerifyCaseCompletionPolicy } from "../lib/verify-case-completion-receipt.mjs";
-import { bindEphemeralPrivateCleanup, readOnboardingSessionCleanupBinding, releaseOnboardingSessionCleanup } from "../lib/onboarding-continuity.mjs";
-import { cleanupSession, finalizeTemporaryResource, inspectSessionClosure, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, releaseCompletedVerifyRunSession, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import { readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
+import { finalizeTemporaryResource, loadSessionDescriptor, registerTemporaryIntent } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { registerVerifyRunRecord, settleVerifyRunRecord, sweepStaleVerifyRunRecords } from "../lib/verify-run-record.mjs";
 
@@ -299,57 +299,6 @@ function closeRunLock(run, runId, clock) {
   run.lockClosed = true;
   const closed = Buffer.from(`${JSON.stringify(verifyRunLock(runId, "closed", clock))}\n`);
   try { ftruncateSync(run.lockFd, 0); writeSync(run.lockFd, closed, 0, closed.length, 0); fsyncSync(run.lockFd); } finally { closeSync(run.lockFd); }
-}
-
-// ALFRED-RF1: retire EXACTLY the descriptor and private binding this invocation created -- matched
-// by the descriptor id + digest + owner nonce and the binding tuple it captured at creation, and
-// refused (never "repaired") when anything else moved. It drains only the unsealed run directory
-// registered for THIS run (a run that already wrote terminal.json/interruption.json is evidence
-// the terminal path retains, so it is refused here, never deleted).
-function retireInvocationOwner({ repoRoot, runPath, descriptor, owner }) {
-  const binding = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
-  if (binding.status !== "bound" || binding.stateSha256 !== owner.stateSha256
-    || binding.revision !== owner.revision
-    || digestJson(binding.sessionCleanup) !== digestJson(owner.sessionCleanup)) {
-    throw new Error("captured cleanup binding changed");
-  }
-  const active = listActiveSessionDescriptors(repoRoot);
-  if (active.length !== 1 || active[0].sessionId !== descriptor.sessionId
-    || active[0].descriptorSha256 !== descriptor.descriptorSha256) {
-    throw new Error("active descriptor inventory changed");
-  }
-  const exactDescriptor = loadSessionDescriptor(repoRoot, descriptor.sessionId, {
-    expectedDescriptorSha256: descriptor.descriptorSha256,
-  });
-  if (exactDescriptor.ownerNonce !== descriptor.ownerNonce) throw new Error("descriptor owner changed");
-  if (pathPresent(join(runPath, "terminal.json")) || pathPresent(join(runPath, "interruption.json"))) {
-    throw new Error("sealed run evidence is retained by the terminal path and is never deleted here");
-  }
-  const drained = cleanupSession(repoRoot, { sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce }, { allowAbsent: true });
-  if (drained.ok !== true || drained.receipt?.status !== "complete") throw new Error("owner resources could not be drained");
-  retireSessionDescriptor(repoRoot, {
-    sessionId: descriptor.sessionId,
-    ownerNonce: descriptor.ownerNonce,
-    descriptorSha256: descriptor.descriptorSha256,
-  });
-  const closure = inspectSessionClosure(repoRoot, descriptor.sessionId, {
-    expectedDescriptorSha256: descriptor.descriptorSha256,
-  });
-  if (closure.status !== "closed" || closure.receiptSha256 !== sha(readFileSync(drained.receiptPath))) {
-    throw new Error("canonical descriptor closure readback failed");
-  }
-  const released = releaseOnboardingSessionCleanup({
-    rootDir: repoRoot,
-    expectedStateSha256: owner.stateSha256,
-    expectedRevision: owner.revision,
-    sessionCleanup: owner.sessionCleanup,
-  });
-  const after = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
-  if (released.status !== "released" || released.sessionCleanup !== null
-    || after.sessionCleanup !== null || after.stateSha256 !== owner.stateSha256
-    || after.revision !== owner.revision || listActiveSessionDescriptors(repoRoot).length !== 0) {
-    throw new Error("private cleanup binding readback failed");
-  }
 }
 
 const OWNER_EXIT_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"].filter((name) => name in osConstants.signals);
@@ -1238,69 +1187,6 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
   }
 }
 
-function finalizeAndReleaseInvocationOwner({ repoRoot, runId, cleanupRegistration, automaticRegistration, canaryRelative = "terminal.json" }) {
-  const { descriptor, owner } = automaticRegistration;
-  const binding = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
-  if (binding.status !== "bound" || binding.stateSha256 !== owner.stateSha256
-    || binding.revision !== owner.revision
-    || digestJson(binding.sessionCleanup) !== digestJson(owner.sessionCleanup)) {
-    throw new Error("captured cleanup binding changed");
-  }
-  const active = listActiveSessionDescriptors(repoRoot);
-  if (active.length !== 1 || active[0].sessionId !== descriptor.sessionId
-    || active[0].descriptorSha256 !== descriptor.descriptorSha256) {
-    throw new Error("active descriptor inventory changed");
-  }
-  const exactDescriptor = loadSessionDescriptor(repoRoot, descriptor.sessionId, {
-    expectedDescriptorSha256: descriptor.descriptorSha256,
-  });
-  if (exactDescriptor.ownerNonce !== descriptor.ownerNonce) throw new Error("descriptor owner changed");
-
-  finalizeTemporaryResource(repoRoot, {
-    sessionId: descriptor.sessionId,
-    ownerNonce: descriptor.ownerNonce,
-    resourceId: cleanupRegistration.resourceId,
-    canaryRelative,
-  });
-  const retained = releaseCompletedVerifyRunSession(repoRoot, {
-    sessionId: descriptor.sessionId,
-    ownerNonce: descriptor.ownerNonce,
-  });
-  const receipt = retained?.receipt;
-  if (retained?.ok !== true || receipt?.status !== "complete"
-    || receipt?.sessionSha256 !== sha(Buffer.from(descriptor.sessionId))
-    || receipt?.counts?.registered !== 1 || receipt?.counts?.retained !== 1
-    || receipt?.counts?.removed !== 0 || receipt?.counts?.blocked !== 0
-    || receipt?.outcomes?.length !== 1
-    || receipt.outcomes[0].resourceId !== cleanupRegistration.resourceId
-    || receipt.outcomes[0].type !== "verify-run-directory"
-    || receipt.outcomes[0].status !== "retained") {
-    throw new Error("canonical Verify retention receipt did not prove one retained resource");
-  }
-  retireSessionDescriptor(repoRoot, {
-    sessionId: descriptor.sessionId,
-    ownerNonce: descriptor.ownerNonce,
-    descriptorSha256: descriptor.descriptorSha256,
-  });
-  const closure = inspectSessionClosure(repoRoot, descriptor.sessionId, {
-    expectedDescriptorSha256: descriptor.descriptorSha256,
-  });
-  if (closure.status !== "closed" || closure.receiptSha256 !== sha(readFileSync(retained.receiptPath))) {
-    throw new Error("canonical descriptor closure readback failed");
-  }
-  const released = releaseOnboardingSessionCleanup({
-    rootDir: repoRoot,
-    expectedStateSha256: owner.stateSha256,
-    expectedRevision: owner.revision,
-    sessionCleanup: owner.sessionCleanup,
-  });
-  const after = readOnboardingSessionCleanupBinding({ rootDir: repoRoot });
-  if (released.status !== "released" || released.sessionCleanup !== null
-    || after.sessionCleanup !== null || after.stateSha256 !== owner.stateSha256
-    || after.revision !== owner.revision || listActiveSessionDescriptors(repoRoot).length !== 0) {
-    throw new Error("private cleanup binding readback failed");
-  }
-}
 export function deriveVerifyExecutionMetrics({ steps, startedAt, completedAt, concurrency, serialLaneSuites, exclusiveSuites }) {
   if (!Array.isArray(steps)) throw new Error("VERIFY-EXECUTION-METRICS: steps must be an array");
   if (!Number.isSafeInteger(concurrency) || concurrency < 0) {

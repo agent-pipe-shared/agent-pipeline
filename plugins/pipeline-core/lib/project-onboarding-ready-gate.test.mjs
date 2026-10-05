@@ -930,6 +930,10 @@ test("validForeignCleanupResidueWarning accepts exactly the closed foreign-resid
     const good = foreignResidueWarning(rootDir, ["foreign-a", "foreign-b"]);
     assert.equal(validForeignCleanupResidueWarning(good, rootDir), true);
     assert.equal(validForeignCleanupResidueWarning(foreignResidueWarning(rootDir), rootDir), true);
+    const withoutArchiveActions = structuredClone(good);
+    withoutArchiveActions.archiveActions = [];
+    assert.equal(validForeignCleanupResidueWarning(withoutArchiveActions, rootDir), true,
+      "PO decision 2026-10-05: a foreign descriptor with no zero-authority archive action yields an empty list that is admitted");
 
     const elsewhere = join(tmpdir(), "foreign-plugin", "scripts", "session-cleanup.mjs");
     const tampers = {
@@ -938,7 +942,10 @@ test("validForeignCleanupResidueWarning accepts exactly the closed foreign-resid
       "missing key": (w) => { delete w.guidance; },
       "wrong code": (w) => { w.code = "cleanup_recovery_required"; },
       "wrong path": (w) => { w.path = "$.runtime"; },
-      "empty archiveActions": (w) => { w.archiveActions = []; },
+      // ALFRED-RDY2-20261005: "empty archiveActions" is no longer a tamper. It encoded the superseded
+      // first-cut rule; under the PO decision "Readiness root fix" (2026-10-05) an authority-bearing or
+      // observable-owner foreign descriptor has no zero-authority archive action, so the list may be empty.
+      // The positive admission of an empty list is asserted explicitly below.
       "archiveActions not an array": (w) => { w.archiveActions = w.archiveActions[0]; },
       "flipped mutation on the read-only plan action": (w) => { w.nextAction.mutation = true; },
       "flipped mutation on an archive action": (w) => { w.archiveActions[1].mutation = false; },
