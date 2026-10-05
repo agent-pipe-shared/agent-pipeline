@@ -1731,6 +1731,42 @@ export function foreignDescriptorResidueWarning({ root, deps = {} }) {
   }
 }
 
+// FLAP2 (readiness flap): listing the active session descriptors reads each one by name, so a
+// concurrent session creating or retiring its own descriptor makes the read throw a transient
+// typed/filesystem error for a moment (measured: malformed JSON mid-write, not-a-private-regular-
+// file mid-rename, descriptor gone between readdir and load). The observation is therefore
+// retried a bounded number of times -- 3 attempts, sleeping 50 ms then 100 ms -- before it is
+// given up as unobservable. Only these codes are retried; any other error, and exhaustion, still
+// reach the fail-closed catch below, so a persistently corrupt or unreadable descriptor blocks
+// exactly as before and a failed observation is never read as authority.
+const CLEANUP_RECOVERY_OBSERVATION_BACKOFF_MS = Object.freeze([50, 100]);
+const CLEANUP_RECOVERY_TRANSIENT_CODES = new Set([
+  "WT-SESSION-DESCRIPTOR",
+  "WT-SESSION-MISSING",
+  "EBUSY",
+  "EPERM",
+  "EACCES",
+  "ENOENT",
+  "EAGAIN",
+]);
+
+function sleepSyncDefault(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function observeCleanupRecoveryBounded(observe, deps) {
+  const sleepSync = deps.sleepSync ?? sleepSyncDefault;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return observe();
+    } catch (error) {
+      if (attempt >= CLEANUP_RECOVERY_OBSERVATION_BACKOFF_MS.length
+        || !CLEANUP_RECOVERY_TRANSIENT_CODES.has(error?.code)) throw error;
+      sleepSync(CLEANUP_RECOVERY_OBSERVATION_BACKOFF_MS[attempt]);
+    }
+  }
+}
+
 function partialCleanupRecoveryResult(args) {
   const result = partialCleanupRecoveryResultCore(args);
   const { root, intent, observation = null, deps = {} } = args;
@@ -1746,7 +1782,10 @@ function partialCleanupRecoveryResult(args) {
   return null;
 }
 
-function partialCleanupRecoveryResultCore({
+// Exported only as the unit-test seam of the bounded cleanup-recovery re-observation (injected
+// plan/apply/sleep deps, no onboarding fixture); production callers go through
+// partialCleanupRecoveryResult above.
+export function partialCleanupRecoveryResultCore({
   root,
   runner,
   intent,
@@ -1760,10 +1799,10 @@ function partialCleanupRecoveryResultCore({
   try {
     const planCleanupRecovery = deps.planSessionCleanupRecovery
       ?? planSessionCleanupRecovery;
-    const recovery = planCleanupRecovery({
+    const recovery = observeCleanupRecoveryBounded(() => planCleanupRecovery({
       rootDir: root,
       scriptPath: SESSION_CLEANUP_SCRIPT,
-    });
+    }), deps);
     // Per the PO's explicit 2026-08-18 decision (backlog item
     // pipeline.self-healing-local-cleanup-recovery), a "ready" typed recovery
     // plan is auto-applied here rather than surfaced as a PO selection
@@ -1866,7 +1905,7 @@ function partialCleanupRecoveryResultCore({
         )],
       });
     }
-  } catch {
+  } catch (error) {
     if (strict) {
       return lifecycleResult({
         status: "partial",
@@ -1879,7 +1918,7 @@ function partialCleanupRecoveryResultCore({
         diagnostics: [lifecycleDiagnostic(
           "$.authority.sessionCleanup",
           "cleanup_recovery_observation_unavailable",
-          "cleanup recovery authority could not be observed safely",
+          `cleanup recovery authority could not be observed safely (cause: ${error?.code ?? error?.cause?.code ?? error?.name ?? "unknown"})`,
           "repair private cleanup-state read access before retrying",
         )],
       });
