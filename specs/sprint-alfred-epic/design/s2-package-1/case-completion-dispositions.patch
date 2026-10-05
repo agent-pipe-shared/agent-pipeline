@@ -1,0 +1,72 @@
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -175,6 +175,11 @@
+       "path": "plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "clone-hook-readiness-rollback-tests",
++      "path": "plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "clone-hook-readiness-tests",
+       "path": "plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs",
+@@ -541,6 +546,16 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "fanout-governor-tests",
++      "path": "plugins/pipeline-core/lib/fanout-governor.test.mjs",
++      "disposition": "required"
++    },
++    {
++      "name": "fanout-ledger-tests",
++      "path": "plugins/pipeline-core/lib/fanout-ledger.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "feature-close-audit-receipt-tests",
+       "path": "plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs",
+@@ -1376,6 +1391,11 @@
+       "path": "plugins/pipeline-core/lib/runtime-handover-projection.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "runtime-handover-projection-win-path-tests",
++      "path": "plugins/pipeline-core/lib/runtime-handover-projection.win-path.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "runtime-handover-writer-tests",
+       "path": "plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs",
+@@ -1481,6 +1501,16 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "slice-queue-cli-tests",
++      "path": "plugins/pipeline-core/scripts/slice-queue.test.mjs",
++      "disposition": "required"
++    },
++    {
++      "name": "slice-queue-tests",
++      "path": "plugins/pipeline-core/lib/slice-queue.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "source-observation-tests",
+       "path": "plugins/pipeline-core/lib/source-observation.test.mjs",
+@@ -1522,6 +1552,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "stop-fanout-tests",
++      "path": "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "threat-model-approval-request-tests",
+       "path": "plugins/pipeline-core/lib/threat-model-approval-request.test.mjs",

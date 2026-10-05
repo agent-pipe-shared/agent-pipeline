@@ -7,7 +7,7 @@
 @@ -309,2 +310,10 @@ const TEST_SUITES = [
    { name: "checkpoint-push-audit-tests", file: join(libDir, "checkpoint-push-audit.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CPA001"], maxBytes: 65_536 } },
 +  { name: "checkpoint-push-approval-tests", file: join(libDir, "checkpoint-push-approval.test.mjs") },
-+  { name: "fanout-ledger-tests", file: join(libDir, "fanout-ledger.test.mjs") },
++  { name: "fanout-ledger-tests", file: join(libDir, "fanout-ledger.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `FL${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 +  { name: "fanout-governor-tests", file: join(libDir, "fanout-governor.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 33 }, (_, index) => `FG${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 +  { name: "slice-queue-tests", file: join(libDir, "slice-queue.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 34 }, (_, index) => `SQ${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 +  { name: "slice-queue-cli-tests", file: join(pluginScriptsDir, "slice-queue.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 14 }, (_, index) => `SC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -21,7 +21,7 @@
    { name: "setup-check-tests", file: join(hooksDir, "setup-check.test.mjs") },
 @@ -321,2 +331,3 @@ const TEST_SUITES = [
    { name: "runtime-projection-v3-tests", file: join(libDir, "runtime-projection-v3.test.mjs") },
-+  { name: "runtime-handover-projection-win-path-tests", file: join(libDir, "runtime-handover-projection.win-path.test.mjs") },
++  { name: "runtime-handover-projection-win-path-tests", file: join(libDir, "runtime-handover-projection.win-path.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["RHPW001", "RHPW002"], maxBytes: 65_536 } },
    { name: "runner-profile-migration-v3-tests", file: join(libDir, "runner-profile-migration-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 56 }, (_, index) => `RPM${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 @@ -331,2 +342,3 @@ const TEST_SUITES = [
    { name: "project-onboarding-e2e-tests", file: join(pluginScriptsDir, "project-onboarding-e2e.test.mjs") },
