@@ -457,6 +457,7 @@
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.managed-onboarding-success-contract | deferred | workflow-improvement | pipeline | — | 2026-07-25 | — | — |
+| pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.manifest-language-repair-demands-a-full-process-restart | closed | defect | pipeline | nova-b | 2026-08-29 | — | Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -835,7 +836,7 @@
 
 ## Counts
 
-- open: 170
+- open: 171
 - in_progress: 0
 - closed: 643
 - rejected: 3

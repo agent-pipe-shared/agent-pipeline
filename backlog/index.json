@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0070cb5917045bd807ebef077a48fa5d232c8eeac5f88f1d6f1da5e86a50352a"
+    "transitionHead": "6567407715c7bf1a449ddc7348494b074988b5d046b1bcbde26d72ffdbf89dea"
   },
   "counts": {
-    "open": 170,
+    "open": 171,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -5855,6 +5855,16 @@
       "created": "2026-07-25",
       "source": "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix",
       "deferred": true
+    },
+    {
+      "id": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "HOOKREFRESH S5 Critic, finding F3 (specs/sprint-alfred-epic/evidence/critic-2026-10-05/hookrefresh-s1-s5.md).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet",
