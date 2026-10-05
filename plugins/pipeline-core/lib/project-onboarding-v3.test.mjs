@@ -1327,22 +1327,43 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(foreignTwo.diagnostics[0].code, "cleanup_residue_foreign");
     assert.equal(foreignTwo.diagnostics[0].archiveActions.length, 2);
 
-    // Authority-bearing, the requester's own, and a mixed set all keep blocking,
-    // exactly like a single retained residue always did.
+    // ALFRED-RDY2-20261005 -- ADAPTED (superseded rule). This block used to assert that an authority-bearing
+    // foreign descriptor, and a mixed set containing one, keep blocking ("descriptors with resources keep
+    // blocking", first cut RF2B). The PO decision "Readiness root fix" (2026-10-05) supersedes that: a FOREIGN
+    // descriptor -- authority-bearing or not, alone or mixed -- only warns. What still blocks is the requester's
+    // OWN descriptor (alone or mixed with foreign ones) and any state that cannot be observed. Ownership is
+    // decided by classifyActiveSessionDescriptors, so the cases below inject its verdict through the same dep
+    // the production path uses.
     const withResources = { sessionId: "has-resources", descriptorSha256: "c".repeat(64), code: "WT-ORPHAN-ARCHIVE-AUTHORITY" };
     const ownSession = { sessionId: "own", descriptorSha256: "d".repeat(64), code: "WT-ORPHAN-ARCHIVE-OWN-SESSION" };
-    for (const offer of [
-      offerOf([], [withResources]),
-      offerOf([], [ownSession]),
-      offerOf([orphanCandidate("foreign-1", "a")], [withResources]),
-      { ...offerOf([orphanCandidate("foreign-1", "a")]), observationCode: "WT-SESSION-OBSERVATION" },
+    const descriptorOf = (sessionId, digitChar) => ({ sessionId, descriptorSha256: digitChar.repeat(64) });
+    const sessionInspectClassified = (offer, classify) => inspectProjectOnboardingV3({
+      runner: "codex", rootDir: path, intent: "session",
+      deps: { ...retainedBindingDeps(offer), classifyActiveSessionDescriptors: classify },
+    });
+    for (const [offer, foreign] of [
+      [offerOf([], [withResources]), [descriptorOf("has-resources", "c")]],
+      [offerOf([orphanCandidate("foreign-1", "a")], [withResources]), [descriptorOf("foreign-1", "a"), descriptorOf("has-resources", "c")]],
     ]) {
-      const blocked = sessionInspect(offer);
+      const warned = sessionInspectClassified(offer, () => ({ own: [], foreign }));
+      assert.equal(warned.status, "ready");
+      assert.equal(warned.diagnostics.length, 1);
+      assert.equal(warned.diagnostics[0].code, "cleanup_residue_foreign");
+      assert.equal(warned.diagnostics[0].severity, "warning");
+    }
+    for (const [offer, classify] of [
+      [offerOf([], [ownSession]), () => ({ own: [descriptorOf("own", "d")], foreign: [] })],
+      [offerOf([orphanCandidate("foreign-1", "a")], [ownSession]),
+        () => ({ own: [descriptorOf("own", "d")], foreign: [descriptorOf("foreign-1", "a")] })],
+      [{ ...offerOf([orphanCandidate("foreign-1", "a")]), observationCode: "WT-SESSION-OBSERVATION" },
+        () => { throw new Error("descriptor inventory unobservable"); }],
+    ]) {
+      const blocked = sessionInspectClassified(offer, classify);
       assert.equal(blocked.status, "partial");
       assert.deepEqual(blocked.nextAction, humanRecoveryAction);
       assertDiagnostic(blocked, "cleanup_recovery_required");
     }
-    assert.equal(activeSessionAppServerCalls, 2);
+    assert.equal(activeSessionAppServerCalls, 4);
 
     const unavailable = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
