@@ -361,6 +361,108 @@ for (const [cmd, why] of PUSHCLASS_NEGATIVE_TABLE) {
   );
 }
 
+// ---- commandIsGitPush: the `git` word only counts where an executable can stand (GPGL-2) ---
+// Fail-closed check #2 used to read the `git` inside `--no-git` (and `.git`, `=git`, `xgit`)
+// as an executable followed by an unknown option, and routed `gitleaks detect --no-git
+// --redact` to the push gate. The boundary rule: the `git` word counts at the start of the
+// command or after whitespace, a shell operator (`;` `&` `|` `(` backtick, `$(`), a quote,
+// or a path separator (`/` `\`) -- never after `-`, `=`, `.` or a word character.
+const GPGL2_NOT_AN_EXECUTABLE_TABLE = [
+  ["gitleaks detect --no-git --redact", "the observed trigger: `git` inside --no-git is an option, not an executable"],
+  ["tool --no-git -v --source .", "--no-git followed by a verbose flag and a source path"],
+  ["tool --git-dir=x --redact", "--git-dir=x is an option of another tool, not a git invocation"],
+  ["tool --exclude=git --flag", "a `git` after `=` is a value, not an executable"],
+  ["echo origin.git --flag", "a `git` after `.` is a name suffix, not an executable"],
+  ["xgit push origin main", "a `git` after a word character is part of a longer word"],
+  ["xgit --unknown-opt status", "a longer word ending in git followed by an option is not git"],
+];
+for (const [cmd, why] of GPGL2_NOT_AN_EXECUTABLE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL2-NOT-GIT ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
+}
+
+const GPGL2_EXECUTABLE_POSITION_TABLE = [
+  ["/usr/bin/git push origin main", "an absolute POSIX path ending in git"],
+  ["C:\\Git\\bin\\git.exe push origin main", "a Windows path ending in git.exe"],
+  ['"git" push origin main', "a quoted executable name"],
+  ["a;git push origin main", "after a `;` operator"],
+  ["$(git push origin main)", "inside a command substitution"],
+  ["/usr/bin/git --unknown-opt status", "check #2 after a POSIX path separator (unknown option, no push word)"],
+  ["C:\\Git\\bin\\git.exe --unknown-opt status", "check #2 after a Windows path separator and git.exe"],
+  ["a;git --unknown-opt status", "check #2 after `;`"],
+  ["a&&git --unknown-opt status", "check #2 after `&&`"],
+  ["a|git --unknown-opt status", "check #2 after `|`"],
+  ["$(git --unknown-opt status)", "check #2 inside `$(`"],
+  ["(git --unknown-opt status)", "check #2 inside a subshell parenthesis"],
+  ["echo `git --unknown-opt status`", "check #2 inside a backtick substitution"],
+  ["a git --unknown-opt status", "check #2 after whitespace"],
+  ["git --unknown-opt status", "check #2 at the start of the command"],
+  ["FOO=bar git --unknown-opt status", "check #2 after a leading NAME=value assignment"],
+  // fail-closed: literal git word stays refused (GPGL-2)
+  ["gitleaks git --redact", "fail-closed: a whitespace-separated literal git argument is indistinguishable from the executable"],
+  ['gitleaks git --redact --log-opts "origin/main..HEAD --not push"', "fail-closed: the same literal git word with a quoted argument"],
+];
+for (const [cmd, why] of GPGL2_EXECUTABLE_POSITION_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL2-GIT-WORD ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
+// ---- commandIsGitPush: backslash-escaped quotes and quoted executable names fail closed (GPGL-3) ---
+// In a POSIX shell a backslash-escaped quote is a literal character, so text between two of
+// them is EXECUTED, while `stripQuotedSegments` / `tokenizeArgv` read the pair as a quoted span
+// and blank it: a real push placed there was classified "not a push" (fail-open; defect item
+// pipeline.push-classifier-misreads-backslash-escaped-quotes). The rule: a backslash-escaped
+// quote outside a plain single-quoted span AND a `git` word at an executable boundary anywhere
+// in the raw command AND the word `push` as a separate token anywhere in the raw text (GPGL-4)
+// classifies as a push. Second shape: a quoted executable name (`"git"`)
+// hides from the whole-string branch, so a quoted git word followed later by a push word
+// classifies as a push whatever sits between them.
+const GPGL3_FAIL_CLOSED_TABLE = [
+  [String.raw`echo \'; git push origin main; echo \'`, "the minimal shape: escaped single quotes fake a quoted span around a real push"],
+  [String.raw`gitleaks detect --no-git --x \'; git push origin HEAD:refs/heads/feat/x; echo \'`, "the GL-B13 shape: the same fake span behind a gitleaks call"],
+  [String.raw`echo \"; git push; echo \"`, "escaped double quotes fake the span just the same"],
+  [String.raw`echo "a \" b" ; git push origin main ; echo "c \" d"`, "an escaped quote INSIDE a double-quoted span desynchronises the quote stripper the same way"],
+  [String.raw`echo $'it\'s' ; git push origin main ; echo $'a\'b'`, "an escaped quote inside an ANSI-C $'...' string (the quote count stays even, so the unterminated-quote check cannot catch it)"],
+  // GPGL-4: the push word keeps check #3 closed regardless of case or spacing around it.
+  [String.raw`echo \'; git  PUSH origin main; echo \'`, "uppercase push word and a double space still classify as a push"],
+  ['"git" --unknown-opt push origin main', "quoted executable name, unknown option, then push"],
+  ["'git' -c core.sshCommand=x push origin main", "single-quoted executable name, a recognised -c option, then push"],
+  ['"/usr/bin/git" -c a=b push origin main', "quoted POSIX path ending in git, then push"],
+  [String.raw`"C:\Git Tools\cmd\git.exe" -c a=b push origin main`,"quoted Windows path ending in git.exe, then push"],
+  ['"GIT.EXE" --unknown-opt push origin main', "the quoted executable name is matched case-insensitively"],
+  ['echo x;"git" -c a=b push origin main', "quoted executable name glued to a preceding shell operator"],
+  ['"git" -c a=b "push" origin main', "the push word itself quoted"],
+];
+for (const [cmd, why] of GPGL3_FAIL_CLOSED_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL3-FAIL-CLOSED ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
+const GPGL3_NEGATIVE_TABLE = [
+  [String.raw`echo \'hello\'`, "escaped quotes with no git word anywhere"],
+  ["gitleaks detect --no-git --redact", "no git executable (GPGL-2 stays closed)"],
+  ["git log --format='%s'", "a single-quoted argument with no escape is not a push"],
+  ["git status", "a plain read command"],
+  [String.raw`echo \"hello\" gitleaks detect --no-banner`, "escaped quotes plus a word that merely STARTS with git: no executable boundary"],
+  [String.raw`git log --grep='a\'`, "a backslash inside a plain single-quoted span is literal, not an escape"],
+  ['"git" status', "a quoted executable name with no push word"],
+  ['"git" -c a=b status', "a quoted executable name, a recognised option, no push word"],
+  ['"git" commit -m "push later"', "a push word that only occurs inside one quoted message token"],
+  [String.raw`"C:\Git Tools\cmd\git.exe" log --oneline`,"a quoted Windows path ending in git.exe, no push word"],
+  // GPGL-4: no push word, escaped quote alone is not a push
+  [String.raw`git commit -m "say \"hi\""`, "an escaped quote in a double-quoted commit message, no push word"],
+  // GPGL-4: no push word, escaped quote alone is not a push
+  [String.raw`git log --grep "a \"b\""`, "an escaped quote in a double-quoted grep pattern, no push word"],
+  // GPGL-4: no push word, escaped quote alone is not a push
+  [String.raw`git tag -m "x \"y\""`, "an escaped quote in a double-quoted tag message, no push word"],
+  // GPGL-4: no push word, escaped quote alone is not a push
+  [String.raw`git log -- "C:\repo\"`, "a Windows path ending in a backslash before the closing quote, no push word"],
+];
+for (const [cmd, why] of GPGL3_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL3-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);

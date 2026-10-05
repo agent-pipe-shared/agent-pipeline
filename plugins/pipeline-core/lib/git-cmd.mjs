@@ -253,6 +253,96 @@ function hasUnterminatedQuote(cmd) {
 }
 
 /**
+ * hasEscapedQuoteOutsideSingleQuotes(cmd) -- true when `cmd` contains a backslash-escaped
+ * quote (`\'` or `\"`) anywhere except inside a plain single-quoted span (GPGL-3).
+ *
+ * In a POSIX shell an escaped quote is a literal character, never a delimiter, so the text
+ * between two of them is EXECUTED. `stripQuotedSegments` and `tokenizeArgv` do not know
+ * that: they read the pair as a quoted span and blank or merge it, which hides a real push
+ * placed there (`echo \'; git push origin main; echo \'`). The same desynchronisation
+ * happens with an escaped quote INSIDE a double-quoted span and inside an ANSI-C `$'...'`
+ * string, where `\'` is an escape too -- so only a plain `'...'` span, where a backslash
+ * is a literal character, is exempt. Backslash handling mirrors the shell: outside a plain
+ * single-quoted span a backslash consumes the next character.
+ */
+function hasEscapedQuoteOutsideSingleQuotes(cmd) {
+  let inSingle = false;
+  let inAnsiC = false;
+  let inDouble = false;
+  for (let i = 0; i < cmd.length; i += 1) {
+    const ch = cmd[i];
+    if (inSingle) {
+      if (ch === "'") inSingle = false;
+      continue;
+    }
+    if (ch === "\\") {
+      const next = cmd[i + 1];
+      if (next === "'" || next === '"') return true;
+      i += 1;
+      continue;
+    }
+    if (inAnsiC) {
+      if (ch === "'") inAnsiC = false;
+      continue;
+    }
+    if (inDouble) {
+      if (ch === '"') inDouble = false;
+      continue;
+    }
+    if (ch === "$" && cmd[i + 1] === "'") {
+      inAnsiC = true;
+      i += 1;
+    } else if (ch === "'") inSingle = true;
+    else if (ch === '"') inDouble = true;
+  }
+  return false;
+}
+
+// A `git`/`git.exe` word at a position an executable can occupy (see the boundary rule of
+// GIT_EXECUTABLE_THEN_OPTION_RE below), without requiring a following option.
+const GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b/iu;
+
+// The word `push` as a separate token anywhere in the raw text (GPGL-4): a word boundary on both
+// sides, case-insensitive. Check #3 only matters for a command that can carry a push at all, so an
+// escaped quote alone, with no push word to hide, is not a reason to route a command to the push gate.
+const PUSH_WORD_ANYWHERE_RE = /\bpush\b/iu;
+
+// A quoted executable name: a quote, an optional path ending in a separator, `git`/`git.exe`,
+// then a quote (`"git"`, `'git.exe'`, `"/usr/bin/git"`, `"C:\Git Tools\cmd\git.exe"`).
+const QUOTED_GIT_WORD_RE = /["'](?:[^"']*[/\\])?git(?:\.exe)?["']/iu;
+// A tokenizeArgv token that IS a git executable: the whole token, or its tail after a path
+// separator or a shell operator that was glued to it (`x;"git"` unwraps to `x;git`).
+const GIT_EXECUTABLE_TOKEN_RE = /(?:^|[;&|(`/\\])git(?:\.exe)?$/iu;
+// A tokenizeArgv token that IS the push word, allowing shell operators glued to it
+// (`push;`, `&&push`) but not a longer word (`push.txt`, `--no-push`) or a message token.
+const PUSH_WORD_TOKEN_RE = /(?:^|[;&|(`])push(?:$|[;&|)`])/iu;
+
+/**
+ * hasQuotedGitWordBeforePushWord(cmd) -- true when `cmd` names git as a QUOTED executable
+ * (`"git"`, `'git.exe'`, a quoted path ending in git) and a push word follows it later
+ * (GPGL-3). `stripQuotedSegments` blanks `"git"` to `""`, so neither the whole-string
+ * branch nor the global-option collapse ever sees the executable; the positional branch
+ * only recognises `push` or `-C <dir> push` directly after it, so `"git" --unknown-opt push`
+ * and `"git" -c a=b push` evade classification. Fail closed on the quoted-executable shape
+ * instead of guessing what sits between the executable and the push word.
+ */
+function hasQuotedGitWordBeforePushWord(cmd) {
+  if (!QUOTED_GIT_WORD_RE.test(cmd)) return false;
+  const tokens = tokenizeArgv(cmd);
+  const gitIndex = tokens.findIndex((token) => GIT_EXECUTABLE_TOKEN_RE.test(token));
+  return gitIndex !== -1 && tokens.slice(gitIndex + 1).some((token) => PUSH_WORD_TOKEN_RE.test(token));
+}
+
+// Fail-closed check #2's pattern (GPGL-2): `git`/`git.exe` followed by whitespace and a
+// `-`-prefixed token, where the `git` word only counts at a position an executable can
+// occupy -- start of the command, or directly after whitespace, a shell operator (`;`,
+// `&`, `|`, `(` which also covers `$(`, or a backtick), a quote, or a path separator
+// (`/`, `\`). A bare `\b` boundary is not enough: it also holds between `-` and `g`, so
+// the `git` inside `--no-git` (or `.git`, `=git`, `xgit`) read as an executable and a
+// `gitleaks detect --no-git --redact` call was routed to the push gate as ambiguous.
+const GIT_EXECUTABLE_THEN_OPTION_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b\s+-\S/iu;
+
+/**
  * commandIsGitPush(cmd) -- the ONE source of truth for "is this command a git push",
  * extracted VERBATIM from guard-push.mjs's own three-branch `isPush` computation
  * (former lines ~239-336: the heredoc-aware whole-string-regex branch tested against
@@ -287,14 +377,14 @@ function hasUnterminatedQuote(cmd) {
  * Branch 3 (`shellWrapperPush`, positional): matches a `sh`/`bash`/`zsh`/`dash`/`pwsh`/
  * `powershell`/`cmd`/`ssh` wrapper whose argument contains `git ... push`.
  *
- * Fail-closed on uncertainty (NVA-PUSHCLASS-1), checked BEFORE the three branches and
- * independently of them: at every call site this function has (codex-pretool-guard.mjs's
+ * Fail-closed on uncertainty (NVA-PUSHCLASS-1, GPGL-3), checked BEFORE the three branches
+ * and independently of them: at every call site this function has (codex-pretool-guard.mjs's
  * prefilter deciding whether guard-push.mjs runs at all; guard-push.mjs's own `if
  * (!isPush) process.exit(0)` fast path), returning `false` and returning "I cannot tell"
  * currently have the EXACT SAME effect -- the push gate never runs. For an ordinary
  * function that is a reasonable simplification; for a gate's own classifier it is the
  * wrong default, because it silently converts "unrecognized" into "definitely safe". So
- * this function now over-approximates on purpose in two situations, at the cost of
+ * this function now over-approximates on purpose in four situations, at the cost of
  * occasionally routing a genuinely non-push command to guard-push.mjs for nothing:
  * guard-push.mjs does the real evaluation once it actually runs, and a spurious run costs
  * nothing a missed push does not.
@@ -307,13 +397,49 @@ function hasUnterminatedQuote(cmd) {
  *      whitelist does not know, so its value-consuming shape (does it take a value at
  *      all? space-separated or `=`-only? can the value contain more `-`-prefixed text?)
  *      is unknown, and the real subcommand position cannot be located with certainty.
+ *      The `git` word only counts where an executable can stand (GPGL-2): at the start of
+ *      the command, or preceded by whitespace, a shell operator (`;` `&` `|` `(` -- which
+ *      also covers `$(` -- or a backtick), a quote, or a path separator (`/` `\`). A `git`
+ *      preceded by `-`, `=`, `.` or a word character is part of an option or a longer
+ *      word (`--no-git`, `--exclude=git`, `xgit`), never an executable, so a tool that
+ *      merely carries such text (`gitleaks detect --no-git --redact`) is not routed to the
+ *      push gate. A whitespace-separated literal `git` ARGUMENT (`gitleaks git --redact`)
+ *      is deliberately still indistinguishable from the executable and stays refused:
+ *      fail-closed, accepted.
+ *   3. A backslash-escaped quote (`\'` or `\"`) anywhere outside a plain single-quoted
+ *      span, together with a `git`/`git.exe` word at an executable boundary (the same
+ *      boundary rule as check #2, no option required) and the word `push` as a separate
+ *      token (a word boundary on both sides, case-insensitive) anywhere in the raw text
+ *      (GPGL-3, narrowed by GPGL-4). A shell treats an escaped quote as a literal character,
+ *      so text between two of them is executed, while `stripQuotedSegments`/`tokenizeArgv`
+ *      read the pair as a quoted span and hide it (`echo \'; git push origin main; echo \'`):
+ *      a fail-open the other checks cannot see. Deliberately blunt where a push word is
+ *      present: `git commit -m "say \"push\""` is routed to the push gate too, because an
+ *      escaped quote inside a double-quoted span desynchronises the stripper the same way.
+ *      Without a push word there is nothing for the desynchronisation to hide, so
+ *      `git commit -m "say \"hi\""`, `git log --grep "a \"b\""` and a Windows path ending in
+ *      `\"` are not pushes. This check keys on the literal token: a push word split so that
+ *      it never appears as that token in the raw text (for example by interior quotes) does
+ *      not trigger it.
+ *   4. A QUOTED git executable name (`"git"`, `'git.exe'`, a quoted path ending in git)
+ *      with a push word later in the command (GPGL-3). Quote-stripping blanks `"git"`, so
+ *      neither the whole-string branch nor the global-option collapse ever sees the
+ *      executable, and the positional branch only knows `push` / `-C <dir> push` directly
+ *      after it -- `"git" --unknown-opt push` and `"git" -c a=b push` evaded all three.
  *
- * Returns `true` if either fail-closed check fires, or if ANY of the three branches
+ * Returns `true` if any fail-closed check fires, or if ANY of the three branches
  * match.
  */
 export function commandIsGitPush(cmd) {
   if (typeof cmd !== "string" || cmd === "") return false;
   if (/\bgit(?:\.exe)?\b/iu.test(cmd) && hasUnterminatedQuote(cmd)) return true;
+  // Fail-closed checks #3 and #4 (GPGL-3), raw-text based and independent of the branches below.
+  if (
+    PUSH_WORD_ANYWHERE_RE.test(cmd) &&
+    GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(cmd) &&
+    hasEscapedQuoteOutsideSingleQuotes(cmd)
+  ) return true;
+  if (hasQuotedGitWordBeforePushWord(cmd)) return true;
   const stripped = stripQuotedSegments(cmd);
   const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
   const commandRegion = (() => {
@@ -347,7 +473,7 @@ export function commandIsGitPush(cmd) {
   // option has already been collapsed away by normalizeGlobalGitOptions above, so a
   // `git`/`git.exe` still immediately followed by a `-`-prefixed token here names an
   // option this file does not know how to consume. Do not guess "not a push".
-  if (/\bgit(?:\.exe)?\b\s+-\S/iu.test(commandRegion)) return true;
+  if (GIT_EXECUTABLE_THEN_OPTION_RE.test(commandRegion)) return true;
   const rawDetectionTokens = tokenizeArgv(cmd);
   // Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
   // `env git push` are still detected POSITIONALLY.
