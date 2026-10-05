@@ -131,6 +131,8 @@ function git(root, args) {
     encoding: "utf8",
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
     shell: false,
+    // Inert off win32; on native Windows it stops each git probe opening a console window.
+    windowsHide: true,
     timeout: 10_000,
     maxBuffer: 16 * 1024 * 1024,
   });

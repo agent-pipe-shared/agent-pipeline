@@ -12,7 +12,17 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { digestJson } from "../lib/verify-resume.mjs";
 import { applyOnboardingKickoff, bindEphemeralPrivateCleanup, planOnboardingKickoff, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
 import { listActiveSessionDescriptors, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
-import { compileVerifySuites, createVerifyRun, deriveVerifyExecutionMetrics, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
+import { compileVerifySuites, createVerifyRun, deriveVerifyExecutionMetrics, resolveDefaultConcurrency, resolveSuiteChildEnvironment, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
+import whChildProcess, { execFileSync as whExecFileSync } from "node:child_process";
+import { promisify } from "node:util";
+import {
+  WINDOWS_HIDE_WRAPPED,
+  WINDOWS_VERIFY_CONCURRENCY_CAP,
+  composeWindowsHideNodeOptions,
+  installWindowsHide,
+  resolveWindowsVerifyConcurrency,
+  windowsHideImportOption,
+} from "../lib/windows-hide-preload.mjs";
 
 // The journal deliberately emits one bounded public progress line per state
 // transition in production.  Most cases below exercise storage, scheduling,
@@ -1347,6 +1357,304 @@ test("AGY-VERIFYTUNER-1: a Tier-B suite's --permission flags still apply correct
     assert.match(log, /FileSystemRead/u);
     assert.equal(log.includes("should never be reached"), false);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// ============================================================================================
+// ALFRED-WINHIDE2: native-Windows console-window containment. Part 1 pins the preload module
+// (windows-hide-preload.mjs) itself; part 2 pins its wiring into the suite spawner. On a non-win32
+// host the "this host" cases assert the INERT contract, so each platform proves its own half.
+// ============================================================================================
+const WH_NAMES = ["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync", "fork"];
+const WH_IS_WIN32 = process.platform === "win32";
+const WH_WIN = { platform: "win32" };
+
+function whInstallOnFake(platform = "win32") {
+  const calls = [];
+  const target = {};
+  for (const name of WH_NAMES) target[name] = (...args) => { calls.push({ name, args }); return `${name}-result`; };
+  const originals = { ...target };
+  let syncCalls = 0;
+  const result = installWindowsHide({ childProcess: target, platform, sync: () => { syncCalls += 1; } });
+  return { target, calls, originals, result, syncCalls: () => syncCalls };
+}
+
+test("ALFRED-WINHIDE2: win32 wraps every spawn-family function and supplies windowsHide:true when the options do not state it", () => {
+  const { target, calls, result, syncCalls } = whInstallOnFake();
+  assert.deepEqual(result, { installed: true, wrapped: WH_NAMES });
+  assert.equal(syncCalls(), 1, "ESM named exports are re-synced exactly once");
+  assert.equal(target.spawn("git"), "spawn-result", "the original return value passes through");
+  target.spawn("git", ["status"]);
+  target.spawnSync("git", ["status"], { encoding: "utf8" });
+  target.execFileSync("git", ["status"], { cwd: "." });
+  target.fork("module.js", ["a"]);
+  target.fork("module.js");
+  target.execSync("echo hi");
+  target.execSync("echo hi", { cwd: "." });
+  assert.deepEqual(calls.map((call) => call.args), [
+    ["git", { windowsHide: true }],
+    ["git", ["status"], { windowsHide: true }],
+    ["git", ["status"], { encoding: "utf8", windowsHide: true }],
+    ["git", ["status"], { cwd: ".", windowsHide: true }],
+    ["module.js", ["a"], { windowsHide: true }],
+    ["module.js", { windowsHide: true }],
+    ["echo hi", { windowsHide: true }],
+    ["echo hi", { cwd: ".", windowsHide: true }],
+  ]);
+});
+
+test("ALFRED-WINHIDE2: win32 callback-bearing signatures keep the callback last and the options in position", () => {
+  const { target, calls } = whInstallOnFake();
+  const callback = () => {};
+  target.execFile("git", callback);
+  target.execFile("git", ["status"], callback);
+  target.execFile("git", ["status"], { cwd: "." }, callback);
+  target.execFile("git", { cwd: "." }, callback);
+  target.exec("echo hi", callback);
+  target.exec("echo hi", { cwd: "." }, callback);
+  target.spawn("git", null, { cwd: "." });
+  assert.deepEqual(calls.map((call) => call.args), [
+    ["git", { windowsHide: true }, callback],
+    ["git", ["status"], { windowsHide: true }, callback],
+    ["git", ["status"], { cwd: ".", windowsHide: true }, callback],
+    ["git", { cwd: ".", windowsHide: true }, callback],
+    ["echo hi", { windowsHide: true }, callback],
+    ["echo hi", { cwd: ".", windowsHide: true }, callback],
+    ["git", null, { cwd: ".", windowsHide: true }],
+  ]);
+});
+
+test("ALFRED-WINHIDE2: an explicit windowsHide is respected and the caller's options object is never mutated", () => {
+  const { target, calls } = whInstallOnFake();
+  const visible = { windowsHide: false, stdio: "inherit" };
+  const plain = { cwd: "." };
+  target.spawnSync("git", ["status"], visible);
+  target.spawnSync("git", ["status"], { windowsHide: true });
+  target.spawnSync("git", ["status"], plain);
+  assert.equal(calls[0].args[2], visible, "explicit false is passed through as the same object");
+  assert.equal(calls[0].args[2].windowsHide, false);
+  assert.equal(calls[1].args[2].windowsHide, true);
+  assert.equal(calls[2].args[2].windowsHide, true);
+  assert.deepEqual(plain, { cwd: "." }, "the caller's options object stays untouched");
+});
+
+test("ALFRED-WINHIDE2: an argument shape Node itself rejects is passed through unchanged", () => {
+  const { target, calls } = whInstallOnFake();
+  target.spawnSync();
+  target.spawnSync("git", ["status"], null);
+  target.spawnSync("git", ["status"], "not-options");
+  assert.deepEqual(calls.map((call) => call.args), [[], ["git", ["status"], null], ["git", ["status"], "not-options"]]);
+});
+
+test("ALFRED-WINHIDE2: loading twice wraps once, and the marker identifies a wrapped function", () => {
+  const { target, calls } = whInstallOnFake();
+  const second = installWindowsHide({ childProcess: target, platform: "win32", sync: () => assert.fail("nothing left to sync") });
+  assert.deepEqual(second, { installed: true, wrapped: [] });
+  target.spawn("git");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].args, ["git", { windowsHide: true }]);
+  for (const name of WH_NAMES) assert.equal(target[name][WINDOWS_HIDE_WRAPPED], true, name);
+});
+
+test("ALFRED-WINHIDE2: util.promisify(execFile) still resolves {stdout, stderr} and goes through the wrapper", async () => {
+  const calls = [];
+  const execFile = (...args) => { calls.push(args); args[args.length - 1](null, "out", "err"); };
+  Object.defineProperty(execFile, promisify.custom, {
+    value: (...args) => new Promise((resolvePromise) => { execFile(...args, (error, stdout, stderr) => resolvePromise({ stdout, stderr })); }),
+  });
+  const target = { execFile };
+  installWindowsHide({ childProcess: target, platform: "win32", sync: () => {} });
+  assert.deepEqual(await promisify(target.execFile)("git", ["status"]), { stdout: "out", stderr: "err" });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].slice(0, 3), ["git", ["status"], { windowsHide: true }]);
+});
+
+test("ALFRED-WINHIDE2: non-win32 platforms replace nothing and sync nothing", () => {
+  for (const platform of ["linux", "darwin", "freebsd"]) {
+    const { target, originals, result, syncCalls } = whInstallOnFake(platform);
+    assert.deepEqual(result, { installed: false, wrapped: [] }, platform);
+    assert.equal(syncCalls(), 0, platform);
+    for (const name of WH_NAMES) assert.equal(target[name], originals[name], `${platform} ${name}`);
+  }
+});
+
+test("ALFRED-WINHIDE2: this host's real child_process matches the platform contract and still round-trips", async () => {
+  for (const name of WH_NAMES) assert.equal(whChildProcess[name][WINDOWS_HIDE_WRAPPED] === true, WH_IS_WIN32, `child_process.${name}`);
+  assert.equal(spawnSync[WINDOWS_HIDE_WRAPPED] === true, WH_IS_WIN32, "the ESM named import sees the wrapper only on win32");
+  const git = spawnSync("git", ["--version"], { encoding: "utf8" });
+  assert.equal(git.status, 0);
+  assert.match(git.stdout, /^git version /u);
+  assert.equal(whExecFileSync(process.execPath, ["-e", "process.stdout.write('ok')"], { encoding: "utf8" }), "ok");
+  const child = spawnChild(process.execPath, ["-e", "process.stdout.write('async-ok');process.stderr.write('err');process.exit(3)"], { stdio: ["ignore", "pipe", "pipe"] });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const code = await new Promise((resolvePromise) => child.once("close", resolvePromise));
+  assert.deepEqual({ code, stdout, stderr }, { code: 3, stdout: "async-ok", stderr: "err" });
+});
+
+const WH_MARKER_PROBE = [
+  "const marker = Symbol.for('pipeline.windows-hide-preload.wrapped');",
+  "const cp = require('node:child_process');",
+  "const own = cp.spawnSync[marker] === true && cp.execFileSync[marker] === true;",
+  "const grand = cp.execFileSync(process.execPath, ['-e', \"process.stdout.write(String(require('node:child_process').spawnSync[Symbol.for('pipeline.windows-hide-preload.wrapped')] === true))\"], { encoding: 'utf8' });",
+  "process.stdout.write(JSON.stringify({ own, grand }));",
+].join("\n");
+
+test("ALFRED-WINHIDE2: a NODE_OPTIONS child, and its own node child, load the preload only on win32", () => {
+  const env = { ...process.env, NODE_OPTIONS: composeWindowsHideNodeOptions(process.env.NODE_OPTIONS, WH_WIN) };
+  const run = spawnSync(process.execPath, ["-e", WH_MARKER_PROBE], { encoding: "utf8", env });
+  assert.equal(run.status, 0, run.stderr);
+  assert.deepEqual(JSON.parse(run.stdout), WH_IS_WIN32 ? { own: true, grand: "true" } : { own: false, grand: "false" });
+});
+
+test("ALFRED-WINHIDE2: a permission-model child is not broken by the NODE_OPTIONS entry", { skip: !process.allowedNodeEnvironmentFlags.has("--permission") }, () => {
+  const env = { ...process.env, NODE_OPTIONS: composeWindowsHideNodeOptions(process.env.NODE_OPTIONS, WH_WIN) };
+  const run = spawnSync(process.execPath, ["--permission", "-e", "process.stdout.write('ran')"], { encoding: "utf8", env });
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.stdout, "ran");
+});
+
+test("ALFRED-WINHIDE2: composeWindowsHideNodeOptions adds one gated --import entry, preserves existing options and is idempotent on win32", () => {
+  const option = windowsHideImportOption();
+  const composed = composeWindowsHideNodeOptions(undefined, WH_WIN);
+  assert.equal(composed, option);
+  assert.ok(option.startsWith("--import=data:text/javascript,"));
+  assert.ok(!/\s/u.test(option), "a single NODE_OPTIONS token: no whitespace to mis-split or quote");
+  assert.match(decodeURIComponent(option), /if\(!process\.permission\)await import\(/u);
+  assert.equal(composeWindowsHideNodeOptions("--max-old-space-size=4096", WH_WIN), `--max-old-space-size=4096 ${option}`);
+  assert.equal(composeWindowsHideNodeOptions("  --no-warnings --enable-source-maps  ", WH_WIN), `--no-warnings --enable-source-maps ${option}`);
+  assert.equal(composeWindowsHideNodeOptions("", WH_WIN), option);
+  const once = composeWindowsHideNodeOptions("--no-warnings", WH_WIN);
+  assert.equal(composeWindowsHideNodeOptions(once, WH_WIN), once);
+  const odd = composeWindowsHideNodeOptions(undefined, { ...WH_WIN, preloadUrl: "file:///C:/Some%20Dir/it's/windows-hide-preload.mjs" });
+  assert.ok(!/[\s"]/u.test(odd), "a preload URL with spaces and quotes still yields one clean token");
+  for (const platform of ["linux", "darwin", "freebsd"]) {
+    assert.equal(composeWindowsHideNodeOptions(undefined, { platform }), undefined, platform);
+    assert.equal(composeWindowsHideNodeOptions("--no-warnings", { platform }), "--no-warnings", platform);
+  }
+});
+
+test("ALFRED-WINHIDE2: resolveWindowsVerifyConcurrency caps win32 unless a valid override is given, and leaves other platforms alone", () => {
+  assert.equal(WINDOWS_VERIFY_CONCURRENCY_CAP, 2);
+  assert.equal(resolveWindowsVerifyConcurrency({}, WH_WIN), 2);
+  for (const override of ["1", "4", "8", " 6 ", "16"]) assert.equal(resolveWindowsVerifyConcurrency({ PIPELINE_VERIFY_CONCURRENCY: override }, WH_WIN), undefined, override);
+  for (const override of ["", "   ", "0", "-3", "abc", "2.5", "NaN", "Infinity"]) assert.equal(resolveWindowsVerifyConcurrency({ PIPELINE_VERIFY_CONCURRENCY: override }, WH_WIN), 2, override);
+  for (const platform of ["linux", "darwin", "freebsd"]) {
+    assert.equal(resolveWindowsVerifyConcurrency({}, { platform }), undefined, platform);
+    assert.equal(resolveWindowsVerifyConcurrency({ PIPELINE_VERIFY_CONCURRENCY: "6" }, { platform }), undefined, platform);
+  }
+});
+
+test("ALFRED-WINHIDE2: resolveSuiteChildEnvironment composes NODE_OPTIONS on win32 and is the identity elsewhere", () => {
+  const option = windowsHideImportOption();
+  const base = { PATH: "p", NODE_OPTIONS: "--no-warnings", KEEP: "1" };
+  assert.deepEqual(resolveSuiteChildEnvironment(undefined, { platform: "win32", base }), { PATH: "p", KEEP: "1", NODE_OPTIONS: `--no-warnings ${option}` });
+  assert.equal(base.NODE_OPTIONS, "--no-warnings", "the base environment is never mutated");
+  assert.deepEqual(resolveSuiteChildEnvironment(undefined, { platform: "win32", base: { PATH: "p" } }), { PATH: "p", NODE_OPTIONS: option });
+  assert.deepEqual(resolveSuiteChildEnvironment({ A: "1" }, { platform: "win32", base }), { A: "1", NODE_OPTIONS: option }, "an explicit env (case-completion) is extended, not replaced by base");
+  assert.deepEqual(resolveSuiteChildEnvironment({ Node_Options: "--no-warnings", X: "1" }, { platform: "win32", base }), { X: "1", NODE_OPTIONS: `--no-warnings ${option}` }, "a differently cased variable is folded into one key");
+  const already = resolveSuiteChildEnvironment(undefined, { platform: "win32", base });
+  assert.deepEqual(resolveSuiteChildEnvironment(already, { platform: "win32", base }), already, "composing twice adds nothing");
+  const explicit = { A: "1" };
+  for (const platform of ["linux", "darwin", "freebsd"]) {
+    assert.equal(resolveSuiteChildEnvironment(explicit, { platform, base }), explicit, `${platform}: same object back`);
+    assert.equal(resolveSuiteChildEnvironment(undefined, { platform, base }), undefined, `${platform}: inherit stays inherit`);
+  }
+});
+
+test("ALFRED-WINHIDE2: resolveDefaultConcurrency caps win32 at 2 unless env or calibration say otherwise; other platforms keep 8", () => {
+  const root = mkdtempSync(join(tmpdir(), "winhide-concurrency-"));
+  try {
+    assert.equal(resolveDefaultConcurrency(root, {}, WH_WIN), 2);
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "abc" }, WH_WIN), 2, "an unusable override does not lift the cap");
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "6" }, WH_WIN), 6);
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "1" }, WH_WIN), 1);
+    for (const platform of ["linux", "darwin", "freebsd"]) {
+      assert.equal(resolveDefaultConcurrency(root, {}, { platform }), 8, platform);
+      assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "3" }, { platform }), 3, platform);
+    }
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ verifyConcurrency: 5 }), { mode: 0o600 });
+    assert.equal(resolveDefaultConcurrency(root, {}, WH_WIN), 5, "an explicit calibration value is configuration, so it beats the win32 cap");
+    assert.equal(resolveDefaultConcurrency(root, { PIPELINE_VERIFY_CONCURRENCY: "7" }, WH_WIN), 7);
+    assert.equal(resolveDefaultConcurrency(root, {}, { platform: "linux" }), 5);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-WINHIDE2: runVerifyJournal hands each suite child this host's NODE_OPTIONS contract (mock spawn)", async () => {
+  const f = fixture();
+  const seen = [];
+  const spawn = (command, argv, options) => { seen.push(options); return spawnPass(); };
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-winhide-env", registerRun, spawn, environment: {} });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(seen.length, 1);
+    if (WH_IS_WIN32) {
+      assert.equal(seen[0].env.NODE_OPTIONS, composeWindowsHideNodeOptions(process.env.NODE_OPTIONS, WH_WIN));
+      assert.ok(seen[0].env.NODE_OPTIONS.includes(windowsHideImportOption()));
+    } else {
+      assert.equal(seen[0].env, undefined, "non-win32: the spawn options are unchanged and the child inherits");
+    }
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-WINHIDE2: the default pool width is 2 on win32 and 8 elsewhere, and an explicit env override wins on every host", async () => {
+  for (const [override, expected] of [[undefined, WH_IS_WIN32 ? 2 : 4], ["3", 3]]) {
+    const f = twoSuiteFixture(["wh-a", "wh-b", "wh-c", "wh-d"]);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const spawn = delayedSpawn({ delayMs: 30, onStart: () => { inFlight += 1; maxInFlight = Math.max(maxInFlight, inFlight); }, onSettle: () => { inFlight -= 1; } });
+    try {
+      const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: `verify-winhide-width-${override ?? "default"}`, registerRun, spawn, environment: override === undefined ? {} : { PIPELINE_VERIFY_CONCURRENCY: override } });
+      assert.equal(result.terminal.status, "passed");
+      assert.equal(maxInFlight, expected, `override ${override ?? "none"}`);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test("ALFRED-WINHIDE2: a real suite run through the default spawn loads the preload only on win32, in the suite and in its own children", async () => {
+  const f = fixture();
+  const suiteFile = join(f.root, "winhide-probe.test.mjs");
+  writeFileSync(suiteFile, [
+    "import cp from 'node:child_process';",
+    "const marker = Symbol.for('pipeline.windows-hide-preload.wrapped');",
+    "const grand = cp.execFileSync(process.execPath, ['-e', \"process.stdout.write(String(require('node:child_process').spawnSync[Symbol.for('pipeline.windows-hide-preload.wrapped')] === true))\"], { encoding: 'utf8' });",
+    "process.stdout.write(`probe own=${cp.spawnSync[marker] === true} grand=${grand}\\n`);",
+    "",
+  ].join("\n"), { mode: 0o600 });
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "winhide-probe-suite", file: suiteFile, dependsOn: [] }], policyInputs: { harness: "test" }, runId: "verify-winhide-real-probe", registerRun });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(result.steps[0].exitCode, 0);
+    const log = readFileSync(join(result.runDir, "logs", `${verifySuiteArtifactName("winhide-probe-suite")}.log`), "utf8");
+    assert.match(log, WH_IS_WIN32 ? /probe own=true grand=true/u : /probe own=false grand=false/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-WINHIDE2: a Tier-B (--permission) suite passes through the default spawn with the NODE_OPTIONS entry present", async () => {
+  const f = fixture();
+  writeFileSync(join(f.root, "tierb-winhide-allowed.mjs"), "export const allowed = true;\n", { mode: 0o600 });
+  const suiteFile = join(f.root, "tierb-winhide-ok.test.mjs");
+  writeFileSync(suiteFile, ["import './tierb-winhide-allowed.mjs';", "process.stdout.write('tierb winhide ok\\n');", ""].join("\n"), { mode: 0o600 });
+  const tierBDeclarations = { "tierb-winhide-ok-suite": { reads: ["tierb-winhide-allowed.mjs"] } };
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "tierb-winhide-ok-suite", file: suiteFile, dependsOn: [] }], policyInputs: { harness: "test" }, runId: "verify-winhide-tierb", registerRun, tierBDeclarations });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(result.steps[0].exitCode, 0);
+    assert.match(readFileSync(join(result.runDir, "logs", `${verifySuiteArtifactName("tierb-winhide-ok-suite")}.log`), "utf8"), /tierb winhide ok/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ALFRED-WINHIDE2: the only non-test spawn site in the verify spawner and in the evidence producer passes windowsHide: true", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  for (const file of ["verify-journal.mjs", "verify-evidence-producer.mjs"]) {
+    const source = readFileSync(join(here, file), "utf8");
+    const sites = [...source.matchAll(/\b(?:spawnSync|spawnChildProcess|execFileSync|execFile|execSync)\(/gu)];
+    assert.equal(sites.length, 1, `${file}: exactly one spawn call site`);
+    const block = source.slice(sites[0].index, source.indexOf("});", sites[0].index));
+    assert.ok(block.includes("windowsHide: true"), `${file}: the spawn call passes windowsHide: true`);
+  }
 });
 
 // ALFRED-RF1: a Verify run that created its OWN session descriptor + private binding (the

@@ -7,6 +7,7 @@ import { constants as osConstants } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn as spawnChildProcess, spawnSync } from "node:child_process";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { composeWindowsHideNodeOptions, resolveWindowsVerifyConcurrency } from "../lib/windows-hide-preload.mjs";
 import {
   VERIFY_PROGRESS_SCHEMA,
   digestJson,
@@ -634,6 +635,9 @@ function spawnAsync(command, argv, options = {}) {
         env: options.env,
         stdio: completion === null ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "pipe", "pipe"],
         detached: options.signal instanceof AbortSignal,
+        // Inert off win32. On native Windows a console-subsystem child with no visible console
+        // otherwise gets a console window of its own (ALFRED-WINHIDE2).
+        windowsHide: true,
       });
     } catch (error) {
       resolvePromise({ status: null, closeStatusProved: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error });
@@ -712,8 +716,14 @@ function spawnAsync(command, argv, options = {}) {
 // (not `os.availableParallelism()`) is deliberate: this repo runs on two machines, and a
 // machine-derived default would make the wall-clock evidence and the pool width incomparable
 // between them on a gate whose whole point is determinism (Advisor guidance, AGY-VERIFYTUNER-2).
+//
+// ALFRED-WINHIDE2: on native Windows the literal is replaced by a conservative cap (2) --
+// `resolveWindowsVerifyConcurrency` -- because eight parallel suites each spawning short-lived
+// children destabilised the host. The cap applies ONLY when nothing explicit is configured, so
+// the precedence is: argument > env var > calibration file > win32 cap > literal. Every other
+// platform keeps the literal unchanged. `platform` is injectable for tests.
 const DEFAULT_VERIFY_CONCURRENCY = 8;
-function resolveDefaultConcurrency(repoRoot, environment) {
+export function resolveDefaultConcurrency(repoRoot, environment, { platform = process.platform } = {}) {
   const envValue = environment?.PIPELINE_VERIFY_CONCURRENCY;
   if (typeof envValue === "string" && envValue.trim() !== "") {
     const parsed = Number(envValue);
@@ -728,7 +738,28 @@ function resolveDefaultConcurrency(repoRoot, environment) {
     const declared = calibration?.verifyConcurrency;
     if (Number.isSafeInteger(declared) && declared >= 1) return declared;
   } catch { /* no calibration override available -- fall through to the hardcoded default */ }
-  return DEFAULT_VERIFY_CONCURRENCY;
+  // `undefined` = "leave the resolution alone" (non-win32, or an explicit env override that the
+  // lines above already honoured). Only a win32 host with nothing configured reaches the cap.
+  return resolveWindowsVerifyConcurrency(environment, { platform }) ?? DEFAULT_VERIFY_CONCURRENCY;
+}
+
+// ALFRED-WINHIDE2: the environment a suite child is spawned with. `env` is what the caller wanted
+// (`undefined` = inherit `base`). Off win32 it is returned untouched, so non-Windows behaviour is
+// byte-identical. On win32 the child gets `base`/`env` plus a NODE_OPTIONS that preserves any
+// existing value and appends the windowsHide preload entry once, so the suite's own child
+// processes, and theirs, never open console windows. The entry is a data: URL gate that skips the
+// preload under the Node permission model (Tier-B suites), where a bare --import of a file outside
+// --allow-fs-read would crash the suite before it ran.
+export function resolveSuiteChildEnvironment(env, { platform = process.platform, base = process.env } = {}) {
+  if (platform !== "win32") return env;
+  const source = env ?? base;
+  // Windows environment names are case-insensitive: a plain-object copy of process.env can carry
+  // the variable under another casing, which must be folded into the one NODE_OPTIONS key.
+  const { NODE_OPTIONS: exact, ...rest } = source;
+  const variants = Object.keys(rest).filter((key) => key.toUpperCase() === "NODE_OPTIONS");
+  const existing = exact ?? (variants.length > 0 ? rest[variants[0]] : undefined);
+  for (const key of variants) delete rest[key];
+  return { ...rest, NODE_OPTIONS: composeWindowsHideNodeOptions(existing, { platform }) };
 }
 
 // AGY-VERIFYTUNER-2: the serial lane. Its STARTING POINT was derived MECHANICALLY
@@ -950,11 +981,11 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
     cwd: suite.cwd,
     maxBuffer: MAX_LOG_BYTES,
     signal,
-    env: completionPolicy === null ? undefined : {
+    env: resolveSuiteChildEnvironment(completionPolicy === null ? undefined : {
       ...process.env,
       PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
       PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: String(completionPolicy.maxBytes),
-    },
+    }),
     caseCompletion: completionPolicy,
   });
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? "");
