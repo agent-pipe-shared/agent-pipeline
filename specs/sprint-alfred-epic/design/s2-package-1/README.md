@@ -52,7 +52,7 @@ still required (MP-07). New suite names may also need `verify-phase:` surfaces i
 | `plugins/pipeline-core/skills/close-block/close-block-fanout-report.test.mjs` | `close-block-fanout-report-tests` |
 | `plugins/pipeline-core/lib/test-support/private-tmp.test.mjs` | `private-tmp-tests` |
 | `plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs` | `hook-refresh-detection-tests` |
-| `plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs` | `clone-hook-readiness-rollback-tests` (caseCompletion CHRB001-CHRB008) |
+| `plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs` | `clone-hook-readiness-rollback-tests` (caseCompletion CHRB001-CHRB009) |
 
 Extended 2026-10-06 (REGPATCH2, REGPATCH3) with the tonight-slice suites. After the REGPATCH3 edit,
 `git apply --check` on `test-registrations.patch` alone exited 0 (`scratch/REGPATCH3/apply-check.log`); the
@@ -151,7 +151,7 @@ real-path run is the last apply-order step.
 | 22 | `close-block-fanout-report-tests` | none needed | `deterministic-verification` |
 | 23 | `private-tmp-tests` | none needed | `deterministic-verification` |
 | 24 | `hook-refresh-detection-tests` | none needed | `deterministic-verification` |
-| 25 | `clone-hook-readiness-rollback-tests` | `required` entry (patch), inline CHRB001-CHRB008 | `setup-and-runtime-projection` |
+| 25 | `clone-hook-readiness-rollback-tests` | `required` entry (patch), inline CHRB001-CHRB009 | `setup-and-runtime-projection` |
 
 Capability rationale: most are Verify test suites and sit with their sibling `*-tests` surfaces in
 `deterministic-verification` (e.g. `guard-push-*-tests`, `checkpoint-push-audit-tests`, `pipeline-start-preflight-*`);
