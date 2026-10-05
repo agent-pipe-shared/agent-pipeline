@@ -192,7 +192,66 @@ test("pre-commit was not installed by this call: a failing second install trigge
   assert.doesNotMatch(error.message, /was rolled back/);
 }));
 
-if (completionCases.length !== 8) throw new Error("case completion count drift: expected 8, got " + completionCases.length);
+test("second install RETURNS a refusal instead of throwing: it rolls back exactly like a throw, with the refusal as cause", () => {
+  // The only reachable shape is a plan/install race: the commit-msg installer re-plans and refuses.
+  withRepository(({ root, hookFile }) => {
+    assert.deepEqual(statuses(inspectMandatoryHookReadiness(root)), { "pre-commit-hook": "install", "commit-msg-hook": "install" });
+    const refusal = { status: "refused-foreign-hook", detail: "a commit-msg hook appeared between plan and install" };
+    let preCommitPresentWhenSecondRan = false;
+    const error = thrown(() => applyMandatoryHookReadiness(root, {
+      applyCommitMsg() {
+        preCommitPresentWhenSecondRan = existsSync(hookFile("pre-commit"));
+        return refusal;
+      },
+    }));
+    assert.equal(preCommitPresentWhenSecondRan, true, "the first hook really was installed by this call");
+    assert.equal(error.name, "MandatoryHookReadinessApplyError");
+    assert.equal(error.code, "HOOK-READINESS-APPLY-ROLLED-BACK");
+    assert.equal(error.failedHook, "commit-msg-hook");
+    assert.match(error.message, /commit-msg-hook/);
+    assert.match(error.message, /refused-foreign-hook/);
+    assert.match(error.message, /rolled back/);
+    assert.equal(error.cause, refusal, "the returned refusal is reachable as cause");
+    assert.deepEqual(error.rollback, { hook: "pre-commit-hook", status: "rolled-back" });
+    assert.equal(existsSync(hookFile("pre-commit")), false);
+    const after = inspectMandatoryHookReadiness(root);
+    assert.equal(after.status, "provisioning-required", "not the one-installed-one-missing wedge");
+    assert.deepEqual(statuses(after), { "pre-commit-hook": "install", "commit-msg-hook": "install" });
+    assert.notEqual(after.nextAction, null, "a repair route is still offered");
+    assert.deepEqual(error.readinessAfter, { status: "provisioning-required", code: "HOOK-READINESS-INSTALL-REQUIRED" });
+  });
+  // The same code family as the throw path: the installer refuses to remove a hook modified meanwhile.
+  withRepository(({ root, hookFile }) => {
+    const refusal = { status: "refused-foreign-hook" };
+    const tampered = "#!/bin/sh\n# edited by a human after the install\n";
+    const error = thrown(() => applyMandatoryHookReadiness(root, {
+      applyCommitMsg() {
+        writeFileSync(hookFile("pre-commit"), tampered);
+        return refusal;
+      },
+    }));
+    assert.equal(error.code, "HOOK-READINESS-APPLY-ROLLBACK-FAILED");
+    assert.equal(error.cause, refusal);
+    assert.equal(error.rollback.status, "failed");
+    assert.equal(error.rollback.result.status, "refused-modified-hook");
+    assert.equal(readFileSync(hookFile("pre-commit"), "utf8"), tampered, "a modified hook is never deleted");
+  });
+  // A pre-commit hook this call did not install is never removed, whatever shape the second failure takes.
+  withRepository(({ root }) => {
+    const refusal = { status: "refused-foreign-hook" };
+    const error = thrown(() => applyMandatoryHookReadiness(root, {
+      applyPreCommit: () => ({ status: "refused-foreign-hook" }),
+      removePreCommit: mustNotRun("removePreCommit"),
+      applyCommitMsg: () => refusal,
+    }));
+    assert.equal(error.code, "HOOK-READINESS-APPLY-FAILED");
+    assert.equal(error.cause, refusal);
+    assert.deepEqual(error.rollback, { hook: "pre-commit-hook", status: "not-needed" });
+    assert.doesNotMatch(error.message, /was rolled back/);
+  });
+});
+
+if (completionCases.length !== 9) throw new Error("case completion count drift: expected 9, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -8,12 +8,17 @@ import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-cl
 import { applyInstall as applyPreCommit, applyRemoval as removePreCommit } from "./pre-commit-hook-install.mjs";
 import { applyInstall as applyCommitMsg } from "./commit-msg-hook-install.mjs";
 
+/** Result statuses by which an installer reports that the hook is now in place. Anything else a second
+ * install RETURNS (a `refused-*` result, or no recognisable status) is a failed install, like a throw. */
+const APPLIED_INSTALL_STATUSES = new Set(["installed", "upgraded"]);
+
 /** Typed failure of `applyMandatoryHookReadiness` when the second mandatory hook (commit-msg) could not
- * be installed after the first (pre-commit) was. `code` is one of:
+ * be installed after the first (pre-commit) was, whether that install threw or returned a refusal. `code` is one of:
  *  - HOOK-READINESS-APPLY-ROLLED-BACK: pre-commit, installed by this same call, was removed again.
  *  - HOOK-READINESS-APPLY-ROLLBACK-FAILED: that removal did not succeed; the repository is half-applied.
  *  - HOOK-READINESS-APPLY-FAILED: pre-commit was not installed by this call, so nothing was rolled back.
- * `cause` is always the original commit-msg install failure; `rollback.error` is the removal failure, if any. */
+ * `cause` is always the original commit-msg install failure (the thrown error, or the returned refusal result);
+ * `rollback.error` is the removal failure, if any. */
 export class MandatoryHookReadinessApplyError extends Error {
   constructor({ code, message, failedHook, rollback, readinessAfter, cause }) {
     super(message, { cause });
@@ -111,9 +116,15 @@ export function applyMandatoryHookReadiness(rootDir = process.cwd(), dependencie
   const installCommitMsg = dependencies.applyCommitMsg ?? applyCommitMsg;
   const root = resolve(rootDir);
   const preCommitResult = installPreCommit({ rootDir: root });
+  const remove = dependencies.removePreCommit ?? removePreCommit;
   let commitMsgResult;
   try { commitMsgResult = installCommitMsg({ rootDir: root }); }
-  catch (cause) { throw applyFailureError({ rootDir: root, cause, preCommitResult, remove: dependencies.removePreCommit ?? removePreCommit }); }
+  catch (cause) { throw applyFailureError({ rootDir: root, cause, preCommitResult, remove }); }
+  // A returned refusal (plan/install race) is a failed install exactly like a throw: it must not fall through to
+  // the readback with pre-commit left installed beside a missing commit-msg hook.
+  if (!APPLIED_INSTALL_STATUSES.has(commitMsgResult?.status)) {
+    throw applyFailureError({ rootDir: root, cause: commitMsgResult, preCommitResult, remove });
+  }
   const results = [{ id: "pre-commit-hook", result: preCommitResult }, { id: "commit-msg-hook", result: commitMsgResult }];
   const after = inspectMandatoryHookReadiness(rootDir);
   return {
