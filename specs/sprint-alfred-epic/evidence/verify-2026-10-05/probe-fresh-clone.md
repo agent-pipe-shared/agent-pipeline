@@ -103,3 +103,54 @@ B: git discovery from the root behaves the same on Windows, macOS and consumer r
 fixture defect is OS-independent; a temp dir inside an enclosing repo or an exported `GIT_DIR` hides it on any OS.
 C: `core.hooksPath` (global or per-repo) is honoured on every OS; consumer repos using a managed hooks path get
 `install`/`foreign-owner` outcomes by design, so the fixture must not depend on them.
+
+## Family A verdict (PROBEA, interim: tool-budget checkpoint at call 40, NOT SETTLED)
+
+Verdict: not settled; no fix applied, no file touched except this one. The "Family A (not reached)" section above is superseded
+by this one. Two of its leads are refuted by reading the fixture, and a better candidate site is named (hypothesis, unprobed).
+
+Step 1 (call the observer in a probe and print the swallowed error) was NOT done: the native Windows run cannot reach the
+failing assertion, and WSL was forbidden for this dispatch. Evidence of that:
+```
+$ node scratch/PROBEA/run.mjs ct-full plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs     (exit 1; empty GIT_CONFIG_GLOBAL, no GIT_DIR)
+$ node scratch/PROBEA/run.mjs base-ct plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs     (exit 1; host git config, same result)
+AssertionError: private-state-object-unsafe: private-state directory Windows assurance is unavailable or unsafe   (28 of 37 cases fail, 9 pass)
+    at createReadyLifecycleFixture (codex-pretool-guard.test.mjs:254)   <- the intake-capture-apply step, 34 lines BEFORE line 288
+```
+That error is `windowsAssurance` in `plugins/pipeline-core/lib/codex-onboarding-runtime.mjs` 92-104 (a Windows ACL check on the
+fixture's private state). It is independent of git config, so it is a separate native-Windows finding, not Family A. Outputs:
+`scratch/PROBEA/out-ct-full.txt`, `scratch/PROBEA/out-base-ct.txt` (git-ignored, lost unless moved).
+
+What reading established (all file:line, no probe):
+- Lead 2 (no global git identity) is refuted for this suite: `createReadyLifecycleFixture` (codex-pretool-guard.test.mjs 206-235)
+  passes `--git-author-name/--git-author-email` to onboarding-init (228) and then runs `git config`, `git add` and `git commit`
+  in the root with `assert.equal(git.status, 0)` (232-235). Line 288 is only reached if all of that succeeded.
+- Lead 1 (git-common-dir throw swallowed) is unlikely for this suite for the same reason: a non-repo root would already have
+  failed the asserted `git config` at 234. Unlike family B, this fixture root is a real git repo with a HEAD commit.
+- The swallow at `project-onboarding-v3.mjs` 3480-3487 cannot be what separates the two statuses here: the fixture profile is
+  `feature` (test line 255-256), so `finalPackageProfile` is true (3496-3497) and `needsAcknowledgement` is false (3498-3499)
+  whether or not the observer throws; `nextAction` is then `bootstrapBindPlanAction` (3576-3578), and
+  `collectPrdAcknowledgementAction` is never called. The briefing premise that 2869-2877 is the only producer is also
+  incomplete: `architecture-design-required` has a second producer at 3190 (`designToImplementationHandoverAction`, needs a
+  persisted approved/implementing PO authority). So the assertion at 288 expects a state this `generated` branch does not
+  produce for `feature` at all; what differs between host (green) and fresh clone is therefore which BRANCH 287 lands in.
+- Candidate site (hypothesis, unprobed): the second swallow at 3504-3546. With `finalPackageProfile` true,
+  `planOnboardingIntakeSpecMarker` runs (3507, with `spawn: fs.spawnSync`); a throw or an invalid observation falls into
+  `catch` 3539 and returns `status: "bootstrap-binding-required"` with `nextAction: null` and diagnostic
+  `intake_spec_marker_observation_unavailable` (3540-3545). That is the exact status the triage reports.
+- The definition of `observeBootstrapBindAcknowledgement` (imported at 49) was not located within budget.
+
+Cheapest decisive next step (needs Linux/WSL, so a dispatcher decision): the failing assertion at 288 already prints the full
+result via `JSON.stringify(designStop)`. Read `status`, `nextAction` and `diagnostics[].code` from the Verify log of that case.
+`intake_spec_marker_observation_unavailable` points at 3539 (then probe `planOnboardingIntakeSpecMarker` with the fixture root,
+printing the swallowed error); `bootstrap_binding_required` means 287 stayed in `generated` and the fixture's expectation
+needs the question "why does the host reach the design stop" answered first. If the cause is environmental state the host has
+and a clean clone lacks, the fix is in the unprotected fixtures (codex-pretool-guard, guard-apply-patch, measure-tofu-push-e2e);
+if it is the swallow hiding a real throw, the fix is production (distinct diagnostic), which is outside this dispatch.
+
+Protected-path status: none of codex-pretool-guard.test.mjs, guard-apply-patch.test.mjs, measure-tofu-push-e2e or
+onboarding-init suites matches TP-1..TP-13. Matrix: observed Linux fresh clone only; native Windows fails earlier on the
+ACL assurance (own finding); macOS not examined; both swallow sites also hide a git/spawn failure behind a generic status in
+consumer repos (design note, no measurement).
+Prepared but not run (git-ignored): `scratch/PROBEA/fake-linux.mjs` preload (forces `process.platform` to linux to skip the
+ACL step; indicative only, not a Linux emulation) via `scratch/PROBEA/run.mjs fake-ct <test file>`.
