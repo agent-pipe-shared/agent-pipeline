@@ -48,6 +48,7 @@
 | pipeline.advisor-demand-reuse-has-no-design-course-bound | open | workflow-improvement | pipeline | none | 2026-09-28 | — | — |
 | pipeline.advisor-evidence-read-enforces-size-limit-after-allocation | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.advisor-prompt-is-emitted-before-host-route-admission | open | defect | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.advisor-question-contract-and-final-source-binding-conflict | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.afk-assumption-mode | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-binding-guards-are-not-os-level-sandboxing | closed | defect | pipeline | nova-b | 2026-08-25 | — | Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature. |
@@ -830,7 +831,7 @@
 
 ## Counts
 
-- open: 165
+- open: 166
 - in_progress: 0
 - closed: 643
 - rejected: 3

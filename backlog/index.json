@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "56b6b2363fa7e11925a949480f5df8558b31f1aa5c394120f978710fda4dc952"
+    "transitionHead": "681ea8946c1118db6e4e416b14f408ea34e627df931ea893ab36b29e7cf13cc5"
   },
   "counts": {
-    "open": 165,
+    "open": 166,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -584,6 +584,16 @@
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Codex/WSL greenfield review B2 on 2026-09-27; bridge source-order verification in specs/sprint-alfred-epic/evidence/0.7-codex-greenfield-advisor-triage-2026-09-27.md.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-05",
+      "source": "Observed live under parallel agents, Alfred session, 2026-10-05; diagnosis specs/sprint-alfred-epic/evidence/verify-2026-10-05/flap3-devplan-diagnosis.md.",
       "deferred": false,
       "sprint": "alfred"
     },
