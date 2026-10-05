@@ -6,20 +6,47 @@
  * Design: specs/sprint-alfred-epic/design/fanout-enforcement-design.md section 3.3 and row S5.
  *
  * Pure plumbing, no policy: parse the Stop payload, load the slice queue, read the session ledger,
- * call `evaluateFanoutStop`, substitute `<plugin-root>`, append `telemetry.events` and emit
- * `{"decision":"block","reason":...}` when (and only when) the governor's EFFECTIVE decision is a
- * block. Every other outcome, and every error, is: exit 0 with nothing on stdout (fail open).
- * Advisory text is not emitted (the Stop output shape only carries a block decision).
+ * call `evaluateFanoutStop`, substitute `<plugin-root>`, append `telemetry.events` and emit what the
+ * governor decided. Two output shapes, nothing else; every other outcome, and every error, is exit 0
+ * with nothing on stdout (fail open):
+ *   block     `{"decision":"block","reason":...}`, only when the governor's EFFECTIVE decision is a block
+ *             AND its `block` event was durably appended first (see below).
+ *   advisory  `{"systemMessage":...,"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":...}}`,
+ *             the shape and channel `hooks/stop-suggest.mjs` already uses (design 3.3 "Modes"). It carries the
+ *             governor's non-block text: the FANOUT-ADVISORY line of `advisory` mode and the FANOUT-NO-QUEUE
+ *             line of `advisory` and `enforce` mode. `shadow` and `off` never emit it; the adapter checks the
+ *             governor's resolved `telemetry.mode` itself, so a policy slip there cannot reach the model.
+ *             Whether the host surfaces `additionalContext` on a `Stop` event is inherited from the sibling
+ *             hook and not measured here.
+ *
+ * Durable-append precondition (governor Critic F1): a block is issued only after the `block` event of the
+ * same governor result was appended to the ledger. Rule 9's loop bounds count recorded `block` events, so a
+ * block that could not be recorded (a ledger the adapter can read but not append to, e.g. FANOUT-FILE-UNSAFE
+ * on a non-private file) would defeat them. A refused append, or a block result with no `block` event,
+ * therefore returns nothing at all: fail open, no output of any kind.
+ *
+ * Cost (design 3.6, 8 "native Windows"): the hook is one short Node process. Without a `queuePath` (config
+ * unset, empty, or lacking one) it returns at once, before any `git` spawn, state resolution or ledger read.
+ * The one remaining child process, `git rev-parse --git-common-dir`, is spawned with `windowsHide: true`
+ * and only when the config carries no absolute `commonDir`.
  *
  * Configuration input (open PO question Q7: no default queue location is decided here): one JSON
  * object in the env var `PIPELINE_FANOUT_CONFIG`. Its keys are the governor's `resolveFanoutConfig`
  * input (mode, target, ...) plus three adapter-only keys:
- *   queuePath  the slice queue file (relative to the payload `cwd`); absent => "no queue" is passed
+ *   queuePath  the slice queue file (relative to the payload `cwd`); REQUIRED, absent => fan-out is not
+ *              configured for this project and the hook is silent (the S7 dispatch guard behaves the same).
+ *              A queuePath whose file does not exist is the governor's "absent queue" (FANOUT-NO-QUEUE).
  *   commonDir  absolute git common dir override; default `git rev-parse --git-common-dir` in `cwd`
  *   (requiresEnforcement defaults to `observeGovernanceScope({ rootDir: cwd }).requiresEnforcement`
  *    when the config does not carry a boolean)
- * Test seam: `PIPELINE_FANOUT_TEST_THROW=1` makes the adapter throw before calling the governor
- * (proves the fail-open path; never set in production).
+ *   (implementationPhaseActive defaults, only while the queue file is absent, to design 3.10's "implementation
+ *    phase active": `activeFeature.phase === "implementation"` in the feature state file, the neutral
+ *    `project/pipeline-state.json` when present else the legacy `.claude/pipeline-state.json`, the same
+ *    fallback `stop-suggest.mjs` applies. `resolveProjectAuthorityPaths` is deliberately not called: it
+ *    may spawn git. An unreadable or malformed state is "not implementing".)
+ * Test seams: `PIPELINE_FANOUT_TEST_THROW=1` makes the adapter throw before calling the governor (proves the
+ * fail-open path; never set in production); `decideStop` options `evaluate`, `append` and `execFile` inject the
+ * governor, the ledger append and the git spawn for in-process callers.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
@@ -30,6 +57,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices, readEvents } from "../lib/fanout-ledger.mjs";
 import { PLUGIN_ROOT_PLACEHOLDER, evaluateFanoutStop } from "../lib/fanout-governor.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE } from "../lib/project-authority.mjs";
 import { loadSliceQueue } from "../lib/slice-queue.mjs";
 
 const RUNNER = "claude";
@@ -46,19 +74,38 @@ function readConfig() {
   return parsed;
 }
 
-function resolveCommonDir(cwd, config) {
+function resolveCommonDir(cwd, config, execFile) {
   if (config.commonDir !== undefined) {
     if (typeof config.commonDir !== "string" || !isAbsolute(config.commonDir)) throw new Error("commonDir");
     return config.commonDir;
   }
-  const out = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+  const out = String(execFile("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
     timeout: 5000,
-  }).trim();
+    windowsHide: true,
+  })).trim();
   if (out === "" || !isAbsolute(out)) throw new Error("commonDir");
   return out;
+}
+
+/** Design 3.10: is the feature in its implementation phase? Any unreadable or malformed state is "no". */
+function readImplementationPhaseActive(cwd) {
+  for (const relative of [NEUTRAL_STATE, LEGACY_STATE]) {
+    const path = join(cwd, relative);
+    try {
+      const info = statSync(path);
+      if (!info.isFile()) continue;
+      if (info.size > MAX_RECORD_BYTES) return false;
+      const state = JSON.parse(readFileSync(path, "utf8"));
+      return isObject(state) && isObject(state.activeFeature) && state.activeFeature.phase === "implementation";
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      return false;
+    }
+  }
+  return false;
 }
 
 /** Dispatch records of the queue's slices, in the shape `readyAndLive` consumes. Unreadable ones are skipped. */
@@ -79,21 +126,25 @@ function readRecords(evidenceDir, sliceIds) {
 
 /**
  * Returns the Stop-hook stdout text ("" for nothing). Throws on any fault; `run` turns that into
- * silence. `options.evaluate` is injectable for in-process callers.
+ * silence. `options.evaluate`, `options.append`, `options.execFile` and `options.config` are injectable
+ * for in-process callers.
  */
 export function decideStop(input, options = {}) {
   if (!isObject(input)) return "";
   const evaluate = options.evaluate ?? evaluateFanoutStop;
+  const append = options.append ?? appendEvent;
+  const execFile = options.execFile ?? execFileSync;
   const config = options.config ?? readConfig();
+  // Early exit BEFORE any child process, state resolution or ledger read: with no queuePath fan-out is
+  // not configured here, and the governor could say nothing (design 3.6, 8 "native Windows").
+  if (!isObject(config) || typeof config.queuePath !== "string" || config.queuePath === "") return "";
   const cwd = typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : (process.env.CLAUDE_PROJECT_DIR || process.cwd());
   const sessionId = input.session_id;
   if (typeof sessionId !== "string" || sessionId === "") return "";
-  const commonDir = resolveCommonDir(cwd, config);
+  const commonDir = resolveCommonDir(cwd, config, execFile);
   const now = Date.now();
 
-  const queue = typeof config.queuePath === "string" && config.queuePath !== ""
-    ? loadSliceQueue(resolve(cwd, config.queuePath), isObject(config.queueOptions) ? config.queueOptions : {})
-    : undefined;
+  const queue = loadSliceQueue(resolve(cwd, config.queuePath), isObject(config.queueOptions) ? config.queueOptions : {});
   const sliceIds = Array.isArray(queue?.raw?.slices)
     ? queue.raw.slices.map((slice) => slice?.id).filter((id) => typeof id === "string")
     : [];
@@ -105,17 +156,34 @@ export function decideStop(input, options = {}) {
   const requiresEnforcement = typeof config.requiresEnforcement === "boolean"
     ? config.requiresEnforcement
     : observeGovernanceScope({ rootDir: cwd }).requiresEnforcement === true;
+  // Only an absent queue file consults the phase (governor rule 4); every other queue state ignores it.
+  const implementationPhaseActive = typeof config.implementationPhaseActive === "boolean"
+    ? config.implementationPhaseActive
+    : (queue?.status === "absent" ? readImplementationPhaseActive(cwd) : false);
   if (process.env.PIPELINE_FANOUT_TEST_THROW === "1") throw new Error("test seam");
   const { queuePath: _q, commonDir: _c, ...governorConfig } = config;
-  const result = evaluate({ input, queue, ledger, config: { ...governorConfig, requiresEnforcement }, now });
+  const result = evaluate({ input, queue, ledger, config: { ...governorConfig, requiresEnforcement, implementationPhaseActive }, now });
 
   // Record first: a block that could not be recorded would escape the anti-loop counters, so it is not issued.
+  // A refused or failed append (e.g. FANOUT-FILE-UNSAFE) fails the whole evaluation open: nothing is emitted.
+  let blockRecorded = false;
   for (const event of Array.isArray(result?.telemetry?.events) ? result.telemetry.events : []) {
-    appendEvent(commonDir, RUNNER, sessionId, event, { now });
+    try {
+      append(commonDir, RUNNER, sessionId, event, { now });
+    } catch {
+      return "";
+    }
+    if (event?.type === "block") blockRecorded = true;
   }
-  if (result?.decision !== "block" || typeof result.reason !== "string" || result.reason === "") return "";
+  if (typeof result?.reason !== "string" || result.reason === "") return "";
   const reason = result.reason.split(PLUGIN_ROOT_PLACEHOLDER).join(PLUGIN_ROOT);
-  return `${JSON.stringify({ decision: "block", reason })}\n`;
+  if (result.decision === "block") {
+    return blockRecorded ? `${JSON.stringify({ decision: "block", reason })}\n` : "";
+  }
+  // Non-block text is advisory output, and only `advisory` / `enforce` may produce it.
+  const mode = result?.telemetry?.mode;
+  if (result.decision !== "allow" || (mode !== "advisory" && mode !== "enforce")) return "";
+  return `${JSON.stringify({ systemMessage: reason, hookSpecificOutput: { hookEventName: "Stop", additionalContext: reason } })}\n`;
 }
 
 /** Real hook boundary: always exits 0, writes nothing on any error. */

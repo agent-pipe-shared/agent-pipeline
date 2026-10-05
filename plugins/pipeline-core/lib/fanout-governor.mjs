@@ -25,6 +25,12 @@
  * `telemetry.events` are ledger events (`stop-eval`, `block`, `defied`) the adapter
  * appends as returned. The function NEVER throws: any fault is FANOUT-FAILOPEN.
  *
+ * Adapter precondition (rule 9 depends on it): an adapter MUST NOT emit a `block` decision unless the
+ * `block` event of that same result was durably appended to the ledger first. Rule 9's loop bounds count
+ * recorded `block` events only, so a block that could not be recorded (a ledger the adapter can read but
+ * not append to, e.g. FANOUT-FILE-UNSAFE on a non-private file) would never be counted and every turn end
+ * could block without bound. If the append is refused or fails, the adapter fails open and emits nothing.
+ *
  * Open PO questions are NOT decided here, they are inputs with the design's defaults:
  * Q1 (hard block): default mode is `shadow`, `enforce` is opt-in; Q2 (target/ceiling):
  * `target` 4, `maxTarget` 6, both tunable; Q6 (pause authority): `pauseAuthorities`

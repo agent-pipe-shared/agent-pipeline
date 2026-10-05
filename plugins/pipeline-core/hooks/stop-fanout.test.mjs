@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fanoutStatePath, readEvents } from "../lib/fanout-ledger.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+import { decideStop } from "./stop-fanout.mjs";
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "stop-fanout.mjs");
 const SESSION = "s5-session";
@@ -142,9 +143,20 @@ check("a subagent payload (agent_id present) gets no output and no ledger line",
   });
 });
 
-check("advisory mode never produces hook output (the adapter emits only a block decision)", () => {
+// FANOUT-F5: SF07 is CHANGED, not deleted. It used to pin "advisory mode never produces hook output",
+// which locked in the defect (the governor's advisory text was dropped, adapter Critic F2). It now pins
+// the corrected behaviour: advisory text reaches the session on the stop-suggest channel, never as a block.
+check("advisory mode emits the governor's advisory text as systemMessage/additionalContext (never a block decision, no block event)", () => {
   withBox({}, (box) => {
-    assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) }));
+    const result = hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) });
+    assert.equal(result.status, 0, result.stderr);
+    const out = JSON.parse(result.stdout);
+    assert.deepEqual(Object.keys(out).sort(), ["hookSpecificOutput", "systemMessage"]);
+    assert.match(out.systemMessage, /^FANOUT-ADVISORY: 4 free slot\(s\), 3 ready slice\(s\)/u);
+    assert.deepEqual(out.hookSpecificOutput, { hookEventName: "Stop", additionalContext: out.systemMessage });
+    assert.equal(out.systemMessage.includes("<plugin-root>"), false, "the placeholder is substituted");
+    assert.match(out.systemMessage, /node .+slice-queue\.mjs defer <id>/u);
+    assert.deepEqual(ledgerTypes(box), ["stop-eval"], "advisory records the evaluation but never a block");
   });
 });
 
@@ -211,7 +223,132 @@ function readEventsRaw(box) {
   return readEvents(box.common, "claude", SESSION).events.map((event) => `${JSON.stringify({ schema: "pipeline.fanout-event.v1", ...event })}\n`).join("");
 }
 
-assert.equal(cases.length, 15, "the complete stop-fanout corpus must be registered before execution begins");
+// ---------------------------------------------------------------- FANOUT-F5 regression cases
+// adapter Critic F2 (advisory output + implementationPhaseActive), governor Critic F1 (block only after a
+// durable append) and adapter Critic F5 (no spawn before the queuePath/config early exit).
+
+check("shadow and off stay silent even when the governor would block (advisory text is an advisory/enforce channel only)", () => {
+  withBox({}, (box) => {
+    assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode: "shadow" }) }), "shadow");
+    assert.deepEqual(ledgerTypes(box), ["stop-eval"]);
+  });
+  withBox({}, (box) => {
+    assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode: "off" }) }), "off");
+    assert.deepEqual(ledgerTypes(box), []);
+  });
+  withBox({ queue: false }, (box) => {
+    for (const mode of ["shadow", "off"]) {
+      assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode, implementationPhaseActive: true }) }), `${mode} with no queue`);
+    }
+  });
+});
+
+check("FANOUT-NO-QUEUE reaches the session in advisory and enforce mode (absent queue while implementing, invalid queue) as advisory output, never a block", () => {
+  for (const mode of ["advisory", "enforce"]) {
+    withBox({ queue: false }, (box) => {
+      const absent = hook(box, stopPayload(box), { config: configFor(box, { mode, implementationPhaseActive: true }) });
+      assert.equal(absent.status, 0, absent.stderr);
+      const out = JSON.parse(absent.stdout);
+      assert.deepEqual(Object.keys(out).sort(), ["hookSpecificOutput", "systemMessage"], mode);
+      assert.match(out.systemMessage, /^FANOUT-NO-QUEUE: no slice queue is declared/u);
+      assert.match(out.systemMessage, /node .+slice-queue\.mjs add/u);
+      assert.equal(out.systemMessage.includes("<plugin-root>"), false, "the placeholder is substituted");
+      assert.deepEqual(out.hookSpecificOutput, { hookEventName: "Stop", additionalContext: out.systemMessage });
+      assert.deepEqual(ledgerTypes(box), [], "rules 1-4 log nothing");
+      assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode, implementationPhaseActive: false }) }), `${mode}: absent queue, not implementing`);
+    });
+    withBox({ queue: false }, (box) => {
+      writeFileSync(box.queuePath, "{ not json");
+      const invalid = JSON.parse(hook(box, stopPayload(box), { config: configFor(box, { mode }) }).stdout);
+      assert.match(invalid.systemMessage, /^FANOUT-NO-QUEUE: the slice queue is invalid/u, mode);
+      assert.equal(invalid.decision, undefined, "an advisory line is never a block decision");
+    });
+  }
+});
+
+check("implementationPhaseActive is derived from the feature state (design 3.10): implementing with no queue -> the NO-QUEUE line, any other phase or unreadable state -> silent", () => {
+  const advisory = (box) => hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) });
+  for (const [dir, file] of [["project", "pipeline-state.json"], [".claude", "pipeline-state.json"]]) {
+    withBox({ queue: false }, (box) => {
+      assertSilent(advisory(box), `${dir}: no state file`);
+      mkdirSync(join(box.root, dir), { recursive: true });
+      writeFileSync(join(box.root, dir, file), JSON.stringify({ activeFeature: { phase: "design" } }));
+      assertSilent(advisory(box), `${dir}: phase design`);
+      writeFileSync(join(box.root, dir, file), JSON.stringify({ activeFeature: { phase: "implementation" } }));
+      const result = advisory(box);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(JSON.parse(result.stdout).systemMessage, /^FANOUT-NO-QUEUE: no slice queue is declared/u, dir);
+      writeFileSync(join(box.root, dir, file), "{ malformed");
+      assertSilent(advisory(box), `${dir}: malformed state`);
+    });
+  }
+});
+
+check("a block is emitted only after its block event was durably appended: a refused append, or a result without a block event, fails open", () => {
+  withBox({}, (box) => {
+    const config = JSON.parse(configFor(box));
+    const input = stopPayload(box);
+    const recorded = [];
+    const ok = (_common, _runner, _session, event) => {
+      recorded.push(event.type);
+      return { path: "unit", event };
+    };
+    assert.equal(JSON.parse(decideStop(input, { config, append: ok })).decision, "block", "control: a recorded block is issued");
+    assert.deepEqual(recorded, ["stop-eval", "block"], "recorded in the governor's order before the block is returned");
+
+    const refused = [];
+    const unsafeOnBlock = (_common, _runner, _session, event) => {
+      if (event.type === "block") throw Object.assign(new Error("ledger"), { code: "FANOUT-FILE-UNSAFE" });
+      refused.push(event.type);
+      return { path: "unit", event };
+    };
+    assert.equal(decideStop(input, { config, append: unsafeOnBlock }), "", "FANOUT-FILE-UNSAFE on the block append: no block");
+    assert.deepEqual(refused, ["stop-eval"]);
+    const unsafeAlways = () => {
+      throw Object.assign(new Error("ledger"), { code: "FANOUT-FILE-UNSAFE" });
+    };
+    assert.equal(decideStop(input, { config, append: unsafeAlways }), "", "no event can be appended: no block");
+
+    const withoutBlockEvent = () => ({ decision: "block", reasonCode: "FANOUT-BLOCK", reason: "FANOUT-BLOCK: unit", telemetry: { mode: "enforce", events: [{ type: "stop-eval" }] } });
+    assert.equal(decideStop(input, { config, evaluate: withoutBlockEvent, append: ok }), "", "a block whose block event was never produced is not issued");
+  });
+});
+
+check("no config or no queuePath returns silently having spawned nothing; once a queue is configured the one git spawn is windowsHide", () => {
+  withBox({}, (box) => {
+    const spawned = [];
+    const spy = (file, args, options) => {
+      spawned.push({ file, args, options });
+      return `${box.common}\n`;
+    };
+    const input = stopPayload(box);
+    const base = { mode: "enforce", requiresEnforcement: true, platform: "linux" };
+    for (const [label, config] of [
+      ["unset config", {}],
+      ["no queuePath", base],
+      ["empty queuePath", { ...base, queuePath: "" }],
+      ["non-string queuePath", { ...base, queuePath: 7 }],
+    ]) {
+      assert.equal(decideStop(input, { config, execFile: spy }), "", label);
+    }
+    assert.deepEqual(spawned, [], "no child process before the queuePath/config early exit");
+    assert.deepEqual(ledgerTypes(box), []);
+
+    const { commonDir: _omit, ...withoutCommonDir } = JSON.parse(configFor(box));
+    const out = decideStop(input, { config: withoutCommonDir, execFile: spy, append: (_common, _runner, _session, event) => ({ event }) });
+    assert.equal(JSON.parse(out).decision, "block", "control: the configured queue flows through the injected spawn seam");
+    assert.equal(spawned.length, 1, "exactly one git spawn once a queue is configured");
+    assert.equal(spawned[0].file, "git");
+    assert.equal(spawned[0].options.windowsHide, true, "no console window on native Windows");
+    assert.equal(spawned[0].options.cwd, box.root);
+  });
+  withBox({}, (box) => {
+    assertSilent(hook(box, stopPayload(box), { config: "" }), "unset PIPELINE_FANOUT_CONFIG as a real child");
+    assert.deepEqual(ledgerTypes(box), []);
+  });
+});
+
+assert.equal(cases.length, 20, "the complete stop-fanout corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
