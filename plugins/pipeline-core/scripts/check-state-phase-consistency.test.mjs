@@ -19,7 +19,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { run } from "./pipeline-state.mjs";
+import { run, readState } from "./pipeline-state.mjs";
+import { readRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
 import { checkStatePhaseConsistency } from "./check-state-phase-consistency.mjs";
 import {
   PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
@@ -34,9 +35,18 @@ const D = "d".repeat(64);
 
 function freshDir() {
   const dir = mkdtempSync(join(tmpdir(), "state-phase-consistency-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir, windowsHide: true });
   mkdirSync(join(dir, "docs"), { recursive: true });
   writeFileSync(join(dir, "docs/state.md"), "# Project state\n\n## Next action\n\nplaceholder\n");
   return dir;
+}
+
+// In a git repository the phase marker is projected only to the private
+// next-action projection (never docs/state.md); read it back from there.
+function projectedNextAction(dir) {
+  const projection = readRuntimeNextAction({ rootDir: dir, state: readState(dir).state });
+  assert.equal(projection.status, "available", JSON.stringify(projection));
+  return projection.sectionText;
 }
 
 // Mirrors pipeline-state-approve-announce.test.mjs's injectedPoGateAuthority:
@@ -194,7 +204,7 @@ test("the marker stays atomic with a real design -> implementation transition", 
     const afterSetFeature = checkStatePhaseConsistency({ rootDir: dir });
     assert.equal(afterSetFeature.status, "consistent", JSON.stringify(afterSetFeature));
     assert.equal(afterSetFeature.phase, "design");
-    const markerAfterSetFeature = readFileSync(join(dir, "docs/state.md"), "utf8");
+    const markerAfterSetFeature = projectedNextAction(dir);
     assert.match(markerAfterSetFeature, /\*\*Lifecycle phase:\*\* feature `atomic-feature` . phase `design`/u);
 
     const continuityInit = initializeLifecycleContinuity(dir, "atomic-feature", planPath);
@@ -215,7 +225,7 @@ test("the marker stays atomic with a real design -> implementation transition", 
     const afterSetPhase = checkStatePhaseConsistency({ rootDir: dir });
     assert.equal(afterSetPhase.status, "consistent", JSON.stringify(afterSetPhase));
     assert.equal(afterSetPhase.phase, "implementation");
-    const markerAfterSetPhase = readFileSync(join(dir, "docs/state.md"), "utf8");
+    const markerAfterSetPhase = projectedNextAction(dir);
     assert.match(markerAfterSetPhase, /\*\*Lifecycle phase:\*\* feature `atomic-feature` . phase `implementation`/u);
     assert.doesNotMatch(markerAfterSetPhase, /phase `design`/u);
   } finally {

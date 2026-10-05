@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -200,6 +200,7 @@ function fixture({ linkedLanguage = null } = {}) {
   const primary = join(base, "primary");
   mkdirSync(common, { recursive: true });
   mkdirSync(primary, { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: primary, windowsHide: true });
   populateRoot(primary, "de");
   const current = linkedLanguage === null ? primary : join(base, "linked");
   if (linkedLanguage !== null) {
