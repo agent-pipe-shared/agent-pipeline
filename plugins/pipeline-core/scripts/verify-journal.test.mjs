@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawn as spawnChild, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { closeSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { constants as osConstants, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -385,7 +386,25 @@ test("session-less passed and numeric failed terminals retain journal bytes, rel
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("a session-less checkout with an already-active session descriptor falls back to the original refusal, never overriding it", async () => {
+// ALFRED-RDY3B-20261005 helpers for the run-record design. Bytes of a private session-state tree
+// (descriptors, cleanup manifests) -- empty when the tree does not exist -- and the run-record files
+// Verify keeps under <git-common-dir>/agent-pipeline/verify/run-records.
+const sessionStateBytes = (common) => ({
+  descriptors: existsSync(join(common, "agent-pipeline", "session-descriptors")) ? snapshotFiles(join(common, "agent-pipeline", "session-descriptors")) : {},
+  cleanup: existsSync(join(common, "agent-pipeline", "session-cleanup")) ? snapshotFiles(join(common, "agent-pipeline", "session-cleanup")) : {},
+});
+const runRecordFiles = (common) => {
+  try { return readdirSync(join(common, "agent-pipeline", "verify", "run-records")).filter((name) => name.endsWith(".json")).sort(); } catch { return []; }
+};
+
+// ALFRED-RDY3B-20261005 -- SUPERSEDED CONTRACT (PO decision "Readiness root fix", 2026-10-05, tracked in
+// specs/sprint-alfred-epic/design/po-queue-2026-10-03.md). This case used to assert that a session-less
+// Verify REFUSED (VERIFY-CLEANUP-REGISTRATION-REQUIRED) when another active session descriptor existed,
+// because Verify created its own session descriptor + cleanup binding and could not do so beside a foreign
+// one. Verify no longer creates or needs either: it records its cleanup duty in a private run record, so
+// that refusal property no longer exists by design. What survives, and is asserted here, is the safety
+// property underneath it: Verify never overrides, touches, retires or archives a foreign descriptor.
+test("a session-less checkout with an already-active foreign session descriptor still runs Verify and leaves that descriptor byte-identical", async () => {
   const root = mkdtempSync(join(tmpdir(), "verify-journal-sessionless-conflict-"));
   chmodSync(root, 0o700);
   const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
@@ -396,18 +415,27 @@ test("a session-less checkout with an already-active session descriptor falls ba
     project: "fixture", verify: "node verify.mjs", autonomy: "bounded",
     branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
   }, null, 2)}\n`);
-  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Exercise the conflicting-descriptor refusal" });
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Exercise Verify beside a foreign descriptor" });
   applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
-  // A descriptor already exists with no continuity binding pointing at it (e.g. a prior,
-  // still-open real session) -- the ephemeral fallback must never create a second one or
-  // silently proceed around it.
-  startSessionDescriptor(root, {});
+  // A descriptor already exists with no continuity binding pointing at it (e.g. a prior, still-open
+  // real session): foreign to Verify.
+  const foreign = startSessionDescriptor(root, {});
   const common = join(root, ".git");
+  const foreignBefore = sessionStateBytes(common);
+  assert.ok(Object.keys(foreignBefore.descriptors).length > 0, "the foreign descriptor is on disk");
   const suiteFile = join(root, "fixture.test.mjs");
   writeFileSync(suiteFile, "process.stdout.write('complete private log\\n')\n", { mode: 0o600 });
   try {
-    await assert.rejects(() => runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "test" }, runId: "verify-sessionless-conflict", spawn: spawnPass }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED/u);
-    assert.throws(() => lstatSync(join(common, "agent-pipeline", "verify")));
+    // The default async spawn (a real child) is required here: only it can PROVE the child closed, and an
+    // unproven close deliberately keeps the run record (see the production-spawn-error case below), which
+    // would turn this into a different property than the one under test.
+    const result = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "test" }, runId: "verify-sessionless-conflict" });
+    assert.equal(result.terminal.status, "passed");
+    assert.deepEqual(sessionStateBytes(common), foreignBefore, "no descriptor or cleanup-manifest byte changed");
+    assert.deepEqual(listActiveSessionDescriptors(root), [{ sessionId: foreign.sessionId, descriptorSha256: foreign.descriptorSha256 }]);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound", "Verify created no cleanup binding");
+    assert.deepEqual(runRecordFiles(common), [], "the run record was retired");
+    assert.equal(existsSync(join(result.runDir, "terminal.json")), true, "the sealed run is retained evidence");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -465,9 +493,22 @@ test("a normalized failed receipt after a production spawn error cannot release 
     assert.equal(terminal.status, "failed");
     assert.equal(receipt.exitCode, 1);
     assert.equal(receipt.status, "completed");
-    const binding = readOnboardingSessionCleanupBinding({ rootDir: f.root });
-    assert.equal(binding.status, "bound");
-    assert.equal(listActiveSessionDescriptors(f.root).length, 1);
+    // ALFRED-RDY3B-20261005 (PO decision "Readiness root fix", 2026-10-05): the "owner" Verify creates is
+    // now its private run record, never a session descriptor or a cleanup binding. The property is
+    // unchanged: an unproven child close means the run's cleanup duty is NOT released. The record stays
+    // registered for this live process and the sealed run is retained, so neither a sweep nor a later
+    // Verify can settle or drain a run whose children may still be alive.
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "unbound", "no cleanup binding was ever created");
+    assert.equal(listActiveSessionDescriptors(f.root).length, 0, "no session descriptor was ever created");
+    assert.deepEqual(runRecordFiles(f.common), ["verify-sessionless-null.json"], "the run record is not released");
+    const record = JSON.parse(readFileSync(join(f.common, "agent-pipeline", "verify", "run-records", "verify-sessionless-null.json"), "utf8"));
+    assert.equal(record.pid, process.pid);
+    assert.equal(record.runPath, runDir);
+    const { sweepStaleVerifyRunRecords } = await import("../lib/verify-run-record.mjs");
+    const swept = sweepStaleVerifyRunRecords({ gitCommonDir: f.common });
+    assert.deepEqual(swept.settled, [], "a live owner's record is never settled by a sweep");
+    assert.deepEqual(swept.retained, ["verify-sessionless-null"]);
+    assert.equal(JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8")).status, "failed", "terminal evidence is not lost");
     assert.equal(JSON.parse(readFileSync(join(runDir, "run.lock"), "utf8")).status, "closed");
   } finally {
     Object.defineProperty(process, "execPath", originalExecPath);
@@ -554,45 +595,60 @@ test("a caller-supplied registration callback has no automatic owner teardown au
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("a suite-created foreign descriptor blocks owner teardown without losing terminal evidence", async () => {
-  const f = sessionlessCheckout("verify-journal-foreign-descriptor-", "Exercise foreign descriptor refusal");
+// ALFRED-RDY3B-20261005 (PO decision "Readiness root fix", 2026-10-05): Verify keeps a private run record,
+// not a session descriptor. A descriptor created by a suite DURING the run is foreign: the run still
+// completes, its terminal evidence is kept, and the foreign descriptor is never touched, retired or
+// archived by Verify's own cleanup. (Formerly: such a descriptor made owner teardown refuse and the run
+// reject with VERIFY-OWNER-CLEANUP-REQUIRED, because teardown shared the session machinery.)
+test("a suite-created foreign descriptor is never touched by Verify cleanup and terminal evidence is kept", async () => {
+  const f = sessionlessCheckout("verify-journal-foreign-descriptor-", "Exercise foreign descriptor safety");
   const suiteFile = join(f.root, "fixture.test.mjs");
+  const marker = join(f.root, "foreign-descriptor.json");
   const lifecycleUrl = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../lib/worktree-lifecycle.mjs")).href;
-  writeFileSync(suiteFile, `import { startSessionDescriptor } from ${JSON.stringify(lifecycleUrl)};\nstartSessionDescriptor(process.cwd(), {});\n`, { mode: 0o600 });
+  writeFileSync(suiteFile, `import { writeFileSync } from "node:fs";\nimport { startSessionDescriptor } from ${JSON.stringify(lifecycleUrl)};\nconst started = startSessionDescriptor(process.cwd(), {});\nwriteFileSync(${JSON.stringify(marker)}, JSON.stringify({ sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 }));\n`, { mode: 0o600 });
   const stateBytes = readFileSync(f.statePath);
   try {
-    await assert.rejects(
-      () => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "foreign-descriptor" }, runId: "verify-foreign-descriptor" }),
-      /VERIFY-OWNER-CLEANUP-REQUIRED:verify-foreign-descriptor/u,
-    );
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "foreign-descriptor" }, runId: "verify-foreign-descriptor" });
+    assert.equal(result.terminal.status, "passed");
     const runDir = join(f.common, "agent-pipeline", "verify", "runs", "verify-foreign-descriptor");
-    assert.equal(JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8")).status, "passed");
+    assert.equal(JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8")).status, "passed", "terminal evidence is kept");
     assert.equal(JSON.parse(readFileSync(join(runDir, "run.lock"), "utf8")).status, "closed");
-    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "bound");
-    assert.equal(listActiveSessionDescriptors(f.root).length, 2);
+    const foreign = JSON.parse(readFileSync(marker, "utf8"));
+    assert.deepEqual(listActiveSessionDescriptors(f.root), [foreign], "exactly the suite-created descriptor, byte-identical (digest-bound), nothing retired or added");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "unbound", "Verify created no cleanup binding");
+    assert.deepEqual(runRecordFiles(f.common), [], "the run record was retired");
     assert.deepEqual(readFileSync(f.statePath), stateBytes);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("an extra owner resource blocks retention and preserves the journal and binding", async () => {
-  const f = sessionlessCheckout("verify-journal-extra-resource-", "Exercise extra resource refusal");
+// ALFRED-RDY3B-20261005 (PO decision "Readiness root fix", 2026-10-05): the run record's only cleanup duty
+// is "remove this invocation's own UNSEALED run directory". An extra resource -- one inside the sealed
+// run directory or beside it -- must survive Verify's cleanup, and the journal and terminal evidence must
+// stay intact. (Formerly: an extra resource registered under the session owner made retention refuse; no
+// session owner exists any more, so the property is asserted against what Verify's cleanup can reach.)
+test("an extra resource in or beside a sealed run directory survives Verify cleanup and the journal stays intact", async () => {
+  const f = sessionlessCheckout("verify-journal-extra-resource-", "Exercise extra resource preservation");
   const suiteFile = join(f.root, "fixture.test.mjs");
-  const continuityUrl = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../lib/onboarding-continuity.mjs")).href;
-  const lifecycleUrl = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../lib/worktree-lifecycle.mjs")).href;
-  const extraPath = join(f.root, "extra-registered-resource");
-  writeFileSync(suiteFile, `import { mkdirSync } from "node:fs";\nimport { readOnboardingSessionCleanupBinding } from ${JSON.stringify(continuityUrl)};\nimport { loadSessionDescriptor, registerTemporaryIntent } from ${JSON.stringify(lifecycleUrl)};\nconst binding = readOnboardingSessionCleanupBinding({ rootDir: process.cwd() });\nconst descriptor = loadSessionDescriptor(process.cwd(), binding.sessionCleanup.sessionId, { expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256 });\nmkdirSync(${JSON.stringify(extraPath)}, { mode: 0o700 });\nregisterTemporaryIntent(process.cwd(), { sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce, resourceId: "extra-resource", type: "scratch-directory", path: ${JSON.stringify(extraPath)}, contentClass: "verify-recovery", soleCopy: false, cleanupPolicy: "remove-directory" });\n`, { mode: 0o600 });
+  const runDir = join(f.common, "agent-pipeline", "verify", "runs", "verify-extra-resource");
+  const extraInside = join(runDir, "extra-resource.txt");
+  const extraBeside = join(f.root, "extra-registered-resource");
+  writeFileSync(suiteFile, `import { mkdirSync, writeFileSync } from "node:fs";\nmkdirSync(${JSON.stringify(extraBeside)}, { mode: 0o700 });\nwriteFileSync(${JSON.stringify(extraInside)}, "not written by Verify\\n", { mode: 0o600 });\n`, { mode: 0o600 });
   const stateBytes = readFileSync(f.statePath);
   try {
-    await assert.rejects(
-      () => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "extra-resource" }, runId: "verify-extra-resource" }),
-      /VERIFY-OWNER-CLEANUP-REQUIRED:verify-extra-resource/u,
-    );
-    const runDir = join(f.common, "agent-pipeline", "verify", "runs", "verify-extra-resource");
-    assert.equal(JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8")).status, "passed");
-    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "bound");
-    assert.equal(listActiveSessionDescriptors(f.root).length, 1);
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "extra-resource" }, runId: "verify-extra-resource" });
+    assert.equal(result.terminal.status, "passed");
+    const terminal = JSON.parse(readFileSync(join(runDir, "terminal.json"), "utf8"));
+    assert.equal(terminal.status, "passed");
+    // The journal Verify writes is `progress.jsonl` (createVerifyRun); the sealed terminal binds its bytes.
+    const journalBytes = readFileSync(join(runDir, "progress.jsonl"));
+    assert.ok(journalBytes.length > 0, "the journal is present and non-empty");
+    assert.equal(terminal.journalSha256, createHash("sha256").update(journalBytes).digest("hex"), "the journal is intact and matches the sealed terminal");
+    assert.equal(readFileSync(extraInside, "utf8"), "not written by Verify\n", "the extra resource inside the sealed run is retained, never drained");
+    assert.equal(lstatSync(extraBeside).isDirectory(), true, "the extra resource beside the run is untouched");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "unbound");
+    assert.equal(listActiveSessionDescriptors(f.root).length, 0);
+    assert.deepEqual(runRecordFiles(f.common), [], "the run record was retired");
     assert.deepEqual(readFileSync(f.statePath), stateBytes);
-    assert.equal(lstatSync(extraPath).isDirectory(), true);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
@@ -1363,16 +1419,39 @@ test("ALFRED-RF1: an exception thrown from the suite spawn seam is rethrown unch
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+// ALFRED-RDY3C-20261005 (PO decision "Readiness root fix", 2026-10-05): Verify's own cleanup duty is its
+// run record, not a session descriptor, so it can no longer collide with a foreign descriptor -- the old
+// VERIFY-OWNER-CLEANUP-REQUIRED aggregate (Verify could not retire "its" descriptor beside a foreign one)
+// has no cause left. What survives is the safety property underneath it: owner retirement never touches
+// a descriptor it did not create. A descriptor appearing mid-run stays byte-identical, the original error
+// reaches the caller unwrapped, and Verify's OWN unsealed run directory is drained wholesale (including a
+// file the seam dropped into it) while the run record is retired.
 test("ALFRED-RF1: owner retirement never touches a descriptor it did not create", async () => {
   const f = rf1Checkout("verify-journal-rf1-foreign-");
+  const runId = "verify-rf1-foreign";
+  const runDir = rf1RunDir(f, runId);
   let foreign = null;
+  let foreignBytes = null;
+  let failure = null;
   try {
     await assert.rejects(
-      () => rf1Run(f, "verify-rf1-foreign", { spawn: async () => { foreign = startSessionDescriptor(f.root, {}); throw new Error("RF1-SEAM-FOREIGN"); } }),
-      (error) => /VERIFY-OWNER-CLEANUP-REQUIRED:verify-rf1-foreign/u.test(error.message) && /RF1-SEAM-FOREIGN/u.test(error.message),
+      () => rf1Run(f, runId, { spawn: async () => {
+        foreign = startSessionDescriptor(f.root, {});
+        foreignBytes = sessionStateBytes(f.common);
+        writeFileSync(join(runDir, "extra-in-unsealed-run.txt"), "dropped by the seam\n", { mode: 0o600 });
+        throw new Error("RF1-SEAM-FOREIGN");
+      } }),
+      (error) => { failure = error; return true; },
     );
-    assert.ok(foreign !== null);
-    assert.equal(listActiveSessionDescriptors(f.root).some((entry) => entry.sessionId === foreign.sessionId && entry.descriptorSha256 === foreign.descriptorSha256), true, "the foreign descriptor is untouched");
+    assert.ok(foreign !== null && foreignBytes !== null, "the seam ran and created the foreign descriptor");
+    assert.equal(failure.message, "RF1-SEAM-FOREIGN", "the original error is rethrown unwrapped");
+    assert.equal(failure instanceof AggregateError, false);
+    assert.equal(failure.cause, undefined);
+    assert.deepEqual(sessionStateBytes(f.common), foreignBytes, "no descriptor or cleanup-manifest byte changed");
+    assert.deepEqual(listActiveSessionDescriptors(f.root), [{ sessionId: foreign.sessionId, descriptorSha256: foreign.descriptorSha256 }], "exactly the foreign descriptor remains");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: f.root }).status, "unbound", "Verify created no cleanup binding");
+    assert.equal(existsSync(runDir), false, "Verify's own unsealed run directory is drained wholesale");
+    assert.deepEqual(runRecordFiles(f.common), [], "the run record was retired");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
