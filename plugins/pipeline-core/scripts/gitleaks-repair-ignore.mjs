@@ -36,6 +36,7 @@ import {
   normalizeCandidateFindingPath,
   isInstalled,
 } from "./security-adapters/gitleaks.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const IGNORE_FILE = ".gitleaksignore";
 
@@ -163,6 +164,6 @@ async function main() {
   console.log(result.newEntry);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   main();
 }
