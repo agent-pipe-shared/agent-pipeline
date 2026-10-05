@@ -12,6 +12,7 @@
  * Run: node --test plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
  */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

@@ -9,6 +9,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -28,7 +29,9 @@ const C = "c".repeat(64);
 const D = "d".repeat(64);
 
 function freshDir() {
-  return mkdtempSync(join(tmpdir(), "pipeline-state-approve-announce-"));
+  const dir = mkdtempSync(join(tmpdir(), "pipeline-state-approve-announce-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir, windowsHide: true });
+  return dir;
 }
 
 function injectedPoGateAuthority(planPath) {

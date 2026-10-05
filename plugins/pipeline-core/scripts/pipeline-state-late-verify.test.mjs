@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Regression coverage for pipeline.baseline-only-verify-needs-an-actionable-release-recovery.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +14,9 @@ const NOW = "2026-09-18T12:00:00.000Z";
 const SEEDED_VERIFY = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
 
 function rootFor(name) {
-  return mkdtempSync(join(tmpdir(), `pipeline-late-verify-${name}-`));
+  const root = mkdtempSync(join(tmpdir(), `pipeline-late-verify-${name}-`));
+  execFileSync("git", ["init", "-q"], { cwd: root, windowsHide: true });
+  return root;
 }
 
 function writeFixture(root, { phase = "design", legacy = "baseline", command = SEEDED_VERIFY } = {}) {
