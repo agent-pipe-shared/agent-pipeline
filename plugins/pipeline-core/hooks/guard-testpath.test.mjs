@@ -25,7 +25,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, openSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
@@ -566,7 +566,7 @@ const cases = names.map((name, index) => {
   } };
 });
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 const completionMaxBytes = Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536");
 registerTestCaseCompletion({ cases, fd: completionFd, maxBytes: completionMaxBytes });

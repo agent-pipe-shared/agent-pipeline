@@ -448,6 +448,21 @@ host storage/readback. The same paths remain protected through both project
 and installed-plugin anchors. A window cannot rewrite a dependency while
 leaving its importing guard or signed authority reader intact.
 
+The completed first-party import walk additionally protects exactly
+`lib/claude-task-output-read-scope.mjs`, `lib/bound-design-line-endings.mjs`,
+`lib/design-authoring.mjs`, `lib/claude-initial-prompt-pointer.mjs`,
+`lib/claude-intake-prompt-capture.mjs`, `lib/runtime-handover-projection.mjs`,
+`lib/model-family-discovery.mjs`, `scripts/check-runner-manifest-parity.mjs`,
+and `scripts/model-family-approval-request.mjs`. These modules decide which
+background-task output file the guarded reader may expose, what onboarding
+intake material is captured and resolved after consent, the handover
+projection published by the sanctioned state writer, the exact family-migration
+request a human is shown before signing, and the runner-manifest parity check
+behind Critic-skip coverage. Each is imported by a kernel module and executes
+in that module's process, so it is protected through both the project and the
+installed-plugin anchors for the same reason as the dependencies above. The
+closure was walked to a fixed point; these nine add no further first-party hop.
+
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 

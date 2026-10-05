@@ -559,6 +559,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "git-hook-runtime-snapshot-fast-verify-tests",
+      "path": "plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "github-actions-permissions-tests",
       "path": "harness/scripts/check-github-actions-permissions.test.mjs",
       "disposition": "legacy-process-only",
@@ -597,6 +602,11 @@
     {
       "name": "governance-verification-action-tests",
       "path": "plugins/pipeline-core/lib/governance-verification-action.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "guard-dispatch-budget-checkpoint-tests",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
       "disposition": "required"
     },
     {
@@ -1164,6 +1174,16 @@
       "disposition": "required"
     },
     {
+      "name": "project-onboarding-foreign-residue-tests",
+      "path": "plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "project-onboarding-foreign-residue-unit-tests",
+      "path": "plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "project-onboarding-v3-tests",
       "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
       "disposition": "required"
@@ -1564,6 +1584,11 @@
       "path": "harness/scripts/verify-evidence-root.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "verify-run-record-tests",
+      "path": "plugins/pipeline-core/lib/verify-run-record.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "verify-selection-tests",

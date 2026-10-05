@@ -11218,3 +11218,604 @@ test("QP3-4 W0-4 F-2: the record lane admits exactly backlog/, docs/ and scratch
   const notebookTraversal = qw04Run(path, "NotebookEdit", { notebook_path: "scratch/../project/qp3.ipynb" });
   assert.equal(notebookTraversal.exitCode, 2, "NotebookEdit traversal out of scratch/ refused");
 });
+
+// ALFRED-QP4-BUILD2: tests for the fourth signed quality package (appended to the HEAD test file); re-scoped to the guard-side changes only.
+// Contract: scratch/qp4/false-positives.md. The refusal label GUARD-READ-SCOPE-OUTSIDE-ROOT used to be printed for EVERY non-admitted single read-family
+// command (isRejectedReadFamilyCommand), so R1-R3/R6 were never outside-root reads: they are refused for rg flags the closed grammar does not know
+// (--no-heading, -m, a repeated -g -- fixed separately in the unprotected guard-command-grammar.mjs), R5 for a double-quoted native-Windows drive
+// path whose backslashes the POSIX tokenizer drops.
+//   QP4-1  a single read-family command the grammar does not support (R1, R2, R3, R6 shapes and in-root siblings) is refused with the NEW code
+//          GUARD-READ-COMMAND-UNSUPPORTED and never with the scope code; a target that really resolves outside the root keeps the scope code.
+//   QP4-2  win32: a double-quoted native drive path made of plain path characters is the same file for the shell and the guard (R5).
+//   QP4-3  Codex and Antigravity Bash payload shapes reach the same predicate and carry the same labels; in-root tail/wc/head stay admitted (R4).
+//   QP4-4  Glob wildcard listing inside the project root (G1, G3, G4); G2 (.git) refused. Round 2 (R2-1, SEC-11 "native Grep requires an exact file"): the
+//          directory-scoped Grep lane is REMOVED, so every directory-scoped Grep (round 1 admitted five shapes) is refused again, exactly as at HEAD.
+//   QP4-5  Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING (F1), never for private or outside paths.
+//   QP4-6  Round 2 (R2-1): the Glob wildcard listing is admitted only when no directory at or below the named path has a name starting with "." (a bounded,
+//          fail-closed walk that follows links to their physical target); a fixture WITHOUT any secret-named file proves the refusal comes from that walk.
+//   QP4-7  Round 2 (R2-2): the outside-root label looks only at read targets -- the rg/grep PATTERN and the value of an option that takes a value are not.
+const QP4_READ_TARGET = "GUARD-READ-TARGET";
+const QP4_UNSUPPORTED = /GUARD-READ-COMMAND-UNSUPPORTED:/u;
+const QP4_SCOPE = /GUARD-READ-SCOPE-OUTSIDE-ROOT/u;
+
+function qp4Fwd(path) { return path.replaceAll("\\", "/"); }
+
+function qp4Fixture() {
+  const path = realpathSync(root());
+  markGovernedFixture(path);
+  for (const dir of ["scratch/sub", "plugins/pipeline-core/scripts", "plugins/pipeline-core/lib", "vault", ".git/agent-pipeline/session-descriptors/active"]) {
+    mkdirSync(join(path, ...dir.split("/")), { recursive: true });
+  }
+  writeFileSync(join(path, "scratch", "notes.md"), "authorize-commit apply\n");
+  writeFileSync(join(path, "scratch", "log.txt"), "line\n");
+  writeFileSync(join(path, "scratch", "sub", "a.md"), "authorize-commit\n");
+  writeFileSync(join(path, "scratch", "sub", "b.mjs"), "export const b = 1;\n");
+  writeFileSync(join(path, "plugins", "pipeline-core", "scripts", "signed-quality-package.mjs"), "export const apply = 1;\n");
+  writeFileSync(join(path, "plugins", "pipeline-core", "lib", "a.mjs"), "export const a = 1;\n");
+  writeFileSync(join(path, "vault", "id_rsa"), "private\n");
+  writeFileSync(join(path, "vault", "readme.md"), "x\n");
+  writeFileSync(join(path, ".git", "agent-pipeline", "session-descriptors", "active", "s.json"), "{}\n");
+  return path;
+}
+
+// On native Windows the system temp directory sits under LOCALAPPDATA, which the passive read policy protects by design; the fixture
+// is a project root of its own, so those two variables point at a missing directory for the duration of the case.
+function qp4WithoutAppDataRoots(fn) {
+  const saved = { APPDATA: process.env.APPDATA, LOCALAPPDATA: process.env.LOCALAPPDATA };
+  const missing = join(tmpdir(), `qp4-no-appdata-${process.pid}`);
+  process.env.APPDATA = missing;
+  process.env.LOCALAPPDATA = missing;
+  try { return fn(); } finally {
+    for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+}
+
+function qp4Verdict(input, path) {
+  const r = evaluateLifecycleReadyGuard(input, { projectDir: path });
+  return { exitCode: r.exitCode, text: String(r.stderr ?? "") };
+}
+
+function qp4Admit(command, path) {
+  const predicate = isReadOnlyDiagnosticCommand(command, path);
+  const verdict = qp4Verdict(bash(command), path);
+  assert.equal(predicate, true, `predicate: ${command}`);
+  assert.equal(verdict.exitCode, 0, `guard: ${command}\n${verdict.text}`);
+}
+
+function qp4Refuse(command, path) {
+  const verdict = qp4Verdict(bash(command), path);
+  assert.equal(isReadOnlyDiagnosticCommand(command, path), false, `predicate: ${command}`);
+  assert.equal(verdict.exitCode, 2, `guard: ${command}`);
+  return verdict;
+}
+
+// Refused because the COMMAND is not supported: the new code, never the scope code.
+function qp4RefuseUnsupported(command, path) {
+  const verdict = qp4Refuse(command, path);
+  assert.match(verdict.text, QP4_UNSUPPORTED, `unsupported label: ${command}`);
+  assert.doesNotMatch(verdict.text, QP4_SCOPE, `no scope label: ${command}`);
+}
+
+// Refused because a target really resolves outside the project: the scope code, never the unsupported code.
+function qp4RefuseOutside(command, path) {
+  const verdict = qp4Refuse(command, path);
+  assert.match(verdict.text, QP4_SCOPE, `scope label: ${command}`);
+  assert.doesNotMatch(verdict.text, QP4_UNSUPPORTED, `no unsupported label: ${command}`);
+}
+
+test("QP4-1 a single read-family command the grammar does not support is refused with GUARD-READ-COMMAND-UNSUPPORTED (R1, R2, R3, R6 shapes), a target that really resolves outside the root keeps GUARD-READ-SCOPE-OUTSIDE-ROOT", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const fwd = qp4Fwd(path);
+      const script = "plugins/pipeline-core/scripts/signed-quality-package.mjs";
+      // Every target below is INSIDE the project root; the commands are refused for their own flags or spelling only. The rg flag gaps themselves
+      // (--no-heading, -m N, a repeated -g) are NOT admitted by this package: they are refused with the truthful code until guard-command-grammar.mjs
+      // learns them in a separate, ordinary commit.
+      for (const command of [
+        `rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
+        `rg -n --no-heading "authorize-commit" ${fwd}/scratch`,
+        `rg -n --no-heading -m 20 "authorize-commit\\|\\"apply\\"" ${script}`,
+        `rg -n --no-heading -m 20 apply ${fwd}/${script} ${fwd}/plugins/pipeline-core/lib/a.mjs`,
+        `rg -m 5 apply ${script}`,
+        `rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"`,
+        "rg --hidden --no-ignore apply .",
+        "grep -R apply .",
+        "git diff --output scratch/escaped.txt",
+        "node --test-reporter-destination scratch/escaped.txt --test",
+      ]) qp4RefuseUnsupported(command, path);
+      // The refusal still states the complete admitted grammar and a machine-readable (empty) retry envelope.
+      const unsupported = qp4Refuse(`rg -n --no-heading apply ${script}`, path);
+      assert.match(unsupported.text, /pipeline\.guard-retry-actions\.v1/u);
+      assert.match(unsupported.text, /not a path|not reported as a read outside the project root/u);
+      // Targets that really resolve outside the project keep the scope code. A plain outside file may be an admitted passive read (that policy is
+      // unchanged), so the refused outside targets here are protected credential reads: absolute, relative-traversal and tilde spellings.
+      const outsideSecret = qp4Fwd(join(outside, "vault", "id_rsa"));
+      for (const command of [
+        `cat ${outsideSecret}`,
+        `tail -n 20 ${outsideSecret}`,
+        `rg -n private ${outsideSecret}`,
+        `cat ${qp4Fwd(relative(path, join(outside, "vault", "id_rsa")))}`,
+        "cat ~/.ssh/id_rsa",
+      ]) qp4RefuseOutside(command, path);
+      // Secrets inside the root and the admitted forms of the same commands are unchanged.
+      qp4Refuse("cat vault/id_rsa", path);
+      qp4Admit(`rg -n -e authorize ${fwd}/${script}`, path);
+      qp4Admit(`rg -n apply ${script}`, path);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("QP4-2 R5 on native Windows a double-quoted drive path of plain path characters is admitted; protected and mixed-quote spellings stay refused", { skip: process.platform !== "win32" && "native Windows drive paths exist only on a win32 host (the rewrite is gated on process.platform and is inert elsewhere)" }, () => {
+  const path = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const bwd = path.replaceAll("/", "\\");
+      qp4Admit(`wc -l "${bwd}\\scratch\\notes.md"`, path);
+      qp4Admit(`tail -n 20 "${bwd}\\scratch\\log.txt"`, path);
+      qp4Admit(`rg -n apply "${bwd}\\scratch\\notes.md"`, path);
+      qp4Refuse(`wc -l "${bwd}\\vault\\id_rsa"`, path);
+      qp4Refuse(`wc -l "${path.slice(0, 3)}Users\\x\\.ssh\\id_ed25519"`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\notes.md" 'scratch\\log.txt'`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\notes.md\\"`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\$HOME"`, path);
+      qp4Refuse(`wc -l x"${bwd}\\scratch\\notes.md"`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\notes.md" > out.txt`, path);
+      // An outside-root drive path in the same spelling is still a scope refusal, not an unsupported command.
+      const outside = qp4Fixture();
+      try { qp4RefuseOutside(`wc -l "${outside.replaceAll("/", "\\")}\\vault\\id_rsa"`, path); } finally { rmSync(outside, { recursive: true, force: true }); }
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("QP4-3 R4 an existing in-root file through tail, wc and head is admitted; the Codex and Antigravity Bash payload shapes reach the same predicate and carry the same labels", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      for (const command of ["tail -n 20 scratch/log.txt", `tail -n 20 ${qp4Fwd(path)}/scratch/log.txt`, "wc -l scratch/notes.md", "head -n 5 scratch/notes.md"]) qp4Admit(command, path);
+      const script = `${qp4Fwd(path)}/plugins/pipeline-core/scripts/signed-quality-package.mjs`;
+      // Codex: PreToolUse {tool_name:"Bash", tool_input:{command}} -> isReadOnlyDiagnosticCommand(command, projectRoot) (codex-pretool-guard.mjs).
+      // Codex has no Glob/Grep/Read tool at the adapter: supportedTools is exactly Bash, apply_patch, Edit, Write.
+      const codexRefused = { tool_name: "Bash", tool_input: { command: `rg -n --no-heading -m 20 apply ${script}` } };
+      assert.equal(isReadOnlyDiagnosticCommand(codexRefused.tool_input.command, path), false);
+      const codexVerdict = evaluateLifecycleReadyGuard(codexRefused, { projectDir: path });
+      assert.equal(codexVerdict.exitCode, 2);
+      assert.match(String(codexVerdict.stderr), QP4_UNSUPPORTED);
+      assert.doesNotMatch(String(codexVerdict.stderr), QP4_SCOPE);
+      const codexAdmitted = { tool_name: "Bash", tool_input: { command: `rg -n -e apply ${script}` } };
+      assert.equal(isReadOnlyDiagnosticCommand(codexAdmitted.tool_input.command, path), true);
+      // Antigravity: {toolCall:{name:"run_command",args:{CommandLine,Cwd}}} normalizes to {tool_name:"Bash",tool_input:{command,cwd}};
+      // its view_file/list_dir/find_by_name/grep_search calls are read-only short-circuits at the adapter and never reach this guard.
+      const antigravity = (command) => ({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, cwd: path } });
+      const unsupported = evaluateLifecycleReadyGuard(antigravity(`rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt"`), { projectDir: path });
+      assert.equal(unsupported.exitCode, 2);
+      assert.match(String(unsupported.stderr), QP4_UNSUPPORTED);
+      assert.doesNotMatch(String(unsupported.stderr), QP4_SCOPE);
+      const scope = evaluateLifecycleReadyGuard(antigravity(`cat ${qp4Fwd(join(outside, "vault", "id_rsa"))}`), { projectDir: path });
+      assert.equal(scope.exitCode, 2);
+      assert.match(String(scope.stderr), QP4_SCOPE);
+      assert.doesNotMatch(String(scope.stderr), QP4_UNSUPPORTED);
+      assert.equal(evaluateLifecycleReadyGuard(antigravity("rg -n --no-heading apply scratch > out.txt"), { projectDir: path }).exitCode, 2);
+      assert.equal(evaluateLifecycleReadyGuard(antigravity("rg -n -e apply scratch/notes.md"), { projectDir: path }).exitCode, 0);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); every directory-scoped Grep stays refused (R2-1, SEC-11)", async (t) => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const tool = (name, input) => qp4Verdict({ tool_name: name, tool_input: input }, path);
+      for (const input of [
+        { pattern: "scratch/sub/*", path },
+        { pattern: "scratch/*", path },
+        { pattern: "scratch/*", path: qp4Fwd(path) },
+        { pattern: "*", path: join(path, "scratch") },
+        { pattern: "scratch/sub/*" },
+      ]) assert.equal(tool("Glob", input).exitCode, 0, JSON.stringify(input));
+      for (const input of [
+        { pattern: ".git/agent-pipeline/session-descriptors/active/*.json", path },
+        { pattern: ".git/agent-pipeline/session-descriptors/active/*", path },
+        { pattern: "*", path: join(path, ".git") },
+        { pattern: "*", path: join(path, ".git", "agent-pipeline") },
+        { pattern: "vault/*", path },
+        { pattern: "scratch/*/*", path },
+        { pattern: "scratch/**", path },
+        { pattern: "../*", path },
+        { pattern: "scratch/../vault/*", path },
+        { pattern: "scratch/*", path: join(outside, "scratch") },
+        { pattern: "scratch/*", path: outside },
+        { pattern: "/*", path },
+        { pattern: "scratch\\*", path },
+      ]) {
+        const r = tool("Glob", input);
+        assert.equal(r.exitCode, 2, JSON.stringify(input));
+        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+      // R2-1 (SEC-11 "native Grep requires an exact file"): the directory-scoped Grep lane is removed. Round 1 admitted these five shapes; each is
+      // refused again, exactly as at HEAD (content search over a tree uses the admitted `git grep`).
+      for (const input of [
+        { pattern: "authorize-commit|apply", path: join(path, "scratch"), glob: "*.md" },
+        { pattern: "authorize", path: join(path, "scratch"), glob: "**/*.md" },
+        { pattern: "authorize", path: qp4Fwd(join(path, "scratch")), glob: "*.mjs" },
+        { pattern: "authorize", path: "scratch", glob: "*.md" },
+        { pattern: "apply", path: join(path, "plugins", "pipeline-core"), glob: "**/*.mjs" },
+      ]) {
+        const r = tool("Grep", input);
+        assert.equal(r.exitCode, 2, JSON.stringify(input));
+        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+      for (const input of [
+        { pattern: "x", path: join(path, "scratch") },
+        { pattern: "x", glob: "*.md" },
+        { pattern: "x", path: join(path, ".git"), glob: "*.json" },
+        { pattern: "x", path: join(path, ".git", "agent-pipeline"), glob: "**/*.json" },
+        { pattern: "x", path: join(path, "vault"), glob: "*.md" },
+        { pattern: "x", path, glob: "*.md" },
+        { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
+        { pattern: "x", path: join(path, "scratch"), glob: "*" },
+        { pattern: "x", path: join(path, "scratch"), glob: "../*.md" },
+        { pattern: "x", path: join(path, "scratch"), glob: ".git/*.md" },
+        { pattern: "x", path: join(outside, "scratch"), glob: "*.md" },
+        { pattern: "x", path: join(path, "scratch", "notes.md"), glob: "*.md" },
+      ]) {
+        const r = tool("Grep", input);
+        assert.equal(r.exitCode, 2, JSON.stringify(input));
+        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+      assert.equal(tool("Read", { file_path: join(path, "scratch", "notes.md") }).exitCode, 0);
+      assert.equal(tool("Read", { file_path: join(path, "vault", "id_rsa") }).exitCode, 2);
+    });
+    // A directory link that leaves the project is an escape for both lanes (a junction on native Windows, a symlink elsewhere).
+    let linked = true;
+    try { symlinkSync(join(outside, "scratch"), join(path, "scratch", "escape"), "junction"); } catch (error) {
+      if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+      linked = false;
+    }
+    await t.test("QP4-4 directory link escape is refused", { skip: !linked && "directory link creation not permitted on this host" }, () => {
+      qp4WithoutAppDataRoots(() => {
+        assert.equal(qp4Verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/escape/*", path } }, path).exitCode, 2);
+        assert.equal(qp4Verdict({ tool_name: "Grep", tool_input: { pattern: "x", path: join(path, "scratch", "escape"), glob: "*.md" } }, path).exitCode, 2);
+      });
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING; private, secret-named and outside paths keep GUARD-READ-TARGET", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const read = (file) => qp4Verdict({ tool_name: "Read", tool_input: { file_path: file } }, path);
+      for (const file of [join(path, "scratch", "perf", "tests.log"), join(path, "scratch", "missing.log"), "scratch/missing.log", qp4Fwd(join(path, "scratch", "missing.log"))]) {
+        const r = read(file);
+        assert.equal(r.exitCode, 2, file);
+        assert.match(r.text, /GUARD-READ-TARGET-MISSING/u, file);
+      }
+      for (const file of [join(path, ".git", "agent-pipeline", "missing.json"), join(path, "scratch", "id_rsa"), join(path, "scratch", ".env"), join(path, "scratch", "k.pem"),
+        join(outside, "scratch", "missing.log"), join(path, "..", "missing.log"), join(path, "scratch", "notes.md", "inner"), join(path, "vault", "id_rsa")]) {
+        const r = read(file);
+        assert.equal(r.exitCode, 2, file);
+        assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, file);
+      }
+      assert.equal(read(join(path, "scratch", "log.txt")).exitCode, 0);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// R2-1 fixture: NO secret-named file anywhere, so the whole-tree secret screen passes and every refusal below can only come from the hidden-directory walk.
+function qp4HiddenFixture() {
+  const path = realpathSync(root());
+  markGovernedFixture(path);
+  for (const dir of ["src/sub", "docs", "top/mid/.cache", "nest/.claude", ".claude", ".git/agent-pipeline", "shallow/d/d/d/d/d", "deep"]) {
+    mkdirSync(join(path, ...dir.split("/")), { recursive: true });
+  }
+  mkdirSync(join(path, "deep", ...Array.from({ length: 40 }, () => "d")), { recursive: true });
+  for (const file of ["src/a.md", "src/sub/b.mjs", "docs/c.md", "top/mid/.cache/d.md", "nest/.claude/x.md", "nest/n.md", ".claude/x.md", ".git/agent-pipeline/x.json"]) {
+    writeFileSync(join(path, ...file.split("/")), "x\n");
+  }
+  return path;
+}
+
+test("QP4-6 R2-1 the Glob wildcard listing is admitted only when no directory at or below the named path is hidden (name starts with a dot); the refusal is the walk's, not the secret screen's", async (t) => {
+  const path = qp4HiddenFixture();
+  try {
+    const tool = (input) => qp4Verdict({ tool_name: "Glob", tool_input: input }, path);
+    const refused = (input) => {
+      const r = tool(input);
+      assert.equal(r.exitCode, 2, JSON.stringify(input));
+      assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+    };
+    qp4WithoutAppDataRoots(() => {
+      for (const input of [
+        { pattern: "src/*", path }, { pattern: "*", path: join(path, "src") }, { pattern: "docs/*", path }, { pattern: "src/sub/*", path },
+        { pattern: "*", path: qp4Fwd(join(path, "src", "sub")) }, { pattern: "shallow/*", path },
+      ]) assert.equal(tool(input).exitCode, 0, JSON.stringify(input));
+      // The project root (it contains .claude and .git), the parent of a hidden directory, a directory with a hidden directory further below, and a
+      // tree deeper than the walk's bound (40 nested directories, no hidden one) are all refused.
+      for (const input of [
+        { pattern: "*", path }, { pattern: "*" }, { pattern: "nest/*", path }, { pattern: "*", path: join(path, "nest") }, { pattern: "top/*", path },
+        { pattern: "*", path: qp4Fwd(join(path, "top")) }, { pattern: "top/mid/*", path }, { pattern: "deep/*", path },
+      ]) refused(input);
+      // Controls: remove the one hidden directory and the very same listing is admitted -- the hidden directory alone was the reason.
+      rmSync(join(path, "nest", ".claude"), { recursive: true, force: true });
+      assert.equal(tool({ pattern: "nest/*", path }).exitCode, 0, "control: nest/* once its hidden directory is gone");
+      rmSync(join(path, "top", "mid", ".cache"), { recursive: true, force: true });
+      assert.equal(tool({ pattern: "top/*", path }).exitCode, 0, "control: top/* once its hidden directory is gone");
+    });
+    let linked = true;
+    try { symlinkSync(join(path, "src"), join(path, "docs", "to-src"), "junction"); } catch (error) {
+      if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+      linked = false;
+    }
+    await t.test("QP4-6 a link to a visible in-root directory is followed; a link whose physical target is hidden is refused", { skip: !linked && "directory link creation not permitted on this host" }, () => {
+      qp4WithoutAppDataRoots(() => {
+        assert.equal(tool({ pattern: "docs/*", path }).exitCode, 0, "a link to a visible in-root directory");
+        symlinkSync(join(path, ".claude"), join(path, "docs", "to-hidden"), "junction");
+        refused({ pattern: "docs/*", path });
+      });
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("QP4-7 R2-2 the outside-root label looks only at read targets: an rg/grep pattern and the value of an option that takes a value are never one", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      // In-root targets; the command is refused for the unsupported flag only. A pattern that looks like a path ("// TODO" is absolute, a tilde-prefixed
+      // pattern is a home path) or an option value ("-g //x") must not turn that into a scope refusal.
+      for (const command of [
+        `rg -n --no-heading "// TODO" scratch`,
+        `rg -n --no-heading "~/notes" scratch`,
+        `rg -n --no-heading "~notes" scratch`,
+        `rg -n --no-heading -e "// TODO" scratch`,
+        `rg -n --no-heading -e "~/x" -e "//y" scratch`,
+        `rg -n --no-heading --regexp "// TODO" scratch`,
+        `rg -n --no-heading -g "//x" apply scratch`,
+        `rg -n --no-heading --glob "~/x" apply scratch`,
+        `rg -n --no-heading -m 20 "// TODO" scratch`,
+        `rg -n --no-heading "// TODO" ${qp4Fwd(path)}/scratch/notes.md`,
+        `grep -n --no-heading "// TODO" scratch/notes.md`,
+        `grep -n -e "~/x" -m 5 scratch/notes.md`,
+      ]) qp4RefuseUnsupported(command, path);
+      // A target that really resolves outside the project still gets the scope code, however the pattern is spelled -- including a pattern FILE (-f), which the
+      // command reads.
+      const outsideFile = qp4Fwd(join(outside, "vault", "id_rsa"));
+      for (const command of [
+        `rg -n --no-heading "// TODO" ${outsideFile}`,
+        `rg -n --no-heading -e "~/x" ${outsideFile}`,
+        `rg -n --no-heading -g "*.md" apply ${outsideFile}`,
+        `rg -n --no-heading "// TODO" scratch ${outsideFile}`,
+        `rg -n --no-heading -f ${outsideFile} scratch`,
+        `grep -n -e apply ${outsideFile}`,
+      ]) qp4RefuseOutside(command, path);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// ALFRED-RECCOL-PREP: tests for the dispatch-record write-after-commit fix (appended after package 4's appendix, which is appended after the HEAD tests).
+// Contract: scratch/reccol/critic-spec.md. The owning dispatch (the Claude runtime agent_id that made the opening write of
+// evidence/dispatch-record-<TASK_ID>.json, recorded in the guard's private owner registry under the git common dir) may keep writing its record after its own commit;
+// a different writer (another dispatch, the orchestrator) may not; a final-terminal record is immutable except for the owner's identical-content re-write;
+// a runner whose payload carries no agent identity keeps today's behaviour.
+//   RECCOL-1  the owner may checkpoint after its commit (in-progress log append, interim outcome, Edit of the interim record, final outcome + report).
+//   RECCOL-2  a foreign writer (other dispatch, orchestrator) is refused on a claimed record; an unclaimed record keeps today's behaviour.
+//   RECCOL-3  a final-terminal record refuses every write except the owner's identical-content re-write.
+//   RECCOL-4  task-id reuse bound by git history, or by another owner's claim, stays refused and creates no claim.
+//   RECCOL-5  a payload without a resolvable agent identity creates no claim and keeps today's behaviour (the post-commit refusal remains for that runner).
+//   RECCOL-6  claimDispatchRecordOwnership: first opening write claims, never adopts an existing record, never overwrites a claim, never guesses an identity.
+import * as reccolGuardNs from "./guard-lifecycle-ready.mjs";
+
+const RECCOL_OWNER = "reccol-agent-owner";
+const RECCOL_OTHER = "reccol-agent-other";
+const RECCOL_SHA = "f262a5c712345678";
+const RECCOL_COMMIT = "a".repeat(40);
+
+function reccolFixture() {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  mkdirSync(join(path, "evidence"), { recursive: true });
+  mkdirSync(join(commonDir, "agent-pipeline", "bootstrap-receipt"), { recursive: true });
+  const fx = { path, commonDir, history: null };
+  for (const agentId of [RECCOL_OWNER, RECCOL_OTHER]) {
+    writeFileSync(bootstrapReceiptPathFixture(commonDir, agentId), JSON.stringify({
+      schema: "pipeline.bootstrap-receipt.v1", agentId, agentType: "pipeline-core:goldfish-deep", observedAt: "1970-01-01T00:00:00.000Z",
+    }));
+  }
+  fx.deps = {
+    projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(),
+    nowFn: () => "1970-01-01T00:00:00.000Z", gitCommitForTaskIdFn: () => fx.history,
+  };
+  fx.rel = (id) => "evidence/dispatch-record-" + id + ".json";
+  fx.file = (id) => join(path, "evidence", "dispatch-record-" + id + ".json");
+  fx.claim = (id) => join(commonDir, "agent-pipeline", "dispatch-record-owner", id + ".json");
+  fx.input = (agentId, tool, toolInput) => ({
+    tool_name: tool, tool_input: toolInput, transcript_path: "/parent/session.jsonl",
+    ...(agentId === null ? {} : { agent_id: agentId, agent_type: "pipeline-core:goldfish-deep" }),
+  });
+  fx.write = (agentId, id, record) => evaluateLifecycleReadyGuard(fx.input(agentId, "Write", { file_path: fx.rel(id), content: JSON.stringify(record, null, 2) }), fx.deps);
+  fx.edit = (agentId, id, from, to) => evaluateLifecycleReadyGuard(fx.input(agentId, "Edit", { file_path: fx.rel(id), old_string: from, new_string: to }), fx.deps);
+  fx.land = (id, record) => writeFileSync(fx.file(id), JSON.stringify(record, null, 2));
+  fx.cleanup = () => { rmSync(path, { recursive: true, force: true }); rmSync(commonDir, { recursive: true, force: true }); };
+  return fx;
+}
+
+const RECCOL_COLLISION = /GUARD-DISPATCH-RECORD-COLLISION/u;
+
+test("RECCOL-1 owner may checkpoint after commit: log append, interim outcome, Edit of the interim record and the final outcome with report are admitted for the dispatch that opened the record", () => {
+  const fx = reccolFixture();
+  const id = "RECCOL-OWN-1";
+  try {
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    const opened = fx.write(RECCOL_OWNER, id, open);
+    assert.equal(opened.exitCode, 0, opened.stderr);
+    fx.land(id, open);
+    fx.history = RECCOL_SHA; // the dispatch's own commit now cites the task id in git history
+    const appended = { ...open, log: [{ phase: "committed" }] };
+    const logAppend = fx.write(RECCOL_OWNER, id, appended);
+    assert.equal(logAppend.exitCode, 0, logAppend.stderr); // before the fix: GUARD-DISPATCH-RECORD-COLLISION "already bound to commit ... in git history"
+    assert.equal(JSON.parse(readFileSync(fx.claim(id), "utf8")).agentId, RECCOL_OWNER, "the opening write recorded its owner");
+    fx.land(id, appended);
+    const interim = { ...appended, outcome: "committed-pending-report", commits: [RECCOL_COMMIT] };
+    const checkpoint = fx.write(RECCOL_OWNER, id, interim);
+    assert.equal(checkpoint.exitCode, 0, checkpoint.stderr);
+    fx.land(id, interim);
+    const editInterim = fx.edit(RECCOL_OWNER, id, "\"log\": [", "\"log\": [{ \"phase\": \"checkpoint\" },");
+    assert.equal(editInterim.exitCode, 0, editInterim.stderr);
+    const final = { ...interim, outcome: "completed", candidateCommit: RECCOL_COMMIT, report: { text: "done" } };
+    const finalized = fx.write(RECCOL_OWNER, id, final);
+    assert.equal(finalized.exitCode, 0, finalized.stderr);
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-2 a foreign writer (another dispatch, the orchestrator) is refused on a claimed record; an unclaimed record keeps today's behaviour", () => {
+  const fx = reccolFixture();
+  const id = "RECCOL-FOREIGN-2";
+  try {
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(RECCOL_OWNER, id, open).exitCode, 0);
+    fx.land(id, open);
+    for (const who of [RECCOL_OTHER, null]) {
+      for (const result of [
+        fx.write(who, id, { ...open, log: [{ x: 1 }] }),
+        fx.write(who, id, { ...open, outcome: "completed" }),
+        fx.edit(who, id, "\"log\": [", "\"log\": [{ \"x\": 1 },"),
+      ]) {
+        assert.equal(result.exitCode, 2, String(who));
+        assert.match(result.stderr, RECCOL_COLLISION);
+        assert.match(result.stderr, /owned by dispatch agent reccol-agent-owner/u);
+      }
+    }
+    assert.equal(fx.write(RECCOL_OWNER, id, { ...open, log: [{ x: 1 }] }).exitCode, 0);
+    // a record nobody claimed (created by the orchestrator, or before this fix) is finalised exactly as before
+    const legacy = "RECCOL-LEGACY-2";
+    fx.land(legacy, { taskId: legacy, outcome: "in-progress" });
+    assert.equal(fx.write(null, legacy, { taskId: legacy, outcome: "completed" }).exitCode, 0);
+    assert.equal(existsSync(fx.claim(legacy)), false);
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-3 a final-terminal record refuses every write except the owner's identical-content re-write", () => {
+  const fx = reccolFixture();
+  const id = "RECCOL-FINAL-3";
+  try {
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(RECCOL_OWNER, id, open).exitCode, 0);
+    const final = { taskId: id, outcome: "completed", candidateCommit: RECCOL_COMMIT, commits: [RECCOL_COMMIT], log: [], report: { text: "final" } };
+    fx.land(id, final);
+    const reordered = Object.fromEntries(Object.entries(final).reverse());
+    assert.equal(fx.write(RECCOL_OWNER, id, reordered).exitCode, 0, "identical content in another key order is a no-op");
+    for (const result of [
+      fx.write(RECCOL_OWNER, id, { ...final, report: { text: "altered" } }),
+      fx.write(RECCOL_OWNER, id, { ...final, outcome: "in-progress" }),
+      fx.write(RECCOL_OWNER, id, { ...final, outcome: "committed-pending-report" }),
+      fx.edit(RECCOL_OWNER, id, "final", "altered"),
+    ]) {
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, RECCOL_COLLISION);
+      assert.match(result.stderr, /already been used by a completed dispatch/u);
+    }
+    for (const who of [RECCOL_OTHER, null]) {
+      for (const result of [fx.write(who, id, final), fx.write(who, id, { ...final, report: { text: "altered" } }), fx.edit(who, id, "final", "altered")]) {
+        assert.equal(result.exitCode, 2, String(who));
+        assert.match(result.stderr, RECCOL_COLLISION);
+      }
+    }
+    for (const outcome of ["blocked", "partial", "read-only-completed", "stopped-without-commit", "completed-no-delivery"]) {
+      fx.land(id, { ...final, outcome });
+      const refused = fx.write(RECCOL_OWNER, id, { ...final, outcome, report: { text: "altered" } });
+      assert.equal(refused.exitCode, 2, outcome);
+      assert.match(refused.stderr, RECCOL_COLLISION, outcome);
+    }
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-4 reusing a task id that git history or another owner's claim already binds stays refused and creates no claim", () => {
+  const fx = reccolFixture();
+  try {
+    const bound = "RECCOL-HIST-4";
+    fx.history = RECCOL_SHA; // git history binds this id to another dispatch's commit
+    const reuse = fx.write(RECCOL_OTHER, bound, { taskId: bound, outcome: "in-progress", commits: [], log: [] });
+    assert.equal(reuse.exitCode, 2);
+    assert.match(reuse.stderr, RECCOL_COLLISION);
+    assert.match(reuse.stderr, /already bound to commit f262a5c71234 in git history/u);
+    assert.equal(existsSync(fx.claim(bound)), false);
+    fx.history = null;
+    const claimed = "RECCOL-CLAIMED-4";
+    const open = { taskId: claimed, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(RECCOL_OWNER, claimed, open).exitCode, 0); // claims; the record file never lands (another guard may refuse the write)
+    const second = fx.write(RECCOL_OTHER, claimed, open);
+    assert.equal(second.exitCode, 2);
+    assert.match(second.stderr, /owned by dispatch agent reccol-agent-owner/u);
+    assert.equal(JSON.parse(readFileSync(fx.claim(claimed), "utf8")).agentId, RECCOL_OWNER);
+    assert.equal(fx.write(RECCOL_OWNER, claimed, open).exitCode, 0, "the owner may retry its own opening write");
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-5 a payload without a resolvable agent identity creates no claim and keeps today's behaviour (the post-commit refusal remains for that runner)", () => {
+  const fx = reccolFixture();
+  try {
+    const id = "RECCOL-NOID-5";
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(null, id, open).exitCode, 0);
+    assert.equal(existsSync(fx.claim(id)), false);
+    fx.land(id, open);
+    fx.history = RECCOL_SHA;
+    const refused = fx.write(null, id, { ...open, log: [{ phase: "committed" }] });
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /already bound to commit f262a5c71234 in git history/u);
+    fx.history = null;
+    const malformed = "RECCOL-BADID-5";
+    const result = evaluateLifecycleReadyGuard({
+      tool_name: "Write", tool_input: { file_path: fx.rel(malformed), content: JSON.stringify({ taskId: malformed, outcome: "in-progress" }) },
+      transcript_path: "/parent/session.jsonl", agent_id: "../traversal", agent_type: "pipeline-core:goldfish-deep",
+    }, fx.deps);
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.equal(existsSync(fx.claim(malformed)), false);
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-6 claimDispatchRecordOwnership claims on the first opening write only, never adopts an existing record, never overwrites a claim, never guesses an identity", () => {
+  const fx = reccolFixture();
+  try {
+    assert.equal(typeof reccolGuardNs.claimDispatchRecordOwnership, "function", "claimDispatchRecordOwnership is exported");
+    const claim = (id, agentId, extra = {}) => reccolGuardNs.claimDispatchRecordOwnership({
+      relPath: fx.rel(id), requested: fx.file(id), root: fx.path, input: fx.input(agentId, "Write", { file_path: fx.rel(id) }), dependencies: fx.deps, ...extra,
+    });
+    assert.equal(claim("RECCOL-C-6", RECCOL_OWNER).status, "claimed");
+    const stored = JSON.parse(readFileSync(fx.claim("RECCOL-C-6"), "utf8"));
+    assert.deepEqual(stored, {
+      schema: "pipeline.dispatch-record-owner.v1", taskId: "RECCOL-C-6", agentId: RECCOL_OWNER, agentType: "pipeline-core:goldfish-deep", claimedAt: "1970-01-01T00:00:00.000Z",
+    });
+    assert.equal(claim("RECCOL-C-6", RECCOL_OTHER).status, "claim-exists");
+    assert.equal(JSON.parse(readFileSync(fx.claim("RECCOL-C-6"), "utf8")).agentId, RECCOL_OWNER);
+    fx.land("RECCOL-E-6", { taskId: "RECCOL-E-6", outcome: "in-progress" });
+    assert.equal(claim("RECCOL-E-6", RECCOL_OWNER).status, "record-exists");
+    assert.equal(existsSync(fx.claim("RECCOL-E-6")), false);
+    assert.equal(claim("RECCOL-N-6", null).status, "no-identity");
+    assert.equal(existsSync(fx.claim("RECCOL-N-6")), false);
+    assert.equal(claim("RECCOL-D-6", RECCOL_OWNER, { dependencies: { ...fx.deps, resolveGitCommonDirFn: () => null } }).status, "no-common-dir");
+    assert.equal(reccolGuardNs.claimDispatchRecordOwnership({
+      relPath: "evidence/not-a-record.json", requested: join(fx.path, "evidence", "not-a-record.json"), root: fx.path, input: fx.input(RECCOL_OWNER, "Write", {}), dependencies: fx.deps,
+    }).status, "not-a-dispatch-record");
+  } finally { fx.cleanup(); }
+});

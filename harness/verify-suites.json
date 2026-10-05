@@ -1540,6 +1540,107 @@
       },
       "invariantPinned": "Design-course guard admission binds exact current feature, sources and dispatch; agent profile-change apply and stale or malformed producer commands fail closed",
       "nonOverlapNote": "Command admission exercises the guard boundary independently of coordinator execution and does not grant PO approval or implementation authority"
+    },
+    {
+      "name": "guard-dispatch-budget-checkpoint-tests",
+      "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GDBC01",
+          "GDBC02",
+          "GDBC03",
+          "GDBC04",
+          "GDBC05",
+          "GDBC06",
+          "GDBC07",
+          "GDBC08",
+          "GDBC09",
+          "GDBC10",
+          "GDBC11",
+          "GDBC12",
+          "GDBC13",
+          "GDBC14",
+          "GDBC15"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "The dispatch-budget hook emits the checkpoint notice at exactly ceil(0.8 x cap) and on the last three working calls, hands the closing lane back only to the Critic, never notifies or counts the orchestrator, and bounds every granted cap by maxTurns minus the closing allowance minus one",
+      "nonOverlapNote": "Exercises the real hook child process and the pure grant core black-box and imports no guard module; it is additive to guard-dispatch-budget-tests, whose module-scope-import hazard it avoids"
+    },
+    {
+      "name": "git-hook-runtime-snapshot-fast-verify-tests",
+      "file": "plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GHRSF01",
+          "GHRSF02",
+          "GHRSF03",
+          "GHRSF04",
+          "GHRSF05",
+          "GHRSF06",
+          "GHRSF07",
+          "GHRSF08",
+          "GHRSF09",
+          "GHRSF10",
+          "GHRSF11",
+          "GHRSF12",
+          "GHRSF13",
+          "GHRSF14",
+          "GHRSF15",
+          "GHRSF16",
+          "GHRSF17",
+          "GHRSF18",
+          "GHRSF19"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "The fast verification paths of the git-hook runtime snapshot (batched native DACL read, below-root lstat walk, in-process verified memo) never weaken its refusals of tampered content, planted links or junctions, foreign ACEs and source drift, and the source tree is re-read and hashed in full",
+      "nonOverlapNote": "Pins only the security properties of the fast verification paths; fixtures live under the OS temp dir and every planted ACE, junction or tamper is removed before a test ends"
+    },
+    {
+      "name": "project-onboarding-foreign-residue-tests",
+      "file": "plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PFR01"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Session readiness depends only on the requesting session's own descriptor: foreign descriptors (killed or stopped Verify incidents, bare orphans) yield a ready result carrying one admitted cleanup_residue_foreign warning and are never touched, while the requester's own descriptor with retained resources keeps the non-ready result",
+      "nonOverlapNote": "Readiness-level case on incident-shaped descriptors in a throw-away fixture repository; distinct from the unit-level foreign-residue decision pinned by project-onboarding-foreign-residue-unit-tests"
+    },
+    {
+      "name": "project-onboarding-foreign-residue-unit-tests",
+      "file": "plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PFRU01",
+          "PFRU02",
+          "PFRU03"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Whether retained session residue is foreign is decided against real session descriptors: a foreign descriptor (incident shapes, with or without resources) is a warning and never a lock, the requester's own descriptor decides, and no descriptor or an unreadable inventory yields no warning (fail closed)",
+      "nonOverlapNote": "Unit-level decision against real descriptors in a throw-away git fixture; it needs no onboarding fixture and is distinct from the readiness-level case in project-onboarding-foreign-residue.test.mjs"
+    },
+    {
+      "name": "verify-run-record-tests",
+      "file": "plugins/pipeline-core/lib/verify-run-record.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "VRR01",
+          "VRR02",
+          "VRR03"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "A Verify run records its cleanup duty in a run record and never in a session descriptor or session-cleanup state, the record carries PID and start evidence, an abort settles it and drains the unsealed run directory, and a stale record of a dead PID is swept without a signature while live and sealed runs are respected",
+      "nonOverlapNote": "Pins the run-record cleanup contract only; session-descriptor and worktree behavior stay pinned by worktree-lifecycle-tests"
     }
   ]
 }

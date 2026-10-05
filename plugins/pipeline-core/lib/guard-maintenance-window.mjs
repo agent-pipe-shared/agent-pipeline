@@ -670,6 +670,22 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/model-family-route-source.mjs",
   "plugins/pipeline-core/lib/model-family-host-store.mjs",
   "plugins/pipeline-core/lib/model-family-latest-selection.mjs",
+  // ALFRED-QP5 (GMWKC01 closure repair): the first-party import closure had drifted open again. The nine modules below are statically imported,
+  // directly or one hop further, by kernel files already listed above, so they run inside those files' process with their authority:
+  // guard-lifecycle-ready.mjs -> claude-task-output-read-scope (the one file the guarded reader exposes); onboarding-continuity.mjs ->
+  // bound-design-line-endings, design-authoring; both project-onboarding-v3.mjs -> claude-initial-prompt-pointer, claude-intake-prompt-capture;
+  // scripts/pipeline-state.mjs -> runtime-handover-projection; scripts/po-human-approval.mjs (the script the human signs with) ->
+  // model-family-approval-request -> model-family-discovery; scripts/check-critic-skip-coverage.mjs -> check-runner-manifest-parity.
+  // The walk was run to a fixed point: these nine add no further first-party hop. A GS-6 window must not be able to rewrite any of them.
+  "plugins/pipeline-core/lib/bound-design-line-endings.mjs",
+  "plugins/pipeline-core/lib/claude-initial-prompt-pointer.mjs",
+  "plugins/pipeline-core/lib/claude-intake-prompt-capture.mjs",
+  "plugins/pipeline-core/lib/claude-task-output-read-scope.mjs",
+  "plugins/pipeline-core/lib/design-authoring.mjs",
+  "plugins/pipeline-core/lib/model-family-discovery.mjs",
+  "plugins/pipeline-core/lib/runtime-handover-projection.mjs",
+  "plugins/pipeline-core/scripts/check-runner-manifest-parity.mjs",
+  "plugins/pipeline-core/scripts/model-family-approval-request.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

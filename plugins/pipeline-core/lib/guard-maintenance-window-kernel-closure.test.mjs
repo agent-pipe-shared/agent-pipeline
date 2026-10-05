@@ -234,6 +234,7 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/commit-message-policy.mjs",
     "../lib/signed-quality-package.mjs",
     "../lib/project-authority.mjs",
+    "../lib/guard-devplan-policy.mjs",
   ],
 };
 

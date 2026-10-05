@@ -13,6 +13,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   statSync,
@@ -696,6 +697,14 @@ const GRAMMAR_DENIAL_GUIDANCE = {
 const MAX_AND_CHAIN_SEGMENTS = 6;
 const READ_SCOPE_DENIAL_CODE = "GUARD-READ-SCOPE-OUTSIDE-ROOT";
 const READ_SCOPE_DENIAL_GUIDANCE = "The bounded read-only diagnostic pipeline reads a path outside the project root.";
+// ALFRED-QP4 (backlog: read-scope false positives): GUARD-READ-SCOPE-OUTSIDE-ROOT used to be printed for EVERY single read-family command that
+// was not admitted (isRejectedReadFamilyCommand), including commands whose only fault is a flag or spelling the closed grammar does not know
+// (rg --no-heading, rg -m N, a repeated rg -g, git diff --output, a non-canonical double-quoted drive path ...) with every target inside the
+// project. This code names that case truthfully. The scope code is now printed only when the command is admitted in every respect except that a
+// read target resolves outside the project root (isOutsideRootSingleCommandRead, the same two-call pattern its siblings use). Both refuse.
+const READ_COMMAND_UNSUPPORTED_CODE = "GUARD-READ-COMMAND-UNSUPPORTED";
+const READ_COMMAND_UNSUPPORTED_GUIDANCE = "The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).";
+const READ_COMMAND_UNSUPPORTED_NOTE = "This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below, or use the Read, Glob or Grep tools for reads inside the project.";
 // NVA-I-GRAMMAR (PO, 2026-08-28, backlog: 2026-08-27-shell-grammar-reads-quoted-content-as-
 // shell-syntax.md): "wichtig ist, dass der guard das erlaubte grammar immer auch sagt" -- the
 // refusal must state the COMPLETE admitted grammar with bounds and exact spellings, not just
@@ -928,7 +937,9 @@ function blocked(
   // GRAMMAR_DENIAL_GUIDANCE (it must not print the grammar remedy -- the pipeline was never
   // the objection), so it is checked first and supplies its own true guidance/remedy.
   const readScope = code === READ_SCOPE_DENIAL_CODE;
-  const grammarReason = readScope ? READ_SCOPE_DENIAL_GUIDANCE : GRAMMAR_DENIAL_GUIDANCE[code];
+  const readUnsupported = code === READ_COMMAND_UNSUPPORTED_CODE;
+  const grammarReason = readScope ? READ_SCOPE_DENIAL_GUIDANCE
+    : readUnsupported ? READ_COMMAND_UNSUPPORTED_GUIDANCE : GRAMMAR_DENIAL_GUIDANCE[code];
   if (grammarReason) {
     const retryEnvelope = {
       schema: "pipeline.guard-retry-actions.v1",
@@ -943,7 +954,9 @@ function blocked(
     // GUARD-REDIRECT-UNAPPROVED) trim on repeat.
     const remedyLines = readScope
       ? READ_SCOPE_DENIAL_REMEDY
-      : (firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT);
+      : readUnsupported
+        ? [READ_COMMAND_UNSUPPORTED_NOTE, ...GRAMMAR_DENIAL_REMEDY]
+        : (firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT);
     return verdict(
       2,
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
@@ -1275,7 +1288,108 @@ export function extractWritePayload(toolInput, toolName) {
 
 export const DISPATCH_RECORD_COLLISION_DENIAL_CODE = "GUARD-DISPATCH-RECORD-COLLISION";
 
-export function checkDispatchRecordCollision({ relPath, requested, payload, root, dependencies = {} }) {
+// ALFRED-RECCOL: the OWNING dispatch may keep writing its own dispatch record after its own commit. Before this, once a commit cited the task id
+// (Dispatch: <TASK_ID> (goldfish)) every further write was refused (git-history binding of an in-progress rewrite, or the interim outcome
+// "committed-pending-report" being terminal by the denylist, or an Edit payload that is not JSON), so the template's "commit, checkpoint the record,
+// ..., final outcome + report as last act" sequence could not complete. Ownership is the runtime agent identity the guard already resolves for the
+// caller (lifecycleSubagentIdentity: agent_id + agent_type on the Claude PreToolUse payload). The FIRST admitted write of a dispatched subagent that
+// CREATES the record (no record file yet) claims it in the guard's private state under the git common dir (exclusive create, written by the guard,
+// not forgeable by a subagent: private state is refused to agents elsewhere in this file). Rules for a CLAIMED record:
+//   - a caller whose resolved identity is not the owner (another dispatch, the orchestrator, an unresolved identity) is refused;
+//   - the owner is admitted while the record is non-final (in-progress, or the interim outcome) -- log/commits/report appends, the interim checkpoint
+//     and the final outcome -- without the git-history test (its own commits cite its own task id; the history test already ran when it claimed);
+//   - a FINAL-terminal record (any terminal outcome except the interim one) is immutable: only the owner's identical-content re-write is admitted
+//     (a no-op, so a retried finalising write is not mistaken for a failure); an Edit can never prove identity and is refused.
+// An UNCLAIMED record (created by the orchestrator, before this fix, or by a runner whose payload carries no agent identity) keeps the previous
+// logic unchanged. No identity is ever guessed.
+export const DISPATCH_RECORD_OWNER_SCHEMA = "pipeline.dispatch-record-owner.v1";
+export const DISPATCH_RECORD_INTERIM_OUTCOME = "committed-pending-report";
+const DISPATCH_RECORD_PATH = /^evidence\/dispatch-record-([A-Za-z0-9._-]+)\.json$/;
+
+function dispatchRecordCommonDir(root, dependencies) {
+  try { return (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies) ?? null; } catch { return null; }
+}
+
+function dispatchRecordOwnerDir(commonDir) {
+  return join(commonDir, "agent-pipeline", "dispatch-record-owner");
+}
+
+function dispatchRecordOwnerPath(commonDir, taskId) {
+  return join(dispatchRecordOwnerDir(commonDir), taskId + ".json");
+}
+
+function dispatchRecordCanonicalJson(value) {
+  if (Array.isArray(value)) return "[" + value.map(dispatchRecordCanonicalJson).join(",") + "]";
+  if (value !== null && typeof value === "object") {
+    return "{" + Object.keys(value).sort().map((key) => JSON.stringify(key) + ":" + dispatchRecordCanonicalJson(value[key])).join(",") + "}";
+  }
+  return JSON.stringify(value);
+}
+
+function readDispatchRecordOwnerClaim(commonDir, taskId, dependencies) {
+  if (commonDir === null) return null;
+  try {
+    const claim = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(dispatchRecordOwnerPath(commonDir, taskId), "utf8"));
+    if (claim !== null && typeof claim === "object" && claim.schema === DISPATCH_RECORD_OWNER_SCHEMA && claim.taskId === taskId
+      && typeof claim.agentId === "string" && claim.agentId !== "") return claim;
+  } catch {}
+  return null;
+}
+
+// "unclaimed" -> the previous logic decides; "admit" / "refuse" -> final for a claimed record.
+function dispatchRecordOwnerDecision({ taskId, requested, incoming, input, root, dependencies }) {
+  const claim = readDispatchRecordOwnerClaim(dispatchRecordCommonDir(root, dependencies), taskId, dependencies);
+  if (claim === null) return { decision: "unclaimed" };
+  const identity = input === null || input === undefined ? { kind: "orchestrator" } : lifecycleSubagentIdentity(input, dependencies);
+  if (identity.kind !== "subagent" || identity.agentId !== claim.agentId) {
+    return {
+      decision: "refuse",
+      reason: "task ID \"" + taskId + "\" is owned by dispatch agent " + claim.agentId + ", which opened this record; only that dispatch may write it. "
+        + "Amend or recover a record you do not own through the sanctioned record writer (dispatch-record-write.mjs) or the PO override route, and never reuse the task ID.",
+    };
+  }
+  let existing = null;
+  try {
+    if ((dependencies.existsSyncFn ?? existsSync)(requested)) existing = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(requested, "utf8"));
+  } catch {}
+  const isTerminalFn = dependencies.isTerminalOutcomeFn ?? isTerminalOutcome;
+  const isFinal = existing !== null && typeof existing === "object" && isTerminalFn(existing.outcome)
+    && String(existing.outcome).trim().toLowerCase() !== DISPATCH_RECORD_INTERIM_OUTCOME;
+  if (!isFinal) return { decision: "admit" };
+  if (incoming !== null && typeof incoming === "object" && dispatchRecordCanonicalJson(incoming) === dispatchRecordCanonicalJson(existing)) return { decision: "admit" };
+  return {
+    decision: "refuse",
+    reason: "task ID \"" + taskId + "\" has already been used by a completed dispatch (outcome: \"" + existing.outcome + "\"). A final dispatch record is immutable: "
+      + "only an identical-content re-write by its owner is admitted, because overwriting it orphans prior commit authorship.",
+  };
+}
+
+/**
+ * Records the dispatched subagent that CREATES evidence/dispatch-record-<TASK_ID>.json as its owner (exclusive create of one private file under the git
+ * common dir). Called by the guard AFTER the collision check admitted the write; a pure side effect that never changes a verdict. Never adopts an
+ * existing record, never replaces a claim, never guesses: no resolvable subagent identity (orchestrator, unresolved, other runners) means no claim.
+ */
+export function claimDispatchRecordOwnership({ relPath, requested, root, input, dependencies = {} }) {
+  const match = DISPATCH_RECORD_PATH.exec(relPath);
+  if (!match) return { status: "not-a-dispatch-record" };
+  if (input === null || input === undefined) return { status: "no-identity" };
+  const identity = lifecycleSubagentIdentity(input, dependencies);
+  if (identity.kind !== "subagent") return { status: "no-identity" };
+  const commonDir = dispatchRecordCommonDir(root, dependencies);
+  if (commonDir === null) return { status: "no-common-dir" };
+  try {
+    if ((dependencies.existsSyncFn ?? existsSync)(requested)) return { status: "record-exists" };
+    (dependencies.mkdirSyncFn ?? mkdirSync)(dispatchRecordOwnerDir(commonDir), { recursive: true, mode: 0o700 });
+    const nowFn = dependencies.nowFn ?? (() => new Date().toISOString());
+    const claim = { schema: DISPATCH_RECORD_OWNER_SCHEMA, taskId: match[1], agentId: identity.agentId, agentType: identity.agentType, claimedAt: nowFn() };
+    (dependencies.writeFileSyncFn ?? writeFileSync)(dispatchRecordOwnerPath(commonDir, match[1]), JSON.stringify(claim, null, 2) + "\n", { encoding: "utf8", flag: "wx", mode: 0o600 });
+    return { status: "claimed", agentId: identity.agentId };
+  } catch (error) {
+    return { status: error?.code === "EEXIST" ? "claim-exists" : "error" };
+  }
+}
+
+export function checkDispatchRecordCollision({ relPath, requested, payload, root, input = null, dependencies = {} }) {
   const match = /^evidence\/dispatch-record-([A-Za-z0-9._-]+)\.json$/.exec(relPath);
   if (!match) return null;
   const taskId = match[1];
@@ -1289,6 +1403,11 @@ export function checkDispatchRecordCollision({ relPath, requested, payload, root
 
   const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+
+  // ALFRED-RECCOL: a CLAIMED record is decided by its owner binding; an unclaimed one falls through to the previous logic below, unchanged.
+  const ownership = dispatchRecordOwnerDecision({ taskId, requested, incoming, input, root, dependencies });
+  if (ownership.decision === "admit") return null;
+  if (ownership.decision === "refuse") return { taskId, reason: ownership.reason };
 
   if (existsSyncFn(requested)) {
     let existing = null;
@@ -3485,6 +3604,95 @@ function isStandaloneHeadTailReadArgs(args, root, extraRoots) {
   return paths.length === 0 || paths.every((path) => isApprovedSingleCommandReadArg(path, root, extraRoots));
 }
 
+// ALFRED-QP4 (R5): Claude's Bash on native Windows is Git-Bash, which keeps the backslashes of a double-quoted word such as "D:\dir\file.md",
+// while the guard's POSIX-dialect tokenizer treats every backslash in double quotes as an escape and so reads D:dirfile.md (no drive path, refused).
+// For win32 ONLY, a double-quoted word that is a whole shell word and consists solely of a drive letter plus backslash-separated segments of
+// letters, digits, dot, underscore, space and hyphen is shown to the grammar with forward slashes -- the same file on Windows. Anything else is
+// returned untouched: any single quote or escaped double quote in the command (quote pairing would be ambiguous), an unbalanced quote, a
+// word glued to other text, a backslash next to a dollar sign, backtick, backslash or quote. Targets, containment and the secret-tree screen stay
+// the grammar's, unchanged: the rewritten command is judged by exactly the same predicate as its forward-slash spelling.
+function win32QuotedDrivePathCommand(command, platform = process.platform) {
+  if (platform !== "win32" || typeof command !== "string" || !command.includes("\\") || command.includes("'") || /\\"/u.test(command)) return command;
+  const parts = command.split('"');
+  if (parts.length % 2 === 0) return command;
+  for (let index = 1; index < parts.length; index += 2) {
+    if (!/(?:^|\s)$/u.test(parts[index - 1]) || !/^(?:\s|$)/u.test(parts[index + 1])) continue;
+    if (/^[A-Za-z]:(?:\\[A-Za-z0-9._ -]+)+$/u.test(parts[index])) parts[index] = parts[index].replaceAll("\\", "/");
+  }
+  return parts.join('"');
+}
+
+// ALFRED-QP4: label selection helper (never an admission). Does ANY non-flag operand of the single rejected command lexically resolve outside the
+// project root? Uses the guard's own rawReadCandidatePath() (absolute stays absolute, "~" becomes an absolute sentinel, a relative operand is joined
+// onto the root so a leading "../" leaves it) and pathInside(). A protected credential read outside the root (cat ~/.ssh/id_rsa, a secret-named file
+// in another tree) is refused by the secret screen even when its own path is approved as a read root, so isOutsideRootSingleCommandRead() alone
+// would call it "unsupported"; this keeps the scope code truthful for those.
+// R2-2: for rg and grep the PATTERN positional and the value of an option that takes a value are not read targets (a pattern such as "// TODO" or
+// "~x" looks like an absolute or home path but is text). The positionals left are the read targets; the VALUE of -f/--file (a pattern file the command
+// reads) stays a target. Label selection only: an unknown option is treated as taking no value, which can only make the label more conservative.
+const QP4_RG_SHORT_VALUE = "efgmABCtTrjMdE";
+const QP4_GREP_SHORT_VALUE = "efmABCdD";
+const QP4_RG_LONG_VALUE = new Set(["regexp", "file", "glob", "iglob", "max-count", "after-context", "before-context", "context", "type", "type-not", "type-add",
+  "type-clear", "replace", "threads", "max-columns", "max-depth", "maxdepth", "max-filesize", "encoding", "colors", "color", "sort", "sortr", "path-separator",
+  "pre", "pre-glob", "ignore-file", "engine", "context-separator", "field-context-separator", "field-match-separator", "dfa-size-limit", "regex-size-limit",
+  "hostname-bin", "hyperlink-format"]);
+const QP4_GREP_LONG_VALUE = new Set(["regexp", "file", "max-count", "after-context", "before-context", "context", "directories", "devices", "include",
+  "exclude", "exclude-from", "exclude-dir", "label", "binary-files", "group-separator"]);
+
+function qp4ReadTargetOperands(name, argv) {
+  const rg = name === "rg";
+  const shortValue = rg ? QP4_RG_SHORT_VALUE : QP4_GREP_SHORT_VALUE;
+  const longValue = rg ? QP4_RG_LONG_VALUE : QP4_GREP_LONG_VALUE;
+  const positionals = [];
+  const fileValues = [];
+  let explicitPattern = false;
+  let endOfOptions = false;
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (typeof token !== "string") continue;
+    if (endOfOptions || !token.startsWith("-") || token === "-") { positionals.push(token); continue; }
+    if (token === "--") { endOfOptions = true; continue; }
+    let option = null;
+    let attached = "";
+    let consumesNext = false;
+    if (token.startsWith("--")) {
+      const equals = token.indexOf("=");
+      const bare = equals === -1 ? token.slice(2) : token.slice(2, equals);
+      if (rg && bare === "files") explicitPattern = true;
+      if (!longValue.has(bare)) continue;
+      option = bare;
+      if (equals === -1) consumesNext = true; else attached = token.slice(equals + 1);
+    } else {
+      for (let k = 1; k < token.length; k += 1) {
+        if (!shortValue.includes(token[k])) continue;
+        option = token[k];
+        attached = token.slice(k + 1);
+        consumesNext = attached === "";
+        break;
+      }
+      if (option === null) continue;
+    }
+    const patternFile = option === "f" || option === "file";
+    if (patternFile || option === "e" || option === "regexp") explicitPattern = true;
+    const value = consumesNext ? argv[index + 1] : attached;
+    if (consumesNext) index += 1;
+    if (patternFile && typeof value === "string" && value !== "") fileValues.push(value);
+  }
+  return [...(explicitPattern ? positionals : positionals.slice(1)), ...fileValues];
+}
+
+function qp4OperandResolvesOutsideRoot(parsed, root) {
+  if (!parsed || parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return false;
+  const rootResolved = resolve(root);
+  const executable = basename(String(parsed.segments[0].executable ?? "")).toLowerCase();
+  const operands = executable === "rg" || executable === "grep" ? qp4ReadTargetOperands(executable, parsed.segments[0].argv) : parsed.segments[0].argv;
+  return operands.some((token) => {
+    if (typeof token !== "string" || token.includes("\0")) return false;
+    const candidate = rawReadCandidatePath(token, root);
+    return candidate !== null && !pathInside(rootResolved, resolve(candidate));
+  });
+}
+
 function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
@@ -3642,6 +3850,7 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
  * and cat-pipeline families), all backed by the shared realpath-safe containment discipline.
  */
 export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
+  command = win32QuotedDrivePathCommand(command);
   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   const pipelineRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots];
   if (isBoundedReadOnlyPipeline(parsed, root, pipelineRoots)) return true;
@@ -6672,6 +6881,100 @@ function passiveTargetIsFile(raw, root) {
   catch { return false; }
 }
 
+// ALFRED-QP4 (G1, G3, G4, F1; amended R2-1). Every lane below is read-only, requires the target to be a directory (or a missing file) that is inside the
+// project root BOTH lexically and physically (no link or junction escape), carries no dot-segment in the path it NAMES, and re-uses
+// isAllowedPassiveReadTarget -- including its whole-tree secret screen -- unchanged. The Glob wildcard listing additionally walks the subtree below the
+// named path and is admitted only when no directory there is hidden (qp4NoHiddenDirectoryAtOrBelow), so .git private state and .claude are not listed
+// through a parent directory either. There is NO Grep directory lane: guardrails/security.md SEC-11 requires native Grep to name an exact file.
+function qp4PhysicallyInsideProject(candidate, root) {
+  try {
+    const lexical = resolve(candidate);
+    const rootResolved = resolve(root);
+    if (!isPathWithinRoot(lexical, rootResolved)) return false;
+    const physical = realpathSync(lexical);
+    const rootPhysical = realpathSync(rootResolved);
+    if (!isPathWithinRoot(physical, rootPhysical)) return false;
+    return [relative(rootResolved, lexical), relative(rootPhysical, physical)]
+      .every((part) => part.split(sep).every((segment) => segment !== ".." && !segment.startsWith(".")));
+  } catch { return false; }
+}
+
+function qp4InRootDirectory(raw, root, extraRoots) {
+  if (typeof raw !== "string" || raw === "" || /[\0$\x60*?\[\]{}]/u.test(raw) || raw.startsWith("~")) return false;
+  const candidate = passiveCandidate(raw, root);
+  if (!qp4PhysicallyInsideProject(candidate, root)) return false;
+  try { if (!statSync(candidate).isDirectory()) return false; } catch { return false; }
+  return isAllowedPassiveReadTarget(raw, {
+    rootDir: root, recursive: true, directoryListing: true, additionalRecursiveRoots: extraRoots,
+  });
+}
+
+// Glob: "<literal directories>/*" lists the immediate entry names of one in-root directory whose whole tree passes the secret screen AND in which no
+// directory at or below the named path is hidden (R2-1). The project root is therefore never an admitted path while it contains .git or .claude.
+function qp4InRootWildcardListing(raw, selector, root, extraRoots) {
+  if (typeof selector !== "string" || selector === "" || /[\0$\x60\[\]{}\\]/u.test(selector) || selector.startsWith("~")
+    || isAbsolute(selector) || win32.isAbsolute(selector)) return false;
+  const parts = selector.split("/");
+  if (!parts.every((part) => part !== "" && !part.startsWith("."))) return false;
+  if (parts[parts.length - 1] !== "*" || parts.slice(0, -1).some((part) => /[?*]/u.test(part))) return false;
+  const directory = parts.length === 1 ? raw : join(raw, ...parts.slice(0, -1));
+  return qp4InRootDirectory(directory, root, extraRoots) && qp4NoHiddenDirectoryAtOrBelow(passiveCandidate(directory, root), root);
+}
+
+// R2-1: bounded, fail-closed subtree walk. True ONLY when no directory at or below `directory` has a name starting with "." -- every directory entry is
+// resolved to its physical path (links and junctions are followed), which must stay inside the physical project root and carry no dot-named segment
+// relative to it. Any read error (including a dangling or looping link), an entry that cannot be classified, more than QP4_WALK_MAX_ENTRIES entries or a
+// tree deeper than QP4_WALK_MAX_DEPTH returns false. Read-only; lists names, never reads file contents.
+const QP4_WALK_MAX_ENTRIES = 5000;
+const QP4_WALK_MAX_DEPTH = 32;
+function qp4NoHiddenDirectoryAtOrBelow(directory, root) {
+  try {
+    const rootPhysical = realpathSync(resolve(root));
+    const pending = [{ path: realpathSync(resolve(directory)), depth: 0 }];
+    const seen = new Set();
+    let entries = 0;
+    while (pending.length > 0) {
+      const { path, depth } = pending.pop();
+      if (seen.has(path)) continue;
+      seen.add(path);
+      if (depth > QP4_WALK_MAX_DEPTH) return false;
+      if (!isPathWithinRoot(path, rootPhysical) || relative(rootPhysical, path).split(sep).some((segment) => segment.startsWith("."))) return false;
+      for (const entry of readdirSync(path, { withFileTypes: true })) {
+        if (++entries > QP4_WALK_MAX_ENTRIES) return false;
+        const lexical = join(path, entry.name);
+        let isDirectory = entry.isDirectory();
+        if (entry.isSymbolicLink() || (!isDirectory && !entry.isFile())) isDirectory = statSync(lexical).isDirectory();
+        if (!isDirectory) continue;
+        if (entry.name.startsWith(".")) return false;
+        pending.push({ path: realpathSync(lexical), depth: depth + 1 });
+      }
+    }
+    return true;
+  } catch { return false; }
+}
+
+const QP4_SECRET_NAME = /^(?:id_[^/\\]*|credentials|auth\.json|oauth_creds\.json|[^/\\]+\.(?:p12|pfx|key|pem))$/iu;
+
+// Read: a file that does not exist, spelled as a plain in-root path whose nearest existing ancestor is a directory physically inside the project.
+function qp4MissingInRootTarget(raw, root) {
+  if (typeof raw !== "string" || raw === "" || /[\0$\x60*?\[\]{}]/u.test(raw) || raw.startsWith("~")) return false;
+  const rootResolved = resolve(root);
+  const candidate = resolve(passiveCandidate(raw, root));
+  if (candidate === rootResolved || !isPathWithinRoot(candidate, rootResolved)) return false;
+  if (relative(rootResolved, candidate).split(sep).some((segment) => segment === ".." || segment.startsWith("."))
+    || QP4_SECRET_NAME.test(basename(candidate))) return false;
+  try { lstatSync(candidate); return false; } catch (error) { if (error?.code !== "ENOENT") return false; }
+  try {
+    let ancestor = resolve(candidate, "..");
+    for (;;) {
+      try { return statSync(ancestor).isDirectory() && isPathWithinRoot(realpathSync(ancestor), realpathSync(rootResolved)); } catch (error) {
+        if ((error?.code !== "ENOENT" && error?.code !== "ENOTDIR") || ancestor === rootResolved) return false;
+        ancestor = resolve(ancestor, "..");
+      }
+    }
+  } catch { return false; }
+}
+
 function readToolScopeVerdict(input, root, dependencies) {
   const toolName = String(input.tool_name);
   const params = input.tool_input ?? {};
@@ -6701,6 +7004,11 @@ function readToolScopeVerdict(input, root, dependencies) {
     : selector === undefined;
   const scoped = targetSafe && selectorSafe;
   if (scoped) return verdict(0);
+  if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
+  // R2-1 (SEC-11): there is no Grep directory lane; Grep with a directory path is refused exactly as at HEAD.
+  if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n");
+  }
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
 }
 
@@ -7044,6 +7352,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
           requested,
           payload,
           root,
+          input,
           dependencies,
         });
         if (collision !== null) {
@@ -7056,6 +7365,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
           }
           lifts.push(route.admitted);
         }
+        // ALFRED-RECCOL: the dispatched subagent that creates the record becomes its owner (a side effect only; the verdict is already decided).
+        claimDispatchRecordOwnership({ relPath, requested, root, input, dependencies });
       }
     }
   }
@@ -7078,7 +7389,17 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   }
   if (toolName === "Bash"
     && isRejectedReadFamilyCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
-    return withLifts(lifts, blocked(READ_SCOPE_DENIAL_CODE, null, []));
+    // ALFRED-QP4: label selection ONLY (both refuse, nothing is admitted here). The scope code requires a target that really resolves outside
+    // the project root; every other rejected single read-family command is an unsupported command.
+    let outsideRoot = false;
+    try {
+      const rejected = parseGuardCommand(
+        win32QuotedDrivePathCommand(input.tool_input.command ?? input.tool_input.CommandLine), root,
+        { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM },
+      );
+      outsideRoot = isOutsideRootSingleCommandRead(rejected, root) || qp4OperandResolvesOutsideRoot(rejected, root);
+    } catch { outsideRoot = false; }
+    return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, []));
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return withLifts(lifts, verdict(0));
