@@ -304,10 +304,22 @@ export function decodeBashAnsiCEscape(source, index) {
  * PRESERVING the inner content verbatim -- `"v1.2.3"` -> `v1.2.3`, `'refs/tags/v*'`
  * -> `refs/tags/v*`, a bare `v1.2.3` -> `v1.2.3` unchanged. A quote appearing anywhere
  * INSIDE a token (not just at its edges) also collapses to its content (`a"b"c` ->
- * `abc`). Since GPGL-5 the tokenizer follows POSIX quoting (`scanShell`): outside quotes a
- * backslash escapes the next character (`p\ush` -> `push`; a backslash-newline pair is
- * removed); inside double quotes it escapes only `"`, `\`, `$`, a backtick and a newline;
- * inside single quotes nothing is escaped; `$'...'` decodes ANSI-C escapes.
+ * `abc`). Since GPGL-5 the tokenizer follows POSIX QUOTING (`scanShell`): inside double
+ * quotes a backslash escapes only `"`, `\`, `$`, a backtick and a newline; inside single
+ * quotes nothing is escaped; `$'...'` decodes ANSI-C escapes; a backslash-newline pair is
+ * removed.
+ *
+ * ONE deliberate exception (GPGL-6): an UNQUOTED backslash before an ordinary character is
+ * kept LITERALLY, the Windows-path-separator reading of `scanShell` (`pathBackslash`), so
+ * `git -C C:\Users\x\repo push origin main` yields the path `C:\Users\x\repo` and `p\ush`
+ * stays `p\ush`. guard-push parses push targets and refspecs from this function's tokens
+ * on native Windows, where those backslashes are separators; the POSIX reading (GPGL-5)
+ * ate them and every push from a Windows path was refused as "not unambiguous". This is the
+ * EXTRACTION view only. `commandIsGitPush` classifies under BOTH readings on its own, so
+ * `git p\ush origin main` still fails closed as a push and an escaped-quote attack string
+ * is still routed to the gate -- the classifier never depends on what this function does
+ * with an unquoted backslash. An unquoted backslash before a structural character (a space,
+ * a quote, another backslash, an operator) still escapes it in both readings.
  *
  * Tokenizes ONE command segment -- it does NOT split on `&&`/`;`/`|`; the caller
  * (guard-push.mjs's deploy branch) isolates the push segment first. NO new regex is
@@ -316,7 +328,7 @@ export function decodeBashAnsiCEscape(source, index) {
  * plain token list this function returns.
  */
 export function tokenizeArgv(cmd) {
-  return scanShell(cmd).words;
+  return scanShell(cmd, true).words;
 }
 
 const REGEX_SPECIAL_CHAR_RE = /[.*+?^${}()|[\]\\]/;

@@ -498,10 +498,39 @@ for (const [cmd, why] of GPGL3_NEGATIVE_TABLE) {
   );
 }
 {
+  // Re-specified by GPGL-6. GPGL-5 asserted the POSIX reading here (`p\ush` -> `push`), which made the exported
+  // tokenizer mangle every unquoted native Windows path guard-push parses a target from. The exported tokenizer
+  // now keeps an unquoted backslash before an ordinary character literally (a Windows path separator); quoted
+  // parts still concatenate. The POSIX reading of `p\ush` lives on inside `commandIsGitPush` (GPGL5-FAIL-CLOSED).
   const out = tokenizeArgv(String.raw`git p\ush pu"sh" 'pu'sh`);
   record(
-    "GPGL5-TOKENIZE an unquoted backslash escapes one character and adjacent parts concatenate",
-    JSON.stringify(out) === JSON.stringify(["git", "push", "push", "push"]),
+    "GPGL5-TOKENIZE (re-specified by GPGL-6) an unquoted backslash before an ordinary character stays literal while adjacent quoted parts still concatenate",
+    JSON.stringify(out) === JSON.stringify(["git", String.raw`p\ush`, "push", "push"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv(String.raw`git -C C:\Users\x\repo push origin main`);
+  record(
+    "GPGL6-TOKENIZE an unquoted native Windows path after -C survives with every backslash intact",
+    JSON.stringify(out) === JSON.stringify(["git", "-C", String.raw`C:\Users\x\repo`, "push", "origin", "main"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv(String.raw`git -C C:\Users\x\repo commit -m "say \"hi\" at C:\tmp"`);
+  record(
+    "GPGL6-TOKENIZE a double-quoted span keeps POSIX rules: \\\" is a literal quote, a backslash before an ordinary character stays literal",
+    JSON.stringify(out) ===
+      JSON.stringify(["git", "-C", String.raw`C:\Users\x\repo`, "commit", "-m", String.raw`say "hi" at C:\tmp`]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv(String.raw`git push origin "a\"b" 'c\"d'`);
+  record(
+    "GPGL6-TOKENIZE POSIX quoting is unchanged: \\\" inside double quotes is one literal quote, inside single quotes both characters stay",
+    JSON.stringify(out) === JSON.stringify(["git", "push", "origin", 'a"b', String.raw`c\"d`]),
     `out=${JSON.stringify(out)}`,
   );
 }
@@ -554,6 +583,30 @@ const GPGL5_NEGATIVE_TABLE = [
 for (const [cmd, why] of GPGL5_NEGATIVE_TABLE) {
   const out = commandIsGitPush(cmd);
   record(`GPGL5-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
+}
+
+// ---- the exported tokenizer and the classifier read an unquoted backslash differently on purpose (GPGL-6) ----
+// `tokenizeArgv` (guard-push's target/refspec parser) keeps an unquoted backslash literal so a native Windows
+// path survives; `commandIsGitPush` classifies under BOTH readings. Neither may drag the other along.
+const GPGL6_CLASSIFIER_TABLE = [
+  [String.raw`git -C C:\Users\x\repo push origin main`, true, "a native Windows -C path classifies as a push"],
+  [String.raw`git -C C:\Users\x\repo status`, false, "the same path with a read-only subcommand is not a push"],
+  [String.raw`git p\ush origin main`, true, "POSIX reading of an escaped push word still classifies, although tokenizeArgv keeps it literal"],
+  [String.raw`git -C C:\Users\x\repo p\ush origin main`, true, "a Windows path and an escaped push word together"],
+  [String.raw`echo \'; git pu"sh" origin main; echo \'`, true, "the Critic F1 attack stays closed"],
+];
+for (const [cmd, expected, why] of GPGL6_CLASSIFIER_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL6-CLASSIFIER ${JSON.stringify(cmd)}  ${why}`, out === expected, `cmd=${JSON.stringify(cmd)} expected=${expected} out=${out}`);
+}
+{
+  const cmd = String.raw`git p\ush origin main`;
+  const tokens = tokenizeArgv(cmd);
+  record(
+    "GPGL6-SPLIT the exported tokenizer reads `p\\ush` literally while the classifier still fails closed on it",
+    tokens[1] === String.raw`p\ush` && commandIsGitPush(cmd) === true,
+    `tokens=${JSON.stringify(tokens)} push=${commandIsGitPush(cmd)}`,
+  );
 }
 
 // ---- Summary ------------------------------------------------------------------------------
