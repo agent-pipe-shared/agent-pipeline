@@ -31,6 +31,24 @@ still required (MP-07). New suite names may also need `verify-phase:` surfaces i
 | `plugins/pipeline-core/lib/runtime-handover-projection.win-path.test.mjs` | `runtime-handover-projection-win-path-tests` |
 | `plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs` | `project-onboarding-v3-flap-tests` |
 | `harness/scripts/guard-split-map.test.mjs` | `guard-split-map-tests` |
+| `plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs` | `guard-push-checkpoint-approval-tests` |
+| `plugins/pipeline-core/lib/design-advisor-provenance.flap3.test.mjs` | `design-advisor-provenance-flap3-tests` |
+| `plugins/pipeline-core/lib/governance-event-store.win-fsync.test.mjs` | `governance-event-store-win-fsync-tests` |
+| `plugins/pipeline-core/lib/slice-queue.test.mjs` | `slice-queue-tests` (caseCompletion SQ01-SQ34) |
+| `plugins/pipeline-core/scripts/slice-queue.test.mjs` | `slice-queue-cli-tests` (caseCompletion SC01-SC14) |
+| `plugins/pipeline-core/lib/fanout-governor.test.mjs` | `fanout-governor-tests` (caseCompletion FG01-FG33) |
+| `plugins/pipeline-core/hooks/stop-fanout.test.mjs` | `stop-fanout-tests` (caseCompletion SF01-SF15) |
+| `plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs` | `guard-dispatch-fanout-tests` |
+| `plugins/pipeline-core/hooks/post-compact-reground.fanout.test.mjs` | `post-compact-reground-fanout-tests` |
+| `plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs` | `pipeline-start-preflight-session-intent-tests` |
+| `plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs` | `pipeline-start-preflight-path-spelling-tests` |
+| `plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs` | `gitleaks-repair-ignore-cli-tests` |
+| `plugins/pipeline-core/lib/hardened-private-directory.test.mjs` | `hardened-private-directory-tests` |
+| `plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs` | `hardened-private-directory-install-tests` |
+| `plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs` | `nova-verify-journal-drvfs-hint-tests` |
+| `plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs` | `guard-push-gitleaks-prefix-tests` |
+| `plugins/pipeline-core/skills/close-block/close-block-fanout-report.test.mjs` | `close-block-fanout-report-tests` |
+| `plugins/pipeline-core/lib/test-support/private-tmp.test.mjs` | `private-tmp-tests` |
 
-Further new test files from slices still in flight tonight (push guard, hook installers, fan-out queue, Windows fsync)
-are added to this list before the package is built.
+Extended 2026-10-06 (REGPATCH2) with the tonight-slice suites; the heading count in the artifact table ("five new
+suites") predates this and now means twenty-three.

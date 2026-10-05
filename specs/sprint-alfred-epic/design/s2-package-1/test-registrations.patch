@@ -1,25 +1,64 @@
 --- a/harness/scripts/verify.mjs
 +++ b/harness/scripts/verify.mjs
-@@ -308,4 +308,6 @@
-   { name: "architecture-push-currency-tests", file: join(libDir, "architecture-push-currency.test.mjs") },
+@@ -306,2 +306,3 @@ const TEST_SUITES = [
+   { name: "guard-push-attestation-diagnostics-tests", file: join(hooksDir, "guard-push-attestation-diagnostics.test.mjs") },
++  { name: "guard-push-checkpoint-approval-tests", file: join(hooksDir, "guard-push-checkpoint-approval.test.mjs") },
+   { name: "push-destination-policy-tests", file: join(libDir, "push-destination-policy.test.mjs") },
+@@ -309,2 +310,10 @@ const TEST_SUITES = [
    { name: "checkpoint-push-audit-tests", file: join(libDir, "checkpoint-push-audit.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CPA001"], maxBytes: 65_536 } },
 +  { name: "checkpoint-push-approval-tests", file: join(libDir, "checkpoint-push-approval.test.mjs") },
 +  { name: "fanout-ledger-tests", file: join(libDir, "fanout-ledger.test.mjs") },
++  { name: "fanout-governor-tests", file: join(libDir, "fanout-governor.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 33 }, (_, index) => `FG${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
++  { name: "slice-queue-tests", file: join(libDir, "slice-queue.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 34 }, (_, index) => `SQ${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
++  { name: "slice-queue-cli-tests", file: join(pluginScriptsDir, "slice-queue.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 14 }, (_, index) => `SC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
++  { name: "stop-fanout-tests", file: join(hooksDir, "stop-fanout.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 15 }, (_, index) => `SF${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
++  { name: "guard-dispatch-fanout-tests", file: join(hooksDir, "guard-dispatch-fanout.test.mjs") },
++  { name: "close-block-fanout-report-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "close-block", "close-block-fanout-report.test.mjs") },
    { name: "stop-suggest-tests", file: join(hooksDir, "stop-suggest.test.mjs") },
-   { name: "close-coordinator-tests", file: join(pluginScriptsDir, "close-coordinator.test.mjs") },
-@@ -320,3 +322,4 @@
-   { name: "runner-profiles-v3-tests", file: join(libDir, "runner-profiles-v3.test.mjs") },
+@@ -312,2 +321,3 @@ const TEST_SUITES = [
+   { name: "post-compact-reground-tests", file: join(hooksDir, "post-compact-reground.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["PCR001", "PCR002", "PCR003", "PCR004", "PCR005", "PCR006", "PCR007", "PCR008", "PCR009", "PCR010", "PCR011", "PCR012", "PCR013", "PCR014", "PCR015", "PCR016", "PCR017", "PCR018", "PCR019", "PCR020", "PCR021", "PCR022", "PCR023", "PCR024", "PCR025", "PCR026", "PCR027", "PCR028"], maxBytes: 65_536 } },
++  { name: "post-compact-reground-fanout-tests", file: join(hooksDir, "post-compact-reground.fanout.test.mjs") },
+   { name: "setup-check-tests", file: join(hooksDir, "setup-check.test.mjs") },
+@@ -321,2 +331,3 @@ const TEST_SUITES = [
    { name: "runtime-projection-v3-tests", file: join(libDir, "runtime-projection-v3.test.mjs") },
 +  { name: "runtime-handover-projection-win-path-tests", file: join(libDir, "runtime-handover-projection.win-path.test.mjs") },
    { name: "runner-profile-migration-v3-tests", file: join(libDir, "runner-profile-migration-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 56 }, (_, index) => `RPM${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-@@ -330,3 +333,4 @@
-   { name: "v3-bootstrap-authority-tests", file: join(pluginScriptsDir, "v3-bootstrap-authority.test.mjs") },
+@@ -331,2 +342,3 @@ const TEST_SUITES = [
    { name: "project-onboarding-e2e-tests", file: join(pluginScriptsDir, "project-onboarding-e2e.test.mjs") },
 +  { name: "project-onboarding-v3-flap-tests", file: join(libDir, "project-onboarding-v3.flap.test.mjs") },
    // ADR-0051/ADR-0057 R1: walks the consumer chain executing each returned action
-@@ -471,4 +475,5 @@
-   { name: "critic-fail-closed-tests", file: join(scriptDir, "check-critic-fail-closed.test.mjs") },
-   { name: "critic-fail-closed-check", file: join(scriptDir, "check-critic-fail-closed.mjs") },
+@@ -396,2 +408,4 @@ const TEST_SUITES = [
+   { name: "pipeline-start-preflight-tests", file: join(pluginScriptsDir, "pipeline-start-preflight.test.mjs") },
++  { name: "pipeline-start-preflight-session-intent-tests", file: join(pluginScriptsDir, "pipeline-start-preflight.session-intent.test.mjs") },
++  { name: "pipeline-start-preflight-path-spelling-tests", file: join(pluginScriptsDir, "pipeline-start-preflight.path-spelling.test.mjs") },
+   { name: "runner-usage-v1-tests", file: join(libDir, "runner-usage-v1.test.mjs") },
+@@ -465,2 +479,5 @@ const TEST_SUITES = [
+   { name: "private-overlay-activation-e2e-tests", file: join(pluginScriptsDir, "private-overlay-activation.e2e.test.mjs") },
++  { name: "hardened-private-directory-tests", file: join(libDir, "hardened-private-directory.test.mjs") },
++  { name: "hardened-private-directory-install-tests", file: join(libDir, "hardened-private-directory.install.test.mjs") },
++  { name: "private-tmp-tests", file: join(libDir, "test-support", "private-tmp.test.mjs") },
+   { name: "codex-private-overlay-activation-tests", file: join(pluginScriptsDir, "codex-private-overlay-activation.test.mjs") },
+@@ -473,2 +490,3 @@ const TEST_SUITES = [
    { name: "agents-adapter-migration-tests", file: join(scriptDir, "check-agents-adapter-migration.test.mjs") },
 +  { name: "guard-split-map-tests", file: join(scriptDir, "guard-split-map.test.mjs") },
    { name: "agents-adapter-migration-check", file: join(scriptDir, "check-agents-adapter-migration.mjs") },
+@@ -592,2 +610,3 @@ const TEST_SUITES = [
+   { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
++  { name: "nova-verify-journal-drvfs-hint-tests", file: join(pluginScriptsDir, "verify-journal.drvfs-hint.test.mjs") },
+   { name: "test-case-completion-tests", file: join(libDir, "test-case-completion.test.mjs") },
+@@ -616,2 +635,3 @@ const TEST_SUITES = [
+   { name: "governance-event-store-tests", file: join(libDir, "governance-event-store.test.mjs") },
++  { name: "governance-event-store-win-fsync-tests", file: join(libDir, "governance-event-store.win-fsync.test.mjs") },
+   { name: "governance-event-core-tests", file: join(libDir, "governance-event.test.mjs") },
+@@ -697,2 +717,3 @@ const TEST_SUITES = [
+   { name: "gitleaks-tests", file: join(pluginScriptsDir, "security-adapters", "gitleaks.test.mjs") },
++  { name: "gitleaks-repair-ignore-cli-tests", file: join(pluginScriptsDir, "gitleaks-repair-ignore.cli.test.mjs") },
+   { name: "license-check-tests", file: join(pluginScriptsDir, "security-adapters", "license-check.test.mjs") },
+@@ -707,2 +728,3 @@ const TEST_SUITES = [
+   { name: "guard-push-decision-reference-tests", file: join(hooksDir, "guard-push-decision-reference.test.mjs") },
++  { name: "guard-push-gitleaks-prefix-tests", file: join(hooksDir, "guard-push-gitleaks-prefix.test.mjs") },
+   { name: "control-execution-lifecycle-event-tests", file: join(libDir, "control-execution-lifecycle-event.test.mjs") },
+@@ -906,2 +928,3 @@ const TEST_SUITES = [
+   { name: "design-advisor-provenance-tests", file: join(libDir, "design-advisor-provenance.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC10C001","RC10C002","RC10C003","RC10C004"],maxBytes:65536} },
++  { name: "design-advisor-provenance-flap3-tests", file: join(libDir, "design-advisor-provenance.flap3.test.mjs") },
+   { name: "design-advisory-coordinator-v2-tests", file: join(libDir, "design-advisory-coordinator-v2.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC11C001","RC11C002","RC11C003"],maxBytes:65536} },
