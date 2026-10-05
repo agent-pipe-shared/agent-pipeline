@@ -228,17 +228,25 @@ export function ensureVerifyRunRecordsDirectory(directory) {
   for (const path of [dirname(dirname(directory)), dirname(directory), directory]) ensurePrivateDirectory(path);
 }
 
-function registerRunRecordOwner({ gitCommonDir, runId, runPath }) {
+export const VERIFY_PRIVATE_DIRECTORY_HINT = "HINT: this filesystem reports permissive modes for every path (a WSL /mnt/<drive> DrvFs checkout is the known case), so the private journal directory cannot be created here; clone the repository into the Linux home and run Verify there.";
+
+// The outer code stays VERIFY-CLEANUP-REGISTRATION-REQUIRED (callers match on it); the original
+// failure is preserved as `cause` and named in the message, with a typed hint for the not-private case.
+export function registerRunRecordOwner({ gitCommonDir, runId, runPath, registerRecord = registerVerifyRunRecord }) {
   let written;
   try {
-    written = registerVerifyRunRecord({
+    written = registerRecord({
       gitCommonDir,
       runId,
       runPath,
       processStartId: processStartIdentity(process.pid),
       ensureDirectory: ensureVerifyRunRecordsDirectory,
     });
-  } catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
+  } catch (cause) {
+    const original = typeof cause?.message === "string" && cause.message !== "" ? cause.message : String(cause?.code ?? "unknown");
+    const hint = original.includes("VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE") ? ` ${VERIFY_PRIVATE_DIRECTORY_HINT}` : "";
+    throw new Error(`VERIFY-CLEANUP-REGISTRATION-REQUIRED (cause: ${original})${hint}`, { cause });
+  }
   return {
     descriptor: null,
     owner: null,
