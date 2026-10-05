@@ -11,12 +11,15 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, appendFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
+import { inspectGitHookSourceSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 
 import {
   renderShim,
@@ -105,7 +108,15 @@ function runInstalledHook(dir, stdin, { remote = "origin", url = "https://exampl
   const common = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: dir, encoding: "utf8" });
   assert.equal(common.status, 0, common.stderr);
   const fixtureHome = join(common.stdout.trim(), "fixture-home");
-  const result = spawnSync(install.hookPath, [remote, url], { cwd: dir, input: stdin, encoding: "utf8", timeout: 15000,
+  // The installed hook is an extensionless `#!/bin/sh` shim whose only job is `exec node <impl> "$@"`
+  // (renderShim, pinned below). Native Windows cannot spawn that file directly (spawnSync status null,
+  // observed on this clone: every case below was red before any PUSHSIG change), so there the SAME
+  // installed impl.mjs runs through node: identical logic and the identical argv/stdin/cwd contract.
+  // The POSIX path is unchanged.
+  const [command, args] = process.platform === "win32"
+    ? [process.execPath, [install.implPath, remote, url]]
+    : [install.hookPath, [remote, url]];
+  const result = spawnSync(command, args, { cwd: dir, input: stdin, encoding: "utf8", timeout: 15000,
     env: { ...process.env, HOME: fixtureHome, USERPROFILE: fixtureHome } });
   return { code: result.status, stderr: result.stderr ?? "", stdout: result.stdout ?? "" };
 }
@@ -274,10 +285,292 @@ test("installed hook: linked worktree reads fresh canonical evidence", () => {
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit", () => {
+// ---- PUSHSIG-S3: the hook enforces the feature-checkpoint signature -------------------------
+// Design: specs/sprint-alfred-epic/design/feature-branch-push-signature-design.md (3.5, section 5,
+// HK1..HK7). Every approval below is a REAL ephemeral Ed25519 signature over the exact chain
+// approve-push writes (subject -> action -> intent -> detached proof), verified by the real
+// `authorizeRecordedPush` inside the installed hook -- never a hand-set flag. The hook is a plain
+// node process driven through git's pre-push contract (stdin ref updates, argv remote), so these
+// cases prove behaviour independent of the agent runner (Claude, Codex or Antigravity) hosting the
+// push; they use only git, node and path joins, so they hold on any OS where the suite runs.
+
+const CHECKPOINT_REF = "refs/heads/feat/checkpoint";
+const THREAT_MODEL_PATH = "project/push-threat-model.md";
+const THREAT_MODEL_BODY = "# push threat model\n";
+const POLICY_PATH = "project/critical-human-proof.json";
+const STATE_PATH = ".claude/pipeline-state.json";
+const PLAN_SHA = "c".repeat(64);
+const SPEC_SHA = "d".repeat(64);
+const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
+
+const canonical = (value) => Array.isArray(value)
+  ? `[${value.map(canonical).join(",")}]`
+  : value !== null && typeof value === "object"
+    ? `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(",")}}`
+    : JSON.stringify(value);
+
+function operatorKey() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  return { publicPem, privateKey, publicKeySha256: sha256Hex(publicPem) };
+}
+
+/** The record approve-push writes: signed subject -> action -> intent -> detached proof. */
+function approvalRecord({
+  key, candidate, threatModel, remote = "origin", destination = CHECKPOINT_REF,
+  expiresAt = new Date(Date.now() + 3_600_000).toISOString(), signWith = key.privateKey,
+}) {
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({
+      kind: "push", candidate, subject: { sourceCommit: candidate.commit, remote, destination, threatModel },
+    }),
+    expiresAt,
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId: "demo-feature", planSha256: PLAN_SHA, specSha256: SPEC_SHA, candidate,
+    policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference: "po-key-1",
+    publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), signWith).toString("base64"),
+  };
+  const proofSha256 = sha256Hex(canonical(proof));
+  return {
+    approvedBy: "Human", approvedAt: new Date().toISOString(), forCommit: candidate.commit,
+    criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+    remote, destination, threatModel,
+  };
+}
+
+/**
+ * A feature-branch repository whose HEAD is an exact configured checkpoint (policy namespace,
+ * one Checkpoint-Intent trailer) with a TRACKED, committed state file, a threat model and a proof
+ * policy anchored to a fresh operator key. `recordApproval` then rewrites the tracked state file
+ * exactly as approve-push does after signing, which leaves ` M <state path>` as the only dirt.
+ */
+function checkpointRepo(prefix, { approval = "required", policy = "anchored", userYaml = null } = {}) {
+  const { dir, git } = freshRepo(prefix);
+  const key = operatorKey();
+  git("checkout", "-q", "-b", "feat/checkpoint");
+  writeManifest(dir, { approval });
+  const manifestPath = join(dir, ".claude", "pipeline.yaml");
+  appendFileSync(manifestPath, "pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n");
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, THREAT_MODEL_PATH), THREAT_MODEL_BODY);
+  writeFileSync(join(dir, POLICY_PATH), policy === "garbage"
+    ? "{ this is not json"
+    : `${JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v3",
+      requiredKinds: ["push", "deploy", "publication"],
+      waivedKinds: [],
+      trustAnchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }],
+    }, null, 2)}\n`);
+  writeState(dir, { schema: "pipeline.state.v0" });
+  const tracked = [".claude/pipeline.yaml", THREAT_MODEL_PATH, POLICY_PATH, STATE_PATH];
+  if (userYaml !== null) {
+    writeFileSync(join(dir, "pipeline.user.yaml"), userYaml);
+    tracked.push("pipeline.user.yaml");
+  }
+  git("add", ...tracked);
+  git("commit", "-q", "--amend", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup");
+  const commit = git("rev-parse", "HEAD").stdout.trim();
+  const tree = git("rev-parse", "HEAD^{tree}").stdout.trim();
+  assert.equal(git("status", "--porcelain").stdout, "", "precondition: the checkpoint fixture starts clean");
+  return { dir, git, key, commit, tree, stdin: (ref = CHECKPOINT_REF) => `${ref} ${commit} ${ref} ${ZERO40}\n` };
+}
+
+function recordApproval(repo, overrides = {}) {
+  const record = approvalRecord({
+    key: repo.key,
+    candidate: { commit: repo.commit, tree: repo.tree },
+    threatModel: { path: THREAT_MODEL_PATH, sha256: sha256Hex(THREAT_MODEL_BODY) },
+    ...overrides,
+  });
+  writeState(repo.dir, {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "demo-feature" },
+    planApproval: { poGateAuthority: { planSha256: PLAN_SHA, specSha256: SPEC_SHA } },
+    pushApproval: { lastApproved: record },
+    criticalProofConsumption: [{ proofSha256: record.criticalProof.proofSha256, kind: "push", consumedAt: new Date().toISOString() }],
+  });
+  return record;
+}
+
+const SIGNATURE_REQUIRED = /signature mode requires a current approval bound to this exact commit, remote and destination/;
+
+test("HK1 installed hook, signature mode: a clean exact checkpoint with NO recorded approval is blocked", () => {
+  const repo = checkpointRepo("hk1-no-approval");
+  const { code, stderr } = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(code, 1, stderr);
+  assert.match(stderr, SIGNATURE_REQUIRED);
+  assert.match(stderr, /CHECKPOINT-APPROVAL-STALE/);
+  assert.doesNotMatch(stderr, /verify-latest|security-latest/, "the checkpoint lane demands no publication evidence");
+  const last = readLog(repo.dir).at(-1);
+  assert.equal(last.verdict, "blocked");
+  assert.equal(last.remoteRef, CHECKPOINT_REF);
+  assert.equal(existsSync(join(repo.dir, "evidence")), false);
+});
+
+test("HK2 installed hook: a stale approval (another commit), an expired one and one bound to another destination are blocked", () => {
+  const repo = checkpointRepo("hk2-stale");
+  recordApproval(repo, { candidate: { commit: "e".repeat(40), tree: repo.tree } });
+  const stale = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(stale.code, 1, stale.stderr);
+  assert.match(stale.stderr, SIGNATURE_REQUIRED);
+  assert.match(stale.stderr, /CHECKPOINT-APPROVAL-STALE/);
+
+  recordApproval(repo, { expiresAt: new Date(Date.now() - 60_000).toISOString() });
+  const expired = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(expired.code, 1, expired.stderr);
+  assert.match(expired.stderr, /PUSH-PROOF-EXPIRED/);
+
+  recordApproval(repo, { destination: "refs/heads/feat/another" });
+  const rebound = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(rebound.code, 1, rebound.stderr);
+  assert.match(rebound.stderr, /CHECKPOINT-APPROVAL-BINDING/);
+  assert.equal(readLog(repo.dir).at(-1).verdict, "blocked");
+});
+
+test("HK3 installed hook: a valid commit-bound approval admits the checkpoint with no Verify evidence, tolerating exactly the approval record as dirt", () => {
+  const repo = checkpointRepo("hk3-valid");
+  recordApproval(repo);
+  assert.equal(repo.git("status", "--porcelain").stdout, ` M ${STATE_PATH}\n`, "precondition: the rewritten state record is the only dirt");
+  const { code, stderr } = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(code, 0, stderr);
+  const last = readLog(repo.dir).at(-1);
+  assert.equal(last.verdict, "allowed");
+  assert.equal(last.commit, repo.commit);
+  assert.equal(last.remoteRef, CHECKPOINT_REF);
+  assert.equal(existsSync(join(repo.dir, "evidence")), false, "no Verify/security evidence exists and none was needed");
+});
+
+test("HK3b installed hook: a valid approval does not excuse any other dirt (untracked file, staged state record)", () => {
+  const repo = checkpointRepo("hk3b-dirt");
+  recordApproval(repo);
+  writeFileSync(join(repo.dir, "stray.txt"), "stray\n");
+  const untracked = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(untracked.code, 1, untracked.stderr);
+  assert.match(untracked.stderr, /checkpoint working tree is not clean/);
+  rmSync(join(repo.dir, "stray.txt"));
+  repo.git("add", STATE_PATH);
+  const staged = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(staged.code, 1, staged.stderr);
+  assert.match(staged.stderr, /checkpoint working tree is not clean/);
+});
+
+test("HK4 installed hook: chat mode keeps today's behaviour (no approval needed) and never tolerates the approval record as dirt", () => {
+  const repo = checkpointRepo("hk4-chat", { userYaml: "gates:\n  push_approval: chat\n" });
+  const admitted = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(admitted.code, 0, admitted.stderr);
+  assert.equal(readLog(repo.dir).at(-1).verdict, "allowed");
+  recordApproval(repo);
+  const dirty = runInstalledHook(repo.dir, repo.stdin());
+  assert.equal(dirty.code, 1, dirty.stderr);
+  assert.match(dirty.stderr, /checkpoint working tree is not clean/);
+});
+
+test("HK5 fail closed: a malformed proof policy blocks, and so does an import fault of the approval module", () => {
+  const broken = checkpointRepo("hk5-policy", { policy: "garbage" });
+  recordApproval(broken);
+  const unreadable = runInstalledHook(broken.dir, broken.stdin());
+  assert.equal(unreadable.code, 1, unreadable.stderr);
+  assert.match(unreadable.stderr, SIGNATURE_REQUIRED);
+  assert.match(unreadable.stderr, /CRITICAL-PROOF-POLICY-UNREADABLE/);
+
+  const repo = checkpointRepo("hk5-import");
+  recordApproval(repo);
+  const modules = [...renderImpl(PLUGIN_LIB_DIR).matchAll(/join\(PLUGIN_LIB_DIR, "([a-z0-9-]+\.mjs)"\)/g)].map((m) => m[1]);
+  assert.ok(modules.includes("checkpoint-push-approval.mjs"), "the generated hook must import the shared approval module");
+  // A plugin lib made only of re-export shims, so the ONE module under test can be removed or
+  // broken while every other import resolves to the real file.
+  const runWithLib = (variant) => {
+    const lib = mkdtempSync(join(tmpdir(), `pre-push-hook-hk5-${variant}-`));
+    for (const name of modules) {
+      const isApproval = name === "checkpoint-push-approval.mjs";
+      if (isApproval && variant === "missing") continue;
+      writeFileSync(join(lib, name), isApproval && variant === "throws"
+        ? 'throw new Error("fixture import fault");\n'
+        : `export * from ${JSON.stringify(pathToFileURL(join(PLUGIN_LIB_DIR, name)).href)};\n`);
+    }
+    const implFile = join(lib, "hook-under-test.mjs");
+    writeFileSync(implFile, renderImpl(lib));
+    const result = spawnSync(process.execPath, [implFile, "origin", "https://example.invalid/repo.git"], {
+      cwd: repo.dir, input: repo.stdin(), encoding: "utf8", timeout: 30000,
+    });
+    return { code: result.status, stderr: result.stderr ?? "" };
+  };
+  const control = runWithLib("complete");
+  assert.equal(control.code, 0, `control (every module present) must admit the approved checkpoint: ${control.stderr}`);
+  for (const variant of ["missing", "throws"]) {
+    const faulted = runWithLib(variant);
+    assert.equal(faulted.code, 1, `${variant}: ${faulted.stderr}`);
+    assert.match(faulted.stderr, /faulted unexpectedly/);
+  }
+  assert.equal(readLog(repo.dir).at(-1).verdict, "blocked");
+});
+
+test("HK6 installed hook: a push to another remote name, or addressed by URL, is not admitted by an approval for 'origin' and never echoes the URL", () => {
+  const repo = checkpointRepo("hk6-remote");
+  recordApproval(repo);
+  // The approval binds the remote NAME given to approve-push; the hook sees git's argv remote.
+  const other = runInstalledHook(repo.dir, repo.stdin(), { remote: "upstream" });
+  assert.equal(other.code, 1, other.stderr);
+  assert.match(other.stderr, SIGNATURE_REQUIRED);
+  assert.match(other.stderr, /CHECKPOINT-APPROVAL-BINDING/);
+  // A URL is not a safe remote name for the checkpoint classification, so it never reaches the
+  // checkpoint lane at all and fails closed on the stricter protected lane (design 3.5: "a URL
+  // push fails closed"). Whichever lane refuses it, it is refused and the URL is not echoed.
+  const url = "https://example.invalid/secret-repo.git";
+  const byUrl = runInstalledHook(repo.dir, repo.stdin(), { remote: url, url });
+  assert.equal(byUrl.code, 1, byUrl.stderr);
+  assert.doesNotMatch(byUrl.stderr, /example\.invalid|secret-repo/, "a remote may carry credentials and must not reach a transcript (SEC-01)");
+  const log = readLog(repo.dir);
+  assert.equal(log.at(-1).verdict, "blocked");
+  assert.doesNotMatch(JSON.stringify(log), /example\.invalid|secret-repo/);
+});
+
+test("HK7 the snapshot digest tracks the approval module and the installer, so an existing install reports updateRequired", () => {
+  const imported = new Set([...renderImpl(PLUGIN_LIB_DIR).matchAll(/join\(PLUGIN_LIB_DIR, "([a-z0-9-]+\.mjs)"\)/g)].map((m) => m[1]));
+  for (const name of ["checkpoint-push-approval.mjs", "critical-human-proof-policy.mjs"]) {
+    assert.ok(imported.has(name), `the generated hook must import ${name}`);
+  }
+  const inventory = JSON.parse(inspectGitHookSourceSnapshot({ pluginLibDir: PLUGIN_LIB_DIR }).manifestBytes).inventory.map((row) => row.path);
+  for (const name of imported) assert.ok(inventory.includes(`lib/${name}`), `lib/${name} must be part of the runtime snapshot digest`);
+  assert.ok(inventory.includes("scripts/pre-push-hook-install.mjs"), "the installer (which renders the hook) is part of the digest");
+
+  // An install taken from a plugin library that predates the approval module is stale against
+  // one that carries it: the installer reports updateRequired rather than "current".
+  const fixturePluginLib = (label, withApprovalModule) => {
+    const root = mkdtempSync(join(tmpdir(), `pre-push-hk7-${label}-`));
+    const lib = join(root, "lib");
+    mkdirSync(lib);
+    writeFileSync(join(root, "protected-baseline.json"), readFileSync(join(PLUGIN_LIB_DIR, "..", "protected-baseline.json")));
+    writeFileSync(join(lib, "governance-scope.mjs"), "export const fixture = true;\n");
+    if (withApprovalModule) writeFileSync(join(lib, "checkpoint-push-approval.mjs"), readFileSync(join(PLUGIN_LIB_DIR, "checkpoint-push-approval.mjs")));
+    return lib;
+  };
+  const before = fixturePluginLib("before", false);
+  const after = fixturePluginLib("after", true);
+  const { dir } = freshRepo("hk7");
+  assert.equal(applyInstall({ rootDir: dir, pluginLibDir: before }).status, "installed");
+  const unchanged = planInstall({ rootDir: dir, pluginLibDir: before });
+  assert.equal(unchanged.updateRequired, false);
+  const stale = planInstall({ rootDir: dir, pluginLibDir: after });
+  assert.equal(stale.status, "ready-to-upgrade");
+  assert.equal(stale.current, false);
+  assert.equal(stale.updateRequired, true);
+});
+
+// The pre-PUSHSIG case, now the chat/standing variant: a repository whose push gate is
+// `standing-approved` keeps admitting an exact checkpoint with no approval (design section 2).
+test("installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (standing-approved variant)", () => {
   const { dir, git } = freshRepo("e2e-checkpoint");
   git("checkout", "-q", "-b", "feat/checkpoint");
-  writeManifest(dir, { approval: "required" });
+  writeManifest(dir, { approval: "standing-approved" });
   writeFileSync(join(dir, ".claude", "pipeline.yaml"), `${readFileSync(join(dir, ".claude", "pipeline.yaml"), "utf8")}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
   git("add", ".claude/pipeline.yaml");
   git("commit", "-q", "--amend", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup");

@@ -239,6 +239,21 @@ export function renderImpl(pluginLibDir) {
  *     reconstruct. A repository relying on the critical-proof chain for real protection
  *     (this Pipeline repository included) still needs guard-push.mjs's in-session gate
  *     for that half -- this hook is the evidence/approval backstop, not a substitute.
+ *   - (d) the FEATURE-CHECKPOINT lane (PUSHSIG; specs/sprint-alfred-epic/design/
+ *     feature-branch-push-signature-design.md, 3.5). This is the ONE exception to the (c)
+ *     note above: in "signature" mode -- the default, and also what an unreadable proof
+ *     policy resolves to -- a checkpoint push is admitted only with a current Ed25519
+ *     "push" approval bound to this exact commit, remote name, destination, threat model
+ *     and plan/spec authority, verified by the SAME shared checkCheckpointPushApproval the
+ *     in-session guard calls (lib/checkpoint-push-approval.mjs; reused, never copied). No
+ *     Verify/security evidence is read for it. The trust anchor and the mode lookup are
+ *     read from this repository's own root (a hook is per repository). "chat" and
+ *     "standing-approved" keep admitting a clean exact checkpoint without an approval. In
+ *     signature mode the one tolerated dirty entry is the tracked state record that
+ *     approve-push rewrites after signing (" M <state path>", classified by the shared
+ *     classifyCheckpointPorcelain on the RAW porcelain text); any other dirt blocks. The
+ *     approval binds the remote NAME, so a push addressed by URL is never admitted here.
+ *     A failure to load the shared module is a fault and blocks like every other fault.
  *
  * FAIL-CLOSED, DELIBERATELY UNLIKE THE PLUGIN GUARD FAMILY'S FAIL-OPEN CONVENTION
  *   Every plugin PreToolUse guard (guard-push.mjs included) fails OPEN on unparseable
@@ -326,7 +341,7 @@ export function parseRefUpdates(stdinText) {
   return updates;
 }
 
-function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, classify, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt) {
+function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, classify, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt, approvalPolicy) {
   if (classify.lane !== "feature-checkpoint") return null;
   if (localRef !== remoteRef) {
     return "checkpoint source and destination must be the same explicit feature ref";
@@ -334,12 +349,42 @@ function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, cla
   const head = git(["-C", projectRoot, "rev-parse", "--verify", "HEAD^{commit}"], projectRoot);
   if (head.status !== 0 || head.stdout.trim() !== commit) return "checkpoint source is not the clean checked-out candidate";
   const status = git(["-C", projectRoot, "status", "--porcelain"], projectRoot);
-  if (status.status !== 0 || status.stdout.trim() !== "") return "checkpoint working tree is not clean";
+  if (status.status !== 0) return "checkpoint working tree is not clean";
+  // The RAW porcelain text, never trimmed: entries start with a significant space (PUSHSIG 3.4).
+  // Clean decision = clean || (signatureMode && approvalRecordOnly); every other mode keeps the
+  // strict "no entries at all" reading it always had.
+  const porcelain = approvalPolicy.classifyCheckpointPorcelain(status.stdout, [approvalPolicy.stateRelPath]);
+  if (!(porcelain.clean || (approvalPolicy.signatureMode && porcelain.approvalRecordOnly))) return "checkpoint working tree is not clean";
   const trailers = git(["-C", projectRoot, "show", "-s", "--format=%(trailers:key=Checkpoint-Intent,valueonly)", commit], projectRoot);
   const values = trailers.status === 0 ? trailers.stdout.split("\\n").map((value) => value.trim()).filter(Boolean) : [];
   if (values.length !== 1 || !validCheckpointIntent(values[0])) return "checkpoint candidate needs exactly one bounded Checkpoint-Intent commit trailer";
   const tree = git(["-C", projectRoot, "rev-parse", String(commit) + "^{tree}"], projectRoot);
   if (tree.status !== 0) return "checkpoint candidate tree cannot be resolved";
+  if (approvalPolicy.signatureMode) {
+    // Signature mode: a current, commit-bound Ed25519 approval, checked AFTER the eligibility
+    // messages above (so they keep appearing first) and BEFORE the audit write (an unapproved
+    // push leaves no checkpoint-attempt record). Any unreadable state is an absent approval.
+    let state = null;
+    try {
+      state = JSON.parse(readFileSync(join(projectRoot, approvalPolicy.stateRelPath), "utf8"));
+    } catch {
+      state = null;
+    }
+    const verdict = approvalPolicy.checkCheckpointPushApproval({
+      projectDir: projectRoot,
+      anchorDir: projectRoot,
+      state,
+      candidate: { commit, tree: tree.stdout.trim() },
+      remote,
+      destination: remoteRef,
+      now: new Date().toISOString(),
+    });
+    if (verdict?.ok !== true) {
+      // Fixed texts only: the remote (a possibly credential-bearing URL) is never interpolated (SEC-01).
+      return "checkpoint push: signature mode requires a current approval bound to this exact commit, remote and destination ("
+        + String(verdict?.code ?? "CHECKPOINT-APPROVAL-VERIFIER-FAULT") + ": " + String(verdict?.reason ?? "no verdict") + ").";
+    }
+  }
   const record = checkpointAuditRecord({ commit, tree: tree.stdout.trim(), remote, destination: remoteRef, intent: values[0] });
   if (!record) return "checkpoint audit record cannot be constructed";
   const audit = recordCheckpointPushAttempt({ projectDir: projectRoot, record });
@@ -374,6 +419,18 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
   const { classifyPushDestination, validCheckpointIntent } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "push-destination-policy.mjs")).href);
   const { checkpointAuditRecord, recordCheckpointPushAttempt } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "checkpoint-push-audit.mjs")).href);
   const { resolveProjectAuthorityPaths, NEUTRAL_STATE, LEGACY_STATE } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "project-authority.mjs")).href);
+  // PUSHSIG: the shared checkpoint approval decision. A load fault throws out of here and is
+  // blocked by main()'s fault boundary -- fail closed, like every import above.
+  const { checkpointApprovalMode, checkCheckpointPushApproval, classifyCheckpointPorcelain } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "checkpoint-push-approval.mjs")).href);
+  const { criticalProofWaiverFor } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-human-proof-policy.mjs")).href);
+  // The repository-relative path of the pipeline state record: the one place a push approval is
+  // read from, and the one dirty entry a signature-mode checkpoint tolerates (design 3.4).
+  const stateRelPathFor = () => {
+    const authority = resolveProjectAuthorityPaths({ rootDir: projectRoot });
+    return authority.status === "ready"
+      ? authority.state
+      : (existsSync(join(projectRoot, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  };
 
   const manifestResult = loadManifest(projectRoot);
   if (manifestResult.status === "absent") {
@@ -404,7 +461,25 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
     policy: manifest.pushDestinationPolicy,
     binding: { ok: true, remote, sourceRef: localRef, destination: remoteRef },
   });
-  const checkpointBlock = checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, checkpointClass, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt);
+  // PUSHSIG: which approval mode governs a checkpoint push. The waiver lookup and the trust anchor
+  // use this repository's root. A fault while reading the proof policy can only TIGHTEN the mode
+  // (an unreadable policy resolves to "signature"; checkpointApprovalMode never throws).
+  let approvalPolicy = null;
+  if (checkpointClass.lane === "feature-checkpoint") {
+    let waiver = { waived: false, code: "CHECKPOINT-WAIVER-READ-FAULT" };
+    try {
+      waiver = criticalProofWaiverFor(projectRoot, "push");
+    } catch {
+      // keep the strict default above
+    }
+    approvalPolicy = {
+      signatureMode: checkpointApprovalMode({ pushGate, waiver }) === "signature",
+      classifyCheckpointPorcelain,
+      checkCheckpointPushApproval,
+      stateRelPath: stateRelPathFor(),
+    };
+  }
+  const checkpointBlock = checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, checkpointClass, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt, approvalPolicy);
   if (checkpointClass.lane === "feature-checkpoint") {
     return checkpointBlock
       ? { hardBlock: checkpointBlock, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: false }
