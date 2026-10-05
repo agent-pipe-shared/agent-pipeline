@@ -6,6 +6,7 @@ import { admitModelRoleHostBootstrap, prepareModelRoleHostBootstrap } from "../l
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+import { devNull } from "node:os";
 
 const cases = [];
 function test(name, run) { cases.push({ id: `MDS${String(cases.length + 1).padStart(2, "0")}`, name, run }); }
@@ -254,7 +255,7 @@ test("family selection script-level identity transport failure stays unavailable
 
 assert.equal(cases.length, 10);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

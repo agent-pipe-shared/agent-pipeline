@@ -17,6 +17,7 @@ import {applyInstall as commitMsg} from './commit-msg-hook-install.mjs';
 import {applyInstall as preCommit} from './pre-commit-hook-install.mjs';
 import {applyInstall as prePush} from './pre-push-hook-install.mjs';
 import {validateAgainstSchema} from '../lib/schema-lite.mjs';
+import { devNull } from 'node:os';
 const owned=process.env.PIPELINE_RESET_FIXTURE_ROOT ?? new URL('../../../../scratch/project-reset-git-hooks/',import.meta.url).pathname,plugin=new URL('../',import.meta.url).pathname,schema=JSON.parse(readFileSync(join(plugin,'scripts/project-reset-plan.schema.json')));
 mkdirSync(join(owned,'fixtures'),{recursive:true});
 function git(root,args){const r=spawnSync('git',args,{cwd:root,encoding:'utf8',timeout:20000});assert.equal(r.status,0,JSON.stringify({args,stderr:r.stderr}));return r.stdout;}
@@ -38,7 +39,7 @@ test('legacy receipt readable, legacy journal cannot gain removal authority',t=>
 // Each original sibling callback is registered individually; no envelope case.
 if (completionCases.length !== 17) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { measureBootstrapBytes } from "../../lib/bootstrap-payload-budget.mjs";
 import { DEFAULT_ENVELOPE } from "../../scripts/bootstrap-payload-measure.mjs";
 import { registerTestCaseCompletion } from "../../lib/test-case-completion.mjs";
+import { devNull } from "node:os";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cases = [
@@ -20,7 +21,7 @@ const cases = [
   { id: "PSV08", name: "mandatory skill stays under 24 KiB and loads only the active runner's model detail", run: checkRunnerBudget },
 ];
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

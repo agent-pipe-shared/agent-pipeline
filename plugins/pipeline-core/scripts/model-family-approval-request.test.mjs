@@ -10,6 +10,7 @@ import { verifyModelFamilyAuthority } from "../lib/model-family-authority.mjs";
 import { createModelFamilyApprovalRequest, modelFamilyApprovalRequestMatches } from "./model-family-approval-request.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
+import { devNull } from "node:os";
 
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 const digest = (value) => sha(canonical(value));
@@ -319,6 +320,6 @@ test("canonical PO signer resolves the family request before guard fallback and 
 
 if (completionCases.length !== 10) throw new Error("case completion count drift: expected 10, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });

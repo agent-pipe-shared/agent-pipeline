@@ -13,6 +13,7 @@ import {
   createCloseCoordinator,
   lifecycleDigest,
 } from "./publication-close-journal.mjs";
+import { devNull } from "node:os";
 
 const h = (value) => value.repeat(64);
 const authority = {
@@ -51,7 +52,7 @@ test("feature-close preparation requires an exact durable audit and Critic/Verif
 // Register each original sibling callback directly with the canonical recorder.
 if (completionCases.length !== 1) throw new Error("Required completion case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

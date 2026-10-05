@@ -15,7 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, uptime } from "node:os";
+import { homedir, uptime, devNull } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -669,7 +669,7 @@ check("denies replayed cleanup and foreign workspace marker without broad deleti
 
 assert.equal(cases.length, 10, "the complete local-worker supervisor CLI corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({
   cases: cases,

@@ -4,7 +4,7 @@ import { openSync as openCompletionDescriptor } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { applyInstall as installPrePush } from "./pre-push-hook-install.mjs";
 import { applyInstall as installPreCommit } from "./pre-commit-hook-install.mjs";
@@ -192,6 +192,6 @@ test("stale cleanup removes only marked dead-owner partial trees and retains liv
 
 if (completionCases.length !== 4) throw new Error("case completion count drift: expected 4, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openCompletionDescriptor(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });
