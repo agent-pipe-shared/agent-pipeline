@@ -16,6 +16,10 @@ done_when: manual
 
 Defect 7 of the ALFRED-BACKLOG-20261005 set: once a commit cites a task id, `GUARD-DISPATCH-RECORD-COLLISION` refuses every further write to that dispatch record. This contradicts the goldfish template's "commit, then checkpoint/finalize the record" and leaves the record unable to receive its final state or report after the commit. Reproduction shape: dispatch a Goldfish, commit with a `Dispatch: <TASK_ID> (goldfish)` trailer, then write the dispatch record (log entry, outcome flip or report). Impact: the dispatcher must hand-finalize records or the Goldfish must write the final state before its last commit, which the template does not say consistently. Fix direction: admit record writes by the owning dispatch after its own commit (bound to the task id and the agent identity), or amend the template to a single ordering the guard actually admits; add a regression test for the commit-then-finalize sequence.
 
+## Observed again 2026-10-05 (round 3b)
+
+A restart does not stop background dispatches, and the dispatcher has no reliable liveness view. After a PO restart/resume the earlier BLR3 Goldfish kept running while its record still showed only `phase: start`; a re-dispatch (BLR3b) wrote the same backlog files concurrently and overwrote two of them. Fix direction: a liveness readback for open dispatch records (pid/heartbeat or runner task state) that the dispatch guard checks before admitting a second writer in the same checkout.
+
 ## Description
 
 Three failure modes were observed during the W0-3 dispatches:
