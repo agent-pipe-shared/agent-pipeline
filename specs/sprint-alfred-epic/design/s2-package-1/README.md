@@ -78,7 +78,30 @@ Answer: both registries are valid for a new suite, so the 23+2 entries in `test-
   `verify-case-completion.v1.json:179-181`). The checker only demands an inline policy for suites listed there as
   `required` (`:587`) and the `registerTestCaseCompletion` protocol in their source (`:598-600`). A suite not listed
   there but classified vulnerable (`:409-446`) is reported `VULNERABLE-UNREGISTERED` (`:604`).
-- Not determined (not read to the end): whether `check-verify-case-completion.mjs` after `:607` forces a registry
-  entry for the new suites, and whether the two new files classify as vulnerable. If it does, the follow-up is one
-  entry each in `verify-case-completion.v1.json` (protected-adjacent, outside this slice). New `TEST_SUITES` names
-  also need `verify-phase:` surfaces in `docs/product-capability-inventory.json` (`:506-562`).
+### Determined 2026-10-06 (REGPATCH4, interim: dispositions and inventory patches NOT yet staged)
+
+Method: `classifyVulnerableSuite` (`check-verify-case-completion.mjs:409-446`, exported) run on all 25 files, then the
+checker itself simulated in memory over a copy of `verify.mjs` with `test-registrations.patch` applied (copies only
+under `scratch/REGPATCH4/`; no tracked file touched). Baseline: valid. With the 25 registrations: exactly the nine
+`VULNERABLE-UNREGISTERED` findings below (`:604`), no others.
+
+- Case-completion entry needed (`:601-604`): YES for nine suites, NO for the other sixteen (classifier returns null).
+  - `fanout-ledger-tests`, `fanout-governor-tests`, `slice-queue-tests`, `slice-queue-cli-tests`, `stop-fanout-tests`,
+    `runtime-handover-projection-win-path-tests`, `clone-hook-readiness-rollback-tests`: `top-level-assertions`
+    (`:445`, assertions >= 2 and no `node:test` import).
+  - `hardened-private-directory-install-tests`, `gitleaks-repair-ignore-cli-tests`: `node-test-single` (`:443`).
+  - New registrations may only start as `required` (`LEGACY-NEW`, `:622-625`, fires when a base is given).
+- A `required` entry then demands (simulated): an inline `caseCompletion` policy (`:587`) and
+  `registerTestCaseCompletion` (`:598-600`).
+  - Satisfied as registered: fanout-governor, slice-queue, slice-queue-cli, stop-fanout, clone-hook-readiness-rollback.
+  - `fanout-ledger-tests` and `runtime-handover-projection-win-path-tests` have the protocol but no inline policy in
+    `test-registrations.patch` (finding `REQUIRED-VERIFY-POLICY`). Proposed: ledger `Array.from({ length: 8 }, ...)`
+    with ids `FL01`-`FL08` (test file line 21-23), win-path `["RHPW001", "RHPW002"]` (test file lines 21-35). Not yet
+    simulated with these added.
+  - The two `node-test-single` suites have no `registerTestCaseCompletion` (finding `REQUIRED-PROTOCOL`): there is no
+    clean disposition without migrating the test file or a PO decision. Not determined further; not staged.
+- Inventory surface needed (`check-verify-suite-registration.mjs:539-547`): YES for all 25 (all are `TEST_SUITES`
+  entries; none has a `verify-phase:` surface in `docs/product-capability-inventory.json`; each must go into exactly
+  one capability, a product judgement).
+- Staged: nothing yet. Remaining: `case-completion-dispositions.patch` (seven `required` entries, sorted by name into
+  `verify-case-completion.v1.json`), `inventory-surfaces.patch` (25 surfaces), `git apply --check` evidence.
