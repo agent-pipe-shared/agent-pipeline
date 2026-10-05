@@ -1,0 +1,244 @@
+diff --git a/harness/config/verify-case-completion.v1.json b/scratch/rggram/post/harness/config/verify-case-completion.v1.json
+index 3aaab04a2..3f96b7161 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/scratch/rggram/post/harness/config/verify-case-completion.v1.json
+@@ -558,11 +558,6 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
+-    {
+-      "name": "git-hook-runtime-snapshot-fast-verify-tests",
+-      "path": "plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs",
+-      "disposition": "required"
+-    },
+     {
+       "name": "github-actions-permissions-tests",
+       "path": "harness/scripts/check-github-actions-permissions.test.mjs",
+@@ -605,8 +600,8 @@
+       "disposition": "required"
+     },
+     {
+-      "name": "guard-dispatch-budget-checkpoint-tests",
+-      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
++      "name": "guard-command-grammar-tests",
++      "path": "plugins/pipeline-core/hooks/guard-command-grammar.test.mjs",
+       "disposition": "required"
+     },
+     {
+@@ -1173,16 +1168,6 @@
+       "path": "plugins/pipeline-core/lib/project-authority.test.mjs",
+       "disposition": "required"
+     },
+-    {
+-      "name": "project-onboarding-foreign-residue-tests",
+-      "path": "plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs",
+-      "disposition": "required"
+-    },
+-    {
+-      "name": "project-onboarding-foreign-residue-unit-tests",
+-      "path": "plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs",
+-      "disposition": "required"
+-    },
+     {
+       "name": "project-onboarding-v3-tests",
+       "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+@@ -1585,11 +1570,6 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
+-    {
+-      "name": "verify-run-record-tests",
+-      "path": "plugins/pipeline-core/lib/verify-run-record.test.mjs",
+-      "disposition": "required"
+-    },
+     {
+       "name": "verify-selection-tests",
+       "path": "plugins/pipeline-core/lib/verify-selection.test.mjs",
+diff --git a/harness/verify-suites.json b/scratch/rggram/post/harness/verify-suites.json
+index 53db39bfe..302c36199 100644
+--- a/harness/verify-suites.json
++++ b/scratch/rggram/post/harness/verify-suites.json
+@@ -1542,105 +1542,32 @@
+       "nonOverlapNote": "Command admission exercises the guard boundary independently of coordinator execution and does not grant PO approval or implementation authority"
+     },
+     {
+-      "name": "guard-dispatch-budget-checkpoint-tests",
+-      "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+-      "caseCompletion": {
+-        "schema": "pipeline.verify-case-completion-policy.v1",
+-        "caseIds": [
+-          "GDBC01",
+-          "GDBC02",
+-          "GDBC03",
+-          "GDBC04",
+-          "GDBC05",
+-          "GDBC06",
+-          "GDBC07",
+-          "GDBC08",
+-          "GDBC09",
+-          "GDBC10",
+-          "GDBC11",
+-          "GDBC12",
+-          "GDBC13",
+-          "GDBC14",
+-          "GDBC15"
+-        ],
+-        "maxBytes": 65536
+-      },
+-      "invariantPinned": "The dispatch-budget hook emits the checkpoint notice at exactly ceil(0.8 x cap) and on the last three working calls, hands the closing lane back only to the Critic, never notifies or counts the orchestrator, and bounds every granted cap by maxTurns minus the closing allowance minus one",
+-      "nonOverlapNote": "Exercises the real hook child process and the pure grant core black-box and imports no guard module; it is additive to guard-dispatch-budget-tests, whose module-scope-import hazard it avoids"
+-    },
+-    {
+-      "name": "git-hook-runtime-snapshot-fast-verify-tests",
+-      "file": "plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs",
+-      "caseCompletion": {
+-        "schema": "pipeline.verify-case-completion-policy.v1",
+-        "caseIds": [
+-          "GHRSF01",
+-          "GHRSF02",
+-          "GHRSF03",
+-          "GHRSF04",
+-          "GHRSF05",
+-          "GHRSF06",
+-          "GHRSF07",
+-          "GHRSF08",
+-          "GHRSF09",
+-          "GHRSF10",
+-          "GHRSF11",
+-          "GHRSF12",
+-          "GHRSF13",
+-          "GHRSF14",
+-          "GHRSF15",
+-          "GHRSF16",
+-          "GHRSF17",
+-          "GHRSF18",
+-          "GHRSF19"
+-        ],
+-        "maxBytes": 65536
+-      },
+-      "invariantPinned": "The fast verification paths of the git-hook runtime snapshot (batched native DACL read, below-root lstat walk, in-process verified memo) never weaken its refusals of tampered content, planted links or junctions, foreign ACEs and source drift, and the source tree is re-read and hashed in full",
+-      "nonOverlapNote": "Pins only the security properties of the fast verification paths; fixtures live under the OS temp dir and every planted ACE, junction or tamper is removed before a test ends"
+-    },
+-    {
+-      "name": "project-onboarding-foreign-residue-tests",
+-      "file": "plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs",
+-      "caseCompletion": {
+-        "schema": "pipeline.verify-case-completion-policy.v1",
+-        "caseIds": [
+-          "PFR01"
+-        ],
+-        "maxBytes": 65536
+-      },
+-      "invariantPinned": "Session readiness depends only on the requesting session's own descriptor: foreign descriptors (killed or stopped Verify incidents, bare orphans) yield a ready result carrying one admitted cleanup_residue_foreign warning and are never touched, while the requester's own descriptor with retained resources keeps the non-ready result",
+-      "nonOverlapNote": "Readiness-level case on incident-shaped descriptors in a throw-away fixture repository; distinct from the unit-level foreign-residue decision pinned by project-onboarding-foreign-residue-unit-tests"
+-    },
+-    {
+-      "name": "project-onboarding-foreign-residue-unit-tests",
+-      "file": "plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs",
+-      "caseCompletion": {
+-        "schema": "pipeline.verify-case-completion-policy.v1",
+-        "caseIds": [
+-          "PFRU01",
+-          "PFRU02",
+-          "PFRU03"
+-        ],
+-        "maxBytes": 65536
+-      },
+-      "invariantPinned": "Whether retained session residue is foreign is decided against real session descriptors: a foreign descriptor (incident shapes, with or without resources) is a warning and never a lock, the requester's own descriptor decides, and no descriptor or an unreadable inventory yields no warning (fail closed)",
+-      "nonOverlapNote": "Unit-level decision against real descriptors in a throw-away git fixture; it needs no onboarding fixture and is distinct from the readiness-level case in project-onboarding-foreign-residue.test.mjs"
+-    },
+-    {
+-      "name": "verify-run-record-tests",
+-      "file": "plugins/pipeline-core/lib/verify-run-record.test.mjs",
+-      "caseCompletion": {
+-        "schema": "pipeline.verify-case-completion-policy.v1",
+-        "caseIds": [
+-          "VRR01",
+-          "VRR02",
+-          "VRR03"
++      "name": "guard-command-grammar-tests",
++      "file": "plugins/pipeline-core/hooks/guard-command-grammar.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "RGB01",
++          "RGN01",
++          "RGN02",
++          "RGN03",
++          "RGN04",
++          "RGN05",
++          "RGN06",
++          "RGN07",
++          "RGN08",
++          "RGN09",
++          "RGP01",
++          "RGP02",
++          "RGP03",
++          "RGP04",
++          "RGP05",
++          "RGP06"
+         ],
+         "maxBytes": 65536
+       },
+-      "invariantPinned": "A Verify run records its cleanup duty in a run record and never in a session descriptor or session-cleanup state, the record carries PID and start evidence, an abort settles it and drains the unsealed run directory, and a stale record of a dead PID is swept without a signature while live and sealed runs are respected",
+-      "nonOverlapNote": "Pins the run-record cleanup contract only; session-descriptor and worktree behavior stay pinned by worktree-lifecycle-tests"
++      "invariantPinned": "The closed rg read grammar admits only --no-heading, -m/--max-count 1..10000 and bounded relative -g path globs, and every other flag, glob-alphabet escape and out-of-root target stays refused",
++      "nonOverlapNote": "Grammar-level rg admission is pinned independently of the lifecycle guard's denial rendering and of the passive-read policy, and grants no write or execute route"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/scratch/rggram/post/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index 47a5b3693..342c1079c 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/scratch/rggram/post/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -17,12 +17,12 @@ const SEARCH_BOOLEAN = new Set([
+   "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
+   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
+   "-x", "--line-regexp", "-l", "--files-with-matches", "-L",
+-  "--files-without-match", "--no-messages",
++  "--files-without-match", "--no-messages", "--no-heading",
+ ]);
+ const SEARCH_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+   "-t", "--type", "-T", "--type-not", "-e", "--regexp",
+-  "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
++  "-m", "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
+ ]);
+ // Recursive rg must use its default hidden/ignore policy. Only a basename
+ // extension filter is admitted below; path globs and hidden-name selectors
+@@ -33,10 +33,18 @@ const NUMERIC_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+   "--max-count", "--max-depth",
+ ]);
+-const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
++const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not", "-g", "--glob"]);
++const MAX_COUNT_FLAGS = new Set(["-m", "--max-count"]);
++const MAX_COUNT_LIMIT = 10000;
+ 
+ function isBoundedFilenameFilter(value) {
+-  return typeof value === "string" && /^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
++  if (typeof value !== "string") return false;
++  if (/^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value)) return true;
++  // Relative path globs: closed glob alphabet, no parent segment, no absolute,
++  // drive or UNC start, no negation, and no hidden-name segment.
++  if (value.length > 128 || !/^[A-Za-z0-9_*?{},[\].\/-]+$/u.test(value)) return false;
++  if (value.startsWith("/") || /^[A-Za-z]:/u.test(value)) return false;
++  return value.split("/").every((segment) => segment !== "" && segment !== ".." && !segment.startsWith("."));
+ }
+ 
+ function denied(code = "GUARD-PARSE-UNSUPPORTED") {
+@@ -358,10 +366,12 @@ function validateRg(argv, root, windows, additionalRoots = []) {
+       if (values.has(arg)) {
+         const value = args[index + 1];
+         if (typeof value !== "string" || value === "" || value.startsWith("-")) return false;
+-        if (NUMERIC_VALUE.has(arg) && !canonicalInteger(value, 500)) return false;
++        if (MAX_COUNT_FLAGS.has(arg)) {
++          if (!canonicalInteger(value, MAX_COUNT_LIMIT) || Number(value) < 1) return false;
++        } else if (NUMERIC_VALUE.has(arg) && !canonicalInteger(value, 500)) return false;
+         if (["-e", "--regexp"].includes(arg)) regexpProvided = true;
+         if (["-g", "--glob"].includes(arg)) {
+-          if (globProvided || !isBoundedFilenameFilter(value)) return false;
++          if (!isBoundedFilenameFilter(value)) return false;
+           globProvided = true;
+         }
+         if (["-f", "--file"].includes(arg)) {
