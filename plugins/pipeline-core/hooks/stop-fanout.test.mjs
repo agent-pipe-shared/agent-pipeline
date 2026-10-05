@@ -4,7 +4,7 @@
 // (queue, evidence, and a stand-in for the git common dir); the real repository's private state is never touched.
 import assert from "node:assert/strict";
 import { devNull, tmpdir } from "node:os";
-import { mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,8 +53,8 @@ function sandbox({ slices = 3, queue = true } = {}) {
   return { root, common, queuePath: join(root, "queue.json") };
 }
 const configFor = (box, extra = {}) => JSON.stringify({ mode: "enforce", requiresEnforcement: true, platform: "linux", queuePath: box.queuePath, commonDir: box.common, ...extra });
-function hook(box, payload, { config = configFor(box), env = {}, rawStdin = null } = {}) {
-  const child = spawnSync(process.execPath, [HOOK], {
+function hook(box, payload, { config = configFor(box), env = {}, rawStdin = null, nodeArgs = [] } = {}) {
+  const child = spawnSync(process.execPath, [...nodeArgs, HOOK], {
     cwd: box.root,
     input: rawStdin ?? JSON.stringify(payload),
     encoding: "utf8",
@@ -314,7 +314,11 @@ check("a block is emitted only after its block event was durably appended: a ref
   });
 });
 
-check("no config or no queuePath returns silently having spawned nothing; once a queue is configured the one git spawn is windowsHide", () => {
+// FANOUT-F5b: SF20 is CHANGED, not deleted. Its control used to pin the git fallback ("exactly one git spawn
+// once a queue is configured, windowsHide"); that fallback is gone (design 3.6: no `git`, no child process), so the
+// control now passes the absolute commonDir the contract requires and pins that the configured queue flows through
+// with zero spawns. The early-exit assertions and the real-child unset-config case are unchanged.
+check("no config or no queuePath returns silently having spawned nothing; a configured queue with an absolute commonDir flows through without a spawn", () => {
   withBox({}, (box) => {
     const spawned = [];
     const spy = (file, args, options) => {
@@ -334,13 +338,9 @@ check("no config or no queuePath returns silently having spawned nothing; once a
     assert.deepEqual(spawned, [], "no child process before the queuePath/config early exit");
     assert.deepEqual(ledgerTypes(box), []);
 
-    const { commonDir: _omit, ...withoutCommonDir } = JSON.parse(configFor(box));
-    const out = decideStop(input, { config: withoutCommonDir, execFile: spy, append: (_common, _runner, _session, event) => ({ event }) });
-    assert.equal(JSON.parse(out).decision, "block", "control: the configured queue flows through the injected spawn seam");
-    assert.equal(spawned.length, 1, "exactly one git spawn once a queue is configured");
-    assert.equal(spawned[0].file, "git");
-    assert.equal(spawned[0].options.windowsHide, true, "no console window on native Windows");
-    assert.equal(spawned[0].options.cwd, box.root);
+    const out = decideStop(input, { config: JSON.parse(configFor(box)), execFile: spy, append: (_common, _runner, _session, event) => ({ event }) });
+    assert.equal(JSON.parse(out).decision, "block", "control: the configured queue flows through");
+    assert.deepEqual(spawned, [], "an absolute commonDir means nothing is spawned, not even once (design 3.6)");
   });
   withBox({}, (box) => {
     assertSilent(hook(box, stopPayload(box), { config: "" }), "unset PIPELINE_FANOUT_CONFIG as a real child");
@@ -348,7 +348,169 @@ check("no config or no queuePath returns silently having spawned nothing; once a
   });
 });
 
-assert.equal(cases.length, 20, "the complete stop-fanout corpus must be registered before execution begins");
+// ---------------------------------------------------------------- FANOUT-F5b: no child process at all (design 3.6, 8 "native Windows")
+// Critic finding F-A: the adapter still spawned `git rev-parse` when the config carried no commonDir. The git common
+// dir now comes ONLY from the config's absolute `commonDir`.
+// FANOUT-F5b2, scope of the real-process assertions: the ADAPTER spawns nothing. Two routes on its path may still spawn
+// and are not forbidden wholesale. (1) `observeGovernanceScope` spawns git transitively when the config carries no
+// boolean `requiresEnforcement` (lib/governance-scope.mjs:256-258 -> lib/worktree-lifecycle.mjs:255-277); every config
+// in this file carries one, so that route is not exercised here. (2) The ledger's native-Windows private-state hardening
+// (lib/windows-private-state.mjs, reached through lib/private-boundary.mjs from lib/fanout-ledger.mjs) spawns; those
+// spawns are recorded and reported through the case diagnostic, never asserted against. What IS asserted: no `git`
+// executable is spawned anywhere on the path, and, with a boolean `requiresEnforcement`, no spawn of any executable
+// happens before the ledger is reached (every recorded spawn has `fanout-ledger.mjs` in its call chain).
+
+// A preload for the REAL hook process: it wraps every `node:child_process` entry point, appends one line per call to a
+// log file and then calls through, and `syncBuiltinESMExports()` makes the ESM named imports of the hook, and of every
+// module it loads (a transitive git probe included), see the wrapper. An empty log is a measured "nothing was spawned";
+// SF23 proves the wrapper really sees an ESM-style spawn, so that emptiness cannot be vacuous. One line per call:
+// `<entry point> <executable> <- <module chain, innermost first>`. The executable is the FIRST argument only (its
+// basename; for exec/execSync the first token of the command line), never the argv; the chain is file basenames only.
+const TRIPWIRE_SOURCE = [
+  'const cp = require("node:child_process");',
+  'const { appendFileSync } = require("node:fs");',
+  'const { syncBuiltinESMExports } = require("node:module");',
+  "function executableOf(name, first) {",
+  "  const text = String(first);",
+  '  const match = name === "exec" || name === "execSync" ? /^\\s*(?:"([^"]+)"|(\\S+))/u.exec(text) : null;',
+  "  const target = match === null ? text : (match[1] ?? match[2]);",
+  "  return target.split(/[\\\\/]/u).pop();",
+  "}",
+  "function modulesOf() {",
+  "  const limit = Error.stackTraceLimit;",
+  "  Error.stackTraceLimit = 200;",
+  "  const stack = String(new Error().stack);",
+  "  Error.stackTraceLimit = limit;",
+  "  const modules = [];",
+  '  for (const line of stack.split("\\n")) {',
+  "    const match = /([^()\\s]+\\.(?:mjs|cjs|js)):\\d+:\\d+\\)?\\s*$/u.exec(line);",
+  '    if (match === null || match[1].startsWith("node:")) continue;',
+  "    const file = match[1].split(/[\\\\/]/u).pop();",
+  '    if (file !== "spawn-tripwire.cjs" && modules[modules.length - 1] !== file) modules.push(file);',
+  "  }",
+  '  return modules.join(">");',
+  "}",
+  'for (const name of ["exec", "execFile", "execFileSync", "execSync", "fork", "spawn", "spawnSync"]) {',
+  "  const original = cp[name];",
+  "  cp[name] = function spawnTripwire(...args) {",
+  "    appendFileSync(process.env.PIPELINE_SF_SPAWN_LOG, `${name} ${executableOf(name, args[0])} <- ${modulesOf()}\\n`);",
+  "    return original.apply(this, args);",
+  "  };",
+  "}",
+  "syncBuiltinESMExports();",
+  "",
+].join("\n");
+function tripwire(box) {
+  const preload = join(box.root, "spawn-tripwire.cjs");
+  const log = join(box.root, "spawn.log");
+  writeFileSync(preload, TRIPWIRE_SOURCE);
+  return {
+    nodeArgs: ["--require", preload],
+    env: { PIPELINE_SF_SPAWN_LOG: log },
+    spawned: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : []),
+  };
+}
+/** The tripwire log as records: `{ line, executable, modules }`. */
+function spawnRecords(trip) {
+  return trip.spawned().map((line) => {
+    const match = /^(\w+) (.*?) <- (.*)$/u.exec(line);
+    assert.ok(match, `unparsable tripwire line: ${line}`);
+    return { line, executable: match[2], modules: match[3].split(">") };
+  });
+}
+const isGit = (record) => /^git(?:\.(?:exe|cmd|bat|com))?$/iu.test(record.executable);
+
+check("a queuePath without an absolute commonDir fails open silently: nothing spawned, the governor and the ledger are never reached", () => {
+  withBox({}, (box) => {
+    const { commonDir: _omit, ...withoutCommonDir } = JSON.parse(configFor(box));
+    const variants = [
+      ["absent commonDir", withoutCommonDir],
+      ["relative commonDir", { ...withoutCommonDir, commonDir: "relative/dir" }],
+      ["non-string commonDir", { ...withoutCommonDir, commonDir: 7 }],
+    ];
+    for (const [label, config] of variants) {
+      const spawned = [];
+      const reached = [];
+      // `execFile` is the pre-F5b injection point. Production no longer has one, so this spy is an inert tripwire
+      // (red before the fix); the preload tripwire on the real process below is the actual measure.
+      const spy = (file, args, options) => {
+        spawned.push({ file, args, options });
+        return `${box.common}\n`;
+      };
+      const evaluate = () => {
+        reached.push("evaluate");
+        throw new Error("the governor must not be reached");
+      };
+      const append = () => {
+        reached.push("append");
+        throw new Error("the ledger must not be reached");
+      };
+      assert.equal(decideStop(stopPayload(box), { config, execFile: spy, evaluate, append }), "", `${label}: silent`);
+      assert.deepEqual(spawned, [], `${label}: nothing spawned through the seam`);
+      assert.deepEqual(reached, [], `${label}: neither the governor nor the ledger was reached`);
+    }
+    for (const [label, config] of variants) {
+      const trip = tripwire(box);
+      assertSilent(hook(box, stopPayload(box), { config: JSON.stringify(config), nodeArgs: trip.nodeArgs, env: trip.env }), label);
+      const records = spawnRecords(trip);
+      assert.deepEqual(records.filter(isGit).map((record) => record.line), [], `${label}: the real hook process spawned no git`);
+      // requiresEnforcement is a boolean here and the ledger is never reached: no spawn of any executable is possible.
+      assert.deepEqual(records.map((record) => record.line), [], `${label}: the real hook process spawned nothing before the ledger (it is never reached)`);
+    }
+    assert.deepEqual(readdirSync(box.common), [], "no ledger file or directory was created anywhere");
+  });
+});
+
+check("an absolute commonDir is the only source of the git common dir: normal evaluation with no git spawn and no spawn before the ledger, in-process and in the real hook process", (t) => {
+  withBox({}, (box) => {
+    const spawned = [];
+    const recorded = [];
+    const spy = (file, args, options) => {
+      spawned.push({ file, args, options });
+      return `${box.common}\n`;
+    };
+    const append = (common, _runner, _session, event) => {
+      recorded.push({ common, type: event.type });
+      return { event };
+    };
+    const out = decideStop(stopPayload(box), { config: JSON.parse(configFor(box)), execFile: spy, append });
+    assert.equal(JSON.parse(out).decision, "block", "normal evaluation");
+    assert.deepEqual(spawned, [], "nothing spawned through the seam");
+    assert.deepEqual(recorded, [{ common: box.common, type: "stop-eval" }, { common: box.common, type: "block" }], "the ledger lives under the configured commonDir");
+  });
+  withBox({}, (box) => {
+    const trip = tripwire(box);
+    const result = hook(box, stopPayload(box), { nodeArgs: trip.nodeArgs, env: trip.env });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).decision, "block", "normal evaluation in the real process");
+    assert.deepEqual(ledgerTypes(box), ["stop-eval", "block"]);
+    const records = spawnRecords(trip);
+    assert.deepEqual(records.filter(isGit).map((record) => record.line), [], "the real hook process spawned no git on the whole path, transitive spawns included");
+    // requiresEnforcement is a boolean in this config, so nothing may spawn before the ledger is reached. Spawns inside
+    // the ledger's native-Windows private-state hardening are NOT asserted against: they are recorded and reported.
+    assert.deepEqual(
+      records.filter((record) => !record.modules.includes("fanout-ledger.mjs")).map((record) => record.line),
+      [],
+      "no spawn of any executable happens before the ledger is reached",
+    );
+    t.diagnostic(`ledger-side spawns recorded, not asserted against (${records.length}): ${JSON.stringify(records.map((record) => record.line))}`);
+  });
+});
+
+check("the spawn tripwire is live: a control module that spawns through an ESM named import is recorded", () => {
+  withBox({}, (box) => {
+    const trip = tripwire(box);
+    const control = join(box.root, "spawn-control.mjs");
+    writeFileSync(control, 'import { execFileSync } from "node:child_process";\nexecFileSync(process.execPath, ["--version"], { stdio: "ignore" });\n');
+    const child = spawnSync(process.execPath, [...trip.nodeArgs, control], { encoding: "utf8", env: { ...process.env, ...trip.env } });
+    assert.equal(child.status, 0, child.stderr);
+    const lines = trip.spawned();
+    assert.equal(lines.length, 1, "exactly the control spawn is recorded");
+    assert.match(lines[0], /^execFileSync /u);
+  });
+});
+
+assert.equal(cases.length, 23, "the complete stop-fanout corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

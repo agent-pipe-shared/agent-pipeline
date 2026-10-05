@@ -25,10 +25,20 @@
  * on a non-private file) would defeat them. A refused append, or a block result with no `block` event,
  * therefore returns nothing at all: fail open, no output of any kind.
  *
- * Cost (design 3.6, 8 "native Windows"): the hook is one short Node process. Without a `queuePath` (config
- * unset, empty, or lacking one) it returns at once, before any `git` spawn, state resolution or ledger read.
- * The one remaining child process, `git rev-parse --git-common-dir`, is spawned with `windowsHide: true`
- * and only when the config carries no absolute `commonDir`.
+ * Cost (design 3.6, 8 "native Windows"): the hook is one short Node process, and THIS ADAPTER SPAWNS NOTHING ITSELF:
+ * it does not import `node:child_process`, and the git common dir comes ONLY from the config's absolute `commonDir`
+ * (there is no `git rev-parse` fallback). With no `queuePath`, or a `queuePath` without an absolute string
+ * `commonDir`, it returns silently (fail open) at once, before any state resolution, governor call or ledger access.
+ * Two routes below the adapter can still spawn. They are documented here, not changed here:
+ *   - `observeGovernanceScope`, called only when the config carries no boolean `requiresEnforcement`, spawns git
+ *     transitively (lib/governance-scope.mjs:256-258 -> lib/worktree-lifecycle.mjs:255-277). A config that carries
+ *     the boolean never reaches it; the S8 wiring is expected to supply it.
+ *   - The ledger (`readEvents`, `liveSlices`, `appendEvent`), on native Windows: its private-state hardening
+ *     (lib/fanout-ledger.mjs -> lib/private-boundary.mjs -> lib/windows-private-state.mjs) spawns the fixed Windows
+ *     PowerShell (`powershell.exe`), never git. Measured by the SF22 tripwire on one enforce-mode evaluation:
+ *     4 `spawnSync powershell.exe` calls, every one inside the ledger. It is a Windows-only code path by
+ *     construction (`process.platform === "win32"` in lib/private-boundary.mjs, and the fixed PowerShell paths exist
+ *     only there); it has been measured on native Windows only.
  *
  * Configuration input (open PO question Q7: no default queue location is decided here): one JSON
  * object in the env var `PIPELINE_FANOUT_CONFIG`. Its keys are the governor's `resolveFanoutConfig`
@@ -36,19 +46,20 @@
  *   queuePath  the slice queue file (relative to the payload `cwd`); REQUIRED, absent => fan-out is not
  *              configured for this project and the hook is silent (the S7 dispatch guard behaves the same).
  *              A queuePath whose file does not exist is the governor's "absent queue" (FANOUT-NO-QUEUE).
- *   commonDir  absolute git common dir override; default `git rev-parse --git-common-dir` in `cwd`
+ *   commonDir  the absolute git common dir; REQUIRED together with `queuePath`. Absent, not a string or not
+ *              absolute => fail open silently. The adapter never derives it (no `git rev-parse`).
  *   (requiresEnforcement defaults to `observeGovernanceScope({ rootDir: cwd }).requiresEnforcement`
- *    when the config does not carry a boolean)
+ *    when the config does not carry a boolean; that default spawns git transitively, see Cost above)
  *   (implementationPhaseActive defaults, only while the queue file is absent, to design 3.10's "implementation
  *    phase active": `activeFeature.phase === "implementation"` in the feature state file, the neutral
  *    `project/pipeline-state.json` when present else the legacy `.claude/pipeline-state.json`, the same
  *    fallback `stop-suggest.mjs` applies. `resolveProjectAuthorityPaths` is deliberately not called: it
  *    may spawn git. An unreadable or malformed state is "not implementing".)
  * Test seams: `PIPELINE_FANOUT_TEST_THROW=1` makes the adapter throw before calling the governor (proves the
- * fail-open path; never set in production); `decideStop` options `evaluate`, `append` and `execFile` inject the
- * governor, the ledger append and the git spawn for in-process callers.
+ * fail-open path; never set in production); `decideStop` options `evaluate`, `append` and `config` inject the
+ * governor, the ledger append and the configuration for in-process callers. There is no spawn seam: there is
+ * nothing to inject.
  */
-import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,22 +83,6 @@ function readConfig() {
   const parsed = JSON.parse(raw);
   if (!isObject(parsed)) throw new Error("config");
   return parsed;
-}
-
-function resolveCommonDir(cwd, config, execFile) {
-  if (config.commonDir !== undefined) {
-    if (typeof config.commonDir !== "string" || !isAbsolute(config.commonDir)) throw new Error("commonDir");
-    return config.commonDir;
-  }
-  const out = String(execFile("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
-    cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-    timeout: 5000,
-    windowsHide: true,
-  })).trim();
-  if (out === "" || !isAbsolute(out)) throw new Error("commonDir");
-  return out;
 }
 
 /** Design 3.10: is the feature in its implementation phase? Any unreadable or malformed state is "no". */
@@ -126,22 +121,24 @@ function readRecords(evidenceDir, sliceIds) {
 
 /**
  * Returns the Stop-hook stdout text ("" for nothing). Throws on any fault; `run` turns that into
- * silence. `options.evaluate`, `options.append`, `options.execFile` and `options.config` are injectable
- * for in-process callers.
+ * silence. `options.evaluate`, `options.append` and `options.config` are injectable for in-process callers.
  */
 export function decideStop(input, options = {}) {
   if (!isObject(input)) return "";
   const evaluate = options.evaluate ?? evaluateFanoutStop;
   const append = options.append ?? appendEvent;
-  const execFile = options.execFile ?? execFileSync;
   const config = options.config ?? readConfig();
-  // Early exit BEFORE any child process, state resolution or ledger read: with no queuePath fan-out is
+  // Early exit BEFORE any state resolution, governor call or ledger access: with no queuePath fan-out is
   // not configured here, and the governor could say nothing (design 3.6, 8 "native Windows").
   if (!isObject(config) || typeof config.queuePath !== "string" || config.queuePath === "") return "";
+  // The git common dir comes ONLY from the config's absolute `commonDir`; this adapter never spawns `git` to
+  // derive it (design 3.6). A configured queue without one fails open silently, still before any governor or
+  // ledger access.
+  if (typeof config.commonDir !== "string" || !isAbsolute(config.commonDir)) return "";
+  const commonDir = config.commonDir;
   const cwd = typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : (process.env.CLAUDE_PROJECT_DIR || process.cwd());
   const sessionId = input.session_id;
   if (typeof sessionId !== "string" || sessionId === "") return "";
-  const commonDir = resolveCommonDir(cwd, config, execFile);
   const now = Date.now();
 
   const queue = loadSliceQueue(resolve(cwd, config.queuePath), isObject(config.queueOptions) ? config.queueOptions : {});
