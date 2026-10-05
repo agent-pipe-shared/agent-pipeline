@@ -53,7 +53,7 @@
  * before invoking the extractor.
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
 import {
@@ -64,7 +64,7 @@ import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-bin
 import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings } from "../lib/dispatch-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
-import { loadSliceQueue, scopesOverlap } from "../lib/slice-queue.mjs";
+import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
 import { prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
@@ -132,8 +132,11 @@ export function extractAntigravityDispatches(subagents) {
 //
 // Strictly additive. It runs only after every existing check admitted the packet, it is inactive
 // unless `PIPELINE_FANOUT_CONFIG` carries a `queuePath` and a mode other than `off`, and it blocks
-// ONLY in mode `enforce`, ONLY on FANOUT-SCOPE-OVERLAP. Every fault inside it (config, queue,
+// ONLY in mode `enforce`, on ANY of its findings (FANOUT-NO-SLICE, -SLICE-NOT-READY, -DEP-BLOCKED,
+// -SCOPE-NOT-CONTAINED, -SCOPE-UNDECLARED, -SCOPE-OVERLAP). Every fault inside it (config, queue,
 // ledger, git) fails open to an inactive plan: a broken fan-out check must not stop a dispatch.
+// A fault in the derived slice status alone (`readyAndLive`) leaves `sliceStatus` undefined, so the
+// state/dependency checks fall back to the declared queue state and the live set.
 //
 // Config, cwd and common-dir resolution mirror stop-fanout.mjs (which does not export its
 // resolvers), so the Stop adapter and this hook read the same queue and the same session ledger.
@@ -151,7 +154,8 @@ const FANOUT_MODES = ["off", "shadow", "advisory", "enforce"];
 const FANOUT_SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const FANOUT_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:+@-]{0,127}$/u;
 const FANOUT_MODEL = /\b(?:claude|gpt|o[0-9]|gemini|sonnet|opus|haiku|fable|codex)[-a-z0-9.]*/i;
-const FANOUT_OVERLAP = "FANOUT-SCOPE-OVERLAP";
+const FANOUT_MAX_RECORD_BYTES = 1024 * 1024;
+const FANOUT_GLOB = /[*?[\]{}]/u;
 
 const isPlainObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const fanoutToken = (value) => (typeof value === "string" && FANOUT_TOKEN.test(value) && !/^[A-Za-z]:/u.test(value) && !value.includes("..") ? value : "unknown");
@@ -161,6 +165,89 @@ function fanoutModelOf(prompt) {
   const text = typeof prompt === "string" ? prompt : "";
   const line = /^.*\bModel\/effort\b.*$/imu.exec(text)?.[0] ?? "";
   return fanoutToken(FANOUT_MODEL.exec(line)?.[0] ?? FANOUT_MODEL.exec(text)?.[0]);
+}
+
+/**
+ * Dispatch records of the queue's slices, in the shape `readyAndLive` consumes. Mirrors
+ * `readRecords` in stop-fanout.mjs (which does not export it). `sliceIds` must already be safe ids.
+ * Unreadable, oversized or mismatching records are skipped.
+ */
+function readFanoutRecords(evidenceDir, sliceIds) {
+  const records = [];
+  for (const id of sliceIds) {
+    try {
+      const path = join(evidenceDir, `dispatch-record-${id}.json`);
+      const info = statSync(path);
+      if (!info.isFile() || info.size > FANOUT_MAX_RECORD_BYTES) continue;
+      const parsed = JSON.parse(readFileSync(path, "utf8"));
+      if (!isPlainObject(parsed) || parsed.taskId !== id || typeof parsed.outcome !== "string") continue;
+      records.push({ taskId: parsed.taskId, outcome: parsed.outcome, outcomeClassification: parsed.outcomeClassification, mtimeMs: Math.round(info.mtimeMs) });
+    } catch { /* no usable record for this slice */ }
+  }
+  return records;
+}
+
+// Shape of ONE canonical scope alternative (the output of `normalizeScope`): its path segments, and
+// whether it names a directory subtree (trailing `/`, trailing `/**`, the root `./`, or a name with no
+// glob character and no extension: the same rule slice-queue.mjs compiles with) or a single file/pattern.
+function fanoutScopeShape(canonical) {
+  if (canonical === "./") return { segs: [], dir: true, literalFile: false };
+  const segs = canonical.split("/").filter((segment) => segment !== "");
+  let dir = canonical.endsWith("/");
+  if (segs[segs.length - 1] === "**") {
+    segs.pop();
+    dir = true;
+  }
+  const last = segs[segs.length - 1] ?? "";
+  if (!dir && !FANOUT_GLOB.test(last) && last.indexOf(".", 1) === -1) dir = true;
+  return { segs, dir, literalFile: !dir && !FANOUT_GLOB.test(canonical) };
+}
+
+// Structural cover: does queued shape `q` contain every path of declared shape `d`? A queued file or
+// pattern covers only an identical one; a queued directory covers any shape whose leading segments it
+// matches one-for-one (a queued `*` segment covers any single, non-`**` segment). Anything else is "no".
+function fanoutShapeCovers(q, d) {
+  if (!q.dir) return !d.dir && q.segs.length === d.segs.length && q.segs.every((seg, index) => seg === d.segs[index]);
+  if (q.segs.length > d.segs.length) return false;
+  if (!d.dir && q.segs.length === d.segs.length) return false; // a file is never the directory itself
+  return q.segs.every((seg, index) => seg === d.segs[index] || (seg === "*" && d.segs[index] !== "**"));
+}
+
+/**
+ * Is every declared scope path inside the queue entry's `writeScope`? Both sides go through
+ * `normalizeScope`; a scope it cannot normalise (escape, drive letter, empty, ...) is NOT contained,
+ * and so is an empty list on either side. A queued directory contains what lies under it (exact
+ * match, `./` prefix, directory prefix, `/**` suffix); a declared literal file is also judged against
+ * glob entries by `scopesOverlap` (a single file overlaps a pattern exactly when the pattern matches
+ * it). A declared directory or glob that no queued entry structurally covers is NOT contained: this
+ * errs towards refusing what it cannot judge. Never throws.
+ */
+export function scopeWithin(declared, queued) {
+  try {
+    const declaredList = Array.isArray(declared) ? declared : [];
+    const queuedList = Array.isArray(queued) ? queued : [];
+    if (declaredList.length === 0 || queuedList.length === 0) return false;
+    const queuedCanonical = [];
+    for (const raw of queuedList) {
+      const normalized = normalizeScope(raw);
+      if (!normalized.ok) return false;
+      queuedCanonical.push(...normalized.alternatives);
+    }
+    const queuedShapes = queuedCanonical.map(fanoutScopeShape);
+    for (const raw of declaredList) {
+      const normalized = normalizeScope(raw);
+      if (!normalized.ok) return false;
+      for (const alternative of normalized.alternatives) {
+        const shape = fanoutScopeShape(alternative);
+        const inside = queuedShapes.some((queuedShape) => fanoutShapeCovers(queuedShape, shape))
+          || (shape.literalFile && scopesOverlap([alternative], queuedCanonical));
+        if (!inside) return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -194,10 +281,24 @@ export function observeFanoutDispatches({ input, entries, env = process.env, now
     const transport = entries[0]?.dispatch?.transport;
     const runner = transport === "codex" ? "codex" : transport === "antigravity" ? "antigravity" : "claude";
 
-    const loaded = loadSliceQueue(resolve(cwd, config.queuePath), isPlainObject(config.queueOptions) ? config.queueOptions : {});
+    const queueOptions = isPlainObject(config.queueOptions) ? config.queueOptions : {};
+    const loaded = loadSliceQueue(resolve(cwd, config.queuePath), queueOptions);
     if (loaded.status !== "valid" || !Array.isArray(loaded.queue?.slices)) return inactiveFanoutPlan();
     const sliceIds = loaded.queue.slices.map((slice) => slice?.id).filter((id) => typeof id === "string" && FANOUT_SAFE_ID.test(id));
-    const ledgerLive = liveSlices({ commonDir, runner, sessionId, evidenceDir: join(cwd, "evidence"), sliceIds, now }).map((entry) => entry.sliceId);
+    const evidenceDir = join(cwd, "evidence");
+    const ledgerEntries = liveSlices({ commonDir, runner, sessionId, evidenceDir, sliceIds, now });
+    const ledgerLive = ledgerEntries.map((entry) => entry.sliceId);
+    // Derived status per slice (done / cancelled / held / live / blocked-with-reasons / ready). Any fault
+    // here leaves `sliceStatus` undefined: the checks that need it are skipped, the rest still run.
+    let sliceStatus;
+    try {
+      const derived = readyAndLive({ queue: loaded.raw, records: readFanoutRecords(evidenceDir, sliceIds), live: ledgerEntries, now: now ?? Date.now() }, queueOptions);
+      if (derived?.valid === true && Array.isArray(derived.slices)) {
+        sliceStatus = Object.fromEntries(derived.slices.map((slice) => [slice.id, { status: slice.status, reasons: slice.reasons }]));
+      }
+    } catch {
+      sliceStatus = undefined;
+    }
     const target = Number.isSafeInteger(config.target) && config.target >= 0 && config.target <= 1_000_000 ? config.target : 0;
 
     const findings = [];
@@ -208,7 +309,9 @@ export function observeFanoutDispatches({ input, entries, env = process.env, now
       const dispatch = entry?.dispatch;
       if (!isPlainObject(dispatch)) return;
       const liveSliceIds = [...new Set([...ledgerLive, ...inCall])];
-      const result = fanoutDispatchFindings({ role: entry.role, prompt: dispatch.prompt, queue: loaded.queue, liveSliceIds, overlaps: scopesOverlap });
+      const result = fanoutDispatchFindings({
+        role: entry.role, prompt: dispatch.prompt, queue: loaded.queue, liveSliceIds, overlaps: scopesOverlap, contains: scopeWithin, sliceStatus, mode,
+      });
       for (const finding of result.findings) {
         findings.push({ ...finding, index });
         findingEvents.push({
@@ -216,7 +319,7 @@ export function observeFanoutDispatches({ input, entries, env = process.env, now
           live: liveSliceIds.length,
           target,
           ready: 0,
-          decision: mode === "enforce" && finding.code === FANOUT_OVERLAP ? "block" : "allow",
+          decision: mode === "enforce" ? "block" : "allow",
           reason: finding.code,
           mode,
         });
@@ -237,7 +340,7 @@ export function observeFanoutDispatches({ input, entries, env = process.env, now
       active: true,
       mode,
       findings,
-      block: mode === "enforce" && findings.some((finding) => finding.code === FANOUT_OVERLAP),
+      block: mode === "enforce" && findings.length > 0,
       findingEvents,
       launchEvents,
       commonDir,

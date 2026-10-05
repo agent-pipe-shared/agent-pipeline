@@ -271,16 +271,33 @@ export function parseDispatchSlice(prompt) {
   return { sliceId: ids.size === 1 ? [...ids][0] : null, writeScope };
 }
 
+// Derived slice statuses (`readyAndLive`) under which a dispatch for the slice is refused outright.
+const NOT_READY_CAUSES = {
+  done: "it is already done",
+  cancelled: "it is cancelled",
+  held: "it is held (deferred, hold-po, blocked-external or out of attempts)",
+  live: "it is already live",
+};
+
 /**
- * The fan-out findings of ONE dispatch against a validated slice queue.
- *   FANOUT-NO-SLICE      an implementation (goldfish) dispatch names no queue slice
- *   FANOUT-SCOPE-OVERLAP the dispatch's write scope overlaps a live slice's write scope
+ * The fan-out findings of ONE dispatch against a validated slice queue, emitted in this order
+ * (design 3.4 bullet 2, 3.10 bullet 3):
+ *   FANOUT-NO-SLICE             an implementation (goldfish) dispatch names no queue slice
+ *   FANOUT-SLICE-NOT-READY      the slice is live, done, cancelled, held, or blocked by the
+ *                               protected-slice / single-committer rule
+ *   FANOUT-DEP-BLOCKED          the slice waits on a dependency that is not done
+ *   FANOUT-SCOPE-NOT-CONTAINED  a declared `Write scope:` leaves the queue entry's writeScope
+ *   FANOUT-SCOPE-UNDECLARED     `enforce` only: no `Write scope:` while another slice is live
+ *   FANOUT-SCOPE-OVERLAP        the write scope overlaps a live slice's write scope
  * `queue` is the normalized queue (`loadSliceQueue(...).queue`), `liveSliceIds` the slices that
- * hold a slot, `overlaps(a, b)` the scope-intersection predicate. A read-only dispatch
- * (`Write scope: none`) is never refused for overlap. Returns `{ findings, sliceId, readOnly,
- * writeScope }`; messages are built only from queue-validated ids.
+ * hold a slot, `overlaps(a, b)` the scope-intersection predicate, `contains(declared, queued)` the
+ * containment predicate (absent: no opinion), `sliceStatus` the derived `{ [id]: { status, reasons } }`
+ * taken from `readyAndLive` (absent: only the declared state and the live set are consulted), `mode`
+ * the fan-out mode (default `shadow`). The state and dependency checks apply to read-only
+ * dispatches too; ONLY the overlap check is exempt for `Write scope: none`. Returns `{ findings,
+ * sliceId, readOnly, writeScope }`; messages are built only from queue-validated ids.
  */
-export function fanoutDispatchFindings({ role, prompt, queue, liveSliceIds = [], overlaps } = {}) {
+export function fanoutDispatchFindings({ role, prompt, queue, liveSliceIds = [], overlaps, contains, sliceStatus, mode = "shadow" } = {}) {
   const none = { findings: [], sliceId: null, readOnly: false, writeScope: [] };
   const slices = Array.isArray(queue?.slices) ? queue.slices : null;
   if (slices === null || typeof overlaps !== "function") return none;
@@ -298,9 +315,62 @@ export function fanoutDispatchFindings({ role, prompt, queue, liveSliceIds = [],
       : none;
   }
   const readOnly = named.writeScope === "none";
+  const declared = Array.isArray(named.writeScope) ? named.writeScope : null;
   const queued = Array.isArray(entry.writeScope) ? entry.writeScope : [];
-  const writeScope = readOnly ? [] : Array.isArray(named.writeScope) ? named.writeScope : queued;
+  const writeScope = readOnly ? [] : declared ?? queued;
   const result = { findings: [], sliceId: entry.id, readOnly, writeScope };
+
+  // 1. FANOUT-SLICE-NOT-READY: one finding, naming every cause that applies.
+  const derived = sliceStatus !== null && typeof sliceStatus === "object" && Object.hasOwn(sliceStatus, entry.id) ? sliceStatus[entry.id] : null;
+  const status = typeof derived?.status === "string" ? derived.status : null;
+  const reasons = Array.isArray(derived?.reasons) ? derived.reasons.filter((reason) => reason !== null && typeof reason === "object") : [];
+  const notReady = [];
+  if (liveSliceIds.includes(entry.id)) notReady.push(NOT_READY_CAUSES.live);
+  if ((entry.state ?? "ready") !== "ready") notReady.push("its queue state is not `ready`");
+  if (status !== null && Object.hasOwn(NOT_READY_CAUSES, status) && !notReady.includes(NOT_READY_CAUSES[status])) notReady.push(NOT_READY_CAUSES[status]);
+  if (status === "blocked" && reasons.some((reason) => reason.code === "protected-live" || reason.code === "commit-live")) {
+    notReady.push("the protected-slice / single-committer rule blocks it while a conflicting slice is live");
+  }
+  if (notReady.length > 0) {
+    result.findings.push({
+      code: "FANOUT-SLICE-NOT-READY",
+      why: `slice ${entry.id} is not ready: ${notReady.join("; ")}; dispatch only a ready slice of the slice queue`,
+    });
+  }
+
+  // 2. FANOUT-DEP-BLOCKED: waiting on a dependency (or on a cancelled one) that is not done.
+  if (status === "blocked" && reasons.some((reason) => reason.code === "dependency" || reason.code === "dependency-cancelled")) {
+    const waitsOn = [];
+    for (const reason of reasons) {
+      if (reason.code !== "dependency" && reason.code !== "dependency-cancelled") continue;
+      for (const id of Array.isArray(reason.waitsOn) ? reason.waitsOn : []) {
+        if (typeof id === "string" && !waitsOn.includes(id) && slices.some((candidate) => candidate?.id === id)) waitsOn.push(id);
+      }
+    }
+    result.findings.push({
+      code: "FANOUT-DEP-BLOCKED",
+      why: `slice ${entry.id} waits on dependency slice(s) ${waitsOn.join(", ")} that are not done; wait for them to finish`,
+      waitsOn,
+    });
+  }
+
+  // 3. FANOUT-SCOPE-NOT-CONTAINED: only a declared path list is judged; no predicate, no opinion.
+  if (declared !== null && typeof contains === "function" && !contains(declared, queued)) {
+    result.findings.push({
+      code: "FANOUT-SCOPE-NOT-CONTAINED",
+      why: `slice ${entry.id} declares a \`Write scope:\` that is not contained in the writeScope of its queue entry; declare only paths inside the slice's own scope`,
+    });
+  }
+
+  // 4. FANOUT-SCOPE-UNDECLARED: enforce only; shadow and advisory keep the queue-scope fallback.
+  if (mode === "enforce" && !readOnly && declared === null && liveSliceIds.some((id) => id !== entry.id)) {
+    result.findings.push({
+      code: "FANOUT-SCOPE-UNDECLARED",
+      why: `slice ${entry.id} declares no \`Write scope:\` while another slice is live; add a \`Write scope: <paths>\` line (or \`none\` for read-only) so the overlap check has a declared scope to judge`,
+    });
+  }
+
+  // 5. FANOUT-SCOPE-OVERLAP: the only check a read-only dispatch is exempt from.
   if (readOnly) return result;
   const clashing = [];
   for (const id of liveSliceIds) {
