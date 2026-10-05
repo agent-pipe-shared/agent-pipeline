@@ -686,6 +686,34 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/runtime-handover-projection.mjs",
   "plugins/pipeline-core/scripts/check-runner-manifest-parity.mjs",
   "plugins/pipeline-core/scripts/model-family-approval-request.mjs",
+  // S2-70 (guard split, plan s2-guard-split-plan.md section 3): the 22 modules extracted from
+  // hooks/guard-lifecycle-ready.mjs (already kernel above). The lane verdicts moved verbatim out
+  // of that file into these modules, so they carry the same authority and a GS-6 window must not
+  // be able to rewrite any of them. Their first-party imports outside lib/guard are the ones the
+  // monolith already had (all kernel above); the layer DAG among them is pinned by
+  // lib/guard/guard-split-contract.test.mjs.
+  "plugins/pipeline-core/lib/guard/bootstrap-receipt.mjs",
+  "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+  "plugins/pipeline-core/lib/guard/constants.mjs",
+  "plugins/pipeline-core/lib/guard/denial-route.mjs",
+  "plugins/pipeline-core/lib/guard/denial-telemetry.mjs",
+  "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+  "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+  "plugins/pipeline-core/lib/guard/entry-gates.mjs",
+  "plugins/pipeline-core/lib/guard/evaluate.mjs",
+  "plugins/pipeline-core/lib/guard/gate-strength-lane.mjs",
+  "plugins/pipeline-core/lib/guard/grammar-denials.mjs",
+  "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+  "plugins/pipeline-core/lib/guard/path-containment.mjs",
+  "plugins/pipeline-core/lib/guard/po-commands.mjs",
+  "plugins/pipeline-core/lib/guard/powershell-dialect.mjs",
+  "plugins/pipeline-core/lib/guard/read-scope.mjs",
+  "plugins/pipeline-core/lib/guard/rebase-lane.mjs",
+  "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+  "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+  "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+  "plugins/pipeline-core/lib/guard/verdict.mjs",
+  "plugins/pipeline-core/lib/guard/write-scope.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

@@ -463,6 +463,37 @@ in that module's process, so it is protected through both the project and the
 installed-plugin anchors for the same reason as the dependencies above. The
 closure was walked to a fixed point; these nine add no further first-party hop.
 
+The S2-70 guard-split closure additionally protects exactly the 22 split lanes
+of the lifecycle guard: the modules extracted verbatim from
+`hooks/guard-lifecycle-ready.mjs` (already kernel above) into `lib/guard/`,
+whose module map and layer DAG are pinned by
+`lib/guard/guard-split-contract.test.mjs`. Each lane carries the verdicts it
+moved out of the guard unchanged, so a window must not be able to rewrite one
+while leaving the importing guard intact. The additive paths, in kernel-array
+order, are:
+`lib/guard/bootstrap-receipt.mjs`,
+`lib/guard/command-catalogue.mjs`,
+`lib/guard/constants.mjs`,
+`lib/guard/denial-route.mjs`,
+`lib/guard/denial-telemetry.mjs`,
+`lib/guard/devplan-shell-lane.mjs`,
+`lib/guard/dispatch-record-lane.mjs`,
+`lib/guard/entry-gates.mjs`,
+`lib/guard/evaluate.mjs`,
+`lib/guard/gate-strength-lane.mjs`,
+`lib/guard/grammar-denials.mjs`,
+`lib/guard/lifecycle-gate.mjs`,
+`lib/guard/path-containment.mjs`,
+`lib/guard/po-commands.mjs`,
+`lib/guard/powershell-dialect.mjs`,
+`lib/guard/read-scope.mjs`,
+`lib/guard/rebase-lane.mjs`,
+`lib/guard/sanctioned-args-onboarding.mjs`,
+`lib/guard/sanctioned-args-scripts.mjs`,
+`lib/guard/shell-grammar.mjs`,
+`lib/guard/verdict.mjs`, and
+`lib/guard/write-scope.mjs`.
+
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 

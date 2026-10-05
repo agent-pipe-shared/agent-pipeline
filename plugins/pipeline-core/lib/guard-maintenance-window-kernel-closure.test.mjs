@@ -460,6 +460,10 @@ check("GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from
   );
 });
 
+// A backtick-quoted path token in the threat-model prose. The directory part admits zero or more
+// nested segments (`lib/guard/verdict.mjs`, S2-70); a segment is a plain name, so `..`/`.` never match.
+const DOC_PATH_TOKEN_RE = /`((?:plugins\/pipeline-core\/)?(?:lib|scripts|hooks|schemas)\/(?:[A-Za-z0-9_\-]+\/)*[A-Za-z0-9_.\-]+\.(?:mjs|js|json)|\.\/schemas\/[A-Za-z0-9_.\-]+\.json|harness\/(?:scripts|config)\/[A-Za-z0-9_.\-]+\.(?:mjs|json)|project\/critical-human-proof\.json)`/g;
+
 check("GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry", () => {
   const docPath = join(REPO_ROOT, "docs", "guard-maintenance-window-threat-model.md");
   const doc = readFileSync(docPath, "utf8");
@@ -469,7 +473,7 @@ check("GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets 
     throw new Error(`Could not locate the "## Protected assets" ... "## Threats and controls" span in ${docPath}.`);
   }
   const section = doc.slice(sectionStart, sectionEnd);
-  const DOC_PATH_TOKEN_RE = /`((?:plugins\/pipeline-core\/)?(?:lib|scripts|hooks|schemas)\/[A-Za-z0-9_.\-]+\.(?:mjs|js|json)|\.\/schemas\/[A-Za-z0-9_.\-]+\.json|harness\/(?:scripts|config)\/[A-Za-z0-9_.\-]+\.(?:mjs|json)|project\/critical-human-proof\.json)`/g;
+  DOC_PATH_TOKEN_RE.lastIndex = 0;
   const docPaths = new Set();
   let match;
   while ((match = DOC_PATH_TOKEN_RE.exec(section)) !== null) {
@@ -483,6 +487,20 @@ check("GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets 
     `${missing.length} NEVER_LIFTABLE_KERNEL_PATHS entr${missing.length === 1 ? "y is" : "ies are"} not mentioned in ` +
     `docs/guard-maintenance-window-threat-model.md's "Protected assets" section:\n${missing.join("\n")}`,
   );
+});
+
+check("GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise", () => {
+  const tokens = (text) => [...text.matchAll(DOC_PATH_TOKEN_RE)].map((m) => m[1]);
+  // Positive: a nested lane path, with and without the plugin prefix, plus a flat path as before.
+  assert.deepEqual(tokens("`lib/guard/verdict.mjs`"), ["lib/guard/verdict.mjs"]);
+  assert.deepEqual(tokens("`plugins/pipeline-core/lib/guard/verdict.mjs`"), ["plugins/pipeline-core/lib/guard/verdict.mjs"]);
+  assert.deepEqual(tokens("`lib/entrypoint.mjs`"), ["lib/entrypoint.mjs"]);
+  // Negative: an unlisted top directory, a traversal segment, a wrong extension, and a token
+  // without its backticks never count as a protected-asset mention.
+  assert.deepEqual(tokens("`docs/guard/verdict.mjs`"), []);
+  assert.deepEqual(tokens("`lib/../guard/verdict.mjs`"), []);
+  assert.deepEqual(tokens("`lib/guard/verdict.ts`"), []);
+  assert.deepEqual(tokens("lib/guard/verdict.mjs"), []);
 });
 
 check("GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)", () => {
