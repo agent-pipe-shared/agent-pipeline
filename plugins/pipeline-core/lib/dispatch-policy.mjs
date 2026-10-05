@@ -230,3 +230,91 @@ export function dispatchFindings({ subagentType, prompt, transport = "direct" } 
   // ordinary work in the name of a rule nobody wrote.
   return { role: "other", findings };
 }
+
+// ---------------------------------------------------------------------------------------------
+// FANOUT slice S7 (design: specs/sprint-alfred-epic/design/fanout-enforcement-design.md 3.4).
+//
+// Pure helpers for the dispatch-time slice check. `dispatchFindings()` above is deliberately NOT
+// extended: its codes, messages and verdicts stay byte-identical, and these findings travel in
+// their own channel so that "shadow mode never blocks" is a property of the caller's mode switch,
+// not of a filter someone has to remember. No I/O here: the queue, the live set and the overlap
+// predicate are injected (guard-dispatch.mjs owns the I/O and passes `scopesOverlap`).
+//
+// MARKER. Design 3.4 puts two lines into briefing field 6: `Slice: <id>` and
+// `Write scope: <repo-relative paths, or "none" for read-only>`. The template edit is not part of
+// this slice, so the markers are parsed wherever they stand on a line of their own (an optional
+// list bullet and optional bold markers are tolerated).
+const SLICE_MARKER_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const SLICE_LINE = /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?Slice:(?:\*\*)?[ \t]*`?([^\s`*]+)`?[ \t]*\r?$/gmu;
+const WRITE_SCOPE_LINE = /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?Write scope:(?:\*\*)?[ \t]*(.+?)[ \t]*\r?$/mu;
+const stripQuotes = (text) => text.trim().replace(/^[`"']+|[`"']+$/gu, "").trim();
+
+/**
+ * @returns {{sliceId: string|null, writeScope: "none"|string[]|null}} `sliceId` is null when no
+ * safe id is named, or when two different ids are named (ambiguous names no slice).
+ */
+export function parseDispatchSlice(prompt) {
+  const text = typeof prompt === "string" ? prompt : "";
+  const ids = new Set();
+  for (const match of text.matchAll(SLICE_LINE)) {
+    if (SLICE_MARKER_ID.test(match[1])) ids.add(match[1]);
+  }
+  let writeScope = null;
+  const scopeMatch = WRITE_SCOPE_LINE.exec(text);
+  if (scopeMatch !== null) {
+    if (/^none$/iu.test(stripQuotes(scopeMatch[1]))) writeScope = "none";
+    else {
+      const list = scopeMatch[1].split(",").map(stripQuotes).filter((part) => part !== "");
+      if (list.length > 0) writeScope = list;
+    }
+  }
+  return { sliceId: ids.size === 1 ? [...ids][0] : null, writeScope };
+}
+
+/**
+ * The fan-out findings of ONE dispatch against a validated slice queue.
+ *   FANOUT-NO-SLICE      an implementation (goldfish) dispatch names no queue slice
+ *   FANOUT-SCOPE-OVERLAP the dispatch's write scope overlaps a live slice's write scope
+ * `queue` is the normalized queue (`loadSliceQueue(...).queue`), `liveSliceIds` the slices that
+ * hold a slot, `overlaps(a, b)` the scope-intersection predicate. A read-only dispatch
+ * (`Write scope: none`) is never refused for overlap. Returns `{ findings, sliceId, readOnly,
+ * writeScope }`; messages are built only from queue-validated ids.
+ */
+export function fanoutDispatchFindings({ role, prompt, queue, liveSliceIds = [], overlaps } = {}) {
+  const none = { findings: [], sliceId: null, readOnly: false, writeScope: [] };
+  const slices = Array.isArray(queue?.slices) ? queue.slices : null;
+  if (slices === null || typeof overlaps !== "function") return none;
+  const named = parseDispatchSlice(prompt);
+  const entry = named.sliceId === null ? null : slices.find((candidate) => candidate?.id === named.sliceId) ?? null;
+  if (entry === null) {
+    return role === "goldfish"
+      ? {
+          ...none,
+          findings: [{
+            code: "FANOUT-NO-SLICE",
+            why: "an implementation dispatch names no slice of the slice queue; add a `Slice: <id>` line to the dispatch metadata so work cannot bypass the queue",
+          }],
+        }
+      : none;
+  }
+  const readOnly = named.writeScope === "none";
+  const queued = Array.isArray(entry.writeScope) ? entry.writeScope : [];
+  const writeScope = readOnly ? [] : Array.isArray(named.writeScope) ? named.writeScope : queued;
+  const result = { findings: [], sliceId: entry.id, readOnly, writeScope };
+  if (readOnly) return result;
+  const clashing = [];
+  for (const id of liveSliceIds) {
+    if (id === entry.id || clashing.includes(id)) continue;
+    const live = slices.find((candidate) => candidate?.id === id);
+    if (live === undefined) continue;
+    if (overlaps(writeScope, Array.isArray(live.writeScope) ? live.writeScope : [])) clashing.push(id);
+  }
+  if (clashing.length > 0) {
+    result.findings.push({
+      code: "FANOUT-SCOPE-OVERLAP",
+      why: `slice ${entry.id} declares a write scope that overlaps live slice(s) ${clashing.join(", ")}; wait for them to finish or order the slices with dependsOn`,
+      overlapsWith: clashing,
+    });
+  }
+  return result;
+}

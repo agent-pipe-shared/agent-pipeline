@@ -52,15 +52,19 @@
  * entries for its other consumers; this hook rejects an empty or malformed native envelope
  * before invoking the extractor.
  */
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { isAbsolute, join, resolve } from "node:path";
 
 import {
   persistPendingAdvisorProhibitionBindings,
   prepareAdvisorProhibitionBindings,
 } from "../lib/advisor-prohibition-binding.mjs";
 import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
-import { dispatchBudgetBinding, dispatchFindings } from "../lib/dispatch-policy.mjs";
+import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings } from "../lib/dispatch-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
+import { loadSliceQueue, scopesOverlap } from "../lib/slice-queue.mjs";
 import { prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
@@ -120,6 +124,141 @@ export function extractAntigravityDispatches(subagents) {
     found.push({ subagentType, prompt });
   }
   return found;
+}
+
+// ---------------------------------------------------------------------------------------------
+// FANOUT slice S7: the dispatch-time slice-scope check (design:
+// specs/sprint-alfred-epic/design/fanout-enforcement-design.md 3.4), SHADOW by default.
+//
+// Strictly additive. It runs only after every existing check admitted the packet, it is inactive
+// unless `PIPELINE_FANOUT_CONFIG` carries a `queuePath` and a mode other than `off`, and it blocks
+// ONLY in mode `enforce`, ONLY on FANOUT-SCOPE-OVERLAP. Every fault inside it (config, queue,
+// ledger, git) fails open to an inactive plan: a broken fan-out check must not stop a dispatch.
+//
+// Config, cwd and common-dir resolution mirror stop-fanout.mjs (which does not export its
+// resolvers), so the Stop adapter and this hook read the same queue and the same session ledger.
+//
+// RECORDING CHANNEL. A dispatch-time finding is appended as a `stop-eval` event whose `reason` is
+// the FANOUT-* code, never as a `block` event: the governor's anti-loop counters read `launch` and
+// `block` events only (lib/fanout-governor.mjs), and a dispatch refusal must not feed the Stop
+// hook's own block budget. `ready` is 0 (nothing is evaluated for readiness here) and `target` is
+// the configured target when it is a valid count, else 0 (not evaluated at dispatch time).
+//
+// LAUNCH. A `launch` event is appended for every dispatch that names a queue slice, but only at
+// process exit with code 0 (see the call site), so a dispatch that any later existing check
+// refused never occupies a slot.
+const FANOUT_MODES = ["off", "shadow", "advisory", "enforce"];
+const FANOUT_SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const FANOUT_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:+@-]{0,127}$/u;
+const FANOUT_MODEL = /\b(?:claude|gpt|o[0-9]|gemini|sonnet|opus|haiku|fable|codex)[-a-z0-9.]*/i;
+const FANOUT_OVERLAP = "FANOUT-SCOPE-OVERLAP";
+
+const isPlainObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const fanoutToken = (value) => (typeof value === "string" && FANOUT_TOKEN.test(value) && !/^[A-Za-z]:/u.test(value) && !value.includes("..") ? value : "unknown");
+const inactiveFanoutPlan = () => ({ active: false, mode: "off", findings: [], block: false, findingEvents: [], launchEvents: [] });
+
+function fanoutModelOf(prompt) {
+  const text = typeof prompt === "string" ? prompt : "";
+  const line = /^.*\bModel\/effort\b.*$/imu.exec(text)?.[0] ?? "";
+  return fanoutToken(FANOUT_MODEL.exec(line)?.[0] ?? FANOUT_MODEL.exec(text)?.[0]);
+}
+
+/**
+ * Plans the fan-out recording and the (enforce-only) block for ONE hook call. Never throws.
+ * `entries` is `[{ dispatch: { subagentType, prompt, transport }, role }]` (role from
+ * `dispatchFindings`). A call carrying several dispatches is evaluated pairwise: entry N sees the
+ * ledger's live slices plus the slices named by entries 0..N-1 of the same call.
+ * @returns {{active: boolean, mode: string, findings: object[], block: boolean,
+ *   findingEvents: object[], launchEvents: object[], commonDir?: string, runner?: string, sessionId?: string}}
+ */
+export function observeFanoutDispatches({ input, entries, env = process.env, now } = {}) {
+  try {
+    const raw = env?.PIPELINE_FANOUT_CONFIG;
+    if (typeof raw !== "string" || raw === "") return inactiveFanoutPlan();
+    const config = JSON.parse(raw);
+    if (!isPlainObject(config) || typeof config.queuePath !== "string" || config.queuePath === "") return inactiveFanoutPlan();
+    const mode = FANOUT_MODES.includes(config.mode) ? config.mode : "shadow";
+    if (mode === "off") return inactiveFanoutPlan();
+    const sessionId = input?.session_id;
+    if (typeof sessionId !== "string" || sessionId === "" || !Array.isArray(entries) || entries.length === 0) return inactiveFanoutPlan();
+
+    const cwd = typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : (env.CLAUDE_PROJECT_DIR || process.cwd());
+    let commonDir;
+    if (config.commonDir !== undefined) {
+      if (typeof config.commonDir !== "string" || !isAbsolute(config.commonDir)) throw new Error("commonDir");
+      commonDir = config.commonDir;
+    } else {
+      commonDir = resolveGitCommonDir(cwd);
+      if (typeof commonDir !== "string" || !isAbsolute(commonDir)) throw new Error("commonDir");
+    }
+    const transport = entries[0]?.dispatch?.transport;
+    const runner = transport === "codex" ? "codex" : transport === "antigravity" ? "antigravity" : "claude";
+
+    const loaded = loadSliceQueue(resolve(cwd, config.queuePath), isPlainObject(config.queueOptions) ? config.queueOptions : {});
+    if (loaded.status !== "valid" || !Array.isArray(loaded.queue?.slices)) return inactiveFanoutPlan();
+    const sliceIds = loaded.queue.slices.map((slice) => slice?.id).filter((id) => typeof id === "string" && FANOUT_SAFE_ID.test(id));
+    const ledgerLive = liveSlices({ commonDir, runner, sessionId, evidenceDir: join(cwd, "evidence"), sliceIds, now }).map((entry) => entry.sliceId);
+    const target = Number.isSafeInteger(config.target) && config.target >= 0 && config.target <= 1_000_000 ? config.target : 0;
+
+    const findings = [];
+    const findingEvents = [];
+    const launchEvents = [];
+    const inCall = [];
+    entries.forEach((entry, index) => {
+      const dispatch = entry?.dispatch;
+      if (!isPlainObject(dispatch)) return;
+      const liveSliceIds = [...new Set([...ledgerLive, ...inCall])];
+      const result = fanoutDispatchFindings({ role: entry.role, prompt: dispatch.prompt, queue: loaded.queue, liveSliceIds, overlaps: scopesOverlap });
+      for (const finding of result.findings) {
+        findings.push({ ...finding, index });
+        findingEvents.push({
+          type: "stop-eval",
+          live: liveSliceIds.length,
+          target,
+          ready: 0,
+          decision: mode === "enforce" && finding.code === FANOUT_OVERLAP ? "block" : "allow",
+          reason: finding.code,
+          mode,
+        });
+      }
+      if (result.sliceId === null) return;
+      inCall.push(result.sliceId);
+      const slice = loaded.queue.slices.find((candidate) => candidate?.id === result.sliceId);
+      launchEvents.push({
+        type: "launch",
+        sliceId: result.sliceId,
+        agentType: fanoutToken(dispatch.subagentType),
+        model: fanoutModelOf(dispatch.prompt),
+        writeScopeHash: createHash("sha256").update(JSON.stringify([...result.writeScope].sort())).digest("hex"),
+        commitMode: slice?.commitMode,
+      });
+    });
+    return {
+      active: true,
+      mode,
+      findings,
+      block: mode === "enforce" && findings.some((finding) => finding.code === FANOUT_OVERLAP),
+      findingEvents,
+      launchEvents,
+      commonDir,
+      runner,
+      sessionId,
+    };
+  } catch {
+    return inactiveFanoutPlan();
+  }
+}
+
+/** Appends each event on its own; one that cannot be written never stops a dispatch. Returns the count written. */
+export function recordFanoutEvents(plan, events, now) {
+  let recorded = 0;
+  for (const event of Array.isArray(events) ? events : []) {
+    try {
+      appendEvent(plan.commonDir, plan.runner, plan.sessionId, event, { now });
+      recorded += 1;
+    } catch { /* a ledger that cannot be written never blocks a dispatch */ }
+  }
+  return recorded;
 }
 
 // Gate the entire hook body on being the process entrypoint (matching
@@ -190,6 +329,30 @@ if (isDirectInvocation(import.meta.url)) {
   }));
   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
   if (blocked.length === 0) {
+    // FANOUT slice S7: shadow by default; inactive without PIPELINE_FANOUT_CONFIG. Findings are
+    // recorded now; the `launch` events only if every later existing check also admits the dispatch.
+    const fanout = observeFanoutDispatches({
+      input,
+      entries: evaluated.map(({ dispatch, policy }) => ({ dispatch, role: policy.role })),
+      env: process.env,
+    });
+    if (fanout.active) {
+      recordFanoutEvents(fanout, fanout.findingEvents);
+      if (fanout.block) {
+        process.stderr.write([
+          "BLOCKED (guard-dispatch, plugin pipeline-core): this dispatch failed the fan-out slice check before launch (mode enforce).",
+          "",
+          ...fanout.findings.map((f, i) => `  ${i + 1}. ${f.code}\n     ${f.why}`),
+          "",
+          "Wait for the live slice(s) to finish, order the slices with dependsOn, or correct the `Slice:` and `Write scope:` lines of the dispatch metadata, then dispatch again.",
+          "",
+        ].join("\n"));
+        process.exit(2);
+      }
+      process.once("exit", (code) => {
+        if (code === 0) recordFanoutEvents(fanout, fanout.launchEvents);
+      });
+    }
     const toolUseId = input?.tool_use_id ?? input?.toolUseId;
     const bindingCapableTool = ["Task", "Agent", "Workflow"].includes(input?.tool_name)
       && !dispatches.some((dispatch) => dispatch.transport === "antigravity");
