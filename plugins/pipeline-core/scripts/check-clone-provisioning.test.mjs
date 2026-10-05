@@ -10,7 +10,7 @@ test("checkCloneProvisioning returns well-formed report against current root", (
   assert.equal(report.checks.length, 5);
   assert.deepEqual(report.checks.map((c) => c.id).sort(), ["commit-msg-hook", "po-profile-receipt", "pre-commit-hook", "pre-push-hook", "private-state-directory"]);
   for (const hook of report.checks.filter((check) => check.id.endsWith("-hook"))) {
-    assert.ok(["current", "install", "decline", "foreign-owner", "unresolved"].includes(hook.status), hook.id);
+    assert.ok(["current", "install", "decline", "foreign-owner", "unresolved", "refresh"].includes(hook.status), hook.id);
   }
 });
 
