@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6567407715c7bf1a449ddc7348494b074988b5d046b1bcbde26d72ffdbf89dea"
+    "transitionHead": "22a9f5bfba42e74d9e330e171659549dfd0ff74d9ffb87fd7171ba935135b9dd"
   },
   "counts": {
-    "open": 171,
+    "open": 172,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -7801,6 +7801,16 @@
       "closureRepository": "self",
       "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
       "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
+    },
+    {
+      "id": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "GPGL-7 dispatch report (residual gap after the PowerShell literal-backslash reading), 2026-10-06.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.push-classifier-misreads-backslash-escaped-quotes",

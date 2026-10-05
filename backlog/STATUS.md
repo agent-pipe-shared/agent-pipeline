@@ -604,6 +604,7 @@
 | pipeline.push-approval-signature-commands-also-line-wrap | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.push-artifacts-precede-operator-intent | closed | workflow-improvement | pipeline | nova-b | 2026-09-17 | — | — |
+| pipeline.push-classifier-does-not-model-powershell-backtick-escapes | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.push-classifier-misreads-backslash-escaped-quotes | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.push-flow-needs-one-remote-readback-transaction | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps. |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | — | 2026-08-09 | 2026-08-10 | — |
@@ -836,7 +837,7 @@
 
 ## Counts
 
-- open: 171
+- open: 172
 - in_progress: 0
 - closed: 643
 - rejected: 3
