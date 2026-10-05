@@ -27,11 +27,13 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+import { classifyCheckpointPorcelain } from "../lib/checkpoint-push-approval.mjs";
+import { createCriticalActionApprovalRequest, criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+import { run as runPipelineState } from "../scripts/pipeline-state.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 
@@ -475,6 +477,168 @@ const NOT_CLEAN = "checkpoint working tree is not clean";
     stderrIncludes: [NOT_CLEAN],
     stderrNotIncludes: [NEEDS_APPROVAL],
   });
+}
+
+// ---- C13: the exemption belongs to the directory the approval is READ from (review finding F1) ---
+// `git -C <X> push` binds the command to X, and the approval is read from X's state record. The
+// pushed branch may be attached in a DIFFERENT worktree W, which is where the clean-tree check
+// runs. The single-entry exemption exists because the verifier reads the work-tree state file,
+// so it may only apply when W and X are the same directory; a dirty state record in a checkout
+// the verifier never reads is simply a dirty tree.
+const forwardSlashes = (path) => path.replace(/\\/gu, "/");
+
+function splitSourceRepo(prefix) {
+  // `dir` is the session project directory. It carries the valid approval as its own
+  // ` M <state>` but is moved OFF the pushed branch, so the pushed branch is attached only in
+  // `source`, a separate linked worktree that starts out clean.
+  const fx = checkpointRepo(prefix);
+  const moved = gitAt(fx.dir, "checkout", "-q", "-b", "feat/session-holder");
+  if (moved.status !== 0) throw new Error(`fixture could not move the session directory off the pushed branch: ${moved.stderr}`);
+  const holder = mkdtempSync(join(tmpdir(), `guard-push-ckpt-${prefix}-src-`));
+  ALL_DIRS.push(holder);
+  const source = join(holder, "source");
+  const added = gitAt(fx.dir, "worktree", "add", "-q", source, BRANCH);
+  if (added.status !== 0) throw new Error(`fixture could not attach the pushed branch in a second worktree: ${added.stderr}`);
+  return { ...fx, source };
+}
+
+{
+  const fx = splitSourceRepo("c13a");
+  appendFileSync(join(fx.source, STATE_REL), "\n");
+  const sourceStatus = gitAt(fx.source, "status", "--porcelain").stdout.replace(/\r?\n$/u, "");
+  const sessionStatus = gitAt(fx.dir, "status", "--porcelain").stdout.replace(/\r?\n$/u, "");
+  record(
+    "C13a premise: the attached source worktree reads exactly ` M <state record>` and the session directory holds the approval as its own ` M <state record>`",
+    sourceStatus === ` M ${STATE_REL}` && sessionStatus === ` M ${STATE_REL}` ? [] : [`source ${JSON.stringify(sourceStatus)}, session ${JSON.stringify(sessionStatus)}`],
+  );
+  check(
+    "C13a block a dirty state record in the attached source worktree when the approval is read from a different directory",
+    `git -C ${forwardSlashes(fx.dir)} push origin ${BRANCH}:${DEST}`, fx.dir, BLOCK, { stderrIncludes: [NOT_CLEAN] },
+  );
+  record("C13a no audit record is written for the refused checkpoint", auditText(fx.dir) === "" ? [] : ["audit ledger exists although the push was refused"]);
+}
+{
+  // The mirror image keeps the fix honest: tightening must not refuse a clean source worktree.
+  const fx = splitSourceRepo("c13b");
+  check(
+    "C13b allow a strictly clean attached source worktree when the approval is read from a different directory",
+    `git -C ${forwardSlashes(fx.dir)} push origin ${BRANCH}:${DEST}`, fx.dir, ALLOW, { stderrEmpty: true },
+  );
+}
+{
+  // Same directory, other spelling: the exemption must still apply. A directory alias (a junction
+  // on Windows, a symlink elsewhere) names the session directory without sharing its path string.
+  const { dir, head } = checkpointRepo("c13c");
+  const holder = mkdtempSync(join(tmpdir(), "guard-push-ckpt-c13c-alias-"));
+  ALL_DIRS.push(holder);
+  const alias = join(holder, "alias");
+  let aliasMade = true;
+  try {
+    symlinkSync(dir, alias, "junction");
+  } catch {
+    aliasMade = false;
+  }
+  if (aliasMade) {
+    check(
+      "C13c allow the single dirty state record when the -C directory is the session directory under another spelling",
+      `git -C ${forwardSlashes(alias)} push origin ${BRANCH}:${DEST}`, dir, ALLOW, { stderrEmpty: true },
+    );
+    record("C13c the admitted checkpoint's audit record names the pushed commit", auditText(dir).includes(head) ? [] : ["audit ledger is missing the pushed commit"]);
+  } else {
+    console.log("SKIP  C13c -- this platform refused to create a directory alias; the same-directory-other-spelling case was NOT exercised");
+  }
+}
+
+// ---- C14: the REAL approve-push writer leaves exactly one ` M <state>` entry (review finding F2) --
+// Design 3.4 asks for this to be confirmed on a real repository rather than assumed. The writer is
+// pipeline-state.mjs's own `run(["approve-push", ...])` driven in-process against a fixture
+// repository with the NEUTRAL state path, using a real throwaway Ed25519 proof (no human, no real
+// key). Nothing about the writer is stubbed: git, the state lock, the proof verification and the
+// state write are the production ones.
+{
+  const NEUTRAL_STATE_REL = "project/pipeline-state.json";
+  const problems = [];
+  const stderrSeen = [];
+  const realConsoleError = console.error;
+  try {
+    const key = pushKeypair();
+    const dir = freshRepo("c14");
+    gitAt(dir, "checkout", "-q", "-b", BRANCH);
+    const threatModelBody = "# fixture threat model\n";
+    put(dir, POLICY_REL, `${JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1",
+      requiredKinds: ["push", "deploy", "publication"],
+      trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+    }, null, 2)}\n`);
+    put(dir, THREAT_MODEL_REL, threatModelBody);
+    const planBytes = Buffer.from("c14-plan");
+    const specBytes = Buffer.from("c14-spec");
+    const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+    // Plan/spec digests as the request builder itself derives them, so the committed state
+    // record carries exactly the authority the signed intent will name.
+    const probe = createCriticalActionApprovalRequest({
+      candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, featureId: FEATURE_ID, planBytes, specBytes,
+      action: { kind: "push", subjectSha256: "e".repeat(64), expiresAt },
+    });
+    const { planSha256, specSha256 } = probe.approvalIntent.value;
+    put(dir, NEUTRAL_STATE_REL, JSON.stringify({
+      schema: "pipeline.state.v0", activeFeature: { id: FEATURE_ID }, planApproval: { poGateAuthority: { planSha256, specSha256 } },
+    }));
+    gitAt(dir, "add", "-A");
+    gitAt(dir, "commit", "-q", "-m", "fixture: checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
+    const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+    const candidate = { commit: head, tree: gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim() };
+    const threatModel = { path: THREAT_MODEL_REL, sha256: sha256(threatModelBody) };
+    const subjectSha256 = criticalActionSubjectSha256({
+      kind: "push", candidate, subject: { sourceCommit: head, remote: "origin", destination: DEST, threatModel },
+    });
+    const request = createCriticalActionApprovalRequest({
+      candidate, featureId: FEATURE_ID, planBytes, specBytes, action: { kind: "push", subjectSha256, expiresAt },
+    });
+    const authority = { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 };
+    const proof = {
+      schema: "pipeline.po-approval-proof.v1",
+      intentSha256: request.approvalIntent.sha256,
+      keyReference: "po-key-1",
+      publicKey: key.publicPem,
+      signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), key.privateKey).toString("base64"),
+    };
+    const external = mkdtempSync(join(tmpdir(), "guard-push-ckpt-c14-external-"));
+    ALL_DIRS.push(external);
+    const requestPath = join(external, "request.json");
+    const authorityPath = join(external, "authority.json");
+    const proofPath = join(external, "proof.json");
+    writeFileSync(requestPath, JSON.stringify(request));
+    writeFileSync(authorityPath, JSON.stringify(authority));
+    writeFileSync(proofPath, JSON.stringify(proof));
+
+    const before = gitAt(dir, "status", "--porcelain").stdout;
+    if (before !== "") problems.push(`premise: the fixture was not clean before approve-push: ${JSON.stringify(before)}`);
+    console.error = (...parts) => { stderrSeen.push(parts.join(" ")); };
+    let exitCode;
+    try {
+      exitCode = runPipelineState([
+        "approve-push", "--by", "po-test", "--remote", "origin", "--destination", DEST,
+        "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath,
+      ], { dir, now: () => new Date().toISOString() });
+    } finally {
+      console.error = realConsoleError;
+    }
+    if (exitCode !== 0) problems.push(`the real approve-push exited ${exitCode}: ${stderrSeen.join(" | ").slice(0, 300)}`);
+    const porcelain = gitAt(dir, "status", "--porcelain").stdout;
+    if (porcelain.replace(/\r?\n$/u, "") !== ` M ${NEUTRAL_STATE_REL}`) problems.push(`porcelain after approve-push was ${JSON.stringify(porcelain)}`);
+    if (gitAt(dir, "ls-files", "--error-unmatch", NEUTRAL_STATE_REL).status !== 0) problems.push("the neutral state record is not tracked");
+    if (existsSync(join(dir, STATE_REL))) problems.push("the writer also created the legacy state path");
+    const written = JSON.parse(readFileSync(join(dir, NEUTRAL_STATE_REL), "utf8"));
+    if (written.pushApproval?.lastApproved?.forCommit !== head) problems.push("the written state record does not name the approved commit");
+    if (written.pushApproval?.lastApproved?.pendingAuditWrite !== true) problems.push("the written state record does not carry pendingAuditWrite: true");
+    if (!classifyCheckpointPorcelain(porcelain, [NEUTRAL_STATE_REL]).approvalRecordOnly) problems.push("the checkpoint classifier does not read the real writer's porcelain as the one tolerated entry");
+  } catch (error) {
+    problems.push(`fixture or writer threw: ${error?.message ?? error}`);
+  } finally {
+    console.error = realConsoleError;
+  }
+  record("C14 the real approve-push writer leaves exactly ` M project/pipeline-state.json` on the neutral path (design 3.4 premise)", problems);
 }
 
 // ---- cleanup and summary ---------------------------------------------------------------------

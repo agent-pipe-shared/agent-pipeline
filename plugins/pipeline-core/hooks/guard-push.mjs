@@ -129,7 +129,7 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-push.test.mjs
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1941,6 +1941,20 @@ function resolvedPushSourceRef(binding) {
 }
 
 /**
+ * PUSHSIG F1: are two directory spellings the same directory? Compared by native real path, so a
+ * symlink, a Windows junction, an 8.3 short name or a drive-letter case difference all collapse.
+ * Never by lower-casing: a case-sensitive directory on a case-insensitive platform would then
+ * merge two different trees. Any fault answers `false`, which keeps the strict clean-tree check.
+ */
+function sameRealDirectory(left, right) {
+  try {
+    return realpathSync.native(left) === realpathSync.native(right);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The reduced lane is still candidate-bound: the named source must be the
  * checked-out candidate in its own attached worktree, whose whole tree is
  * clean. The one committed intent trailer is an immutable human statement and
@@ -1950,8 +1964,11 @@ function resolvedPushSourceRef(binding) {
  * carry exactly one dirty entry, the tracked state record modified in the work tree. That is
  * what `approve-push` leaves behind AFTER it signed the subject, so the record can never be
  * inside the commit it covers and committing it would move HEAD and stale the approval.
- * `stateRelPath` is the record this guard itself reads the approval from; it is null outside
- * `signature` mode, so any other mode keeps the strict clean-tree check byte for byte.
+ * `stateRelPath` is the exempt record: it is non-null ONLY when the tree checked here is the
+ * very directory this guard reads the approval from (`sameRealDirectory`, F1), because the
+ * exemption rests on the verifier reading that work-tree file. It is null in every other mode
+ * and whenever the pushed branch is attached in a different checkout, so those keep the strict
+ * clean-tree check byte for byte.
  */
 function checkpointEligibility({ binding, commit, projectDir, signatureMode = false, stateRelPath = null }) {
   const failures = [];
@@ -2025,11 +2042,20 @@ if (pushDestination.lane === CHECKPOINT_LANE) {
   }
   const checkpointSignatureMode = checkpointApprovalMode({ pushGate, waiver: checkpointWaiver }) === "signature";
   let checkpointStateRelPath = null;
+  // PUSHSIG F1: the clean-tree check runs on `evidenceProjectDir` (the checkout the pushed branch
+  // is attached in) but the approval below is read from `projectDir` (the command's bound
+  // directory). The one-dirty-entry exemption is justified only by "the verifier reads this very
+  // work-tree file", so it is granted ONLY when both are the same directory; otherwise the source
+  // checkout must be strictly clean.
+  let checkpointExemptStateRelPath = null;
   if (checkpointSignatureMode) {
     try {
       checkpointStateRelPath = projectStateRelPath(projectDir);
     } catch {
       checkpointStateRelPath = null; // no exempt path, and no state to read: strict
+    }
+    if (checkpointStateRelPath !== null && sameRealDirectory(evidenceProjectDir, projectDir)) {
+      checkpointExemptStateRelPath = checkpointStateRelPath;
     }
   }
   const checkpoint = checkpointEligibility({
@@ -2037,7 +2063,7 @@ if (pushDestination.lane === CHECKPOINT_LANE) {
     commit: sourceCommit,
     projectDir: evidenceProjectDir,
     signatureMode: checkpointSignatureMode,
-    stateRelPath: checkpointStateRelPath,
+    stateRelPath: checkpointExemptStateRelPath,
   });
   if (!checkpoint.ok) {
     emit(2, [
