@@ -165,7 +165,21 @@ const SHARD_COUNT = 6;
 const CHUNK_COUNT = 2;
 const EXPECTED_CASE_COUNT = 216;
 const CASES_PER_CHILD = EXPECTED_CASE_COUNT / (SHARD_COUNT * CHUNK_COUNT);
-const CHILD_DEADLINE_MS = 850_000; // Bound each independent chunk without truncating slower Git fixtures.
+// Bound each independent chunk without truncating slower Git fixtures. Sized from a measured
+// native-Windows run of all 216 cases with no deadline (2026-10-05, working tree and HEAD): the
+// slowest child took 2_008_173 ms with the suite's own 6 concurrent children (1_638_876 ms with 3).
+// 2_008_173 ms x 1.5, rounded up to the next minute, is 3_060_000 ms. Override for a slower or faster
+// host with PIPELINE_TEST_CHILD_DEADLINE_MS (positive integer milliseconds, at most 4 hours).
+const CHILD_DEADLINE_DEFAULT_MS = 3_060_000;
+const CHILD_DEADLINE_MAX_MS = 4 * 60 * 60 * 1000;
+function resolveChildDeadlineMs(raw) {
+  if (raw === undefined || raw === "") return CHILD_DEADLINE_DEFAULT_MS;
+  assert.ok(/^[1-9][0-9]*$/u.test(raw), "PIPELINE_TEST_CHILD_DEADLINE_MS must be a positive integer");
+  const value = Number(raw);
+  assert.ok(Number.isSafeInteger(value) && value <= CHILD_DEADLINE_MAX_MS, `PIPELINE_TEST_CHILD_DEADLINE_MS must be at most ${CHILD_DEADLINE_MAX_MS}`);
+  return value;
+}
+const CHILD_DEADLINE_MS = resolveChildDeadlineMs(process.env.PIPELINE_TEST_CHILD_DEADLINE_MS);
 const DIRECT_INVOCATION = isDirectInvocation(import.meta.url);
 const shardArgument = DIRECT_INVOCATION ? process.argv.slice(2) : [];
 function parseShardArgument(args) {
