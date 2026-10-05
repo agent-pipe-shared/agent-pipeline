@@ -6,10 +6,10 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { listActiveSessionDescriptors } from "./worktree-lifecycle.mjs";
 import {
   VERIFY_RUN_RECORD_SCHEMA, defaultProcessStartIdentity, readVerifyRunRecords, registerVerifyRunRecord,
@@ -17,6 +17,12 @@ import {
 } from "./verify-run-record.mjs";
 
 const DEAD_PID = 2_147_483_646;
+
+// Cases are declared with stable ids and registered together through the completion protocol at the end of the file.
+const cases = [];
+function register(id, name, run) {
+  cases.push({ id, name, run });
+}
 
 function fixture() {
   const path = realpathSync(mkdtempSync(join(tmpdir(), "rdy-run-record-")));
@@ -31,7 +37,7 @@ function startRun(common, runId, extra = {}) {
   return { runPath, written: registerVerifyRunRecord({ gitCommonDir: common, runId, runPath, ...extra }) };
 }
 
-test("a run record creates no session descriptor, no session-cleanup state, and carries PID + start evidence", () => {
+register("VRR01", "a run record creates no session descriptor, no session-cleanup state, and carries PID + start evidence", () => {
   const { path, common } = fixture();
   try {
     const { written } = startRun(common, "run-a");
@@ -45,7 +51,7 @@ test("a run record creates no session descriptor, no session-cleanup state, and 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("an abort path settles the record and drains the unsealed run directory", () => {
+register("VRR02", "an abort path settles the record and drains the unsealed run directory", () => {
   const { path, common } = fixture();
   try {
     const { runPath } = startRun(common, "run-abort");
@@ -58,7 +64,7 @@ test("an abort path settles the record and drains the unsealed run directory", (
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("a stale record of a dead PID is swept without a signature; live and sealed runs are respected", () => {
+register("VRR03", "a stale record of a dead PID is swept without a signature; live and sealed runs are respected", () => {
   const { path, common } = fixture();
   try {
     const dead = startRun(common, "run-dead", { pid: DEAD_PID, processStartId: "1" });
@@ -79,3 +85,9 @@ test("a stale record of a dead PID is swept without a signature; live and sealed
     assert.equal(JSON.parse(readFileSync(join(verifyRunRecordsDirectory(common), "run-live.json"), "utf8")).runId, "run-live");
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
+
+assert.equal(cases.length, 3, "the complete verify-run-record corpus must register before execution");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(devNull, "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
