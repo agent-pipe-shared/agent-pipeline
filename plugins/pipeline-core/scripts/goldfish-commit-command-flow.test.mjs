@@ -56,6 +56,21 @@ test("CLI maps repeated body/path flags exactly and never executes Git", () => {
     "GF-COMMAND-CLI-ARGUMENTS");
 });
 
+test("CLI normalizes unsorted --path input to the sorted output and still refuses duplicates", () => {
+  // PRODSORT: unsorted input is normalized, not refused
+  const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope,
+    "--summary", input.summary, ...input.bodyParagraphs.flatMap((body) => ["--body", body])];
+  const sorted = runGoldfishCommitCommandFlow([...base, "--path", "a.txt", "--path", "b.txt"]);
+  const unsorted = runGoldfishCommitCommandFlow([...base, "--path", "b.txt", "--path", "a.txt"]);
+  assert.equal(sorted.ok, true);
+  assert.deepEqual(unsorted, sorted);
+  assert.equal(JSON.stringify(unsorted), JSON.stringify(sorted));
+  assert.equal(runGoldfishCommitCommandFlow([...base, "--path", "a.txt", "--path", "a.txt"]).code,
+    "GF-COMMAND-PATH-ORDER");
+  assert.equal(runGoldfishCommitCommandFlow([...base, "--path", "b.txt", "--path", "../x"]).code,
+    "GF-COMMAND-PATH");
+});
+
 test("generated commands create one exact-path Git commit with the required trailer block", (t) => {
   const root = mkdtempSync(join(tmpdir(), "goldfish-command-flow-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));

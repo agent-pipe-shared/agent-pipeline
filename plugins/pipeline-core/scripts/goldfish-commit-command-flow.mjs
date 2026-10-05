@@ -4,6 +4,7 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { createGoldfishCommitCommandFlow } from "../lib/goldfish-commit-command-flow.mjs";
+import { normalizeDispatchRecordPath } from "../lib/dispatch-record.mjs";
 
 export function runGoldfishCommitCommandFlow(argv = process.argv.slice(2)) {
   const single = new Set(["--task-id", "--type", "--scope", "--summary"]);
@@ -23,6 +24,11 @@ export function runGoldfishCommitCommandFlow(argv = process.argv.slice(2)) {
     else if (flag === "--scope") values.scope = value;
     else values.summary = value;
   }
+  // PRODSORT: the canonical order is fixed, so normalize it here instead of refusing.
+  // Duplicates are kept (the library still refuses them); invalid paths stay raw so the library refuses them too.
+  values.paths = values.paths.map((path) => {
+    try { return normalizeDispatchRecordPath(path, "commit path"); } catch { return path; }
+  }).sort();
   return createGoldfishCommitCommandFlow(values);
 }
 
