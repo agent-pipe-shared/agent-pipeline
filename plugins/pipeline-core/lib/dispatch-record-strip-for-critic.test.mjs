@@ -200,7 +200,21 @@ check("DRS11", "stripDispatchRecordForCritic is a pure function that never mutat
   assert.deepEqual(FULL_RECORD, copy);
 });
 
-assert.equal(cases.length, 11, "the complete dispatch-record strip corpus must be registered before execution begins");
+check("DRS12", "stripDispatchRecordForCritic accepts only the closed plugin-version form of rulesetSha", () => {
+  for (const accepted of ["0.7.0+claude.20261005202045.7170ed20", "1.2.3+codex.20260101000000.abcdef01"]) {
+    assert.equal(stripDispatchRecordForCritic({ taskId: "NVA-X-VER-1", rulesetSha: accepted }).rulesetSha, accepted);
+  }
+  for (const rejected of [
+    "0.7.0+claude.20261005202045.7170ED20",
+    "0.7.0+claude.20261005202045.7170ed20x",
+    "0.7.0+evil runner.20261005202045.7170ed20",
+    "0.7.0.20261005202045.7170ed20",
+  ]) {
+    assert.throws(() => stripDispatchRecordForCritic({ taskId: "NVA-X-VER-2", rulesetSha: rejected }), TypeError, rejected);
+  }
+});
+
+assert.equal(cases.length, 12,"the complete dispatch-record strip corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -42,6 +42,7 @@ export const DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS = Object.freeze([
 
 const SAFE_COMMIT = /^[a-f0-9]{7,40}$/u;
 const SAFE_RULESET_DIGEST = /^(?:[a-f0-9]{7,40}|[a-f0-9]{64})$/u;
+const SAFE_RULESET_PLUGIN_VERSION = /^\d{1,3}\.\d{1,3}\.\d{1,3}\+(?:claude|codex|antigravity)\.\d{14}\.[a-f0-9]{8}$/u;
 const SAFE_REPO_PATH = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/u;
 
 /**
@@ -54,7 +55,7 @@ const SAFE_REPO_PATH = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/u;
 const RATIONALE_SEPARATOR = " - ";
 
 function safeRulesetDigest(value) {
-  if (typeof value !== "string" || !SAFE_RULESET_DIGEST.test(value)) {
+  if (typeof value !== "string" || !(SAFE_RULESET_DIGEST.test(value) || SAFE_RULESET_PLUGIN_VERSION.test(value))) {
     throw new TypeError("rulesetSha must be an abbreviated/full Git digest or a SHA-256 digest");
   }
   return value;
@@ -134,7 +135,7 @@ function normalizeChangedFiles(changedFiles) {
 
 /**
  * Reduce a full, already-parsed dispatch-record object to the strictly
- * bounded safe field set: digest-shaped `rulesetSha`, `commits`, and
+ * bounded safe field set: digest-shaped or closed plugin-version-form `rulesetSha`, `commits`, and
  * `report.changedFiles` normalized to bare path strings. Everything
  * else — `report.text`, `log`, `dispatcher`, `criticSkip`, `outcome`,
  * task/runner/model selection, `modelOverride`, and any other field — is dropped.
