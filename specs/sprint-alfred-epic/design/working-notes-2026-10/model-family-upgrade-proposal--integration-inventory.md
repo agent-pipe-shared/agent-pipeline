@@ -139,7 +139,7 @@ The production selector imports Agy dispatch; its complete runner branches have 
 
 ## Commands, stop and limitations
 
-[integration-inventory.json](integration-inventory.json) contains each actual search/read command, outcome, current source hashes, ownership arrays and three-valued checks. The broad initial searches included test matches and some output was truncated; bounded follow-up exact source excerpts support the entries above. No tests or native executables were invoked.
+`integration-inventory.json` contains each actual search/read command, outcome, current source hashes, ownership arrays and three-valued checks. The broad initial searches included test matches and some output was truncated; bounded follow-up exact source excerpts support the entries above. No tests or native executables were invoked.
 
 Two attempts failed: the guard rejected an `rg -g` exclusion-option invocation as outside-root; then an explicit read of the guessed `codex-native-critic-child.mjs` failed with ENOENT. The former was followed by a successful explicit absolute-root search. The latter is an agent filename assumption, not proof of missing real source. At that point tracing stopped. Artifact construction only captured hashes and documented already-collected source evidence. A fresh closed dispatch must resolve the actual child path from its host constant and finish the unresolved graph.
 

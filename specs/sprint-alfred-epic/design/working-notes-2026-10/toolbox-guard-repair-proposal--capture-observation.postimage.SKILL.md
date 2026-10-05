@@ -26,14 +26,14 @@ Create one public observation only after its target, privacy, labels, and exact 
 ## Repository Issue Form
 
 For manual intake, use the repository-owned
-[`observation.yml`](../../templates/observation.yml). It uses
+[`observation.yml`](../../../../.github/ISSUE_TEMPLATE/observation.yml). It uses
 the same fields and privacy/security boundary but applies only the two fixed
 labels `kind:observation` and `triage:needs-review`. GitHub Issue Forms cannot
 derive a label from the selected Area, so triage applies the `area:*` label.
 The controlled skill path may apply its verified area label at creation.
 
 The GitHub Issue remains the observation and triage single source. Follow
-[`observation-intake.md`](../../docs/observation-intake.md) for the
+[`observation-intake.md`](../../../../docs/observation-intake.md) for the
 queue validation, confirmed/known-error disposition, and reciprocal
 backlog-link contract. Never promote an observation to the backlog automatically.
 
