@@ -197,7 +197,7 @@ if (isDirectInvocation(import.meta.url)) {
       ? prepareAdvisorProhibitionBindings(dispatches)
       : { status: "not-applicable" };
     if (advisorBinding.status === "rejected") {
-      process.stderr.write(`BLOCKED (guard-dispatch, plugin pipeline-core): ${advisorBinding.code}: the Advisor prohibition cannot be assigned to one exact child before launch.\n`);
+      process.stderr.write(`BLOCKED (guard-dispatch, plugin pipeline-core): ${advisorBinding.code}: ${advisorBinding.message ?? "the Advisor prohibition cannot be assigned to one exact child before launch."}\n`);
       process.exit(2);
     }
     if (advisorBinding.status === "prepared") {

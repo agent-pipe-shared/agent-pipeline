@@ -214,6 +214,59 @@ manualCheck("GD2h a private denial audit is content-free and digest-bound", () =
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// Host built-in agent types (Explore/Plan/general-purpose) must not be refused by the Advisor binding.
+for (const builtIn of ["Explore", "Plan", "general-purpose"]) {
+  check(`GD2i allow a ${builtIn} dispatch without a prohibition line (exact live tool_input shape)`, {
+    tool_use_id: `gd2i-${builtIn}`,
+    tool_name: "Agent",
+    tool_input: { subagent_type: builtIn, description: "read-only research", prompt: "Read the repository and report where X is defined." },
+  }, ALLOW);
+}
+check("GD2j allow a batch of two Explore dispatches without a prohibition line", {
+  tool_use_id: "gd2j",
+  tool_name: "Workflow",
+  tool_input: { script: `
+    agent({ agentType: 'Explore', prompt: 'Read a and report.' })
+    agent({ agentType: 'Explore', prompt: 'Read b and report.' })
+  ` },
+}, ALLOW);
+
+manualCheck("GD2k built-in role spellings bind case-preservingly when the prohibition line is present", () => {
+  const root = mkdtempSync(join(tmpdir(), "advisor-prohibition-builtin-"));
+  try {
+    const prepared = prepareAdvisorProhibitionBindings([
+      { subagentType: "Explore", prompt: `- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
+      { subagentType: "pipeline-core:goldfish-implementor", prompt: "ordinary child" },
+    ]);
+    assert.equal(prepared.status, "prepared");
+    assert.deepEqual(prepared.bindings.map(({ agentType, disposition }) => [agentType, disposition]), [
+      ["Explore", "prohibited"], ["goldfish-implementor", "unrestricted"],
+    ]);
+    assert.equal(persistPendingAdvisorProhibitionBindings({ commonDir: root, toolUseId: "parent-b", bindings: prepared.bindings }).status, "prepared");
+    assert.equal(resolvePendingAdvisorProhibitionBinding({ commonDir: root, toolUseId: "parent-b", agentType: "Explore" }).binding.disposition, "prohibited");
+    assert.equal(resolvePendingAdvisorProhibitionBinding({ commonDir: root, toolUseId: "parent-b", agentType: "explore" }).status, "not-bound");
+    const plan = prepareAdvisorProhibitionBindings([{ subagentType: "Plan", prompt: `${ADVISOR_PROHIBITION_LINE}` }]);
+    assert.deepEqual(plan.bindings.map(({ agentType, disposition }) => [agentType, disposition]), [["Plan", "prohibited"]]);
+    assert.equal(prepareAdvisorProhibitionBindings([
+      { subagentType: "Explore", prompt: "a" }, { subagentType: "Explore", prompt: "b" },
+    ]).code, "APB-NO-PROHIBITION");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+manualCheck("GD2l an unparseable role gets its own code naming the value", () => {
+  for (const bad of ["", "  ", "bad role", "Exp\u0007lore", 42, undefined]) {
+    const prepared = prepareAdvisorProhibitionBindings([{ subagentType: bad, prompt: `- ${ADVISOR_PROHIBITION_LINE}` }]);
+    assert.equal(prepared.status, "rejected");
+    assert.equal(prepared.code, "APB-ROLE-UNPARSEABLE");
+    assert.doesNotMatch(prepared.message, /\u0007/u);
+  }
+  const long = prepareAdvisorProhibitionBindings([{ subagentType: `x y${"z".repeat(500)}`, prompt: `- ${ADVISOR_PROHIBITION_LINE}` }]);
+  assert.ok(long.message.length < 300);
+  assert.match(prepareAdvisorProhibitionBindings([{ subagentType: "bad role", prompt: `- ${ADVISOR_PROHIBITION_LINE}` }]).message, /"bad role"/u);
+  // Without a prohibition line the same role is not this guard's business.
+  assert.equal(prepareAdvisorProhibitionBindings([{ subagentType: "bad role", prompt: "x" }]).status, "not-applicable");
+});
+
 const advisorChild = {
   tool_name: "advisor", tool_use_id: "advisor-call-1", agent_id: "child-1",
   agent_type: "pipeline-core:critic", transcript_path: "/measured/session.jsonl",
@@ -557,7 +610,7 @@ manualCheck("GD20 extractAntigravityDispatches is importable and callable direct
   }
 });
 
-assert.equal(cases.length, 43, "the complete dispatch guard corpus must register before execution");
+assert.equal(cases.length, 49, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

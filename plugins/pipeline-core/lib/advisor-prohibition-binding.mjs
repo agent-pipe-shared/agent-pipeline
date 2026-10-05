@@ -23,7 +23,15 @@ function result(status, code, extra = {}) {
 function normalizedRole(value) {
   if (typeof value !== "string") return null;
   const role = value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
-  return /^[a-z][a-z0-9-]*$/u.test(role) ? role : null;
+  // Case-preserving: host built-ins are spelled `Explore`/`Plan`/`general-purpose`.
+  return /^[A-Za-z][A-Za-z0-9_-]*$/u.test(role) ? role : null;
+}
+
+function describeRoleValue(value) {
+  let text;
+  try { text = JSON.stringify(value); } catch { text = undefined; }
+  if (text === undefined) text = JSON.stringify(String(value));
+  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
 }
 
 /**
@@ -48,20 +56,24 @@ export function advisorProhibitionDisposition(prompt) {
  */
 export function prepareAdvisorProhibitionBindings(dispatches) {
   if (!Array.isArray(dispatches) || dispatches.length === 0) return result("not-applicable", "APB-NO-DISPATCHES");
-  const bindings = [];
+  // Prompts first: a batch with no prohibition line is not-applicable before any role parsing.
+  const dispositions = [];
   for (const dispatch of dispatches) {
-    const agentType = normalizedRole(dispatch?.subagentType);
-    if (agentType === null || typeof dispatch?.prompt !== "string") return result("rejected", "APB-DISPATCH-INVALID");
-    const disposition = advisorProhibitionDisposition(dispatch.prompt);
+    const disposition = advisorProhibitionDisposition(dispatch?.prompt);
     if (disposition.status === "rejected") return disposition;
-    bindings.push({
-      agentType,
-      disposition: disposition.disposition,
-      promptSha256: digest(dispatch.prompt),
-    });
+    dispositions.push(disposition.disposition);
   }
-  if (!bindings.some(({ disposition }) => disposition === "prohibited")) {
-    return result("not-applicable", "APB-NO-PROHIBITION");
+  if (!dispositions.includes("prohibited")) return result("not-applicable", "APB-NO-PROHIBITION");
+  const bindings = [];
+  for (const [index, dispatch] of dispatches.entries()) {
+    if (typeof dispatch?.prompt !== "string") return result("rejected", "APB-DISPATCH-INVALID");
+    const agentType = normalizedRole(dispatch?.subagentType);
+    if (agentType === null) {
+      return result("rejected", "APB-ROLE-UNPARSEABLE", {
+        message: `the dispatch role ${describeRoleValue(dispatch?.subagentType)} is not a valid agent-type name, so the Advisor prohibition in this batch cannot be bound to it.`,
+      });
+    }
+    bindings.push({ agentType, disposition: dispositions[index], promptSha256: digest(dispatch.prompt) });
   }
   const roles = bindings.map(({ agentType }) => agentType);
   if (new Set(roles).size !== roles.length) return result("rejected", "APB-DISPATCH-IDENTITY-AMBIGUOUS");
