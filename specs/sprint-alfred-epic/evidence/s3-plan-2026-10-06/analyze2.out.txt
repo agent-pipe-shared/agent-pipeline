@@ -1,0 +1,141 @@
+total lines 12377; named top-level declarations 430 (function 296, const/let 134); exported 29
+--- CLUSTERS id | range | decls | codeLines | exported | fanInFrom | refsTo(distinct ids)
+C00a-core-constants | 536-546 | 4 | 10 | 4 | C02,C04,C07,C08,C13,C14,C15,C17,C18,C23 |
+C00b-recovery-bridge | 547-645 | 19 | 77 | 4 | C11 | C01:2,C05:4
+C01-constants-and-command-list | 646-814 | 43 | 101 | 1 | C00b,C02,C04,C05,C06,C07,C08,C10,C11,C12,C13,C14,C15,C16,C17,C18,C19,C20,C22,C23 |
+C02-store-read-write | 816-1006 | 7 | 176 | 3 | C04,C06,C07,C08,C10,C11,C13,C14,C15,C17,C18,C20,C21,C22,C23 | C00a:2,C01:1,C04:3,C18:1,C23:1
+C03-gate-action-marker-sync | 1008-1136 | 9 | 80 | 1 | C23 |
+C04-continuity-lock-io | 1138-1401 | 16 | 241 | 4 | C02,C05,C06,C07,C08,C13,C14,C15,C16,C17,C18,C19,C20,C22,C23 | C00a:3,C01:3,C02:8
+C05-continuity-request-canonical | 1403-1711 | 9 | 278 | 0 | C00b,C06,C07,C08,C10,C11,C13,C14,C15,C16,C17,C18,C20,C21,C22,C23 | C01:2,C04:1
+C06-continuity-result-transactions | 1713-2611 | 33 | 853 | 0 | C07 | C01:19,C02:1,C04:10,C05:23
+C07-continuity-transition-events-run | 2613-2946 | 8 | 280 | 0 | C23 | C00a:1,C01:1,C02:2,C04:4,C05:4,C06:4,C10:3,C11:2
+C08-publication | 2948-3274 | 9 | 316 | 0 | C12,C14,C15,C16,C18,C23 | C00a:1,C01:8,C02:2,C04:4,C05:5,C11:1,C12:1
+C09-flag-parsers | 3276-3318 | 3 | 39 | 0 | C10,C14,C15,C16,C18,C22,C23 |
+C10-legacyv2-gate-estimate-verify-calibration | 3320-3618 | 18 | 211 | 3 | C07,C11,C13,C14,C16,C17,C18,C22,C23 | C01:4,C02:1,C05:3,C09:1
+C11-push-inspect-profiles-next-action | 3620-4446 | 20 | 704 | 0 | C07,C08,C12,C15,C17,C18,C19,C20,C23 | C00b:1,C01:7,C02:1,C05:3,C10:4,C17:4,C19:4,C21:1,C23:1
+C12-external-push-proof | 4448-4648 | 7 | 157 | 1 | C08,C18,C23 | C01:2,C08:1,C11:1
+C13-legacy-adoption | 4650-4818 | 7 | 163 | 0 | C14,C15,C16,C17,C18,C20,C23 | C00a:2,C01:2,C02:2,C04:4,C05:5,C10:1
+C14-result-rebind-case-migration | 4822-5105 | 26 | 269 | 0 | C23 | C00a:2,C01:11,C02:1,C04:12,C05:10,C08:1,C09:1,C10:4,C13:3,C16:3,C17:15
+C15-authority-revision | 5107-5664 | 26 | 488 | 1 | C23 | C00a:1,C01:3,C02:1,C04:8,C05:6,C08:1,C09:3,C11:1,C13:3,C16:8,C17:4,C23:3
+C16-result-bootstrap-close | 5668-6272 | 32 | 565 | 0 | C14,C15,C18,C23 | C01:15,C04:11,C05:11,C08:1,C09:1,C10:3,C13:2,C17:9
+C17-po-authority | 6276-7820 | 45 | 1399 | 2 | C11,C14,C15,C16,C18,C20,C22,C23 | C00a:3,C01:8,C02:6,C04:11,C05:12,C10:4,C11:10,C13:4,C23:3
+C18-feature-package | 7822-8715 | 34 | 701 | 0 | C02,C23 | C00a:1,C01:3,C02:5,C04:9,C05:3,C08:1,C09:1,C10:1,C11:1,C12:1,C13:1,C16:8,C17:7,C23:3
+C19-plan-approval-presentation-prd | 8717-9115 | 33 | 266 | 3 | C11,C23 | C01:2,C04:1,C11:1
+C20-closed-evidence | 9116-9708 | 10 | 568 | 0 | C23 | C01:11,C02:5,C04:4,C05:3,C11:1,C13:2,C17:1
+C21-po-gate-authority | 9710-9865 | 1 | 148 | 1 | C11,C23 | C02:2,C05:1
+C22-enrollment-retirement | 9867-9993 | 9 | 125 | 0 | C23 | C01:1,C02:5,C04:6,C05:2,C09:1,C10:1,C17:1
+C23-run-dispatch | 9995-12366 | 1 | 2372 | 1 | C02,C11,C15,C17,C18,C24 | C00a:2,C01:8,C02:5,C03:3,C04:3,C05:4,C07:1,C08:2,C09:3,C10:13,C11:10,C12:1,C13:1,C14:2,C15:2,C16:2,C17:3,C18:6,C19:12,C20:2,C21:1,C22:2
+C24-entry | 12367-12377 | 1 | 10 | 0 |  | C23:1
+--- SCCs (size>1) excluding C23/C24: C16+C12+C19+C21+C13+C17+C10+C11+C08+C18+C02+C04+C05+C00b
+  edge C16->C13: readStateRaw<-runResultBootstrapCommand ; readStateRaw<-runResultCloseCommand
+  edge C16->C17: physicalRebindFile<-observeCanonicalResultBootstrap ; physicalRebindFile<-atomicAppendResultBootstrap ; canonicalIso<-buildResultBootstrapPlan ; physicalRebindFile<-buildResultBootstrapPlan ; canonicalIso<-parseResultBootstrapApply ; physicalRebindFile<-runResultBootstrapCommand ; canonicalIso<-parseResultCloseApply ; physicalRebindFile<-observeResultCloseArtifact
+  edge C16->C10: isBlank<-parseResultBootstrapApply ; isBlank<-parseResultClosePlan ; isBlank<-parseResultCloseApply
+  edge C16->C08: defaultGitCommonDir<-resultBootstrapPrivatePaths
+  edge C16->C04: replaceFdContents<-atomicAppendResultBootstrap ; syncDirectory<-atomicAppendResultBootstrap ; safeUnlink<-atomicAppendResultBootstrap ; syncDirectory<-writePrivateBootstrap ; syncDirectory<-retireBootstrapJournal ; acquireContinuityLock<-runResultBootstrapCommand ; atomicWriteContinuityState<-runResultBootstrapCommand ; releaseContinuityLock<-runResultBootstrapCommand
+  edge C16->C05: sameJson<-sameBootstrapResultPreimage ; sha256Bytes<-resultBootstrapPayload ; sha256Bytes<-buildResultBootstrapPlan ; exactObjectKeys<-loadBootstrapJournal ; parseExpectedRevision<-parseResultBootstrapApply ; sha256Bytes<-runResultBootstrapCommand ; parseExpectedRevision<-parseResultClosePlan ; parseExpectedRevision<-parseResultCloseApply
+  edge C12->C11: criticalHumanProofPolicy<-verifyCriticalHumanProof
+  edge C12->C08: defaultGitCommonDir<-localPushScratchArtifacts
+  edge C19->C11: defaultGitCandidate<-designWorkflowGitCandidate
+  edge C19->C04: syncDirectory<-writeDesignWorkflowApprovalRequest
+  edge C21->C02: projectDir<-checkPoGateAuthority ; readState<-checkPoGateAuthority
+  edge C21->C05: sha256Bytes<-checkPoGateAuthority
+  edge C13->C10: isBlank<-runLegacyAdoptionCommand
+  edge C13->C02: statePath<-readStateRaw ; readState<-readStateRaw
+  edge C13->C04: readContinuityRequest<-runLegacyAdoptionCommand ; acquireContinuityLock<-runLegacyAdoptionCommand ; atomicWriteContinuityState<-runLegacyAdoptionCommand ; releaseContinuityLock<-runLegacyAdoptionCommand
+  edge C13->C05: sha256Bytes<-legacyRegularArtifact ; sha256Bytes<-legacyGitObservation ; exactObjectKeys<-validateLegacyAdoptionEnvironment ; sha256Bytes<-buildLegacyAdoptionPlan ; sameJson<-runLegacyAdoptionCommand
+  edge C17->C13: readStateRaw<-runPoAuthorityAcknowledgeCommand ; readStateRaw<-runPoAuthorityRebindCommand ; readStateRaw<-runPoAuthorityDecisionCommand ; readStateRaw<-runPoAuthorityRebindApply
+  edge C17->C10: isBlank<-validRebindApproval ; isBlank<-validPriorAuthority ; isBlank<-parsePoAcknowledgeFlags ; isBlank<-buildPoAuthorityAcknowledgePlan
+  edge C17->C11: DRAFT_PLAN_PROFILES<-parsePoAcknowledgeFlags ; validProfileChangeReason<-parsePoAcknowledgeFlags ; inspectSelectedPlanProfile<-buildPoAuthorityAcknowledgePlan ; DRAFT_PLAN_PROFILES<-buildPoAuthorityAcknowledgePlan ; validProfileChangeReason<-buildPoAuthorityAcknowledgePlan ; defaultGitCandidate<-buildPoAuthorityAcknowledgePlan ; validProfileChangeBinding<-buildPoAuthorityAcknowledgePlan ; committedGlobalChatHumanApproval<-runPoAuthorityAcknowledgeCommand
+  edge C17->C02: statePath<-rebindTransactionPath ; stateRelativePath<-buildPoAuthorityRebindPlan ; stateRelativePath<-buildPoAuthorityDecisionPlan ; stateRelativePath<-recoverRebindTransaction ; stateRelativePath<-buildPoAuthorityAcknowledgePlan ; stateRelativePath<-runPoAuthorityRebindApply
+  edge C17->C04: syncDirectory<-publishRebindTransaction ; syncDirectory<-clearRebindTransaction ; acquireContinuityLock<-runPoAuthorityAcknowledgeCommand ; syncDirectory<-runPoAuthorityAcknowledgeCommand ; releaseContinuityLock<-runPoAuthorityAcknowledgeCommand ; acquireContinuityLock<-runPoAuthorityRebindCommand ; syncDirectory<-runPoAuthorityRebindCommand ; releaseContinuityLock<-runPoAuthorityRebindCommand
+  edge C17->C05: sha256Bytes<-physicalRebindFile ; exactObjectKeys<-validRebindApproval ; exactObjectKeys<-validCurrentPoProfile ; exactObjectKeys<-validPriorAuthority ; sha256Bytes<-buildPoAuthorityRebindPlan ; sha256Bytes<-buildPoAuthorityDecisionPlan ; exactObjectKeys<-parseRebindTransaction ; sha256Bytes<-parseRebindTransaction
+  edge C10->C02: readState<-buildLateVerifyRecoveryAction
+  edge C10->C05: sameJson<-readIdenticalCalibrationVerifyTwins ; sameJson<-prepareCalibrationVerifyWrite ; exactObjectKeys<-projectV1LegacyApprovalForSpecBind
+  edge C11->C19: validPlanPresentation<-buildInspectNextAction ; PLAN_PRESENTATION_DWP_SCHEMA<-buildInspectNextAction ; DESIGN_WORKFLOW_PACKAGE_PATH_RE<-buildInspectNextAction ; observeDesignWorkflowSignatureApproval<-buildInspectNextAction
+  edge C11->C21: checkPoGateAuthority<-buildInspectNextAction
+  edge C11->C17: canonicalIso<-inspectSelectedPlanProfile ; describeFailedPostimagePredicates<-resolveDraftProfileReceiptAction ; physicalRebindFile<-inspectPlanLifecycle ; resolvePoRebindRunner<-buildInspectNextAction
+  edge C11->C10: isBlank<-validProfileChangeBinding ; isBlank<-inspectSelectedPlanProfile ; readCalibrationVerifyStatus<-buildInspectNextAction ; buildLateVerifyRecoveryAction<-buildInspectNextAction
+  edge C11->C02: readState<-resolveDraftPlanSubmissionDefaults
+  edge C11->C05: sha256Bytes<-boundRepositoryArtifact ; exactObjectKeys<-validProfileChangeBinding ; exactObjectKeys<-inspectSelectedPlanProfile
+  edge C11->C00b: safeIso<-inspectPushApproval
+  edge C08->C12: verifyCriticalHumanProof<-runPublicationCommand
+  edge C08->C11: criticalHumanProofPolicy<-runPublicationCommand
+  edge C08->C02: projectDir<-runPublicationCommand ; readState<-runPublicationCommand
+  edge C08->C04: readContinuityRequest<-runPublicationCommand ; acquireContinuityLock<-runPublicationCommand ; atomicWriteContinuityState<-runPublicationCommand ; releaseContinuityLock<-runPublicationCommand
+  edge C08->C05: exactObjectKeys<-validPublicationProjection ; exactObjectKeys<-publicationReplayMatches ; sameJson<-publicationReplayMatches ; exactObjectKeys<-runPublicationCommand ; sameJson<-runPublicationCommand
+  edge C18->C16: observeBootstrapPrivateDirectory<-loadFeaturePackageApplyJournal ; readPrivateBootstrap<-loadFeaturePackageApplyJournal ; bootstrapJournalMac<-loadFeaturePackageApplyJournal ; ensureBootstrapPrivateDirectory<-publishFeaturePackageApplyJournal ; readPrivateBootstrap<-publishFeaturePackageApplyJournal ; writePrivateBootstrap<-publishFeaturePackageApplyJournal ; bootstrapJournalMac<-publishFeaturePackageApplyJournal ; ensureBootstrapPrivateDirectory<-retireFeaturePackageApplyJournal
+  edge C18->C12: verifyCriticalHumanProof<-defaultFeaturePackageReconcileApproval
+  edge C18->C13: readStateRaw<-runFeaturePackageReconcileCommand
+  edge C18->C17: physicalRebindFile<-computeFeaturePackagePostimage ; writeRebindFile<-runFeaturePackageApplyCommand ; physicalRebindFile<-runFeaturePackageApplyCommand ; physicalRebindFile<-computeFeaturePackageReconcilePostimage ; writeRebindFile<-runFeaturePackageReconcileCommand ; physicalRebindFile<-runFeaturePackageReconcileCommand ; physicalRebindFile<-runFeaturePackageRecoverCommand
+  edge C18->C10: isBlank<-defaultFeaturePackageReconcileApproval
+  edge C18->C11: defaultGitCandidate<-runFeaturePackageReconcileCommand
+  edge C18->C08: defaultGitCommonDir<-featurePackageApplyPrivatePaths
+  edge C18->C02: projectDir<-defaultFeaturePackageReconcileApproval ; readState<-defaultFeaturePackageReconcileApproval ; statePath<-defaultFeaturePackageReconcileApproval ; writeState<-defaultFeaturePackageReconcileApproval ; stateWriteSucceeded<-defaultFeaturePackageReconcileApproval
+  edge C18->C04: syncDirectory<-retireFeaturePackageApplyJournal ; acquireContinuityLock<-runFeaturePackageApplyCommand ; syncDirectory<-runFeaturePackageApplyCommand ; releaseContinuityLock<-runFeaturePackageApplyCommand ; acquireContinuityLock<-runFeaturePackageReconcileCommand ; syncDirectory<-runFeaturePackageReconcileCommand ; releaseContinuityLock<-runFeaturePackageReconcileCommand ; acquireContinuityLock<-defaultFeaturePackageReconcileApproval
+  edge C18->C05: exactObjectKeys<-loadFeaturePackageApplyJournal ; sha256Bytes<-computeFeaturePackagePostimage ; sha256Bytes<-computeFeaturePackageReconcilePostimage
+  edge C02->C18: defaultFeaturePackageReconcileApproval<-writeState
+  edge C02->C04: acquireContinuityLock<-writeState ; atomicWriteContinuityState<-writeState ; releaseContinuityLock<-writeState
+  edge C04->C02: projectDir<-continuityLockPath ; statePath<-continuityLockPath ; projectDir<-lockRecoveryPath ; stateDirectory<-acquireRecoveryGuard ; stateDirectory<-acquireContinuityLock ; statePath<-acquireContinuityLock ; statePath<-atomicWriteContinuityState ; stateDirectory<-atomicWriteContinuityState
+  edge C05->C04: safeRequestFile<-evaluateOptInDecisionReference
+  edge C00b->C05: exactObjectKeys<-validRecoveryBridgeApproval ; exactObjectKeys<-exactPoDecision ; sha256Bytes<-recoveryBridgeDecisionDigest ; exactObjectKeys<-validateRecoveryBridgeDecision
+--- run() (C23) outgoing clusters: C02:5,C11:10,C21:1,C09:3,C22:2,C17:3,C13:1,C16:2,C14:2,C20:2,C15:2,C01:8,C07:1,C08:2,C18:6,C00a:2,C10:13,C03:3,C04:3,C19:12,C05:4,C12:1
+--- inbound to C23/C24 from other clusters: C02-store-read-write,C11-push-inspect-profiles-next-action,C15-authority-revision,C17-po-authority,C18-feature-package,C24-entry | C02-store-read-write->C23-run-dispatch: run<-writeState || C11-push-inspect-profiles-next-action->C23-run-dispatch: run<-buildInspectNextAction || C15-authority-revision->C23-run-dispatch: run<-publishAuthorityRevisionJournal;run<-runAuthorityRevisionApplyCommand;run<-runAuthorityRevisionRecoverCommand || C17-po-authority->C23-run-dispatch: run<-runPoAuthorityAcknowledgeCommand;run<-runPoAuthorityRebindCommand;run<-runPoAuthorityDecisionCommand || C18-feature-package->C23-run-dispatch: run<-runFeaturePackageApplyCommand;run<-runFeaturePackageReconcileCommand;run<-defaultFeaturePackageReconcileApproval || C24-entry->C23-run-dispatch: run<-isDirectRun
+--- run() pre-switch routes (2-space `if (sub`/`.has(sub)` lines 10004-10083)
+10004	if (sub === "retire-enrollment" || sub === "activate-enrollment") return runEnrollmentRetirement(sub, rest);
+10005	if (sub === "inspect-enrollment-retirement") {
+10011	if (sub === "po-authority-rebind-plan" || sub === "po-authority-rebind-apply") {
+10020	if (sub === "po-authority-acknowledge-plan" || sub === "po-authority-acknowledge-apply") {
+10029	if (new Set(["po-authority-decision-plan", "po-authority-decision-select", "po-authority-decision-apply"]).has(sub)) {
+10038	if (sub === "continuity-adoption-plan" || sub === "continuity-adoption-apply") {
+10041	if (sub === "continuity-result-close-plan" || sub === "continuity-result-close-apply") {
+10044	if (sub === "continuity-result-bootstrap-plan" || sub === "continuity-result-bootstrap-apply") {
+10047	if (sub === "continuity-result-rebind-plan" || sub === "continuity-result-rebind-apply") {
+10050	if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
+10053	if (sub === "closed-evidence-restore-plan" || sub === "closed-evidence-restore-apply") {
+10056	if (sub === "closed-evidence-repin-plan" || sub === "closed-evidence-repin-apply") {
+10059	if (AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) {
+10062	if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
+10063	if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
+10066	if (FEATURE_PACKAGE_READ_SUBCOMMANDS.has(sub)) return runFeaturePackageReadCommand(sub, rest);
+10069	if (sub === FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND) return runFeaturePackageRebindMutableCommand(rest);
+10073	if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, deps);
+--- run() switch cases: label | range | size | usesRunLocals | breakAtCaseLevel | top-level helper clusters called (count of distinct names)
+case "set-feature": { | 10085-10190 | 106 | dir,now,poGateAuthority,deps,flags,base | - | inner-fns=0 | C00ax1,C02x2,C03x1,C10x1
+case "materialize-architecture": { | 10191-10204 | 14 | dir,gitCandidate,deps,rest | - | inner-fns=0 | C04x2
+case "set-phase": { | 10205-10301 | 97 | dir,now,gitCandidate,deps,flags,base | - | inner-fns=0 | C02x2,C03x1,C10x4,C11x1
+case "configure-verify": { | 10302-10338 | 37 | dir,rest,base | - | inner-fns=0 | C09x1,C10x4
+case "submit-plan": { | 10339-10477 | 139 | dir,now,poGateAuthority,deps,flags,base,existing | - | inner-fns=0 | C01x1,C02x2,C03x1,C10x1,C11x1,C19x3
+case "cancel-submitted-plan": { | 10478-10521 | 44 | dir,now,rest,base | - | inner-fns=0 | C01x1,C02x2,C03x1,C09x1,C10x1,C11x1
+case "cancel-mixed-plan-state": { | 10522-10580 | 59 | dir,now,rest,base | - | inner-fns=0 | C01x1,C02x2,C03x1,C09x1,C10x1,C11x1,C19x1,C23x1
+case "present-plan": { | 10581-10688 | 108 | dir,now,deps,rest,base | - | inner-fns=0 | C01x1,C02x2,C03x1,C09x1,C10x1,C19x5,C23x1
+case "reopen-design": { | 10689-10725 | 37 | dir,now,flags,base | - | inner-fns=0 | C02x2,C03x1,C10x1
+case "seal-plan-approval": { | 10726-10773 | 48 | dir,now,poGateAuthority,rest,base | - | inner-fns=0 | C02x3,C05x1,C09x1
+case "set-gate-estimate": { | 10774-10815 | 42 | dir,now,deps,rest,base | - | inner-fns=0 | C02x2,C10x2
+case "approve-plan": { | 10816-11146 | 331 | dir,now,poGateAuthority,deps,rest,base | - | inner-fns=0 | C01x1,C02x2,C03x1,C09x1,C10x1,C11x2,C19x5,C23x1
+case "plan-legacy-v2-revocation-recovery | 11147-11196 | 50 | now,rest,base,argv | - | inner-fns=0 | C09x1,C10x3
+case "apply-legacy-v2-revocation-recover | 11197-11238 | 42 | dir,rest,base | - | inner-fns=0 | C02x3,C03x1,C09x1,C10x3
+case "revoke-plan": { | 11239-11274 | 36 | dir,now,poGateAuthority,flags,base | - | inner-fns=0 | C00ax1,C02x2,C03x1,C10x1
+case "bind-plan-spec": { | 11275-11331 | 57 | dir,now,poGateAuthority,rest,base | - | inner-fns=0 | C01x1,C02x2,C09x1,C10x2
+case "approve-push": { | 11332-11607 | 276 | dir,now,gitHead,gitCandidate,deps,flags,rest,base,existing | - | inner-fns=0 | C00ax1,C01x2,C02x2,C03x2,C05x1,C09x1,C10x1,C11x1,C12x1,C23x1
+case "materialize-push-threat-model": { | 11608-11665 | 58 | dir,gitCandidate,flags,rest | - | inner-fns=0 | C01x2,C02x1,C09x1,C11x1,C23x1
+case "prepare-push-subject": { | 11666-11714 | 49 | dir,gitCandidate,rest | - | inner-fns=0 | C01x1,C09x1,C10x1,C11x1
+case "close-feature": { | 11715-11944 | 230 | dir,now,gitHead,deps,rest,base,existing | - | inner-fns=0 | C00ax2,C02x3,C03x1,C04x1,C05x2,C08x1,C10x1
+case "discard-feature": { | 11945-12086 | 142 | dir,now,gitHead,deps,flags,base,existing | - | inner-fns=0 | C00ax1,C02x2,C03x1,C05x2,C10x1
+case "approve-deploy": { | 12087-12215 | 129 | dir,now,gitCandidate,deps,flags,rest,base,existing | - | inner-fns=0 | C00ax1,C02x2,C03x2,C05x1,C09x1,C10x1,C11x1,C12x1
+case "consume-deploy": { | 12216-12252 | 37 | dir,now,flags,base,existing | - | inner-fns=0 | C00ax1,C02x2,C10x1
+case "clear-deploy": { | 12253-12305 | 53 | dir,now,flags,base,existing | - | inner-fns=0 | C00ax1,C02x2,C03x1,C10x1
+case "inspect": { | 12306-12344 | 39 | dir,now,gitHead,deps,base | - | inner-fns=0 | C01x1,C11x4,C19x1
+case "--help": | 12345-12345 | 1 |  | - | inner-fns=0 |
+case "-h": | 12346-12346 | 1 |  | - | inner-fns=0 |
+case "help": { | 12347-12358 | 12 | dir,flags | - | inner-fns=0 | C01x1
+default: { | 12359-12366 | 8 | sub | - | inner-fns=0 | C01x1
+--- verb sets (string literals in the constants; may include non-verb strings)
+CONTINUITY_SUBCOMMANDS: continuity-init continuity-cas continuity-apply-native continuity-integrate-final continuity-dispose-failure continuity-record-course-brief continuity-select-course continuity-apply-decision continuity-clear-decision continuity-adoption-plan continuity-adoption-apply
+PUBLICATION_SUBCOMMANDS: publication-prepare publication-approve publication-authorize publication-reconcile publication-observe publication-start-readback publication-close publication-rearm publication-block
+AUTHORITY_REVISION_SUBCOMMANDS: continuity-authority-revision-plan continuity-authority-revision-apply continuity-authority-revision-recover
+FEATURE_PACKAGE_READ_SUBCOMMANDS: feature-package-inspect feature-package-status feature-package-plan
+FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND: feature-package-rebind-mutable
+FEATURE_PACKAGE_WRITE_SUBCOMMANDS: reconcile feature-package-apply feature-package-reconcile feature-package-recover
+PIPELINE_STATE_COMMANDS entries: 72
+listed but no route found: none
+routed but not listed: continuity-adoption-plan continuity-adoption-apply reconcile configure-verify --help -h help root malformed ok

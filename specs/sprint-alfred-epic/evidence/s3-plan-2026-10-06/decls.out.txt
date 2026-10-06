@@ -1,0 +1,546 @@
+FILE plugins/pipeline-core/scripts/pipeline-state.mjs
+TOTAL_LINES 12377
+TOP_LEVEL_UNITS 482 (imports 51, function 296, const/let/var 134, class 0, stmt 1, export-list 0)
+EXPORTED_DECLS 29
+--- SIDE-EFFECT STATEMENTS (col 0)
+12375	if (isDirectRun) {
+--- IMPORT SOURCES
+2-376	import {
+377-377	import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+378-378	import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path }
+379-379	import { spawnSync } from "node:child_process";
+380-380	import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+381-381	import { fileURLToPath } from "node:url";
+382-397	import {
+398-398	import { createControlExecutionExchange } from "../lib/control-execution-exchange.mjs";
+399-399	import { buildLifecycleDispatchEvent, buildLifecycleStatusEvent } from "../lib/control-execution-lifecycle-eve
+400-406	import {
+407-413	import {
+414-417	import {
+418-418	import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+419-419	import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+420-420	import {parse} from 'node:path';
+421-421	import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs';
+422-422	import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
+423-423	import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRe
+424-424	import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs
+425-425	import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal
+426-426	import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture
+427-427	import { inspectArchitectureDesign, inspectArchitectureDesignDraft } from "../lib/architecture-design.mjs";
+428-428	import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-
+429-434	import {
+435-435	import { materializeArchitectureDesign } from "../lib/architecture-design.mjs";
+436-436	import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
+437-437	import { publishRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
+438-458	import {
+459-465	import {
+466-470	import {
+471-477	import {
+478-478	import { observeGitSource } from "../lib/source-observation.mjs";
+479-479	import { parseStrictJson } from "../lib/governance-event.mjs";
+480-480	import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
+481-481	import { discoverRepository, inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
+482-493	import {
+494-494	import { publicationDigest } from "../lib/publication-bundle.mjs";
+495-499	import {
+500-506	import {
+507-512	import {
+513-513	import { readRepoKeyDirectory } from "../lib/po-key-directory.mjs";
+514-514	import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation } from "../lib/chat-ga
+515-515	import { criticalPushScratchArtifactPaths } from "./po-human-approval.mjs";
+516-519	import {
+520-520	import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+521-521	import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+522-522	import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
+523-523	import { isDirectInvocation } from "../lib/entrypoint.mjs";
+524-532	import {
+533-533	import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+534-534	import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
+--- DECLARATIONS start-end size kind exp name
+536-536	1	const	E	SCHEMA_ID
+537-537	1	const	E	CONTINUITY_LOCK_SCHEMA_ID
+538-538	1	const	E	CONTINUITY_LOCK_STALE_MS
+539-545	7	const	E	ARCHITECTURE_IMPACT_VALUES
+547-559	13	const	E	RECOVERY_BRIDGE_DECISION_SCHEMA
+560-560	1	const	E	RECOVERY_BRIDGE_ISSUANCE_CUTOFF
+561-561	1	const	-	RECOVERY_BRIDGE_FEATURE_ID
+562-562	1	const	-	RECOVERY_BRIDGE_OPERATION
+563-563	1	const	-	RECOVERY_BRIDGE_MANIFEST
+564-564	1	const	-	RECOVERY_BRIDGE_ARTIFACT_PATH
+565-565	1	const	-	RECOVERY_BRIDGE_ASSURANCE
+566-566	1	const	-	RECOVERY_BRIDGE_ID_RE
+567-570	4	const	-	RECOVERY_BRIDGE_BINDING_KEYS
+571-571	1	const	-	RECOVERY_BRIDGE_APPROVAL_KEYS
+572-575	4	const	-	RECOVERY_BRIDGE_DECISION_KEYS
+577-583	7	function	-	recoveryBridgeBindingKeys
+584-588	5	function	-	validRecoveryBridgeApproval
+589-591	3	function	-	recoveryBridgeBinding
+592-592	1	function	-	safeIso
+593-597	5	function	-	exactPoDecision
+599-602	4	function	E	recoveryBridgeDecisionDigest
+604-606	3	function	-	recoveryBridgeNow
+608-645	38	function	E	validateRecoveryBridgeDecision
+646-646	1	const	-	CONTINUITY_REQUEST_MAX_BYTES
+647-734	88	const	-	PIPELINE_STATE_COMMANDS
+735-735	1	const	-	PUSH_THREAT_MODEL_DEFAULT_PATH
+736-736	1	const	-	PLUGIN_ROOT
+737-737	1	const	-	DEFAULT_PUSH_THREAT_MODEL_DOC
+738-738	1	const	-	EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES
+739-739	1	const	-	CONTINUITY_RESULT_MAX_BYTES
+740-740	1	const	-	FINAL_INTEGRATION_MAX_BYTES
+741-741	1	const	-	POST_RESULT_SENTINEL
+742-742	1	const	-	NEXT_TRANSITION_KEYS
+743-743	1	const	-	RESULT_BINDING_KEYS
+744-747	4	const	-	FINAL_ENTRY_KEYS
+748-753	6	const	-	RESULT_APPEND_COLLECTIONS
+754-766	13	const	-	CONTINUITY_SUBCOMMANDS
+767-777	11	const	-	PUBLICATION_SUBCOMMANDS
+778-778	1	const	-	PUBLICATION_COMMAND_SCHEMA
+779-779	1	const	-	PUBLICATION_PROJECTION_SCHEMA
+780-780	1	const	-	PUBLICATION_AUTHORIZATION_SCHEMA
+781-781	1	const	-	LOCK_TOKEN_RE
+782-782	1	const	-	SHA256_RE
+783-783	1	const	-	LEGACY_WRITER_LOCK_TOKEN
+784-784	1	const	E	CLOSED_EVIDENCE_REPAIR_SCHEMA
+785-785	1	const	-	CLOSED_EVIDENCE_REPAIR_BINDING_CODE
+786-786	1	const	-	CLOSED_EVIDENCE_REPAIR_PATH_CODE
+787-787	1	const	-	CLOSED_EVIDENCE_REPAIR_PLAN_CODE
+788-788	1	const	-	RESULT_CLOSE_PLAN_SCHEMA
+789-789	1	const	-	RESULT_CLOSE_APPLY_SCHEMA
+790-790	1	const	-	RESULT_CLOSE_LOCK_TOKEN
+791-791	1	const	-	RESULT_BOOTSTRAP_PLAN_SCHEMA
+792-792	1	const	-	RESULT_BOOTSTRAP_APPLY_SCHEMA
+793-793	1	const	-	RESULT_BOOTSTRAP_LOCK_TOKEN
+794-794	1	const	-	RESULT_BOOTSTRAP_JOURNAL_SCHEMA
+795-795	1	const	-	RESULT_REBIND_PLAN_SCHEMA
+796-796	1	const	-	RESULT_REBIND_APPLY_SCHEMA
+797-797	1	const	-	RESULT_REBIND_LOCK_TOKEN
+798-798	1	const	-	RESULT_CASE_MIGRATION_PLAN_SCHEMA
+799-799	1	const	-	RESULT_CASE_MIGRATION_APPLY_SCHEMA
+800-800	1	const	-	RESULT_CASE_MIGRATION_JOURNAL_SCHEMA
+801-801	1	const	-	RESULT_CASE_MIGRATION_LOCK_TOKEN
+802-802	1	const	-	INSPECT_SCHEMA
+803-809	7	const	-	SUBMIT_PLAN_STOP_SCHEMA
+810-810	1	const	-	LEGACY_PLAN_APPROVAL_KEYS
+811-814	4	const	-	LEGACY_PO_GATE_AUTHORITY_KEYS
+816-819	4	function	E	projectDir
+821-829	9	function	E	statePath
+831-833	3	function	-	stateRelativePath
+835-837	3	function	-	stateDirectory
+839-873	35	function	E	readState
+875-992	118	function	-	writeState
+994-1006	13	function	-	stateWriteSucceeded
+1008-1008	1	const	-	GOVERNANCE_GATE_RESULT_SCHEMA
+1009-1009	1	const	-	GOVERNANCE_NOT_APPLICABLE
+1011-1021	11	function	-	buildRequestedGovernanceGateAction
+1023-1044	22	function	-	publishRequestedGovernanceGateAction
+1046-1067	22	function	E	statePhaseProjectionMarker
+1069-1069	1	const	-	STATE_PHASE_MARKER_PREFIX
+1071-1094	24	function	-	upsertStatePhaseMarkerLine
+1096-1116	21	function	-	syncStatePhaseMarker
+1118-1136	19	function	-	syncNextActionDocs
+1138-1141	4	function	E	continuityLockPath
+1143-1145	3	function	-	lockRecoveryPath
+1147-1149	3	function	-	canonicalLockRecord
+1151-1167	17	function	-	parseLockRecord
+1169-1175	7	function	-	replaceFdContents
+1177-1183	7	function	-	safeUnlink
+1185-1199	15	function	-	syncDirectory
+1201-1222	22	function	-	publishExclusiveRecord
+1224-1228	5	function	-	acquireRecoveryGuard
+1230-1245	16	function	-	releaseRecoveryGuard
+1247-1304	58	function	E	acquireContinuityLock
+1306-1324	19	function	E	releaseContinuityLock
+1326-1329	4	function	-	assertContinuityLockOwned
+1331-1369	39	function	E	atomicWriteContinuityState
+1371-1388	18	function	-	safeRequestFile
+1390-1401	12	function	-	readContinuityRequest
+1403-1464	62	function	-	evaluateOptInDecisionReference
+1466-1488	23	function	-	hashBoundRepoFile
+1490-1508	19	function	-	validateContinuityCloseRequest
+1510-1515	6	function	-	parseExpectedRevision
+1517-1523	7	function	-	exactObjectKeys
+1525-1527	3	function	-	sha256Bytes
+1529-1591	63	function	-	sameJson
+1593-1611	19	function	-	canonicalJson
+1613-1711	99	function	-	parseResultJsonStrict
+1713-1715	3	const	-	POST_RESULT_SENTINEL_PATHS
+1717-1726	10	function	-	sentinelPositionsAreClosed
+1728-1766	39	function	-	validHistoricalFinalSemantics
+1768-1795	28	function	-	validateFinalEntry
+1797-1807	11	function	-	collectionFormattingIsCanonical
+1809-1859	51	function	-	validateCourseArtifacts
+1861-1877	17	function	-	resolveResultPathWithoutSymlinks
+1879-1934	56	function	-	readResultAuthority
+1936-1943	8	function	-	replaceSentinel
+1945-1962	18	function	-	buildFinalEntry
+1964-1985	22	function	-	spliceFinalEntry
+1987-2016	30	function	-	spliceCourseArtifact
+2018-2029	12	function	-	priorResultBytes
+2031-2045	15	function	-	priorCourseArtifactBytes
+2047-2085	39	function	-	atomicWriteResult
+2087-2096	10	function	-	continuityResultMatchesState
+2098-2108	11	function	-	expectedFinalEntry
+2110-2127	18	function	-	proposedFinalState
+2129-2141	13	function	-	committedFinalStateMatches
+2143-2246	104	function	-	runFinalIntegrationTransaction
+2248-2256	9	function	-	defaultGitBinding
+2258-2271	14	function	-	exactBriefForCurrentState
+2273-2282	10	function	-	committedCourseBriefStateMatches
+2284-2358	75	function	-	runCourseBriefTransaction
+2360-2371	12	function	-	decisionTxnForIntent
+2373-2377	5	function	-	sameDecisionTxn
+2379-2383	5	function	-	sameSelectedTransition
+2385-2387	3	function	-	resultEntryById
+2389-2424	36	function	-	selectedTransitionMatchesCourseOption
+2426-2431	6	function	-	resultAfterIntentMatchesPre
+2433-2438	6	function	-	resultAfterReceiptMatchesIntent
+2440-2443	4	function	-	persistedSelectionReceipt
+2445-2611	167	function	-	runCourseSelectionTransaction
+2613-2654	42	function	-	continuityTransition
+2656-2656	1	const	-	LIFECYCLE_EVENT_FLAGS
+2658-2712	55	function	-	planDispatchLifecycleEvent
+2714-2720	7	const	-	LIFECYCLE_TERMINAL_STATUS
+2722-2789	68	function	-	planStatusLifecycleEvent
+2791-2801	11	function	-	boundLifecycleEventTarget
+2803-2816	14	function	-	writeLifecycleEventFile
+2818-2946	129	function	-	runContinuityCommand
+2948-2956	9	function	-	defaultGitCommonDir
+2958-2964	7	function	-	emptyPublicationProjection
+2966-2968	3	function	-	publicationIdIsSafe
+2970-2985	16	function	-	publicationAuthorization
+2987-3015	29	function	-	validPublicationProjection
+3017-3030	14	function	-	projectPublication
+3032-3035	4	function	-	parsePublicationExpected
+3037-3078	42	function	-	publicationReplayMatches
+3080-3274	195	function	-	runPublicationCommand
+3276-3287	12	function	-	parseFlags
+3289-3303	15	function	-	parseExactFlags
+3305-3318	14	function	-	parseAllowedOptionalFlags
+3320-3320	1	const	-	LEGACY_V2_REVOCATION_RECOVERY_PLAN_SCHEMA
+3321-3321	1	const	-	LEGACY_V2_RECOVERY_PLAN_FLAGS
+3323-3332	10	function	-	legacyV2RecoveryPlanRecord
+3334-3344	11	function	-	legacyV2RecoveryApplyAction
+3346-3346	1	const	-	GATE_ESTIMATE_ID_RE
+3347-3350	4	const	-	GATE_ESTIMATE_SET_FLAGS
+3352-3376	25	function	-	parseGateEstimateSetFlags
+3378-3389	12	function	-	observeGateEstimateInputs
+3391-3393	3	function	-	isBlank
+3395-3414	20	const	-	UNCONFIGURED_VERIFY_MARKER
+3416-3424	9	function	E	classifyVerifyCommand
+3426-3448	23	function	-	readCalibrationVerifyStatus
+3450-3476	27	function	-	readIdenticalCalibrationVerifyTwins
+3478-3489	12	function	E	isLateVerifyRecoveryLifecycle
+3491-3538	48	function	E	buildLateVerifyRecoveryAction
+3540-3567	28	function	-	writeCalibrationVerifyCommand
+3569-3591	23	function	-	prepareCalibrationVerifyWrite
+3593-3618	26	function	-	projectV1LegacyApprovalForSpecBind
+3620-3630	11	function	-	defaultGitHead
+3632-3647	16	function	-	inspectPushApproval
+3649-3657	9	function	-	defaultGitCandidate
+3659-3660	2	const	-	criticalHumanProofPolicy
+3662-3674	13	function	-	committedGlobalChatHumanApproval
+3676-3691	16	function	-	boundRepositoryArtifact
+3693-3703	11	function	-	resolvePushThreatModelArtifact
+3705-3738	34	const	-	DRAFT_PLAN_PROFILES
+3739-3739	1	const	-	PLAN_APPROVER_NAME_PLACEHOLDER
+3740-3740	1	const	-	MIXED_PLAN_RECOVERY_BY_PLACEHOLDER
+3741-3741	1	const	-	MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER
+3743-3780	38	function	-	resolveLocalGitUserName
+3782-3788	7	function	-	validProfileChangeReason
+3790-3804	15	function	-	validProfileChangeBinding
+3806-3863	58	function	-	inspectSelectedPlanProfile
+3865-3878	14	function	-	resolveDraftPlanSubmissionDefaults
+3880-3951	72	function	-	resolveDraftProfileReceiptAction
+3953-3978	26	function	-	mixedPlanRecoveryObservation
+3980-3992	13	function	-	inspectPlanLifecycle
+3994-4446	453	function	-	buildInspectNextAction
+4448-4474	27	function	E	externalPathIsOutsideRoot
+4476-4487	12	function	-	externalPublicJson
+4489-4511	23	function	-	localPushScratchJson
+4513-4522	10	function	-	repoScopedPushKeyAnchor
+4524-4541	18	function	-	localPushScratchArtifacts
+4543-4557	15	const	-	ALWAYS_REQUIRED_KINDS
+4559-4648	90	function	-	verifyCriticalHumanProof
+4650-4659	10	function	-	legacyRegularArtifact
+4661-4666	6	function	-	exactLegacyRequest
+4668-4686	19	function	-	legacyGitObservation
+4688-4728	41	function	-	validateLegacyAdoptionEnvironment
+4730-4742	13	function	-	readStateRaw
+4744-4760	17	function	-	buildLegacyAdoptionPlan
+4762-4818	57	function	-	runLegacyAdoptionCommand
+4822-4830	9	function	-	resultRebindCandidates
+4832-4856	25	function	-	resultRebindInventory
+4858-4864	7	function	-	resultRebindEligible
+4866-4873	8	function	-	resultRebindNextState
+4875-4904	30	function	-	buildResultRebindPlan
+4906-4909	4	function	-	parseResultRebindPlan
+4911-4914	4	function	-	parseResultRebindApply
+4916-4951	36	function	-	runResultRebindCommand
+4955-4959	5	function	-	caseMigrationArchivePath
+4961-4980	20	function	-	readCaseLifecycle
+4982-4997	16	function	-	caseMigrationEligible
+4999-5001	3	function	-	caseMigrationNextState
+5003-5031	29	function	-	buildResultCaseMigrationPlan
+5033-5036	4	function	-	caseMigrationPrivatePaths
+5037-5051	15	function	-	ensureCaseMigrationDirectory
+5052-5052	1	function	-	caseMigrationMac
+5053-5058	6	function	-	loadCaseMigrationJournal
+5059-5064	6	function	-	publishCaseMigrationJournal
+5065-5065	1	function	-	retireCaseMigrationJournal
+5066-5069	4	function	-	atomicCaseMigrationWrite
+5070-5076	7	function	-	moveCaseMigrationSource
+5077-5088	12	function	-	recoverCaseMigration
+5089-5089	1	function	-	parseCaseMigrationPlan
+5090-5090	1	function	-	parseCaseMigrationApply
+5091-5097	7	function	-	isCaseMigrationPostimage
+5098-5105	8	function	-	runResultCaseMigrationCommand
+5107-5135	29	const	-	AUTHORITY_REVISION_SUBCOMMANDS
+5136-5136	1	const	-	AUTHORITY_REVISION_REQUEST_INPUT_SCHEMA
+5137-5137	1	const	-	AUTHORITY_REVISION_PLAN_SCHEMA
+5138-5138	1	const	-	AUTHORITY_REVISION_APPLY_SCHEMA
+5139-5139	1	const	-	AUTHORITY_REVISION_RECOVER_SCHEMA
+5140-5140	1	const	-	AUTHORITY_REVISION_RECEIPT_SCHEMA
+5141-5144	4	const	-	AUTHORITY_REVISION_JOURNAL_SCHEMA_V1
+5145-5145	1	const	-	AUTHORITY_REVISION_JOURNAL_SCHEMA_V2
+5146-5146	1	const	-	AUTHORITY_REVISION_JOURNAL_SCHEMA
+5147-5147	1	const	-	AUTHORITY_REVISION_JOURNAL_KEYS_V1
+5148-5148	1	const	-	AUTHORITY_REVISION_JOURNAL_KEYS_V2
+5149-5151	3	const	-	AUTHORITY_REVISION_APPROVAL_SCHEMA
+5152-5152	1	const	-	AUTHORITY_REVISION_PRD_PATH_RE
+5154-5163	10	function	-	readAuthorityRevisionFile
+5165-5185	21	function	E	mergeAuthorityRevisionReceipt
+5187-5322	136	function	-	buildAuthorityRevisionPlan
+5324-5334	11	function	-	authorityRevisionPrivatePaths
+5336-5367	32	function	-	loadAuthorityRevisionJournal
+5369-5392	24	function	-	publishAuthorityRevisionJournal
+5394-5397	4	function	-	retireAuthorityRevisionJournal
+5399-5403	5	function	-	parseAuthorityRevisionApplyFlags
+5405-5415	11	function	-	runAuthorityRevisionPlanCommand
+5417-5424	8	function	-	authorityRevisionRequestDocValid
+5426-5525	100	function	-	runAuthorityRevisionApplyCommand
+5527-5655	129	function	-	runAuthorityRevisionRecoverCommand
+5657-5664	8	function	-	runAuthorityRevisionCommand
+5668-5671	4	function	-	resultBootstrapPath
+5673-5675	3	function	-	canonicalResultBootstrapBytes
+5677-5685	9	function	-	observeCanonicalResultBootstrap
+5687-5690	4	function	-	sameBootstrapResultPreimage
+5692-5714	23	function	-	atomicAppendResultBootstrap
+5716-5728	13	function	-	resultBootstrapEligible
+5730-5737	8	function	-	resultBootstrapNextState
+5739-5758	20	function	-	resultBootstrapPayload
+5760-5778	19	function	-	buildResultBootstrapPlan
+5780-5790	11	function	-	resultBootstrapPrivatePaths
+5792-5796	5	function	-	bootstrapPrivateDirectorySecure
+5798-5809	12	function	-	ensureBootstrapPrivateDirectory
+5811-5822	12	function	-	observeBootstrapPrivateDirectory
+5824-5835	12	function	-	writePrivateBootstrap
+5837-5846	10	function	-	readPrivateBootstrap
+5848-5848	1	function	-	bootstrapJournalMac
+5850-5867	18	function	-	loadBootstrapJournal
+5869-5878	10	function	-	publishBootstrapJournal
+5880-5882	3	function	-	retireBootstrapJournal
+5884-5889	6	function	-	parseResultBootstrapApply
+5891-5905	15	function	-	featureClosureProgress
+5907-5978	72	function	-	runResultBootstrapCommand
+5982-5984	3	const	-	RESULT_CLOSE_PLAN_FLAGS
+5986-5999	14	function	-	parseResultClosePlan
+6001-6021	21	function	-	parseResultCloseApply
+6023-6031	9	function	-	observeResultCloseArtifact
+6033-6063	31	function	-	resultClosePlanPayload
+6065-6073	9	function	-	approvedResultCloseRoot
+6075-6114	40	function	-	buildResultClosePlan
+6116-6125	10	function	-	resultCloseApplyPayload
+6127-6135	9	function	-	exactResultCloseReplay
+6137-6272	136	function	-	runResultCloseCommand
+6276-6276	1	const	-	PO_REBIND_PLAN_SCHEMA
+6277-6277	1	const	-	PO_ACK_PLAN_SCHEMA
+6278-6278	1	const	-	PO_ACK_APPLY_SCHEMA
+6279-6293	15	const	E	PO_ACK_APPLY_CONFIRMATION_TOKEN
+6294-6294	1	const	-	PO_DECISION_PLAN_SCHEMA
+6295-6295	1	const	-	PO_DECISION_SELECTION_SCHEMA
+6296-6296	1	const	-	PO_REBIND_LOCK_TOKEN
+6297-6297	1	const	-	PO_REBIND_TXN_SCHEMA
+6298-6298	1	const	-	PO_REBIND_RUNNERS
+6299-6299	1	const	-	TECHNICAL_SPEC_MARKER_RE
+6300-6300	1	const	-	PO_LANGUAGE_MARKER_RE
+6301-6301	1	const	-	PO_PROFILE_SCHEMA
+6302-6302	1	const	-	PO_PROFILE_KEYS
+6304-6304	1	function	-	rebindTransactionPath
+6306-6338	33	function	-	physicalRebindFile
+6340-6343	4	function	-	rebindMarker
+6345-6352	8	function	-	replaceRebindMarker
+6354-6381	28	function	-	validRebindApproval
+6383-6395	13	function	-	validCurrentPoProfile
+6397-6412	16	function	-	validCurrentDecisionDocuments
+6414-6440	27	function	-	validPriorAuthority
+6442-6452	11	function	-	eligibleRebindContinuity
+6454-6463	10	function	-	eligibleDecisionContinuity
+6465-6467	3	function	-	canonicalIso
+6469-6545	77	function	-	buildPoAuthorityRebindPlan
+6547-6712	166	function	-	buildPoAuthorityDecisionPlan
+6714-6729	16	function	-	parsePoRebindApply
+6731-6796	66	function	-	parsePoAcknowledgeFlags
+6798-6806	9	function	-	parsePoDecisionSelection
+6808-6817	10	function	-	parsePoDecisionApply
+6819-6844	26	function	-	writeRebindFile
+6846-6850	5	function	-	restoreRebindFile
+6852-6871	20	function	-	parseRebindTransaction
+6873-6880	8	function	-	publishRebindTransaction
+6882-6888	7	function	-	clearRebindTransaction
+6890-6929	40	function	-	recoverRebindTransaction
+6931-6961	31	function	E	resolvePoRebindRunner
+6963-7012	50	function	-	eligibleAcknowledgeContinuity
+7014-7030	17	function	-	appendAcknowledgementMarker
+7032-7204	173	function	-	buildPoAuthorityAcknowledgePlan
+7206-7383	178	function	-	runPoAuthorityAcknowledgeCommand
+7385-7430	46	function	-	runPoAuthorityRebindCommand
+7432-7603	172	function	-	runPoAuthorityDecisionCommand
+7605-7637	33	function	-	describeFailedPostimagePredicates
+7639-7820	182	function	-	runPoAuthorityRebindApply
+7822-7844	23	const	-	FEATURE_PACKAGE_READ_SUBCOMMANDS
+7845-7845	1	const	-	FEATURE_PACKAGE_INSPECT_SCHEMA
+7846-7846	1	const	-	FEATURE_PACKAGE_STATUS_SCHEMA
+7847-7851	5	const	-	FEATURE_PACKAGE_READ_FLAGS
+7853-7856	4	function	-	refuseFeaturePackageRead
+7858-7880	23	function	-	parseFeaturePackageReadFlags
+7882-7892	11	function	-	featurePackageReadRelative
+7894-7906	13	function	-	featurePackageReadArtifactView
+7908-8011	104	function	-	runFeaturePackageReadCommand
+8013-8037	25	const	-	FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND
+8038-8038	1	const	-	FEATURE_PACKAGE_REBIND_MUTABLE_SCHEMA
+8039-8039	1	const	-	FEATURE_PACKAGE_REBIND_MUTABLE_FLAGS
+8041-8081	41	function	-	runFeaturePackageRebindMutableCommand
+8083-8115	33	const	-	FEATURE_PACKAGE_WRITE_SUBCOMMANDS
+8116-8116	1	const	-	FEATURE_PACKAGE_APPLY_SCHEMA
+8117-8117	1	const	-	FEATURE_PACKAGE_RECONCILE_SCHEMA
+8118-8118	1	const	-	FEATURE_PACKAGE_RECONCILE_APPROVAL_SCHEMA
+8119-8119	1	const	-	FEATURE_PACKAGE_RECOVER_SCHEMA
+8120-8120	1	const	-	FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA
+8121-8121	1	const	-	FEATURE_PACKAGE_APPLY_LOCK_TOKEN
+8122-8122	1	const	-	FEATURE_PACKAGE_APPLY_FLAGS
+8123-8129	7	const	-	FEATURE_PACKAGE_RECONCILE_FLAGS
+8131-8141	11	function	-	featurePackageApplyPrivatePaths
+8143-8168	26	function	-	loadFeaturePackageApplyJournal
+8170-8189	20	function	-	publishFeaturePackageApplyJournal
+8191-8194	4	function	-	retireFeaturePackageApplyJournal
+8196-8249	54	function	-	buildFeaturePackageApplyPreview
+8251-8281	31	function	-	computeFeaturePackagePostimage
+8283-8370	88	function	-	runFeaturePackageApplyCommand
+8372-8392	21	function	-	computeFeaturePackageReconcilePostimage
+8394-8524	131	function	-	runFeaturePackageReconcileCommand
+8526-8566	41	function	-	runFeaturePackageRecoverCommand
+8568-8697	130	function	-	defaultFeaturePackageReconcileApproval
+8699-8715	17	function	-	runFeaturePackageWriteCommand
+8717-8740	24	const	-	PLAN_APPROVAL_BRIEFING_SCHEMA
+8741-8741	1	const	-	PLAN_APPROVAL_BRIEFING_KEYS
+8742-8742	1	const	-	PLAN_APPROVAL_BRIEFING_SCOPE_KEYS
+8743-8743	1	const	-	PLAN_APPROVAL_BRIEFING_CHANGE_KEYS
+8744-8754	11	const	-	PLAN_APPROVAL_BRIEFING_CHANGE_KINDS
+8755-8758	4	const	-	PLAN_APPROVAL_BRIEFING_AUTHORIZES
+8759-8761	3	const	-	PLAN_APPROVAL_BRIEFING_EXCLUDES
+8762-8762	1	const	-	PROFILES_ENUM
+8764-8766	3	function	-	isPlainRecord
+8768-8772	5	function	-	hasExactBriefingKeys
+8774-8791	18	function	-	validPlanApprovalBriefing
+8793-8825	33	const	-	PLAN_PRESENTATION_SCHEMA
+8826-8826	1	const	-	PLAN_PRESENTATION_DWP_SCHEMA
+8827-8827	1	const	-	PLAN_PRESENTATION_KEYS
+8828-8828	1	const	-	PLAN_PRESENTATION_DWP_KEYS
+8829-8829	1	const	-	DESIGN_WORKFLOW_PACKAGE_PATH_RE
+8831-8841	11	function	-	validPlanPresentation
+8843-8846	4	function	-	designWorkflowGitCandidate
+8848-8877	30	function	-	writeDesignWorkflowApprovalRequest
+8879-8892	14	function	-	readPhysicalScratchJson
+8894-8898	5	function	-	designWorkflowApprovalProofPath
+8900-8928	29	function	-	observeDesignWorkflowSignatureApproval
+8930-8948	19	function	-	priorApprovedBriefingBinding
+8950-8963	14	function	-	classifyPlanApprovalBriefingChange
+8965-8978	14	function	-	derivePlanApprovalBriefing
+8980-8982	3	function	-	summarizePlanApprovalBriefing
+8984-9025	42	function	E	reconstructPlanApprovalBriefing
+9027-9043	17	function	-	summarizePhoenixEpicHistory
+9045-9058	14	const	E	PLAN_AUTHORITY_PRD_FRAMING_CODE
+9059-9063	5	const	-	PRD_FRAMING_PLACEHOLDER_MARKERS
+9065-9076	12	function	E	findPrdFramingPlaceholder
+9078-9097	20	function	-	checkPrdFramingPrecondition
+9099-9115	17	function	-	exactGeneratorAcknowledgementExemption
+9123-9138	16	function	-	parseClosedEvidenceRestorePlan
+9140-9167	28	function	-	parseClosedEvidenceRestoreApply
+9169-9207	39	function	-	closedEvidenceArtifactTarget
+9209-9218	10	function	-	closedEvidenceBinding
+9220-9233	14	function	-	closedEvidenceRepairPayload
+9235-9249	15	function	-	confirmClosedEvidenceRepair
+9251-9448	198	function	-	runClosedEvidenceRestoreCommand
+9450-9465	16	function	-	parseClosedEvidenceRepinPlan
+9467-9494	28	function	-	parseClosedEvidenceRepinApply
+9496-9708	213	function	-	runClosedEvidenceRepinCommand
+9710-9865	156	function	E	checkPoGateAuthority
+9867-9876	10	function	-	retirementPhysicalAbsent
+9877-9883	7	function	-	retirementReadFile
+9884-9887	4	function	-	enrollmentTransactionPaths
+9888-9893	6	function	-	enrollmentJournal
+9894-9902	9	function	-	enrollmentPublishJournal
+9903-9913	11	function	-	enrollmentPublishArchive
+9914-9919	6	function	-	enrollmentReadArchive
+9920-9926	7	function	-	enrollmentStateSnapshot
+9927-9993	67	function	-	runEnrollmentRetirement
+9995-12366	2372	function	E	run
+12368-12374	7	const	-	isDirectRun
+12375-12377	3	stmt	-	if (isDirectRun) {
+--- CASE/VERB LINES
+736	const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+3507	const scriptPath = fileURLToPath(import.meta.url);
+3997	const scriptPath = fileURLToPath(import.meta.url);
+4033	argv: [fileURLToPath(import.meta.url), 'reopen-design', '--by', by ?? placeholder("<recovery actor's name>")] });
+4063	const scriptPath = fileURLToPath(import.meta.url);
+4101	const scriptPath = fileURLToPath(import.meta.url);
+4137	const scriptPath = fileURLToPath(import.meta.url);
+4159	const courseScript = fileURLToPath(new URL("./design-course-session.mjs", import.meta.url));
+4196	const scriptPath = fileURLToPath(import.meta.url);
+4213	argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)),
+4260	guidance: `The complete package is presented and the bootstrap receipt is intact, but its exact final approval proof is ${signed.c
+4326	const scriptPath = fileURLToPath(import.meta.url);
+4355	argv: [fileURLToPath(import.meta.url), "set-phase", "--phase", "implementation"],
+4368	argv: [fileURLToPath(import.meta.url), "materialize-push-threat-model"],
+4784	executable: process.execPath, argv: [fileURLToPath(import.meta.url), "continuity-adoption-apply", "--request-file", flags["request
+4922	const writer = fileURLToPath(import.meta.url);
+5099	if (sub === "continuity-result-case-migration-plan") { const request = parseCaseMigrationPlan(rest); if (request === null) { conso
+5912	const writer = fileURLToPath(import.meta.url);
+6155	const writer = fileURLToPath(import.meta.url);
+7262	const action = boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(import.meta.url), ...rest] });
+7376	const applyArgv = [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--root", planned.payload.root, "--plan-sha25
+7425	argv: [fileURLToPath(import.meta.url), "po-authority-rebind-apply", "--plan-sha256", planned.planSha256, "--updated-at", planned.p
+7462	const writer = fileURLToPath(import.meta.url);
+9330	const writer = fileURLToPath(import.meta.url);
+9559	const writer = fileURLToPath(import.meta.url);
+9995	export function run(argv = process.argv.slice(2), deps = {}) {
+10085	case "set-feature": {
+10191	case "materialize-architecture": {
+10205	case "set-phase": {
+10302	case "configure-verify": {
+10339	case "submit-plan": {
+10478	case "cancel-submitted-plan": {
+10522	case "cancel-mixed-plan-state": {
+10581	case "present-plan": {
+10689	case "reopen-design": {
+10726	case "seal-plan-approval": {
+10774	case "set-gate-estimate": {
+10816	case "approve-plan": {
+11147	case "plan-legacy-v2-revocation-recovery": {
+11197	case "apply-legacy-v2-revocation-recovery": {
+11239	case "revoke-plan": {
+11275	case "bind-plan-spec": {
+11332	case "approve-push": {
+11608	case "materialize-push-threat-model": {
+11666	case "prepare-push-subject": {
+11715	case "close-feature": {
+11945	case "discard-feature": {
+12087	case "approve-deploy": {
+12216	case "consume-deploy": {
+12253	case "clear-deploy": {
+12306	case "inspect": {
+12345	case "--help":
+12346	case "-h":
+12347	case "help": {
+12370	return isDirectInvocation(import.meta.url);
