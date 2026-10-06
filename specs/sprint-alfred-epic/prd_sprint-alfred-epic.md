@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 291a212fcda05c53e8e172cdc1a1a899ab19c065e9462aecb73277e180277b47 -->
+<!-- technical-spec-sha256: 9bc1faa5086e7118ab2124cfeb5c7bbbcc8a0be61d6be8a1f3826e1261219ee0 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -918,3 +918,47 @@ chain. No retroactive rewriting of history or evidence.
 **Success.** AC-32 passes on the stamped local candidate on the host matrix.
 Every register ID traces to a Spec §21 workstream and acceptance case, or to the
 deferred list, in `traceability.md`.
+
+## 15. 2026-10-06 device-switch amendment
+
+**Problem.** Bringing the approved IC-2d candidate up on a second device took
+hours of blocks that no agent could clear alone: a Git for Windows 2.56.0
+`NUL` regression hidden behind `GS-GIT-UNAVAILABLE`, a pre-ready lockdown that
+prevented diagnosis, the approval-bound design package stored in the ignored
+root `evidence/` and absent on the second device, backlog writes refused,
+`reopen-design` as the only recovery, signatures spent on continuity mechanics,
+and signing failing on a missing key-directory setting and on `openssl` missing
+from the signing terminal's PATH. Seventeen rows (T1–T17) were recorded.
+
+**Scope.** Spec §22 adds the workstream R7, agent-recoverable operation and
+device portability. Every row T1–T17 is fixed in 0.7.0 and owned exactly once:
+twelve by the R7 contracts R7-1…R7-8, five mapped to the R1, R3, R4 and R5
+contracts that already cover them (T4, T8, T9, T10, T13). `traceability.md`
+carries the 17-row map and AC-37 is the acceptance row. Nothing in §§1–14 or in
+Spec §§1–21 is reduced, and AC-32 is unchanged.
+
+**PO decisions (2026-10-06).** Recorded in `design-input.md` (decisions 17–19;
+owners and cases in `traceability.md`):
+
+- The Pipeline is built so that an agent flows through bootstrap, install,
+  recovery, device switch and lifecycle repair without hurdles. Every block has
+  an agent-executable fix, and the human is needed only where a real signature
+  is required. This makes decisions 15 and 16 of 2026-10-04 concrete and is not
+  new authority.
+- The device-switch findings T1–T17 are fixed in the next candidate, not
+  deferred.
+- Environment prerequisites are checked at install and bootstrap, reported with
+  a concrete repair action, and never discovered for the first time at a
+  signature.
+
+**Non-goals.** No new PO interaction class, no weakening of credential-root
+protection, the §20 recovery contract (no inference of owner death) or design
+authority sealing, and no regeneration of a lost bound artifact presented as
+the original. One question stays open for the PO and is recorded in
+`traceability.md` (T7): whether a re-approval may reuse earlier course and
+readiness evidence when only a bound artifact was lost and PRD and Spec are
+unchanged.
+
+**Success.** AC-37 passes in the source checkout and in the consumer-layout
+fixture on both dialects, including the device-switch walk, and every row
+T1–T17 traces to exactly one owner in `traceability.md`.
