@@ -712,6 +712,75 @@ for (const [cmd, why] of GPGL8_NEGATIVE_TABLE) {
   record(`GPGL8-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
 }
 
+// ---- commandIsGitPush: the remaining traced push-bypass shapes fail closed (GPGL-9t, Critic GPGL-8 F1 / F2 / F3) ----
+// Test-only pin, RED by design: a separate later dispatch makes GPGL9_FAIL_CLOSED_TABLE green. The contract is the
+// GPGL-8 Critic record (specs/sprint-alfred-epic/evidence/critic-2026-10-05/gpgl-8.md, findings F1, F2 and F3) and
+// the backlog item's "Fail closed" proposal: where the classifier cannot tell what a shell will execute, "not a
+// push" is the unsafe answer, because at every call site returning false means the push gate never runs. A case
+// that already passes is "already caught" and stays as a pin. This table is positive-only on purpose: the negative
+// side (ordinary commands that must stay out of the push gate) depends on a PO decision, question Q12.
+// Every string below is an ordinary JS string. Where a shape needs a backslash, the source holds a doubled
+// backslash so the RUNTIME string carries exactly one (the case names print it JSON-escaped, as two).
+//   F1: the detection view writes a backslash-escaped structural character as a literal, so check #5 reads an
+//     escaped `;`, `|`, `&` or `)` as a command terminator and cuts before the substitution that spells the push
+//     word, and its backtick-parity rule counts an escaped backtick. In a POSIX shell the escaped character is
+//     part of the word and the substitution runs.
+//   F2: only `$(`, `${` and the backtick count as expansion syntax. Bare `$NAME` / `$1`, bash locale quoting
+//     (a dollar sign before a double-quoted word), PowerShell `$name` and PowerShell grouping parentheses
+//     around a string all spell the push word without any of them.
+//   F3: here-document bodies are stripped as data, but bash substitutes inside a body whose delimiter is NOT
+//     quoted, so a `$(git push ...)` body line runs a real push.
+const GPGL9_FAIL_CLOSED_TABLE = [
+  // F1 (a): an escaped command terminator inside a -c value, then a substitution that spells the push word
+  ["git -c x.y=a\\;b $(echo push) origin main", "F1 (a): an escaped `;` in a -c value, then a command substitution spelling the push word"],
+  ["git -c x.y=a\\|b $(echo push) origin main", "F1 (a): the same with an escaped `|`"],
+  ["git -c x.y=a\\&b $(echo push) origin main", "F1 (a): the same with an escaped `&`"],
+  ["git -c x.y=a\\)b $(echo push) origin main", "F1 (a): the same with an escaped `)`"],
+  ["git -c x.y=a\\;b `echo push` origin main", "F1 (a): an escaped `;`, then a backtick substitution spelling the push word"],
+  ["git -c x.y=a\\|b `echo push` origin main", "F1 (a): an escaped `|`, then a backtick substitution"],
+  ["git -c x.y=a\\&b `echo push` origin main", "F1 (a): an escaped `&`, then a backtick substitution"],
+  ["git -c x.y=a\\)b `echo push` origin main", "F1 (a): an escaped `)`, then a backtick substitution"],
+  ["git -c x.y=a\\;b ${X:-push} origin main", "F1 (a): an escaped `;`, then a default-value expansion spelling the push word"],
+  ["git -c x.y=a\\|b ${X:-push} origin main", "F1 (a): an escaped `|`, then a default-value expansion"],
+  ["git -c x.y=a\\&b ${X:-push} origin main", "F1 (a): an escaped `&`, then a default-value expansion"],
+  ["git -c x.y=a\\)b ${X:-push} origin main", "F1 (a): an escaped `)`, then a default-value expansion"],
+  // F1 (b): an escaped backtick before git flips the parity the backtick rule counts
+  ["echo \\`; git `echo push; true` origin main", "F1 (b): an escaped backtick before git makes the parity odd and the `;` inside the substitution leaves one backtick after git"],
+  ["echo \\`; git `echo push; true` --force origin main", "F1 (b): the same parity shape with a flag after the substitution"],
+  ["echo \\`; git `echo push` origin main", "F1 (b): an escaped backtick before git, then a plain backtick substitution spelling the push word"],
+  // F2 (c): bare parameter expansion spells the push word
+  ["P=push; git $P origin main", "F2 (c): a bare $NAME expansion of a variable assigned just before"],
+  ["P=push; git $P --force origin main", "F2 (c): a bare $NAME expansion, with a flag"],
+  ["P=push; git -C repo $P origin main", "F2 (c): a bare $NAME expansion after a recognised -C option"],
+  ["set -- push; git $1 origin main", "F2 (c): a positional parameter set by `set --`"],
+  ["set -- push origin main; git $@", "F2 (c): `$@` expands to the whole push argument list"],
+  // F2 (d): the PowerShell variable form
+  ["$p='push'; git $p origin main", "F2 (d): a PowerShell variable assigned just before spells the push word"],
+  ["$p = 'push'; git $p origin main", "F2 (d): the same with spaces around the assignment"],
+  ["$p='push'; git -C repo $p origin main", "F2 (d): a PowerShell variable after a recognised -C option"],
+  ["$env:SUB='push'; git $env:SUB origin main", "F2 (d): a PowerShell environment-drive variable spells the push word"],
+  // F2 (e): bash locale quoting, a dollar sign before a double-quoted word
+  ['git $"push" origin main', "F2 (e): bash locale quoting spells the push word"],
+  ['git $"push" --force origin main', "F2 (e): bash locale quoting, with a flag"],
+  ['git -C repo $"push" origin main', "F2 (e): bash locale quoting after a recognised -C option"],
+  // F2 (f): PowerShell grouping parentheses around a string
+  ['git ("push") origin main', "F2 (f): PowerShell grouping around a double-quoted push word"],
+  ["git ('push') origin main", "F2 (f): PowerShell grouping around a single-quoted push word"],
+  ['git ("push") --force origin main', "F2 (f): PowerShell grouping, with a flag"],
+  ['git -C repo ("push") origin main', "F2 (f): PowerShell grouping after a recognised -C option"],
+  // F3 (g): a here-document with an UNQUOTED delimiter substitutes inside its body
+  ["cat <<EOF\n$(git push origin main)\nEOF", "F3 (g): an unquoted-delimiter here-document whose body line is a command substitution running a push"],
+  ["cat <<EOF\n$(git push origin main)\nEOF\n", "F3 (g): the same with a trailing newline after the delimiter"],
+  ["cat <<EOF\nsome prose\n$(git push --force origin main)\nmore prose\nEOF", "F3 (g): the substitution line sits among prose lines, a force push"],
+  ["cat <<EOF\n`git push origin main`\nEOF", "F3 (g): a backtick substitution in the unquoted body"],
+  ["cat <<-EOF\n$(git push origin main)\nEOF", "F3 (g): the tab-stripping <<- form of the unquoted delimiter"],
+  ["cat > notes.txt <<EOF\n$(git push origin main)\nEOF", "F3 (g): the here-document feeds a redirected cat"],
+];
+for (const [cmd, why] of GPGL9_FAIL_CLOSED_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL9-FAIL-CLOSED ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
