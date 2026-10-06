@@ -45,6 +45,12 @@ until it reads files and runs `pipeline-start-preflight.mjs`. That costs 2-3 too
   step 0 runs the preflight (no code; still one call, no refusal). Interim: the Elephant's
   briefings use C from 2026-10-05 23:40.
 
+## Observed again 2026-10-06 (night run, Claude × native Windows × own repo)
+
+Option C as briefed ("if the first Write is refused, run the preflight and retry once") still costs the refusal plus the
+preflight call: GLREP-t2, GLREP-t3 and others hit `guard-lifecycle-ready` on their first record Write and recovered
+that way. GLREP-t2 reached its cap of 30 with zero slack partly because of it.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
