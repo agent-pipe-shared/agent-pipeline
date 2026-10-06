@@ -76,6 +76,14 @@ the pre-commit hook backstop.
 - Regression tests for physical-identity path comparison and platform-gated
   mode bits, plus the missing `nlink` check; fixtures on win32 and POSIX.
 
+## Observed again 2026-10-06 (signed package d6d2a8b2, Claude × native Windows × own repo)
+
+`sign-intent --request` took about 10 minutes before the passphrase prompt, and the confirmation text again labelled the
+quality package as an HGO/GMW guard-override with `HGO-RECORD-DIGEST-MISMATCH`. After signing, the PO still had to run
+the materializer `apply` and `authorize-commit` himself (the agent's attempt was refused with
+`GUARD-GATE-STRENGTH-SHELL`). PO, verbatim: "hat 10 min gedauert und eigentlich soll der PO auch nur signen und nicht
+noch den 2. befehl machen aber das dann später" — target for one of the next local candidates, not now.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
