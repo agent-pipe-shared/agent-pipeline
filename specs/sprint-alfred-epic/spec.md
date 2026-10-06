@@ -2000,9 +2000,10 @@ fix, and the human is needed only where a real signature is required. This
 makes decisions 15 and 16 of 2026-10-04 concrete; it is not new authority.
 
 **Scope rule (decision #18).** All 17 rows are fixed in the next candidate
-(0.7.0), none deferred. Each row is owned by exactly one R7 contract (§22.1–§22.8)
-or mapped to the existing owner named below. A mapped row gets no second
-contract here; §22.9 only adds a replay obligation on the owner's fixture.
+(0.7.0), none deferred. Each row is owned by exactly one R7 contract
+(§22.1–§22.8 and §22.10) or mapped to the existing owner named below. A mapped
+row gets no second contract here; §22.9 only adds a replay obligation on the
+owner's fixture.
 
 **Prerequisites (decision #19).** Environment prerequisites are checked at
 install and bootstrap, reported with a concrete repair action, and never
@@ -2021,13 +2022,28 @@ discovered for the first time at a signature (R7-7).
 An outcome with neither fails its case. Read-only diagnosis is non-authoritative
 and never changes admission.
 
-**Signature rule.** R7 asks the PO for a signature only in the existing
-authority classes: a trust-anchor change or first-use key confirmation (the
-one-time key setup of §21.0), the final plan approval (including a re-approval
-where an approval's digest set really changes, R7-5), and a push approval. No
-R7 mechanic (diagnosis, archival, provisioning, rebind of an unchanged
-approval, key-directory or toolchain setup, state commits) needs one. R7 adds no
-interaction to scenarios A–D of R3-1.
+**Signature rule.** R7 asks the PO for a signature only in these five existing
+signature classes. Each is defined outside §22, and R7 adds none:
+
+1. Trust-anchor change or first-use key confirmation: the one-time key setup of
+   §21.0 (counting rule, one-time acts).
+2. Final plan approval, including a re-approval where an approval's digest set
+   really changes (§21.0 counting rule; R7-5 `digest-set-changed`).
+3. Push approval (§21.0 counting rule; §21.3 push signing).
+4. The signed quality package for protected paths: the existing route by which
+   a change to a protected-baseline surface (the A3 baseline,
+   `pipeline.protected-baseline.v1`) is built by the agent, independently
+   reviewed and signed once by the PO. R7-1 relies on it only where it says
+   that protected sites change through it.
+5. The §20.2 signed legacy-custody transaction, with the attended external
+   route of §20.1 (RV-8…RV-11). R7-2 relies on it only as the attended route
+   for descriptors it must not archive.
+
+No R7 mechanic (diagnosis, archival, provisioning, rebind of an unchanged
+approval, key-directory or toolchain setup, state commits, superseding a stale
+authoring registration) needs a signature of any class. R7 adds no interaction
+to scenarios A–D of R3-1. R7-9b checks every R7 case and doc against exactly
+this enumeration.
 
 **Consumer and platform universality (§21.0 applies unchanged).** Every R7
 case runs against the source checkout and against a consumer-layout fixture
@@ -2039,19 +2055,20 @@ user home are derived at run time and redacted in every report. Any new schema
 id an implementation adds is registered in the §9 registry in the same change;
 the closed field and enum lists below are normative.
 
-**Row ownership (12 rows owned by R7, 5 mapped).**
+**Row ownership (13 rows owned by R7, 4 mapped; the Owner column names exactly
+one owner per row).**
 
 | Row | Finding and cost | Owner |
 |---|---|---|
 | T1 | Git for Windows 2.56.0.windows.1 rejected the `NUL` spelling every hardened git spawn used; the preflight reported `GS-GIT-UNAVAILABLE` with the cause swallowed (about 40 tool calls, PO-run probes) | R7-1 |
 | T2 | Pre-ready lockdown refused every diagnostic (`git config`, `git worktree list`, `stat`, directory Grep/Glob, `node -e`), so the session could not diagnose itself | R7-1 |
 | T3 | Two orphan session descriptors of a blocked session needed a PO decision and a `--by` actor | R7-2 |
-| T4 | The pre-push hook was absent on the second device (an unbacked gate) and needed PO confirmation | R3 (K6-2, R3-2); report in R7-7 |
+| T4 | The pre-push hook was absent on the second device (an unbacked gate) and needed PO confirmation | R3 (K6-2, R3-2) |
 | T5 | The approval-bound design package lived in the ignored root `evidence/`, so the approval was unverifiable on another device | R7-3 |
 | T6 | Backlog writes were refused while the package was unverifiable; items were parked in `scratch/` | R7-4 |
 | T7 | The only offered recovery was `reopen-design`, a full course again | R7-5 |
-| T8 | `submit-plan` needs idle continuity; clearing the registered authoring dispatch needed `continuity-cas` and a signed override | R5 (coordinator records authoring itself; R5-6) |
-| T9 | Re-registering an authoring dispatch for the course needed a signed override again | R5 (R5-6; R1 catalogue admits the verb) |
+| T8 | `submit-plan` needs idle continuity; clearing the registered authoring dispatch needed `continuity-cas` and a signed override | R7-10 |
+| T9 | Re-registering an authoring dispatch for the course needed a signed override again | R5 (R5-6) |
 | T10 | Agents could not write the course's own outputs under `evidence/` in the design phase | R1 (K5-8, R1-1) |
 | T11 | Committing `project/pipeline-state.json` in the design phase was refused (`GUARD-DEVPLAN-LIFECYCLE`); the state change stayed uncommitted across a ceremony | R7-4 |
 | T12 | The handover did not list device-bound (ignored) artifacts | R7-3 |
@@ -2061,11 +2078,18 @@ the closed field and enum lists below are normative.
 | T16 | Bootstrap does not check preconditions that later block (known-bad Git, signing toolchain, key directory against trust anchor, hooks, tracked bound files) | R7-7 |
 | T17 | `continuity-cas` from the PowerShell lane returned `GUARD-POWERSHELL-GRAMMAR` with no override route; only the Bash lane offered the ceremony | R7-8 |
 
-Rows: 17. Owned by R7: 12 (T1, T2, T3, T5, T6, T7, T11, T12, T14, T15, T16,
-T17: R7-1 two, R7-2 one, R7-3 two, R7-4 two, R7-5 one, R7-6 two, R7-7 one,
-R7-8 one). Mapped to existing owners: 5 (T4, T8, T9, T10, T13). R7-9 owns no
-row. Total 17. T-rows are not findings-register IDs, and the 77-ID map of §21
-is unchanged.
+Rows: 17. Owned by R7: 13 (T1, T2, T3, T5, T6, T7, T8, T11, T12, T14, T15,
+T16, T17: R7-1 two, R7-2 one, R7-3 two, R7-4 two, R7-5 one, R7-6 two, R7-7 one,
+R7-8 one, R7-10 one). Mapped to existing owners: 4 (T4, T9, T10, T13). R7-9
+owns no row. Total 17. T-rows are not findings-register IDs, and the 77-ID map
+of §21 is unchanged.
+
+Secondary references are not owners: T4 is also exercised by the R7-7 report
+(case R7-7e) and by the replay in R7-9; T9 is also exercised by the R1
+catalogue admission of the verb (§21.1); T7's lost-artifact sub-case is the
+open PO question recorded in `traceability.md`; T8 has an R5-6 neighbour (the
+coordinator records authoring itself, §21.5), which does not state the
+clearing obligation that R7-10 states.
 
 ### 22.1 R7-1 — Git child environment and diagnosable failure
 
@@ -2306,26 +2330,74 @@ Contract:
   reports only `match`, `no-key-for-anchor`, `directory-missing` or
   `unreadable`, never key material. A key that matches no anchor is the
   attended one-time key setup of §21.0, not a new act.
-- **The Pipeline resolves its own signing toolchain (T15).** `openssl` is
-  resolved by the Pipeline, never from the signing terminal's PATH alone: the
-  configured path, then the bundled one inside the Git installation derived at
-  run time from the resolved git executable (candidate sub-directories are
-  data, not code), then PATH. A candidate is accepted only if an Ed25519
-  capability probe succeeds: a sign and verify round trip with a throwaway key
-  in a temporary directory outside every repository, touching no PO key. The
-  resolved executable is passed to child processes by absolute path.
+- **The Pipeline resolves its own signing toolchain (T15), and no agent action
+  can change it.** Today `sign-intent` spawns the bare name `openssl` with
+  `shell: false` (`command()` in `po-human-approval.mjs`), so the executable
+  that is handed the PO's private-key path and runs the passphrase prompt is
+  whatever the platform's executable search finds first, with nothing about its
+  location checked. The resolved executable is a trust decision, not a
+  convenience, and R7-6 constrains it as follows:
+  - **Order.** `openssl` is resolved by the Pipeline as an absolute path, never
+    from the signing terminal's PATH alone: (1) the configured path, only if
+    the PO has set one (last sub-bullet); (2) the executable bundled with the
+    Git installation, derived at run time from the resolved git executable
+    (candidate sub-directories are data, not code); (3) each PATH entry in
+    order. A configured path that is missing or fails the location rule is
+    refused with its typed finding; resolution does not fall through to (2) or
+    (3), which would hide that the PO's setting was bypassed.
+  - **Location rule (every candidate, configured or automatic).** Both the path
+    as given and its fully resolved real path (every symlink, junction and
+    short-name component resolved; case-insensitive comparison on win32) lie
+    outside every Git working tree (the project root and every worktree of the
+    repository), outside `scratch/`, outside every plugin cache or data
+    directory the session writes, and outside the OS temporary directory and
+    the session scratch directory. On POSIX neither the file nor any ancestor
+    directory is writable by group or other; win32 applies the equivalent ACL
+    test, and a candidate whose location cannot be established is not
+    accepted. A link (symlink or junction) into a forbidden location, or a link
+    placed inside one, is refused by the same rule. A relative PATH entry (`.`
+    or empty) is never accepted.
+  - **The probe is necessary and never sufficient.** A candidate that passes
+    the location rule is accepted only if an Ed25519 capability probe also
+    succeeds: a sign and verify round trip with a throwaway key in a temporary
+    directory outside every repository, touching no PO key. The probe shows
+    capability, not trust: a candidate that passes the probe but fails the
+    location rule is refused.
+  - **The PO sees what receives the passphrase.** The signing confirmation the
+    PO reads before entering the passphrase (the §21.3 hand-over text) shows
+    the resolved executable's provenance (`configured`, `git-bundled` or
+    `path`), its real path and its sha256. The digest is recomputed
+    immediately before the spawn, and a mismatch refuses signing before any
+    prompt. The child is started by absolute path with `shell: false`.
+    Persisted reports and receipts carry the provenance and the sha256 and a
+    path redacted per §22.0.
+  - **Only the PO sets the path.** The configured path (`poToolchainPath`) is
+    one machine-wide value per OS user account, stored outside every repository
+    and outside `.git`. It is established only in the PO's attended external
+    terminal, as part of the one-time key setup of §21.0 (signature class 1 of
+    the §22.0 signature rule: no new act and no extra signature). No
+    agent-executable action sets or changes the signing executable: no
+    catalogue entry, no `nextAction` (whatever its `requiresConfirmation`) and
+    no setup action, including `set-po-key-directory`, accepts it, and the
+    guard refuses an agent write to its storage location as a write outside the
+    project root.
+
   A failing spawn reports its exit code and a bounded, path-redacted stderr
   head instead of a bare "openssl failed".
 - **Before a ceremony, never during.** `prepare-for-signature` runs both checks
   before it hands the PO a command. When one is blocked, no command is handed
   over, no signing window starts (§21.3) and no ceremony request is created.
 
-Typed repair: `set-po-key-directory`; for the toolchain, the Pipeline's own
+Typed repair: `set-po-key-directory` (agent-executable; key directory only).
+For the toolchain there is no agent-executable setup action: the Pipeline's own
 resolution, else the attended prerequisite naming the finding
-(`openssl-missing`, `openssl-no-ed25519`), with the optional setup action
-`set-openssl-path`.
+(`openssl-missing`, `openssl-no-ed25519`, or `openssl-untrusted-location` with
+the rule class `in-repository`, `agent-writable`, `link` or
+`configured-invalid`). The attended repair is installing the toolchain outside
+the forbidden locations, or the PO's own key-setup step.
 
-Acceptance cases (§22.0 matrix):
+Acceptance cases (§22.0 matrix: R7-6a…R7-6f each run on the win32 and POSIX
+dialects, in the source checkout and in the consumer-layout fixture):
 
 - R7-6a: With the machine-wide value set and the repository value unset, a
   second repository on the same machine resolves it with no new act. With both
@@ -2333,16 +2405,45 @@ Acceptance cases (§22.0 matrix):
   after the agent runs it, `prepare-for-signature` passes. An agent Read or Grep
   of the directory is refused, and no report contains key bytes.
 - R7-6b: With a PATH that lacks `openssl` but a Git-distribution layout fixture
-  holding a stub that passes the probe, the stub resolves by absolute path. A
-  stub failing the Ed25519 probe yields `openssl-no-ed25519`; none yields
-  `openssl-missing` with the attended prerequisite. In both failing cases
-  `prepare-for-signature` hands over no command and starts no window.
+  (outside every repository and agent-writable location) holding a stub that
+  passes the probe, the stub resolves by absolute path. A PO-configured path
+  outside the forbidden locations resolves first; a configured path that fails
+  the location rule is refused with no fall-through. A stub failing the
+  Ed25519 probe yields `openssl-no-ed25519`; none yields `openssl-missing` with
+  the attended prerequisite. In every failing case `prepare-for-signature`
+  hands over no command and starts no window.
 - R7-6c: A failing `openssl` stub yields a result with exit code and bounded
   stderr head and no host path.
+- R7-6d (negative, location): every stub below passes the Ed25519 probe and is
+  refused with `openssl-untrusted-location` and its rule class;
+  `prepare-for-signature` hands over no command, starts no window and creates
+  no ceremony request, and the stub is never started with a PO key path. (i) A
+  configured path inside the repository working tree, and inside a second
+  worktree. (ii) A configured path inside `scratch/`. (iii) A configured path
+  that is a symlink (POSIX) or a symlink or junction (win32) from an
+  allowed-looking directory into the repository or `scratch/`, and one that is
+  a link placed inside an agent-writable tree. (iv) The same three shapes as a
+  Git-bundled candidate and as a PATH entry. (v) Alternative spellings of an
+  in-repository location: case-folded, drive-relative, `\\?\`-prefixed and 8.3
+  short-name forms on win32; `..` segments and a relative PATH entry on POSIX.
+  A fixture host that cannot create a link type reports that case `not-run`,
+  which fails the matrix; it never skips.
+- R7-6e (negative, no agent route): no catalogue entry and no `nextAction`
+  emitted by any R7 outcome carries a value for the signing executable. An
+  agent attempt to set it through `set-po-key-directory`, through any other
+  catalogued verb, or through a Write or Edit to its storage location is
+  refused with its typed code and leaves state byte-identical. A static scan
+  fails on any `nextAction` template, catalogue entry or setup action that
+  accepts it.
+- R7-6f (confirmation): the hand-over text shows provenance, real path and
+  sha256 of the resolved executable before the passphrase prompt; a stub whose
+  bytes change between resolution and spawn is refused before any prompt; a
+  persisted receipt carries provenance and sha256 and no host path.
 
 ### 22.7 R7-7 — Environment readiness report
 
-Rows owned: T16 (decision 19; reports T4 and the findings of R7-2, R7-3, R7-5).
+Rows owned: T16 (decision 19). Also reports, without owning: T4 and the
+findings of R7-2, R7-3, R7-5.
 
 Contract:
 
@@ -2429,10 +2530,10 @@ Contract:
   - T4 (R3-2): an already-onboarded repository cloned to a fresh `.git` gets
     the mandatory hooks through the typed agent action with no PO confirmation
     before the first push.
-  - T8 and T9 (R5-6): clearing or superseding a registered authoring dispatch
-    whose sources are committed at the bound digests, `submit-plan` afterwards,
-    and re-registration for a revision cycle, with zero overrides and zero
-    signatures.
+  - T9 (R5-6): re-registration of an authoring dispatch for a revision cycle
+    by the coordinator, with zero overrides and zero signatures. T8 (clearing
+    an existing registration so that `submit-plan` can run) is owned by R7-10
+    and is not a mapped replay.
   - T10 (R1-1): the agent writes the course outputs under the declared prefix
     in each design phase that emits them (the tracked prefix of R7-3 for bound
     outputs).
@@ -2453,15 +2554,80 @@ Acceptance cases (§22.0 matrix):
   an admitted implementation write. It needs zero PO terminal commands, zero
   overrides and zero signatures.
 - R7-9b: A static check fails if any R7 case or doc asks the PO for a signature
-  outside the §22.0 classes, if AC-32's row text changes, or if the T-map lacks
-  a row or names two owners.
+  outside the five classes enumerated in the §22.0 signature rule; if AC-32's
+  row text changes; if the T-map (the §22.0 table and the T1–T17 map of
+  `traceability.md`) lacks a row, has an owner cell naming more than one owner,
+  or states owner counts other than 13 R7-owned, 4 mapped and 17 in total; or
+  if any catalogue entry, `nextAction` template or setup action accepts a
+  signing-executable value (R7-6e).
 
-### 22.10 Sequencing and completion
+### 22.10 R7-10 — Stale authoring registration: supersede without an override
+
+Rows owned: T8.
+
+Why this contract exists: §21.5 (R5-6) states that the coordinator records
+authoring itself and that a design revision keeps the submission lineage. It
+does not state what happens to a registered authoring dispatch that already
+exists when `submit-plan` has to run: one of an earlier revision, or one whose
+sources are committed at the bound digests while its result artifacts are
+absent on this device. That is the T8 case, and this section states the
+obligation. §21 is unchanged.
+
+Contract:
+
+- **Definition.** A stale authoring registration is a registered authoring
+  dispatch in continuity that blocks the idle continuity `submit-plan` needs
+  and that either belongs to an earlier revision of the same submission
+  lineage, or has its sources committed (tracked and clean, R7-3) at the bound
+  digests while its result artifacts are absent on this device.
+- **Verb.** A catalogue-admitted verb (§21.1, admitted in every phase that
+  emits it) supersedes it: `supersede-authoring-registration`, emitted by
+  `inspect` and the preflight as a typed `nextAction` (`mutation: true`,
+  `requiresConfirmation: false`, closed `expected.schema`, no `--by` PO actor).
+  The coordinator's own writer runs it, so no hand-built `continuity-cas`
+  request, no override and no signature is involved. The superseded
+  registration is archived with its bytes preserved and a receipt recorded (as
+  in R7-2); State, `activeFeature`, proofs, the submission lineage and history
+  are unchanged.
+- **Never inferred.** A registration whose owner is live or unobservable (the
+  §20 native owner observation), that holds any authority (armed override
+  capability, open ceremony request, held lock), or whose sources are modified,
+  untracked or at other digests is not superseded by this verb. The result is
+  the typed attended prerequisite (RV-11); §20 is unchanged and no PO click is
+  added.
+- **Afterwards.** `submit-plan` runs with zero overrides, zero signatures and
+  zero PO terminal commands. Re-registration for a revision cycle stays with
+  the coordinator (R5-6, row T9).
+
+Typed repair: `supersede-authoring-registration` (agent-executable), or the
+RV-11 attended prerequisite.
+
+Acceptance cases (§22.0 matrix: win32 and POSIX dialects, source checkout and
+consumer-layout fixture):
+
+- R7-10a: A registered authoring dispatch of an earlier revision, with sources
+  committed at the bound digests, blocks `submit-plan`. The typed action
+  supersedes it, `submit-plan` then succeeds, and the counts of overrides,
+  signatures and PO terminal commands are all zero; the archived bytes equal
+  the original and a receipt exists.
+- R7-10b: A fresh clone of an approved, committed fixture (fresh private state,
+  result artifacts absent) carries a registration whose sources are committed
+  at the bound digests. It is superseded the same way with the same zero counts.
+- R7-10c: A live owner, an unobservable owner, an armed capability, an open
+  ceremony request, a held lock, and sources that are modified, untracked or at
+  other digests are each not superseded; each returns the typed attended
+  prerequisite and zero mutation occurs.
+- R7-10d: Running the action twice is a no-op the second time, and the
+  PowerShell and Bash lanes give the same result (R7-8).
+
+### 22.11 Sequencing and completion
 
 R7-1 and R7-2 join step 1 of §21.7 (they unblock bootstrap on a second device).
-R7-3, R7-4, R7-5 and R7-8 join the R1 catalogue work and step 3 (R7-3 lands
-before R5 finalises the course outputs it writes). R7-6 and R7-7 join the R3
+R7-3, R7-4, R7-5, R7-8 and R7-10 join the R1 catalogue work and step 3 (R7-3
+lands before R5 finalises the course outputs it writes; the R7-10 verb is a
+catalogue entry shared with the R5 coordinator). R7-6 and R7-7 join the R3
 slice and the hook-and-commit-policy integration slice. R7-9a is part of the
-final integration. R7 is complete only when R7-1a…R7-9b pass in the source
-checkout and in the consumer-layout fixture on both dialects. Independent
-Critic review, Verify, security and PO acceptance remain separate gates.
+final integration. R7 is complete only when R7-1a…R7-9b and R7-10a…R7-10d pass
+in the source checkout and in the consumer-layout fixture on both dialects.
+Independent Critic review, Verify, security and PO acceptance remain separate
+gates.
