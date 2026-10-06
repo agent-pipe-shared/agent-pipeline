@@ -1,7 +1,7 @@
 # Verify registration package 1 — test-suite registrations (staged for the PO signature)
 
-Registers the tonight-slice test suites in Verify, with the case-completion dispositions and inventory surfaces they
-need. Separate from the S2 guard-split package [`../s2-package-1/`](../s2-package-1/README.md).
+Registers 24 tonight-slice test suites (the table below) in Verify, with the case-completion dispositions and inventory
+surfaces they need. Separate from the S2 guard-split package [`../s2-package-1/`](../s2-package-1/README.md).
 
 ## Artifacts
 
@@ -33,6 +33,7 @@ need. Separate from the S2 guard-split package [`../s2-package-1/`](../s2-packag
 | `plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs` | `nova-verify-journal-drvfs-hint-tests` | none | no |
 | `plugins/pipeline-core/lib/governance-event-store.win-fsync.test.mjs` | `governance-event-store-win-fsync-tests` | none | no |
 | `plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs` | `gitleaks-windows-suppression-tests` | none | no |
+| `plugins/pipeline-core/scripts/gitleaks-repair-ignore.value-binding.test.mjs` | `gitleaks-repair-ignore-value-binding-tests` | none | no |
 | `plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs` | `guard-push-gitleaks-prefix-tests` | none | no |
 | `plugins/pipeline-core/lib/design-advisor-provenance.flap3.test.mjs` | `design-advisor-provenance-flap3-tests` | none | no |
 | `plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs` | `hook-refresh-detection-tests` | none | no |
@@ -58,14 +59,19 @@ the second exits 0. See "Expected end state" below.
 
 Independent of the S2 package. Both apply orders were measured on fresh `git archive` exports of HEAD (GNU `patch -p1`):
 every patch step exited 0 (no rejects) in both orders, and the five patched target files are byte-identical in the two
-orders. Evidence, both machine-written:
+orders. The proof for the current 24-suite package is
+[`../../evidence/night-2026-10-05/regproof-regadd-result.json`](../../evidence/night-2026-10-05/regproof-regadd-result.json)
+(machine-written; both orders in one run, registration package first plus an S2-first re-run for the comparison, on one
+export of the HEAD recorded inside it). The two earlier proofs were measured at the 23-suite state, before the
+value-binding suite was added, and stay as history:
 [`../../evidence/night-2026-10-05/regproof-result.json`](../../evidence/night-2026-10-05/regproof-result.json) (S2
 package first) and
 [`../../evidence/night-2026-10-05/regproof-reverse-result.json`](../../evidence/night-2026-10-05/regproof-reverse-result.json)
 (registration package first, plus an S2-first re-run for the comparison). The whole-export digests of the two orders
 differ only in two `.orig` backup files that GNU `patch` writes beside `verify.mjs` and the inventory when a hunk
-applies with an offset; the reverse JSON therefore reads `identicalEndState: false` under its strict whole-export
-definition and `comparison.targetsIdentical: true` for the patched targets.
+applies with an offset; the result JSON therefore reads `identicalEndState: false` under its strict whole-export
+definition, and `comparison.targetsIdentical: true` plus `comparison.differingPathsAllPatchBackups: true` for the patched
+targets.
 The two may be signed under one `sign-intent` or separately. `inventory-surfaces.patch` was deliberately split: one
 hunk was divided so that it no longer straddles the insertion point of the S2 package's inventory patch.
 
@@ -88,7 +94,10 @@ an accepted registry:
 ## Disposition rationale
 
 - A disposition entry is needed for exactly the seven suites above marked `yes (required)`; `classifyVulnerableSuite`
-  (`check-verify-case-completion.mjs`) returns null for the other sixteen.
+  (`check-verify-case-completion.mjs`) returns null for the other seventeen. That includes
+  `gitleaks-repair-ignore-value-binding-tests` (several `node:test` cases, so not `node-test-single`): the case-completion
+  checker exits 0 with 304 entries after both packages, the same 304 as before that suite was added, and no
+  disposition patch entry exists for it.
 - All seven are classified `top-level-assertions` (assertions >= 2, no `node:test` import): fanout-ledger,
   fanout-governor, slice-queue, slice-queue-cli, stop-fanout, runtime-handover-projection-win-path and
   clone-hook-readiness-rollback. New registrations may only start as `required` (`LEGACY-NEW`).
@@ -98,24 +107,27 @@ an accepted registry:
   test file or a PO decision (Q11).
 - Every suite needs one `verify-phase:` surface in exactly one capability of the inventory; most sit with their sibling
   tests in `deterministic-verification`, the exceptions follow the owner of the code under test
-  (`continuity-and-handover`, `governance-event-ledger`, `setup-and-runtime-projection`). The capability is a product
+  (`continuity-and-handover`, `governance-event-ledger`, `setup-and-runtime-projection`). The value-binding suite's
+  surface sits next to `gitleaks-tests` and `gitleaks-windows-suppression-tests`. The capability is a product
   judgement; the PO may move a surface as long as it stays in exactly one capability.
 
 ## Expected end state (measured)
 
 Measured on a fresh `git archive` export of HEAD with this package and the S2 package both applied, in either order
-([`../../evidence/night-2026-10-05/regproof-result.json`](../../evidence/night-2026-10-05/regproof-result.json) and
-[`../../evidence/night-2026-10-05/regproof-reverse-result.json`](../../evidence/night-2026-10-05/regproof-reverse-result.json)):
+([`../../evidence/night-2026-10-05/regproof-regadd-result.json`](../../evidence/night-2026-10-05/regproof-regadd-result.json),
+`assertions.allPass: true`; the two earlier proofs above agree on the exit codes at the 23-suite state):
 
 - `check-verify-case-completion`: **exit 0** (registry valid, 297 entries before and 304 after the seven dispositions).
 - `check-verify-suite-registration`: **exit 2**, exactly two findings, both UNREGISTERED, both the deferred Q11 pair:
   `plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs` and
   `plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs`. No `UNCATEGORIZED-VERIFY-SURFACE`, no duplicate
-  inventory surface.
+  inventory surface; the value-binding test file is not among the findings.
+- An unpatched export of the same HEAD lists 28 UNREGISTERED findings: the 24 suites of this package, the two S2
+  surfaces and the Q11 pair.
 - Applied alone, this package leaves four UNREGISTERED findings: the Q11 pair plus the two S2 surfaces
   (`harness/scripts/guard-split-map.test.mjs`, `plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs`), which
   the S2 package registers.
 
 The exit-2 state is a tolerated red state per QG-06: **reason** — PO question Q11 is open (migrate both test files to
 the `registerTestCaseCompletion` protocol, or a different disposition); **owner** — PO decision, the Elephant
-implements the chosen route; **expiry** — before the 0.7.0 release candidate.
+implements the chosen route; **expiry** — 2026-10-20 (proposed, PO to confirm).

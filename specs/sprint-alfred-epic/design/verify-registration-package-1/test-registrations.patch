@@ -44,15 +44,16 @@
    { name: "governance-event-store-tests", file: join(libDir, "governance-event-store.test.mjs") },
 +  { name: "governance-event-store-win-fsync-tests", file: join(libDir, "governance-event-store.win-fsync.test.mjs") },
    { name: "governance-event-core-tests", file: join(libDir, "governance-event.test.mjs") },
-@@ -697,2 +714,3 @@ const TEST_SUITES = [
+@@ -697,2 +714,4 @@ const TEST_SUITES = [
    { name: "gitleaks-tests", file: join(pluginScriptsDir, "security-adapters", "gitleaks.test.mjs") },
 +  { name: "gitleaks-windows-suppression-tests", file: join(pluginScriptsDir, "security-adapters", "gitleaks.windows-suppression.test.mjs") },
++  { name: "gitleaks-repair-ignore-value-binding-tests", file: join(pluginScriptsDir, "gitleaks-repair-ignore.value-binding.test.mjs") },
    { name: "license-check-tests", file: join(pluginScriptsDir, "security-adapters", "license-check.test.mjs") },
-@@ -707,2 +725,3 @@ const TEST_SUITES = [
+@@ -707,2 +726,3 @@ const TEST_SUITES = [
    { name: "guard-push-decision-reference-tests", file: join(hooksDir, "guard-push-decision-reference.test.mjs") },
 +  { name: "guard-push-gitleaks-prefix-tests", file: join(hooksDir, "guard-push-gitleaks-prefix.test.mjs") },
    { name: "control-execution-lifecycle-event-tests", file: join(libDir, "control-execution-lifecycle-event.test.mjs") },
-@@ -906,2 +925,6 @@ const TEST_SUITES = [
+@@ -906,2 +926,6 @@ const TEST_SUITES = [
    { name: "design-advisor-provenance-tests", file: join(libDir, "design-advisor-provenance.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC10C001","RC10C002","RC10C003","RC10C004"],maxBytes:65536} },
 +  { name: "design-advisor-provenance-flap3-tests", file: join(libDir, "design-advisor-provenance.flap3.test.mjs") },
 +  { name: "hook-refresh-detection-tests", file: join(pluginScriptsDir, "hook-refresh-detection.test.mjs") },
