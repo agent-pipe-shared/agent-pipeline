@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "22a9f5bfba42e74d9e330e171659549dfd0ff74d9ffb87fd7171ba935135b9dd"
+    "transitionHead": "45fa2783a9d7745992d1014b3a6ab8ce2b4d9b91c4461f65ee007265afd99e80"
   },
   "counts": {
-    "open": 172,
+    "open": 173,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -4226,6 +4226,16 @@
       "closureRepository": "self",
       "closureCommit": "b273a1a055bae1e29f7489d232d0c83dff05c7ed",
       "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    },
+    {
+      "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "Three Opus Critic rounds in the Alfred night run, 2026-10-06 (FANOUT category 7 F1/F2, GPGL-7 F-3, HOOKREFRESH fixes F-1).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate",

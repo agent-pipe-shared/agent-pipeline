@@ -332,6 +332,7 @@
 | pipeline.gmw-precommit-kernel-precedence-diverges | closed | defect | pipeline | nova-b | 2026-09-12 | — | — |
 | pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | closed | workflow-improvement | pipeline | — | 2026-08-16 | — | — |
+| pipeline.goldfish-bugfix-module-conflicts-with-qg-04 | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | closed | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
@@ -837,7 +838,7 @@
 
 ## Counts
 
-- open: 172
+- open: 173
 - in_progress: 0
 - closed: 643
 - rejected: 3
