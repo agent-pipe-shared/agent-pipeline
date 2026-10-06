@@ -152,6 +152,19 @@ real-path run is the last apply-order step.
 | 23 | `private-tmp-tests` | none needed | `deterministic-verification` |
 | 24 | `hook-refresh-detection-tests` | none needed | `deterministic-verification` |
 | 25 | `clone-hook-readiness-rollback-tests` | `required` entry (patch), inline CHRB001-CHRB009 | `setup-and-runtime-projection` |
+| 26 | `hook-currentness-digest-once-tests` | none needed: `classifyVulnerableSuite` returns `null` (`check-verify-case-completion.mjs:426-443`: node:test file with more than one `test(` call, so not `node-test-single`; no `check`/`run` wrapper, `:412-425`); no case IDs registered, so no inline policy | `setup-and-runtime-projection` |
+
+#### Staged 2026-10-06 (REGPATCH7): row 26, `hook-currentness-digest-once-tests`
+
+`test-registrations.patch` gains one plain entry (file `hook-currentness.digest-once.test.mjs`, no `caseCompletion`)
+right after `clone-hook-readiness-rollback-tests`; the last hunk header is now `@@ -906,2 +928,6 @@`.
+`inventory-surfaces.patch` adds the `verify-phase:` surface to `setup-and-runtime-projection` (the entry sorts after
+`clone-hook-readiness-tests`, which was the capability's last list element, so that one existing line gains a trailing
+comma in the patch: a `-`/`+` pair, the only change to an existing entry; hunk header `@@ -1314,7 +1336,9 @@`, later
+`+` start lines shifted by one). `case-completion-dispositions.patch` is unchanged (not vulnerable). `git apply --check`
+on each patch alone: exit 0 (`scratch/REGPATCH7/apply-*.log`). Adapted simulation (`scratch/REGPATCH7/sim.log`, `-`
+lines now supported): case-completion findings still only rows 17 and 19; 0 `UNCATEGORIZED-VERIFY-SURFACE`, 0
+`DUPLICATE-VERIFY-SURFACE`; the scratch-location artefacts (118 `MISSING-FILE`/`UNREGISTERED`) are unchanged.
 
 Capability rationale: most are Verify test suites and sit with their sibling `*-tests` surfaces in
 `deterministic-verification` (e.g. `guard-push-*-tests`, `checkpoint-push-audit-tests`, `pipeline-start-preflight-*`);

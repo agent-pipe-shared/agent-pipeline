@@ -58,9 +58,10 @@
    { name: "guard-push-decision-reference-tests", file: join(hooksDir, "guard-push-decision-reference.test.mjs") },
 +  { name: "guard-push-gitleaks-prefix-tests", file: join(hooksDir, "guard-push-gitleaks-prefix.test.mjs") },
    { name: "control-execution-lifecycle-event-tests", file: join(libDir, "control-execution-lifecycle-event.test.mjs") },
-@@ -906,2 +928,5 @@ const TEST_SUITES = [
+@@ -906,2 +928,6 @@ const TEST_SUITES = [
    { name: "design-advisor-provenance-tests", file: join(libDir, "design-advisor-provenance.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC10C001","RC10C002","RC10C003","RC10C004"],maxBytes:65536} },
 +  { name: "design-advisor-provenance-flap3-tests", file: join(libDir, "design-advisor-provenance.flap3.test.mjs") },
 +  { name: "hook-refresh-detection-tests", file: join(pluginScriptsDir, "hook-refresh-detection.test.mjs") },
 +  { name: "clone-hook-readiness-rollback-tests", file: join(pluginScriptsDir, "clone-hook-readiness.rollback.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 9 }, (_, index) => `CHRB${String(index + 1).padStart(3, "0")}`), maxBytes: 65_536 } },
++  { name: "hook-currentness-digest-once-tests", file: join(pluginScriptsDir, "hook-currentness.digest-once.test.mjs") },
    { name: "design-advisory-coordinator-v2-tests", file: join(libDir, "design-advisory-coordinator-v2.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC11C001","RC11C002","RC11C003"],maxBytes:65536} },
