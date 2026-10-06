@@ -607,6 +607,7 @@
 | pipeline.push-artifacts-precede-operator-intent | closed | workflow-improvement | pipeline | nova-b | 2026-09-17 | — | — |
 | pipeline.push-classifier-does-not-model-powershell-backtick-escapes | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.push-classifier-misreads-backslash-escaped-quotes | open | defect | pipeline | alfred | 2026-10-05 | — | — |
+| pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.push-flow-needs-one-remote-readback-transaction | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps. |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | — | 2026-08-09 | 2026-08-10 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
@@ -838,7 +839,7 @@
 
 ## Counts
 
-- open: 173
+- open: 174
 - in_progress: 0
 - closed: 643
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "45fa2783a9d7745992d1014b3a6ab8ce2b4d9b91c4461f65ee007265afd99e80"
+    "transitionHead": "75a2692c1e4cdb0d779203e290786312696e2ef59939867c8e8dce337a002806"
   },
   "counts": {
-    "open": 173,
+    "open": 174,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -7829,6 +7829,16 @@
       "owner": "pipeline",
       "created": "2026-10-05",
       "source": "Found by the GPGL-2 dispatch (code reading plus a regression case), Alfred session, 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "GPGL-8 dispatch report (residual gaps after the expansion and typographic-quote fail-closed checks), 2026-10-06.",
       "deferred": false,
       "sprint": "alfred"
     },
