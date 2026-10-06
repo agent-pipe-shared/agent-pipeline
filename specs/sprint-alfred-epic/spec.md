@@ -1972,3 +1972,496 @@ an owned ID is a reproduction step for that sub-aspect, not a second owner.
 | K7-7 | Compare the `docs/state.md` projection with `pipeline-state inspect` after a design revision. |
 | K7-8 | Run the PO profile receipt check on a freshly cloned repository and capture its failure code. |
 | K4-1 footer suspicion (sub-aspect of K4-1, owned by R3) | Produce a denial whose reason carries the "remains available" footer, then compare request digests. |
+
+## 22. 2026-10-06 device switch: agent-recoverable operation and device portability (R7)
+
+Source of findings: PO decisions 17–19 of 2026-10-06 (`design-input.md`) and
+the toil rows T1–T17 recorded while the approved candidate was brought up on a
+second device. The toil log was a working note in the ignored `scratch/`
+directory, so this section carries each row's finding and cost itself. Three
+tracked backlog items hold the sharpest defects:
+`backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md`,
+`backlog/items/2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md`
+and
+`backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md`.
+This section is additive. It does not relax §§1–21 and grants no
+implementation authority. It is complete in itself: §22.0 lists every row
+T1–T17 exactly once, owned by one R7 contract or mapped to the existing owner
+whose approved scope already covers it, and `traceability.md` repeats the same
+ownership as a map whose row count equals 17. It records no Advisor answer, no
+readiness, no approval and no host evidence.
+
+### 22.0 Scope rule, governing requirement and row ownership
+
+**Governing requirement (PO decision 2026-10-06 #17).** The Pipeline is built
+so that an agent flows through bootstrap, install, recovery, device switch and
+lifecycle repair without hurdles. Every block comes with an agent-executable
+fix, and the human is needed only where a real signature is required. This
+makes decisions 15 and 16 of 2026-10-04 concrete; it is not new authority.
+
+**Scope rule (decision #18).** All 17 rows are fixed in the next candidate
+(0.7.0), none deferred. Each row is owned by exactly one R7 contract (§22.1–§22.8)
+or mapped to the existing owner named below. A mapped row gets no second
+contract here; §22.9 only adds a replay obligation on the owner's fixture.
+
+**Prerequisites (decision #19).** Environment prerequisites are checked at
+install and bootstrap, reported with a concrete repair action, and never
+discovered for the first time at a signature (R7-7).
+
+**Typed repair rule.** Every non-ok R7 outcome carries exactly one of:
+
+- an agent-executable action: a `nextAction` envelope with the fields the
+  preflight emits today (`kind`, `executable`, `argv`, `mutation`,
+  `requiresConfirmation`, `expected.schema`), whose argv is a catalogue entry
+  (§21.1) admitted in every phase that emits it, with `requiresConfirmation`
+  `false`; or
+- a typed attended-prerequisite result naming the concrete prerequisite
+  (§20.1, RV-11), where safe repair is impossible (decision 15).
+
+An outcome with neither fails its case. Read-only diagnosis is non-authoritative
+and never changes admission.
+
+**Signature rule.** R7 asks the PO for a signature only in the existing
+authority classes: a trust-anchor change or first-use key confirmation (the
+one-time key setup of §21.0), the final plan approval (including a re-approval
+where an approval's digest set really changes, R7-5), and a push approval. No
+R7 mechanic (diagnosis, archival, provisioning, rebind of an unchanged
+approval, key-directory or toolchain setup, state commits) needs one. R7 adds no
+interaction to scenarios A–D of R3-1.
+
+**Consumer and platform universality (§21.0 applies unchanged).** Every R7
+case runs against the source checkout and against a consumer-layout fixture
+repository (plugin installed outside the root, fresh `git init`, onboarding
+through the plugin), on the win32 and POSIX dialects, and selects runner
+behaviour by runner identity only. No fix names a source-only path or a
+machine-specific path; the Git install root, the PO's key directory and the
+user home are derived at run time and redacted in every report. Any new schema
+id an implementation adds is registered in the §9 registry in the same change;
+the closed field and enum lists below are normative.
+
+**Row ownership (12 rows owned by R7, 5 mapped).**
+
+| Row | Finding and cost | Owner |
+|---|---|---|
+| T1 | Git for Windows 2.56.0.windows.1 rejected the `NUL` spelling every hardened git spawn used; the preflight reported `GS-GIT-UNAVAILABLE` with the cause swallowed (about 40 tool calls, PO-run probes) | R7-1 |
+| T2 | Pre-ready lockdown refused every diagnostic (`git config`, `git worktree list`, `stat`, directory Grep/Glob, `node -e`), so the session could not diagnose itself | R7-1 |
+| T3 | Two orphan session descriptors of a blocked session needed a PO decision and a `--by` actor | R7-2 |
+| T4 | The pre-push hook was absent on the second device (an unbacked gate) and needed PO confirmation | R3 (K6-2, R3-2); report in R7-7 |
+| T5 | The approval-bound design package lived in the ignored root `evidence/`, so the approval was unverifiable on another device | R7-3 |
+| T6 | Backlog writes were refused while the package was unverifiable; items were parked in `scratch/` | R7-4 |
+| T7 | The only offered recovery was `reopen-design`, a full course again | R7-5 |
+| T8 | `submit-plan` needs idle continuity; clearing the registered authoring dispatch needed `continuity-cas` and a signed override | R5 (coordinator records authoring itself; R5-6) |
+| T9 | Re-registering an authoring dispatch for the course needed a signed override again | R5 (R5-6; R1 catalogue admits the verb) |
+| T10 | Agents could not write the course's own outputs under `evidence/` in the design phase | R1 (K5-8, R1-1) |
+| T11 | Committing `project/pipeline-state.json` in the design phase was refused (`GUARD-DEVPLAN-LIFECYCLE`); the state change stayed uncommitted across a ceremony | R7-4 |
+| T12 | The handover did not list device-bound (ignored) artifacts | R7-3 |
+| T13 | No wired Claude Advisor route, so a one-time exception rationale was needed every course | R4 (K3-2, R4-1, R4-2) |
+| T14 | `sign-intent` without a remembered key directory: the per-repository value lives in non-travelling private state | R7-6 |
+| T15 | `sign-intent` spawned bare `openssl` from PATH; the one Git for Windows ships was not on the signing terminal's PATH (second failed attempt, PO PATH surgery) | R7-6 |
+| T16 | Bootstrap does not check preconditions that later block (known-bad Git, signing toolchain, key directory against trust anchor, hooks, tracked bound files) | R7-7 |
+| T17 | `continuity-cas` from the PowerShell lane returned `GUARD-POWERSHELL-GRAMMAR` with no override route; only the Bash lane offered the ceremony | R7-8 |
+
+Rows: 17. Owned by R7: 12 (T1, T2, T3, T5, T6, T7, T11, T12, T14, T15, T16,
+T17: R7-1 two, R7-2 one, R7-3 two, R7-4 two, R7-5 one, R7-6 two, R7-7 one,
+R7-8 one). Mapped to existing owners: 5 (T4, T8, T9, T10, T13). R7-9 owns no
+row. Total 17. T-rows are not findings-register IDs, and the 77-ID map of §21
+is unchanged.
+
+### 22.1 R7-1 — Git child environment and diagnosable failure
+
+Rows owned: T1, T2.
+
+Contract:
+
+- **One null-device constant.** Every git child process the Pipeline spawns
+  takes its null device (`GIT_CONFIG_GLOBAL` and every other config or hook
+  null value) from one shared constant whose value is `/dev/null` on every
+  platform. Git for Windows maps it itself in both its MSVCRT and UCRT builds.
+  The spellings `NUL` and `os.devNull` are refused by Git for Windows
+  2.56.0.windows.1 (upstream regression git-for-windows/git#6449, fixed in
+  2.56.0.windows.2) and are never used for git. The constant is never handed to
+  a Node file open, which would create a real file. A ratchet scan fails on a
+  win32 `NUL` literal assigned to a git environment or `-c` value. Protected
+  sites change through the signed package route that already governs them; R7
+  grants no exception.
+- **Diagnosable failure (T1).** A repository-discovery or governance-scope
+  failure reaches the preflight envelope (`pipeline-governance-unverifiable`
+  and every other surface that reports `GS-GIT-UNAVAILABLE`) with a bounded,
+  path-redacted `cause`: the git exit code, the first stderr line and the
+  existing topology diagnostic fields. The envelope also carries a typed
+  read-only `nextAction` (`diagnose-git`, `mutation: false`) that runs the same
+  hardened git probe and prints the git version, exit code and first stderr
+  line. A bare diagnostic code without the cause is a defect.
+- **Pre-ready diagnostic set (T2).** In the pre-ready state the guard admits a
+  closed catalogue of read-only diagnostic entries (§21.1): `diagnose-git`, the
+  preflight, and a Pipeline-owned read-only report returning the effective
+  hardened git environment, the repository-discovery result and the worktree
+  list (credential-root values redacted), so no raw `git config` or `git
+  worktree list` is needed. In-root directory Grep and Glob are admitted in the
+  pre-ready state exactly as R2 defines them. `node -e`, scratch-script
+  execution and every write form stay refused, with the §21.1 truthful denial.
+  The set is diagnostic only and changes no admission.
+
+Typed repair: `diagnose-git` (agent-executable). A git version in the
+known-bad table of R7-7 additionally yields the attended prerequisite naming
+the fixed version.
+
+Acceptance cases (all in the §22.0 matrix):
+
+- R7-1a: A stub git that exits 128 with `unable to access 'NUL': Invalid
+  argument` for any `NUL`-like value (and succeeds for `/dev/null`) mimics the
+  Git for Windows 2.56.0.windows.1 regression. Every Pipeline git spawn site
+  succeeds against it. A fixture that reintroduces a win32 `NUL` literal for a
+  git value fails the ratchet scan. A real-git spawn with the constant exits 0
+  on every dialect the fixture host offers.
+- R7-1b: A stub git whose discovery fails yields a preflight envelope with
+  `cause` (exit code, first stderr line, no host path) and the `diagnose-git`
+  `nextAction`; an envelope with only the bare code fails the test. The
+  `nextAction` has `mutation: false`.
+- R7-1c: With the preflight not ready, every catalogue diagnostic entry and
+  in-root directory Grep/Glob are admitted, while `node -e`, a `scratch/`
+  script, `git config --global …` and `git stash pop` stay refused with their
+  typed codes.
+
+### 22.2 R7-2 — Orphan session descriptors
+
+Rows owned: T3.
+
+Contract:
+
+- **Definition.** An orphan is a session descriptor whose owning session the
+  Pipeline itself recorded as ended (a recorded session end, or the §20 native
+  owner observation reporting not-live) and that holds zero authority: no armed
+  override capability, no continuity registration (authoring or dispatch), no
+  open ceremony request, no held lock.
+- **Archive, not delete.** The preflight reports each orphan with a typed
+  `nextAction` (`archive-orphan-session`, `mutation: true`,
+  `requiresConfirmation: false`, no `--by` PO actor). The action moves the
+  descriptor to the archive with its bytes preserved and a receipt recorded. It
+  grants no authority and leaves State, `activeFeature`, proofs and history
+  unchanged (the §20.2 exclusions).
+- **Never inferred.** A descriptor whose owner observation is `unavailable` (V2
+  null runtime) or `unobserved` (V1 absent), or that holds any authority, is
+  not archived by this route. The result is the typed attended prerequisite
+  (RV-11) and the §20.2 signed legacy-custody transaction stays the only
+  attended route. This route adds no PO click and does not weaken §20.
+
+Typed repair: `archive-orphan-session`, or the RV-11 attended prerequisite.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-2a: Two descriptors of an ended session with zero authority are archived
+  by the typed action with no PO input; the archived bytes are identical to the
+  originals, a receipt exists, and the State digest is unchanged.
+- R7-2b: Descriptors with a null owner runtime, with the field absent, with an
+  armed capability and with a registered authoring dispatch are not archived;
+  each returns the typed attended prerequisite and zero mutation occurs.
+- R7-2c: The preflight lists the orphans with the `nextAction`, and executing it
+  twice is a no-op the second time.
+
+### 22.3 R7-3 — Digest-bound artifacts are tracked and travel
+
+Rows owned: T5, T12.
+
+Contract:
+
+- **Classification (T5).** Every artifact that an approval, signature, gate
+  receipt or State record binds by digest (the bound set) is durable evidence.
+  Its home is `specs/<feature-id>/evidence/` or another tracked home ADR-0063
+  names (`backlog/evidence/` or `specs/*/evidence/`), never the ignored root
+  `evidence/`, which is for artifacts regenerable bit for bit from tracked
+  inputs. The implementation wave amends ADR-0063 to say so in the same
+  package. The design-course producer and the design-workflow package writer
+  write the package and the course and readiness artifacts it digests under
+  the tracked prefix. The R1 catalogue (K5-8) admits exactly those declared
+  paths and no other `evidence/` path; Plan and Spec immutability is unchanged.
+- **Refuse before the signature.** `present-plan` and approval refuse, before
+  the PO signs, when any bound path is git-ignored, untracked or modified
+  against `HEAD`, with the distinct typed codes `DWP-BOUND-PATH-IGNORED`,
+  `DWP-BOUND-PATH-UNTRACKED` and `DWP-BOUND-PATH-MODIFIED`.
+- **Handover and close (T12).** The handover and close checks list every
+  digest-bound path found in State and gate receipts with its status
+  (`tracked`, `ignored`, `untracked`, `modified`), and fail on any status other
+  than `tracked`. The handover also names the device-local, non-travelling
+  artifacts (private state, dispatch records, Verify snapshots) as such, so a
+  second device is never a surprise.
+- **Legacy approvals.** An existing approval whose bound path is in the ignored
+  root is reported by bootstrap as a finding (R7-7) and routed to R7-5.
+
+Typed repair: `DWP-BOUND-PATH-IGNORED` → re-run the producer with the tracked
+output prefix; `DWP-BOUND-PATH-UNTRACKED` and `DWP-BOUND-PATH-MODIFIED` → the
+ordinary exact-path stage and commit (§21.5 trailer grammar). Both are
+agent-executable.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-3a: `present-plan` refuses an ignored, an untracked and a modified bound
+  path with its own code and typed repair, and accepts a tracked, clean one.
+- R7-3b: The producer fixture writes the package and the digested artifacts
+  under the tracked prefix. After a fresh clone of the committed fixture (no
+  ignored file, fresh private state) the approval's digests verify.
+- R7-3c: The close check lists every bound path with its status and fails on
+  one untracked path; the handover output lists the device-local artifacts.
+- R7-3d: A ratchet test enumerates every State field that names a bound path
+  and fails on any field without a classification.
+
+### 22.4 R7-4 — Write admission with an unverifiable approval, and state commits
+
+Rows owned: T6, T11.
+
+Contract:
+
+- **Backlog and documentation writes in every lifecycle state (T6).** A
+  refusal caused by an unverifiable or missing approval package
+  (`DWP-PACKAGE-PHYSICAL` and its class) refuses implementation writes only.
+  Writes under `backlog/`, `docs/` and `scratch/` stay admitted in every
+  lifecycle state the State schema defines, including implementation with an
+  unverifiable approval. Every other guard applies to those paths unchanged:
+  protected baseline, design-authority sealing of approved PRD/Spec bytes,
+  credential roots and documentation governance classification.
+- **State commit through its own writer (T11).** The sanctioned lifecycle
+  writer records, for each change it writes to `project/pipeline-state.json`, a
+  receipt (path, digest of the written bytes, verb, time) in private state. The
+  commit guard admits, in every lifecycle state, a commit whose changed-path set
+  is exactly `project/pipeline-state.json` and whose staged blob digest equals
+  the latest writer receipt. A hand-edited blob, any further path in the same
+  commit or a missing receipt is refused with a typed code naming which. No new
+  trailer form exists; the §21.5 grammar applies. This route admits no hand edit
+  of State.
+
+Typed repair: for a refused implementation write, the R7-5 `rebind-approval`
+route; for a refused state commit, re-running the writer verb and committing
+the exact path.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-4a: A table-driven fixture enumerates the lifecycle states from the State
+  schema. With the bound package absent, a Write to `backlog/items/*.md`,
+  `docs/*.md` and `scratch/*` is admitted in every state; a production-path
+  write is refused with `DWP-PACKAGE-PHYSICAL` and the typed repair; PRD/Spec
+  bytes and a credential root stay refused.
+- R7-4b: In design/draft, awaiting-approval and implementation, a commit of
+  exactly the writer-produced `project/pipeline-state.json` is admitted. A
+  hand-edited blob, an extra path and a missing receipt are each refused with
+  their own typed code.
+
+### 22.5 R7-5 — Rebind an approval on another device
+
+Rows owned: T7.
+
+Contract:
+
+- **Route.** For an approval that cannot be verified on the current checkout,
+  `inspect` offers a typed `rebind-approval` action next to `reopen-design`,
+  not only `reopen-design`. The action compares every digest the approval binds
+  (PRD, Spec, the bound set of R7-3, the candidate ancestry) with this
+  checkout's tracked bytes.
+- **`verified`.** When every bound digest is equal and every bound path is
+  tracked and present, the approval is accepted on this device with zero
+  signatures and zero State change. Only a device-local verification receipt in
+  private state is written. The approval record stays byte-identical.
+- **`digest-set-changed`.** When PRD or Spec bytes differ, the route refuses;
+  the final plan approval is then the only signature and is requested once, as
+  in §21.0.
+- **`DWP-REBIND-ARTIFACT-LOST`.** When PRD and Spec are unchanged but a bound
+  artifact exists only on an unreachable device, the Pipeline never regenerates
+  the artifact and treats it as equal (its bytes embed `createdAt` and
+  host-observed digests, so they are not reproducible). The result is the typed
+  attended prerequisite: retrieve the bound bytes from the origin device, or
+  re-approve. Whether a re-approval may reuse prior course and readiness
+  evidence bound to unchanged PRD/Spec digests is an open PO question (see
+  `traceability.md`); until it is decided the route fails closed and reuses
+  nothing.
+
+Typed repair: `rebind-approval` (agent-executable, no signature on `verified`);
+the attended prerequisite for the other two outcomes.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-5a: A clone of an approved, committed fixture with tracked bound set
+  reaches `verified` with zero signatures; the approval record bytes and the
+  State digest are unchanged.
+- R7-5b: A changed PRD or Spec byte yields `digest-set-changed` and no rebind.
+- R7-5c: A bound artifact absent from the clone yields
+  `DWP-REBIND-ARTIFACT-LOST` with the attended prerequisite; no artifact is
+  regenerated and no prior evidence is reused.
+
+### 22.6 R7-6 — Signing prerequisites: key directory and toolchain
+
+Rows owned: T14, T15.
+
+Contract:
+
+- **One machine-wide key directory (T14).** `poKeyDirectory` is one value per
+  OS user account, stored outside every repository and outside `.git`. Ceremony
+  preparation and `sign-intent` resolve it in this order: explicit argument, the
+  machine-wide value, the legacy per-repository private-state value (read-only
+  fallback, reported as legacy), absent. When it is absent the result is the
+  typed `SIGN-KEY-DIRECTORY-UNSET` with a typed setup action
+  (`set-po-key-directory`, `mutation: true`, no signature) taking the value the
+  PO states in chat; the setting grants no trust, because signatures still
+  verify only against the committed trust anchor. The agent never lists or
+  reads the key directory (the §21.2 credential-root list is unchanged). The
+  check of key directory against trust anchor runs inside a Pipeline script and
+  reports only `match`, `no-key-for-anchor`, `directory-missing` or
+  `unreadable`, never key material. A key that matches no anchor is the
+  attended one-time key setup of §21.0, not a new act.
+- **The Pipeline resolves its own signing toolchain (T15).** `openssl` is
+  resolved by the Pipeline, never from the signing terminal's PATH alone: the
+  configured path, then the bundled one inside the Git installation derived at
+  run time from the resolved git executable (candidate sub-directories are
+  data, not code), then PATH. A candidate is accepted only if an Ed25519
+  capability probe succeeds: a sign and verify round trip with a throwaway key
+  in a temporary directory outside every repository, touching no PO key. The
+  resolved executable is passed to child processes by absolute path.
+  A failing spawn reports its exit code and a bounded, path-redacted stderr
+  head instead of a bare "openssl failed".
+- **Before a ceremony, never during.** `prepare-for-signature` runs both checks
+  before it hands the PO a command. When one is blocked, no command is handed
+  over, no signing window starts (§21.3) and no ceremony request is created.
+
+Typed repair: `set-po-key-directory`; for the toolchain, the Pipeline's own
+resolution, else the attended prerequisite naming the finding
+(`openssl-missing`, `openssl-no-ed25519`), with the optional setup action
+`set-openssl-path`.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-6a: With the machine-wide value set and the repository value unset, a
+  second repository on the same machine resolves it with no new act. With both
+  unset the result is `SIGN-KEY-DIRECTORY-UNSET` with the typed setup action;
+  after the agent runs it, `prepare-for-signature` passes. An agent Read or Grep
+  of the directory is refused, and no report contains key bytes.
+- R7-6b: With a PATH that lacks `openssl` but a Git-distribution layout fixture
+  holding a stub that passes the probe, the stub resolves by absolute path. A
+  stub failing the Ed25519 probe yields `openssl-no-ed25519`; none yields
+  `openssl-missing` with the attended prerequisite. In both failing cases
+  `prepare-for-signature` hands over no command and starts no window.
+- R7-6c: A failing `openssl` stub yields a result with exit code and bounded
+  stderr head and no host path.
+
+### 22.7 R7-7 — Environment readiness report
+
+Rows owned: T16 (decision 19; reports T4 and the findings of R7-2, R7-3, R7-5).
+
+Contract:
+
+- **One read-only report** extends `scripts/toolchain-preflight.mjs` and is
+  produced at plugin install and update, at bootstrap (preflight) and before any
+  ceremony (R7-6). Each finding has the closed fields `findingId`,
+  `status` (`ok`, `repairable`, `attended`, `unknown`), `cause` (bounded,
+  path-redacted) and `repair` (a `nextAction` envelope or an attended
+  prerequisite, per the §22.0 typed repair rule). A non-ok finding without a
+  repair fails its case.
+- **Closed finding ids:** `git-version`, `signing-toolchain`,
+  `po-key-directory`, `trust-anchor-match`, `git-hooks`, `bound-paths-tracked`,
+  `orphan-descriptors`, `approval-verifiable`.
+- **Known-bad Git** is a data table shipped with the plugin (id, version
+  pattern, upstream reference, fixed version, repair). Its first entry is Git
+  for Windows 2.56.0.windows.1. An unknown version is `ok`.
+- **Hooks.** `git-hooks` covers the mandatory pre-push, pre-commit and
+  commit-msg hooks. Its repair is the agent-executable installation (K6-2),
+  with no PO confirmation. A foreign hook is never overwritten and yields the
+  attended prerequisite.
+- **Visibility, not new blocking.** The report adds visibility and repair; it
+  adds no new blocking readiness status. A ceremony start blocks only on the
+  findings it needs (R7-6). Install and update print the report and never fail
+  because of a finding.
+
+Typed repair: per finding, as above.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-7a: A fixture matrix puts each finding id in `ok`, `repairable` and
+  `attended`; the test fails when a non-ok finding has no `repair`.
+- R7-7b: A stub `git --version` equal to a table entry yields `git-version`
+  `attended` naming the fixed version; an unlisted version yields `ok`.
+- R7-7c: The same report content is produced at bootstrap and at
+  `prepare-for-signature`; a blocked finding there hands over no command and
+  starts no window.
+- R7-7d: The report runs from the installed plugin copy in the consumer-layout
+  fixture, naming no source-only path.
+- R7-7e: A missing pre-push hook yields `git-hooks` `repairable`; running the
+  typed action installs it with no PO confirmation; a foreign hook yields
+  `attended` and is left unchanged.
+
+### 22.8 R7-8 — Shell-lane parity
+
+Rows owned: T17.
+
+Contract:
+
+- On win32 the Bash and PowerShell lanes give the same refusal outcome for the
+  same catalogue command: the same typed code family, the same typed retry
+  actions (each rendered for the lane that was denied, `copyCommand.posix` or
+  `copyCommand.powershell`) and one override-eligibility class derived from the
+  denied argv, not from the lane.
+- A PowerShell-lane command the closed grammar cannot parse returns
+  `GUARD-POWERSHELL-GRAMMAR` with a typed retry action naming the equivalent
+  catalogue command, never "no route". `continuity-cas` and the other
+  ceremony-adjacent catalogue commands are admitted or refused identically on
+  both lanes. Where no equivalent exists on a lane the result is typed
+  `unavailable` and names the lane that works.
+
+Typed repair: the lane-rendered retry action of the denial.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-8a: A table-driven fixture runs every catalogue entry through both lanes
+  and asserts equal code family, retry-action argv (modulo lane quoting) and
+  override eligibility.
+- R7-8b: `continuity-cas` from the PowerShell lane yields the same recovery as
+  from the Bash lane.
+- R7-8c: An unparseable PowerShell command carries a typed retry action.
+
+### 22.9 R7-9 — Cross-cutting rules and mapped-row replay
+
+Rows owned: none.
+
+Contract:
+
+- **No new authority class.** R7 introduces no signature, confirmation or
+  terminal command for the PO beyond §22.0's signature rule, and every non-ok
+  R7 outcome obeys the typed repair rule.
+- **Mapped-row replay.** For each mapped row the owner's fixture contains a
+  named step reproducing the row's scenario, and a test enumerates the T-map
+  and fails when a step is missing:
+  - T4 (R3-2): an already-onboarded repository cloned to a fresh `.git` gets
+    the mandatory hooks through the typed agent action with no PO confirmation
+    before the first push.
+  - T8 and T9 (R5-6): clearing or superseding a registered authoring dispatch
+    whose sources are committed at the bound digests, `submit-plan` afterwards,
+    and re-registration for a revision cycle, with zero overrides and zero
+    signatures.
+  - T10 (R1-1): the agent writes the course outputs under the declared prefix
+    in each design phase that emits them (the tracked prefix of R7-3 for bound
+    outputs).
+  - T13 (R4-1, R4-2): a Claude design course ends through the role-route
+    preflight, with no per-course exception rationale when the route is
+    `native` or labelled `fallback-self-dispatch`.
+- **AC-32 is unchanged.** R7 cases are additional. Its host matrix and pass
+  rule stay as written, and a device-switch host run is extra evidence, not a
+  substitute.
+
+Acceptance cases (§22.0 matrix):
+
+- R7-9a: The device-switch walk. A clone of an approved, committed fixture
+  into a fresh directory (fresh private state, no ignored files, no hooks, key
+  directory unset, descriptors of an ended session) walks preflight, the R7-7
+  report, the typed repairs (hooks, orphan archival, key-directory result), the
+  R7-5 `verified` outcome, a `backlog/` write and a state commit, and ends with
+  an admitted implementation write. It needs zero PO terminal commands, zero
+  overrides and zero signatures.
+- R7-9b: A static check fails if any R7 case or doc asks the PO for a signature
+  outside the §22.0 classes, if AC-32's row text changes, or if the T-map lacks
+  a row or names two owners.
+
+### 22.10 Sequencing and completion
+
+R7-1 and R7-2 join step 1 of §21.7 (they unblock bootstrap on a second device).
+R7-3, R7-4, R7-5 and R7-8 join the R1 catalogue work and step 3 (R7-3 lands
+before R5 finalises the course outputs it writes). R7-6 and R7-7 join the R3
+slice and the hook-and-commit-policy integration slice. R7-9a is part of the
+final integration. R7 is complete only when R7-1a…R7-9b pass in the source
+checkout and in the consumer-layout fixture on both dialects. Independent
+Critic review, Verify, security and PO acceptance remain separate gates.

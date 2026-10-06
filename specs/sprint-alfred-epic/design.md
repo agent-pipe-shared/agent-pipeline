@@ -150,6 +150,18 @@ This interleaves with the existing waves rather than replacing them. The
 amendment's acceptance is AC-32: the three-runner end-to-end scenario on the
 host matrix of Spec §21.7, on the stamped candidate.
 
+## 2026-10-06 device-switch amendment
+
+Bringing the approved candidate up on a second device surfaced seventeen
+hurdles (T1–T17) that no agent could clear alone. Spec §22 adds the workstream
+R7, agent-recoverable operation and device portability: twelve rows are owned
+by eight contracts that give each block a typed agent-executable repair
+(null-device handling with a diagnosable preflight, orphan archival, tracked
+bound artifacts, writes in every state, approval rebind, signing prerequisites,
+one readiness report, shell-lane parity), and five rows are mapped to the R1,
+R3, R4 and R5 contracts that already cover them. `traceability.md` carries the 17-row map; AC-37 is
+additional to AC-32.
+
 ## Sequence, evidence and gates
 
 Retain PRD §5 and Spec §§16–19 sequencing: control foundation first; A1/A5,
