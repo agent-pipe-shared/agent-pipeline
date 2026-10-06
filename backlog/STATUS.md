@@ -325,6 +325,7 @@
 | pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.gitleaks-content-suppression-does-not-match-on-windows | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag | closed | defect | pipeline | — | 2026-08-19 | — | — |
+| pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | closed | requirement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | — | 2026-08-16 | — | — |
@@ -841,7 +842,7 @@
 
 ## Counts
 
-- open: 176
+- open: 177
 - in_progress: 0
 - closed: 643
 - rejected: 3
