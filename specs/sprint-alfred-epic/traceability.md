@@ -192,7 +192,7 @@ and AC-37 is additional to AC-32):
 | Decision | Owner | Spec § / cases | Acceptance |
 |---|---|---|---|
 | #17 product goal: agent flows through bootstrap, install, recovery, device switch and lifecycle repair without hurdles; every block has an agent-executable fix; the human only for a real signature | R7 (governing requirement; makes 2026-10-04 #15 and #16 concrete) | §22.0 governing requirement, typed repair rule and signature rule; R7-9a, R7-9b | AC-37 (AC-32 unchanged) |
-| #18 device-switch findings T1–T17 fixed in 0.7.0, none deferred | R7 for 12 rows; R1, R3, R4, R5 for the 5 mapped rows | §22.0 row ownership; R7-1…R7-8; mapped-row replay in R7-9 | AC-37; mapped rows also AC-26, AC-28, AC-29, AC-30 |
+| #18 device-switch findings T1–T17 fixed in 0.7.0, none deferred | R7 for 13 rows; R1, R3, R4, R5 for the 4 mapped rows | §22.0 row ownership; R7-1…R7-8, R7-10; mapped-row replay in R7-9 | AC-37; mapped rows also AC-26, AC-28, AC-29, AC-30 |
 | #19 environment prerequisites checked at install and bootstrap, with a concrete repair action, never first discovered at a signature | R7 | §22.0 prerequisites; R7-7 (report), R7-6 (signing prerequisites) | AC-37 |
 
 Mapped decisions: 2026-10-06 #17–#19 (3 of 3); 2026-10-04 #1–#16 (16 of 16);
@@ -203,23 +203,23 @@ Mapped decisions: 2026-10-06 #17–#19 (3 of 3); 2026-10-04 #1–#16 (16 of 16);
 Rows T1–T17 are the toil rows recorded during the device switch (the working
 log was an ignored scratch note, so the finding is repeated here and in Spec
 §22.0). This map is complete: one row per T-row, each owned by exactly one R7
-contract (Spec §22.1–§22.8) or mapped to the existing owner whose approved
+contract (Spec §22.1–§22.8 and §22.10) or mapped to the existing owner whose approved
 scope already covers it. T-rows are not findings-register IDs and do not change
 the 77-row map above or its counts.
 
-T-rows: 17; mapped rows: 17
+map rows: 17
 
 | Row | Finding | Owner | Spec § / cases | Acceptance | Source |
 |---|---|---|---|---|---|
 | T1 | Git for Windows 2.56.0.windows.1 rejects `NUL`; discovery cause swallowed behind `GS-GIT-UNAVAILABLE` | R7-1 | §22.1 R7-1a, R7-1b | AC-37 | `2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md`; `2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md` |
 | T2 | Pre-ready lockdown refuses every diagnostic | R7-1 | §22.1 R7-1c | AC-37 | `2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md` |
 | T3 | Orphan session descriptors of a blocked session need a PO decision | R7-2 | §22.2 R7-2a, R7-2b, R7-2c | AC-37 | toil row only |
-| T4 | Pre-push hook absent on the second device, PO confirmation | R3 (K6-2); report in R7-7 | §21.3 R3-2; §22.7 R7-7e; replay §22.9 | AC-28, AC-37 | toil row only |
+| T4 | Pre-push hook absent on the second device, PO confirmation | R3 (K6-2) | §21.3 R3-2; §22.7 R7-7e; replay §22.9 | AC-28, AC-37 | toil row only |
 | T5 | Approval-bound package in the ignored root `evidence/` | R7-3 | §22.3 R7-3a, R7-3b, R7-3d | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
 | T6 | Backlog writes refused while the package is unverifiable | R7-4 | §22.4 R7-4a | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
-| T7 | Only `reopen-design` offered as recovery on a new device | R7-5 (`verified` route); lost-artifact sub-case: PO decision required, see below | §22.5 R7-5a, R7-5b, R7-5c | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
-| T8 | Clearing the registered authoring dispatch needs `continuity-cas` and a signed override | R5 | §21.5 coordinator records authoring itself; R5-6; replay §22.9 | AC-30, AC-37 | toil row only |
-| T9 | Re-registering an authoring dispatch needs a signed override | R5 | §21.5 coordinator; R5-6 (R1 catalogue admits the verb); replay §22.9 | AC-30, AC-37 | toil row only |
+| T7 | Only `reopen-design` offered as recovery on a new device | R7-5 | §22.5 R7-5a, R7-5b, R7-5c (`verified` route); lost-artifact sub-case: PO decision required, see below | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
+| T8 | Clearing the registered authoring dispatch needs `continuity-cas` and a signed override | R7-10 | §22.10 R7-10a, R7-10b, R7-10c, R7-10d | AC-37 | toil row only |
+| T9 | Re-registering an authoring dispatch needs a signed override | R5 | §21.5 coordinator; R5-6; R1 catalogue admits the verb; replay §22.9 | AC-30, AC-37 | toil row only |
 | T10 | Course outputs under `evidence/` not writable in design phase | R1 | §21.1 K5-8; R1-1; replay §22.9 | AC-26, AC-37 | toil row only |
 | T11 | `project/pipeline-state.json` commit refused in design phase | R7-4 | §22.4 R7-4b | AC-37 | toil row only |
 | T12 | Handover did not list device-bound artifacts | R7-3 | §22.3 R7-3c | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
@@ -230,8 +230,8 @@ T-rows: 17; mapped rows: 17
 | T17 | PowerShell lane `continuity-cas` denial has no override route | R7-8 | §22.8 R7-8a, R7-8b, R7-8c | AC-37 | toil row only |
 
 Owner counts (equal to the Spec §22.0 statement): R7-1 2, R7-2 1, R7-3 2,
-R7-4 2, R7-5 1, R7-6 2, R7-7 1, R7-8 1 (12 owned by R7); mapped: R1 1 (T10),
-R3 1 (T4), R4 1 (T13), R5 2 (T8, T9); total 17. R7-9 owns no row.
+R7-4 2, R7-5 1, R7-6 2, R7-7 1, R7-8 1, R7-10 1 (13 owned by R7); mapped: R1 1 (T10),
+R3 1 (T4), R4 1 (T13), R5 1 (T9); total 17. R7-9 owns no row.
 
 **Open PO question (T7 sub-case, not decided here).** PRD and Spec unchanged,
 but a bound artifact (package, course or readiness evidence) exists only on an

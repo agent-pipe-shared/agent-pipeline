@@ -932,8 +932,8 @@ from the signing terminal's PATH. Seventeen rows (T1–T17) were recorded.
 
 **Scope.** Spec §22 adds the workstream R7, agent-recoverable operation and
 device portability. Every row T1–T17 is fixed in 0.7.0 and owned exactly once:
-twelve by the R7 contracts R7-1…R7-8, five mapped to the R1, R3, R4 and R5
-contracts that already cover them (T4, T8, T9, T10, T13). `traceability.md`
+thirteen by the R7 contracts R7-1…R7-8 and R7-10, four mapped to the R1, R3, R4 and R5
+contracts that already cover them (T4, T9, T10, T13). `traceability.md`
 carries the 17-row map and AC-37 is the acceptance row. Nothing in §§1–14 or in
 Spec §§1–21 is reduced, and AC-32 is unchanged.
 
