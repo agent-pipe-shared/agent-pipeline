@@ -36,7 +36,7 @@ outside it.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted; template wording plus a refusal for a misplaced record.
+- **Rationale:** RECPATH-d (`e8fb0729a`, `specs/sprint-alfred-epic/evidence/night-2026-10-05/dispatch-record-path.md`): the writer and readers use root `evidence/` only, but a direct Write of `dispatch-record-*.json` elsewhere is admitted (`lib/guard/dispatch-record-lane.mjs` returns null for a non-root path, mirrored in the live monolith `hooks/guard-lifecycle-ready.mjs`), so a misplaced record escapes ownership and collision protection; two misplaced records are tracked under `specs/sprint-alfred-epic/evidence/`. The live refusal sits in a protected hook (PB-GUARD-HOOKS), so it needs a signed package after S2 package 1 lands.
+- **Assignment (if accepted):** (1) template wording "repository-root `evidence/`" in `goldfish-task.md` and its vendored copy (ordinary edit); (2) RED test then refusal in the split lane once S2 package 1 is applied (protected, PO signature); (3) decide whether to move the two tracked misplaced records. Reader coverage of the diagnosis is partial (listed in the note).
+- **Date:** 2026-10-06
