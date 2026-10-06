@@ -361,9 +361,10 @@ check("no config or no queuePath returns silently having spawned nothing; a conf
 // backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md. What IS asserted: no `git`
 // executable is spawned anywhere on the path; no spawn of any executable happens outside the ledger chain (every recorded
 // spawn has `fanout-ledger.mjs` in its call chain); on win32 every ledger-side spawn is the PowerShell executable reached
-// through windows-private-state.mjs > private-boundary.mjs > fanout-ledger.mjs, at most LEDGER_POWERSHELL_SPAWN_BOUND_WIN32
-// of them per enforce-mode evaluation; on every other platform there are none. When the backlog item is fixed that bound
-// must drop to 0.
+// through windows-private-state.mjs > private-boundary.mjs > fanout-ledger.mjs, EXACTLY LEDGER_POWERSHELL_SPAWN_BOUND_WIN32
+// of them per enforce-mode evaluation (an equality, so SF22 is red on a reduction as well as on an increase); on every
+// other platform there are none. When the backlog item is fixed SF22 turns red on purpose, and whoever fixes it must set
+// that constant to 0.
 
 // A preload for the REAL hook process: it wraps every `node:child_process` entry point, appends one line per call to a
 // log file and then calls through, and `syncBuiltinESMExports()` makes the ESM named imports of the hook, and of every
@@ -426,8 +427,9 @@ function spawnRecords(trip) {
 const isGit = (record) => /^git(?:\.(?:exe|cmd|bat|com))?$/iu.test(record.executable);
 // FANOUT-SF22t (used by SF22 only): the pinned ledger-side spawn shape on native Windows, observed as 4 `powershell.exe`
 // runs per enforce-mode evaluation. KNOWN DEVIATION from design 3.6 and 8, tracked in
-// backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md; the bound must drop to 0 when
-// that item is fixed. The executable is matched by basename and the chain by module basenames, innermost first.
+// backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md; SF22 asserts this count with an
+// equality, so fixing that item turns SF22 red until the constant is set to 0. The executable is matched by basename and
+// the chain by module basenames, innermost first.
 const LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 = 4;
 const LEDGER_POWERSHELL_CHAIN = ["windows-private-state.mjs", "private-boundary.mjs", "fanout-ledger.mjs"];
 const isPowerShell = (record) => /^powershell\.exe$/iu.test(record.executable);
@@ -506,8 +508,9 @@ check("an absolute commonDir is the only source of the git common dir: no git sp
       "no spawn of any executable happens outside the ledger chain",
     );
     // FANOUT-SF22t: the ledger-side spawns are PINNED, not tolerated. A known deviation from design 3.6 and 8, tracked in
-    // backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md: when that item is fixed,
-    // LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 must drop to 0 (and this branch collapses into the other-platform one).
+    // backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md. The count is an EXACT equality:
+    // an increase is a regression and a reduction is the tracked fix landing, and both turn this red. Whoever fixes that
+    // item must set LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 to 0 (and this branch collapses into the other-platform one).
     const ledgerSide = records.filter((record) => record.modules.includes("fanout-ledger.mjs"));
     if (process.platform === "win32") {
       assert.deepEqual(
@@ -521,8 +524,8 @@ check("an absolute commonDir is the only source of the git common dir: no git sp
         `on win32 every ledger-side spawn is reached through ${LEDGER_POWERSHELL_CHAIN.join(" > ")}`,
       );
       assert.ok(
-        ledgerSide.length <= LEDGER_POWERSHELL_SPAWN_BOUND_WIN32,
-        `at most ${LEDGER_POWERSHELL_SPAWN_BOUND_WIN32} ledger-side PowerShell spawns per enforce-mode evaluation on win32 (known deviation, backlog item), observed ${ledgerSide.length}: ${JSON.stringify(ledgerSide.map((record) => record.line))}`,
+        ledgerSide.length === LEDGER_POWERSHELL_SPAWN_BOUND_WIN32,
+        `exactly ${LEDGER_POWERSHELL_SPAWN_BOUND_WIN32} ledger-side PowerShell spawns per enforce-mode evaluation on win32 (known deviation, backlog item), observed ${ledgerSide.length}; if the count dropped, the tracked fix landed and LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 must be set to 0, if it rose that is a regression: ${JSON.stringify(ledgerSide.map((record) => record.line))}`,
       );
     } else {
       assert.deepEqual(ledgerSide.map((record) => record.line), [], "off win32 the ledger spawns nothing");
