@@ -46,3 +46,22 @@ The string `timed out after` does not occur in `plugins/pipeline-core/scripts/se
 1. Env fix is not indicated (install is healthy). Capture the actual `reason` and `diagnostics` (the adapter already attaches `diagnostics`, semgrep.mjs:228) from one full-repo `node plugins/pipeline-core/scripts/security-scan.mjs` run, preferably on the host class that failed, to separate the timeout path (143-145) from the `errors[]` path (184-192).
 2. If it is `errors[]`: consider the backlog item's option of treating `level: "warn"` per-file timeouts as degraded-coverage rather than fatal (code change in semgrep.mjs:184, with a new test), or exclude the oversized file via semgrep ignore. If it is the 60 s outer timeout: raise `--timeout-ms` for the verify invocation or scope the scan (config change in the verify suite entry; `harness/verify-suites.json` is a protected path, TP-13, so that needs the PO route).
 3. Record the captured `reason` into the triage row so the "likely env" label is replaced by a measured one.
+
+## SEMG-r: whole-repository run (2026-10-06)
+
+Measurement only, no code change. ONE run of the adapter's exported `run()` (`semgrep.mjs:213`) with `rootDir` = repository root, `config.rulesDir` = the shipped default `plugins/pipeline-core/security/semgrep/pipeline.yml`, `timeoutMs: 60000` (the route's `DEFAULT_TIMEOUT_MS`), driver `scratch/SEMG-r/driver.mjs` (untracked), run via `capture-evidence.mjs` (wrapped exit code 0), log `scratch/SEMG-r/run.log` (untracked). The adapter has no jobs/concurrency option, so it was run as is (semgrep's own defaults). Repository-root prefix shown as `<repo>`.
+
+- Status: `ERROR`, classification `scanner_error`. Findings returned: 0 (the adapter discards findings on this path; the child's own `results[]` held 17 entries).
+- Wall time: 18.7 s (driver 18692 ms; adapter diagnostics `elapsedMs` 18685 of the 60000 ms budget). Child exit 0, no spawn error, no signal, semgrep 1.171.0, stdout 512883 bytes, complete JSON.
+- Exact `reason`: `semgrep JSON contains an error payload`.
+- `errors[]`: count 6. First 5 (all `level: "warn"`, type `PartialParsing`, i.e. syntax errors the semgrep JS parser hit, not timeouts):
+  1. `<repo>\harness\scripts\check-product-capability-inventory.mjs:582` - Syntax error, a regex literal `/<!--[\s\S]*?-->/g` followed by `const` "was unexpected".
+  2. `<repo>\plugins\pipeline-core\lib\onboarding-continuity.mjs:7187` - Syntax error, partial span lines 7187-8773 (a `matchAll(/<!--\s*technical-spec-sha256\s*:/gu)` area).
+  3. `<repo>\plugins\pipeline-core\lib\project-onboarding-v3.test.mjs:9249` - Syntax error, "`/` was unexpected".
+  4. `<repo>\plugins\pipeline-core\scripts\measure-fresh-repo-onboarding-turns.mjs:245` (and 251) - Syntax error, "`/` was unexpected".
+  5. `<repo>\plugins\pipeline-core\scripts\measure-tofu-push-e2e.mjs:240` (and 246) - Syntax error, "`/` was unexpected".
+  The sixth entry was not printed by the driver (first-5 limit).
+
+Which section (a) path: the last row, `semgrep.mjs:184-192` (non-empty `errors[]` at exit 0, fail-closed). Not the outer timeout (143-145): the run finished in 18.7 s against the 60000 ms budget.
+
+Effect on inference (d): CONFIRMED in part, with a refinement. Path (1) (non-empty `errors[]` on a whole-repo scan at exit 0) is confirmed measured on this host; path (2) (60 s outer timeout) is refuted for this host (a different, slower host class is not verified). The `errors[]` content is semgrep parse errors (`PartialParsing`, level `warn`) on large or regex-heavy `.mjs` files, not the per-rule per-file timeouts that the backlog item `2026-08-11-semgrep-timeout-on-oversized-pipeline-state-test-file` describes; (d) listed "timeout or parse error", and the parse-error branch is the one observed. This also supports (f) step 2: the fail-closed rule at line 184 turns warn-level partial-parse errors into a fatal `scanner_error` while the 17 results are dropped. Not measured: whether the 2026-10-05 verify host produced the same six entries.
