@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "75a2692c1e4cdb0d779203e290786312696e2ef59939867c8e8dce337a002806"
+    "transitionHead": "09063361f649c3bb9a013d1b8cac64a8e92a7b7edea73f0d8c501c07b15f36e2"
   },
   "counts": {
-    "open": 174,
+    "open": 175,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -7811,6 +7811,16 @@
       "closureRepository": "self",
       "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
       "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
+    },
+    {
+      "id": "pipeline.push-classifier-deny-list-does-not-converge",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "GPGL-8 Opus Critic round, 2026-10-06 (specs/sprint-alfred-epic/evidence/critic-2026-10-05/gpgl-8.md), fifth consecutive round with new bypasses.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
