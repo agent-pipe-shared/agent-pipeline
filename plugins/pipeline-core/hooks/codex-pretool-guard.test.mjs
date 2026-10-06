@@ -13,11 +13,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-// Fixture directories live under a hardened, process-private temp root instead of the
-// bare OS temp directory: on native Windows the OS temp root grants non-owner principals,
-// which fails the private-state assurance for every fixture beneath it. `tmpdir()` below
-// is that private root; every `mkdtempSync(join(tmpdir(), ...))` call site is unchanged.
-import { privateTmpRoot as tmpdir } from "../lib/test-support/private-tmp.mjs";
+import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fork, spawnSync } from "node:child_process";
