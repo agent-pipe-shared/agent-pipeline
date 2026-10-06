@@ -88,3 +88,74 @@ because gitleaks never reports those findings to the adapter. The other 6 are `g
 `specs/2026-07-24-sprint-cyborg-epic/briefing-gitleaks-in-tree-fixture-fp-fix.md` 59:13,
 `plugins/pipeline-core/lib/resume-hint.test.mjs` 160:7). They block nothing; whether to prune them is a
 separate hygiene decision and was not made here.
+
+## 5. FX5B-2: justified suppression
+
+Dispatch FX5B-2 (diff-only; nothing applied to the real `.gitleaksignore`, nothing committed, no secret value
+copied anywhere). It closes the one finding section 3 left open and extends `repair.patch` so a single
+`git apply` carries both changes.
+
+### Justification (measured from the source and the scanner, no value quoted)
+
+`plugins/pipeline-core/lib/model-family-host-store.test.mjs:39` is the trust-anchor fixture row of the test:
+a `keyReference` label next to `publicKeySha256: sha(publicPem)`. Evidence, all read from the file:
+
+- the string literal assigned as the label describes itself as a synthetic fixture (line 39), and the adapter's
+  matched value is on that same line (driver: `secretFoundOnReportedLine: true`, length 20, reported as a number
+  only). Inferred, not printed: the 20-character label literal is that value (the only candidate of that length);
+- the public key beside it is hashed from a key pair generated in-process by `generateKeyPairSync("ed25519")`
+  (line 37), so no pre-existing key material is involved;
+- the neighbouring constants (lines 29-42) are a fixed timestamp, repeated-digit hex commit/tree values and
+  `sha()` digests of short labels; a grep of the file for network modules, URLs and credential APIs finds none
+  (its only `process.env` use hands fixture data to local `node` child processes, lines 845-852 and 959-969).
+
+Conclusion: a deterministic test-fixture label, not a credential. The rule trips on the `key... : "<label>"`
+assignment shape, not on any secret. The suppression is one exact content-v1 entry (digest over path, rule, line,
+column and the recognised value), so a changed value, a moved line or a different file is not covered.
+
+### Entry metadata
+
+| path | ruleId | line | column |
+|---|---|---|---|
+| `plugins/pipeline-core/lib/model-family-host-store.test.mjs` | `generic-api-key` | 39 | 26 |
+
+The entry line was produced by the adapter's own exported `gitleaksContentAuthorityLine()` from the normalised raw
+finding (driver `scratch/FX5B-2/measure.mjs`, same approach as `scratch/FX5B-W/measure.mjs`: the adapter's `run()`
+on a snapshot of HEAD), not hand-computed. It parses as `kind: "content"` and was not already in the file.
+
+### Combined patch
+
+`repair.patch` now applies BOTH changes in one hunk (`@@ -88,9 +88,18 @@`, 10 lines added, 1 removed): the
+FX5B-W re-lining of the `guard-git.test.mjs` entry (taken verbatim from the previously staged patch; file line 91)
+and the new entry. The new entry is inserted directly after the two `resume-hint.test.mjs` entries (the
+neighbouring `plugins/pipeline-core` test-file entries; the file has no strict global order, only per-block
+grouping), preceded by an 8-line `# FX5B-2 (2026-10-06): ...` justification comment, which is the file's own
+convention for later entries (`# <ID> (<date>): ...`). The comment states the verdict and deliberately does not
+quote the literal. The file had 215 newline-terminated lines before and has 224 after.
+
+- `git apply --check specs/sprint-alfred-epic/design/fx5b-gitleaksignore/repair.patch`: exit 0
+  (`scratch/FX5B-2/apply-check.log`). To apply later: `git apply specs/sprint-alfred-epic/design/fx5b-gitleaksignore/repair.patch`.
+- The patch was applied to a scratch copy with `git apply --directory=scratch/FX5B-2/patched` (exit 0,
+  `scratch/FX5B-2/apply-scratch.log`); the sha256 of the result equals the sha256 of the independently built
+  intended file (both `8b8fd67e...`, `scratch/FX5B-2/build-patch.log` and `scratch/FX5B-2/patched-run.log`).
+- The real `.gitleaksignore` was never written; its sha256 (`8883fa7f...`) was identical before and after every
+  driver run.
+
+### Retained count with the patched copy
+
+| Run | HEAD | Raw findings | Suppressed | Retained |
+|---|---|---|---|---|
+| unpatched (`scratch/FX5B-2/entry.log`) | `bcdeab014db3...` | 38 | 36 | **2** (the two findings of section 1) |
+| patched copy (`scratch/FX5B-2/patched-run.log`) | `64bf51049b2a...` | 38 | 38 | **0** (adapter status PASS, independent re-derivation 0, consistent) |
+
+Raw count 38 in both runs, so the added comment block trips no rule of its own. HEAD moved by commits from the
+shared tree between the two runs (each run saw `headUnchangedDuringRun: true`). The extracted `.gitleaksignore`
+equals HEAD's blob at both HEADs (`ignoreFileMatchesHeadBlob: true` in both logs) and, at the first HEAD, has the same
+sha256 as the working-tree file (`8883fa7f...`); the scanned fixture file equals the working tree at both HEADs
+(`targetFileEqualsWorkingTree: true`).
+
+Labelled deviation from FX5B-W's snapshot handling: the briefing forbids `git worktree`, and the adapter needs only
+a directory, so the snapshot was materialised with `git archive <HEAD sha>` extracted by `tar` into
+`scratch/FX5B-2/tree` (exact commit, no working-tree state), the adapter was run on it, and the directory was
+removed afterwards (`snapshotCleanup: "removed"` in both logs). The `scratch/FX5B-2/*.log` files are ignored
+scratch and not durable; the numbers above are the durable record.
