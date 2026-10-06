@@ -44,6 +44,9 @@ const IGNORE_FILE = ".gitleaksignore";
  * Repairs one stale content-v1 `.gitleaksignore` entry in place. Never touches any other entry or
  * line in the file. Returns `{ ok: true, ignoreFilePath, oldLine, newLine, newEntry }` on success,
  * `{ ok: false, reason }` on any failure -- never throws, never partially writes the file.
+ *
+ * Refuses (`reason` starting `value-binding-mismatch:`) unless the live finding carries the SAME
+ * value the replaced entry was computed for: the entry is re-bound only to a value somebody reviewed.
  */
 export async function repairStaleIgnoreEntry({
   rootDir,
@@ -69,6 +72,7 @@ export async function repairStaleIgnoreEntry({
   const rawText = readFileSync(resolvedIgnorePath, "utf8");
   const lines = rawText.split(/\r?\n/u);
   let staleIndex = -1;
+  let staleDigest = null;
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed === "" || trimmed.startsWith("#")) continue;
@@ -79,6 +83,7 @@ export async function repairStaleIgnoreEntry({
         return { ok: false, reason: `${resolvedIgnorePath} has more than one entry at ${targetPath}:${targetRule}:${oldLine}:${targetColumn}; ambiguous, resolve by hand` };
       }
       staleIndex = i;
+      staleDigest = parsed.digest;
     }
   }
   if (staleIndex === -1) {
@@ -121,6 +126,19 @@ export async function repairStaleIgnoreEntry({
 
   const newEntry = gitleaksContentAuthorityLine(matches[0]);
   if (newEntry === null) return { ok: false, reason: "could not compute a content authority for the live finding (malformed finding fields)" };
+
+  // Value binding (backlog pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one):
+  // the entry being replaced was reviewed for ONE value. Re-bind it only when the live finding carries
+  // that same value: recompute the live finding's authority at the OLD line (same path, rule, column and
+  // live value, StartLine = oldLine) and compare its digest with the digest of the entry being replaced.
+  // A different value at the same path/rule/column was never reviewed and must stay a finding. Fail
+  // closed (a digest that cannot be computed or parsed also refuses), before any write, and never put
+  // the secret value in the reason.
+  const liveAtOldLineLine = gitleaksContentAuthorityLine({ ...matches[0], StartLine: oldLine });
+  const liveAtOldLine = liveAtOldLineLine === null ? null : parseContentAuthorityLine(liveAtOldLineLine);
+  if (liveAtOldLine?.kind !== "content" || liveAtOldLine.digest !== staleDigest) {
+    return { ok: false, reason: `value-binding-mismatch: the live finding at ${targetPath}:${targetRule} column ${targetColumn} does not carry the value the entry at line ${oldLine} was recorded for -- refusing to re-bind an entry to a value nobody reviewed; review the live finding and replace the entry by hand if it is acceptable` };
+  }
 
   const newLine = typeof matches[0]?.StartLine === "number" ? matches[0].StartLine : matches[0]?.line;
   lines[staleIndex] = newEntry;
