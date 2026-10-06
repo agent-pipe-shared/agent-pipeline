@@ -51,10 +51,21 @@ different disposition.
 `test-registrations.patch` → `case-completion-dispositions.patch` → `inventory-surfaces.patch`
 → `node harness/scripts/check-verify-suite-registration.mjs` → `node harness/scripts/check-verify-case-completion.mjs`.
 
+The first checker exits 2 after this package by design (two deferred files stay UNREGISTERED until Q11 is decided);
+the second exits 0. See "Expected end state" below.
+
 ## Independence and the inventory hunk split
 
-Independent of the S2 package; both apply orders were measured with 0 rejects and identical results (evidence:
-[`../../evidence/night-2026-10-05/s2-package-apply-check.md`](../../evidence/night-2026-10-05/s2-package-apply-check.md)).
+Independent of the S2 package. Both apply orders were measured on fresh `git archive` exports of HEAD (GNU `patch -p1`):
+every patch step exited 0 (no rejects) in both orders, and the five patched target files are byte-identical in the two
+orders. Evidence, both machine-written:
+[`../../evidence/night-2026-10-05/regproof-result.json`](../../evidence/night-2026-10-05/regproof-result.json) (S2
+package first) and
+[`../../evidence/night-2026-10-05/regproof-reverse-result.json`](../../evidence/night-2026-10-05/regproof-reverse-result.json)
+(registration package first, plus an S2-first re-run for the comparison). The whole-export digests of the two orders
+differ only in two `.orig` backup files that GNU `patch` writes beside `verify.mjs` and the inventory when a hunk
+applies with an offset; the reverse JSON therefore reads `identicalEndState: false` under its strict whole-export
+definition and `comparison.targetsIdentical: true` for the patched targets.
 The two may be signed under one `sign-intent` or separately. `inventory-surfaces.patch` was deliberately split: one
 hunk was divided so that it no longer straddles the insertion point of the S2 package's inventory patch.
 
@@ -89,5 +100,22 @@ an accepted registry:
   tests in `deterministic-verification`, the exceptions follow the owner of the code under test
   (`continuity-and-handover`, `governance-event-ledger`, `setup-and-runtime-projection`). The capability is a product
   judgement; the PO may move a surface as long as it stays in exactly one capability.
-- Expected end state: `check-verify-suite-registration` reports no `UNCATEGORIZED-VERIFY-SURFACE`;
-  `check-verify-case-completion` reports no finding for the 23 suites (the deferred pair stays open until Q11).
+
+## Expected end state (measured)
+
+Measured on a fresh `git archive` export of HEAD with this package and the S2 package both applied, in either order
+([`../../evidence/night-2026-10-05/regproof-result.json`](../../evidence/night-2026-10-05/regproof-result.json) and
+[`../../evidence/night-2026-10-05/regproof-reverse-result.json`](../../evidence/night-2026-10-05/regproof-reverse-result.json)):
+
+- `check-verify-case-completion`: **exit 0** (registry valid, 297 entries before and 304 after the seven dispositions).
+- `check-verify-suite-registration`: **exit 2**, exactly two findings, both UNREGISTERED, both the deferred Q11 pair:
+  `plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs` and
+  `plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs`. No `UNCATEGORIZED-VERIFY-SURFACE`, no duplicate
+  inventory surface.
+- Applied alone, this package leaves four UNREGISTERED findings: the Q11 pair plus the two S2 surfaces
+  (`harness/scripts/guard-split-map.test.mjs`, `plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs`), which
+  the S2 package registers.
+
+The exit-2 state is a tolerated red state per QG-06: **reason** — PO question Q11 is open (migrate both test files to
+the `registerTestCaseCompletion` protocol, or a different disposition); **owner** — PO decision, the Elephant
+implements the chosen route; **expiry** — before the 0.7.0 release candidate.

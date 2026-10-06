@@ -36,5 +36,34 @@ The case-completion checker classifies neither suite as vulnerable, so neither n
 ## Independence from the registration package
 
 The registration package [`../verify-registration-package-1/`](../verify-registration-package-1/) is separate. Both
-apply orders were measured with 0 rejects and identical results. The two may be signed under one `sign-intent` or
-separately. Evidence: [`../../evidence/night-2026-10-05/s2-package-apply-check.md`](../../evidence/night-2026-10-05/s2-package-apply-check.md).
+apply orders were measured on fresh `git archive` exports of HEAD (GNU `patch -p1`): every patch step exited 0 (no
+rejects) in both orders, and the five target files are byte-identical in the two orders. Evidence, both
+machine-written:
+[`../../evidence/night-2026-10-05/regproof-result.json`](../../evidence/night-2026-10-05/regproof-result.json) (S2
+package first) and
+[`../../evidence/night-2026-10-05/regproof-reverse-result.json`](../../evidence/night-2026-10-05/regproof-reverse-result.json)
+(registration package first, plus an S2-first re-run for the comparison). The whole-export digests differ only in two
+`.orig` backup files that GNU `patch` writes beside `verify.mjs` and the inventory when a hunk applies with an offset;
+the reverse JSON therefore reads `identicalEndState: false` under its strict whole-export definition and
+`comparison.targetsIdentical: true` for the targets. The two may be signed under one `sign-intent` or separately.
+
+## Evidence and review state
+
+Independent review of this package as a whole: pending. PO acceptance: open. No Critic record below carries a PASS
+verdict.
+
+Equivalence evidence (monolith vs facade, native Windows part):
+[`../../evidence/s2-equivalence-2026-10-05.md`](../../evidence/s2-equivalence-2026-10-05.md). Its verdict line reads:
+**NOT VERIFIABLE (at least one test file did not complete in both trees; see table)**.
+
+Machine proofs of the end state (both apply orders):
+[`../../evidence/night-2026-10-05/regproof-result.json`](../../evidence/night-2026-10-05/regproof-result.json) and
+[`../../evidence/night-2026-10-05/regproof-reverse-result.json`](../../evidence/night-2026-10-05/regproof-reverse-result.json).
+
+Critic records, with the verdict as written in each record's header:
+
+| Record | Verdict |
+|---|---|
+| [`s2-guard-split.md`](../../evidence/critic-2026-10-05/s2-guard-split.md) | FAIL |
+| [`s2-registration-patches.md`](../../evidence/critic-2026-10-05/s2-registration-patches.md) | pass/fail withheld (partial review) |
+| [`package-split.md`](../../evidence/critic-2026-10-05/package-split.md) | pass/fail withheld (partial review) |

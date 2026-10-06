@@ -1,0 +1,1415 @@
+{
+  "schema": "pipeline.alfred.regproof.v1",
+  "order": "registration-first",
+  "headSha": "97407974f1cc02204d8fbe903e44f9cb5eb32471",
+  "nodeVersion": "v24.19.0",
+  "platform": "win32",
+  "generatedAt": "2026-10-06T02:33:39.450Z",
+  "placeholders": {
+    "tree": "<tree>",
+    "treeS2First": "<tree-s2first>",
+    "repo": "<repo>",
+    "node": "<node>",
+    "home": "<home>",
+    "host": "<host-path>"
+  },
+  "tailLimit": 40,
+  "toolVersions": {
+    "git": "git version 2.55.0.windows.5",
+    "tar": "tar (GNU tar) 1.35",
+    "patch": "GNU patch 2.7.6"
+  },
+  "inputs": [
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/protected-baseline.patch",
+      "sha256": "06bbf416d14133af00ddfd77b297caaa9d91be355c58694a882bca3e8617e155"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/guard-lifecycle-ready.facade.mjs",
+      "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/verify-registration.patch",
+      "sha256": "5b7cc51c918fe44886f26e441ab784db5027d6d3f6603d404bfd78013934f59f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/inventory-surfaces.patch",
+      "sha256": "15f831d89667846a352fa1f5c4ce832922c2043cb0ead16d1b5e9313fa0cdfa4"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/verify-registration-package-1/test-registrations.patch",
+      "sha256": "df5c9e5d019efa4f286e6b3dd90be1f8b50a8e79bf91b25f9a739574d433c4e2"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/verify-registration-package-1/case-completion-dispositions.patch",
+      "sha256": "549144501173077b2be0aa7c11f9ad7967c3a24eb504a51353fee15c8ff599ac"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/verify-registration-package-1/inventory-surfaces.patch",
+      "sha256": "2631aa5c1fb98a748f866d9169d2172c0193b8a8775c0a1663c59f08f476e853"
+    }
+  ],
+  "stoppedAt": null,
+  "stages": {
+    "baseline": {
+      "suiteRegistration": 2,
+      "caseCompletion": 0,
+      "suiteRegistrationUnregistered": [
+        "harness/scripts/guard-split-map.test.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs",
+        "plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs",
+        "plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs",
+        "plugins/pipeline-core/hooks/post-compact-reground.fanout.test.mjs",
+        "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
+        "plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs",
+        "plugins/pipeline-core/lib/design-advisor-provenance.flap3.test.mjs",
+        "plugins/pipeline-core/lib/fanout-governor.test.mjs",
+        "plugins/pipeline-core/lib/fanout-ledger.test.mjs",
+        "plugins/pipeline-core/lib/governance-event-store.win-fsync.test.mjs",
+        "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+        "plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs",
+        "plugins/pipeline-core/lib/hardened-private-directory.test.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs",
+        "plugins/pipeline-core/lib/runtime-handover-projection.win-path.test.mjs",
+        "plugins/pipeline-core/lib/slice-queue.test.mjs",
+        "plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs",
+        "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs",
+        "plugins/pipeline-core/scripts/hook-currentness.digest-once.test.mjs",
+        "plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs",
+        "plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs",
+        "plugins/pipeline-core/scripts/slice-queue.test.mjs",
+        "plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs",
+        "plugins/pipeline-core/skills/close-block/close-block-fanout-report.test.mjs"
+      ],
+      "suiteRegistrationSummary": "Verify suite registration check failed: 27 finding(s) (27 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired).",
+      "caseCompletionSummary": "Verify case-completion registry valid: 297 entries, 290 conservatively classified suites."
+    },
+    "afterRegistration": {
+      "suiteRegistration": 2,
+      "caseCompletion": 0,
+      "suiteRegistrationUnregistered": [
+        "harness/scripts/guard-split-map.test.mjs",
+        "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+        "plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs",
+        "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs"
+      ],
+      "suiteRegistrationSummary": "Verify suite registration check failed: 4 finding(s) (4 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired).",
+      "caseCompletionSummary": "Verify case-completion registry valid: 304 entries, 297 conservatively classified suites."
+    },
+    "afterBoth": {
+      "suiteRegistration": 2,
+      "caseCompletion": 0,
+      "suiteRegistrationUnregistered": [
+        "plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs",
+        "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs"
+      ],
+      "suiteRegistrationSummary": "Verify suite registration check failed: 2 finding(s) (2 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired).",
+      "caseCompletionSummary": "Verify case-completion registry valid: 304 entries, 297 conservatively classified suites."
+    }
+  },
+  "endState": {
+    "targets": [
+      {
+        "path": "plugins/pipeline-core/protected-baseline.json",
+        "sha256": "091a984e98b3f30839cb0d07c4e41e188d84f8a1c15c035ee967e2d62d6daa29",
+        "bytes": 2613
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+        "bytes": 4832
+      },
+      {
+        "path": "harness/scripts/verify.mjs",
+        "sha256": "1fd68b756f4d25f3b403a0b7ec96a2ccb45330cce815fb464b4d133fc84b1884",
+        "bytes": 122828
+      },
+      {
+        "path": "docs/product-capability-inventory.json",
+        "sha256": "becec010f7a9c39243ad8abc5c70ce13177f798a54cbfcaccafec629f8790707",
+        "bytes": 140814
+      },
+      {
+        "path": "harness/config/verify-case-completion.v1.json",
+        "sha256": "ecf4219e57de7576ab8bd01c0cdb763837bd47bd4cc9d37237a15d219b66fd5f",
+        "bytes": 71471
+      }
+    ],
+    "wholeTree": {
+      "fileCount": 4849,
+      "nonFileEntries": 0,
+      "digestSha256": "d264947495c627359893f97e3ca29b8d99774b4da9155d61ca76114755426a97"
+    }
+  },
+  "s2FirstOrder": {
+    "order": "s2-first",
+    "stages": {
+      "afterS2": {
+        "suiteRegistration": 2,
+        "caseCompletion": 0,
+        "suiteRegistrationUnregistered": [
+          "plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs",
+          "plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs",
+          "plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs",
+          "plugins/pipeline-core/hooks/post-compact-reground.fanout.test.mjs",
+          "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
+          "plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs",
+          "plugins/pipeline-core/lib/design-advisor-provenance.flap3.test.mjs",
+          "plugins/pipeline-core/lib/fanout-governor.test.mjs",
+          "plugins/pipeline-core/lib/fanout-ledger.test.mjs",
+          "plugins/pipeline-core/lib/governance-event-store.win-fsync.test.mjs",
+          "plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs",
+          "plugins/pipeline-core/lib/hardened-private-directory.test.mjs",
+          "plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs",
+          "plugins/pipeline-core/lib/runtime-handover-projection.win-path.test.mjs",
+          "plugins/pipeline-core/lib/slice-queue.test.mjs",
+          "plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs",
+          "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs",
+          "plugins/pipeline-core/scripts/hook-currentness.digest-once.test.mjs",
+          "plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs",
+          "plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs",
+          "plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs",
+          "plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs",
+          "plugins/pipeline-core/scripts/slice-queue.test.mjs",
+          "plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs",
+          "plugins/pipeline-core/skills/close-block/close-block-fanout-report.test.mjs"
+        ],
+        "suiteRegistrationSummary": "Verify suite registration check failed: 25 finding(s) (25 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired).",
+        "caseCompletionSummary": "Verify case-completion registry valid: 297 entries, 290 conservatively classified suites."
+      },
+      "afterBoth": {
+        "suiteRegistration": 2,
+        "caseCompletion": 0,
+        "suiteRegistrationUnregistered": [
+          "plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs",
+          "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs"
+        ],
+        "suiteRegistrationSummary": "Verify suite registration check failed: 2 finding(s) (2 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired).",
+        "caseCompletionSummary": "Verify case-completion registry valid: 304 entries, 297 conservatively classified suites."
+      }
+    },
+    "endState": {
+      "targets": [
+        {
+          "path": "plugins/pipeline-core/protected-baseline.json",
+          "sha256": "091a984e98b3f30839cb0d07c4e41e188d84f8a1c15c035ee967e2d62d6daa29",
+          "bytes": 2613
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+          "bytes": 4832
+        },
+        {
+          "path": "harness/scripts/verify.mjs",
+          "sha256": "1fd68b756f4d25f3b403a0b7ec96a2ccb45330cce815fb464b4d133fc84b1884",
+          "bytes": 122828
+        },
+        {
+          "path": "docs/product-capability-inventory.json",
+          "sha256": "becec010f7a9c39243ad8abc5c70ce13177f798a54cbfcaccafec629f8790707",
+          "bytes": 140814
+        },
+        {
+          "path": "harness/config/verify-case-completion.v1.json",
+          "sha256": "ecf4219e57de7576ab8bd01c0cdb763837bd47bd4cc9d37237a15d219b66fd5f",
+          "bytes": 71471
+        }
+      ],
+      "wholeTree": {
+        "fileCount": 4849,
+        "nonFileEntries": 0,
+        "digestSha256": "3858bcd9e583b2618cec00c7ff2d66a1fbe518f3d746e19e199c4a3c44dfcb07"
+      }
+    }
+  },
+  "identicalEndState": false,
+  "comparison": {
+    "status": "determined",
+    "registrationFirstTargets": [
+      {
+        "path": "plugins/pipeline-core/protected-baseline.json",
+        "sha256": "091a984e98b3f30839cb0d07c4e41e188d84f8a1c15c035ee967e2d62d6daa29",
+        "bytes": 2613
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+        "bytes": 4832
+      },
+      {
+        "path": "harness/scripts/verify.mjs",
+        "sha256": "1fd68b756f4d25f3b403a0b7ec96a2ccb45330cce815fb464b4d133fc84b1884",
+        "bytes": 122828
+      },
+      {
+        "path": "docs/product-capability-inventory.json",
+        "sha256": "becec010f7a9c39243ad8abc5c70ce13177f798a54cbfcaccafec629f8790707",
+        "bytes": 140814
+      },
+      {
+        "path": "harness/config/verify-case-completion.v1.json",
+        "sha256": "ecf4219e57de7576ab8bd01c0cdb763837bd47bd4cc9d37237a15d219b66fd5f",
+        "bytes": 71471
+      }
+    ],
+    "s2FirstTargets": [
+      {
+        "path": "plugins/pipeline-core/protected-baseline.json",
+        "sha256": "091a984e98b3f30839cb0d07c4e41e188d84f8a1c15c035ee967e2d62d6daa29",
+        "bytes": 2613
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+        "bytes": 4832
+      },
+      {
+        "path": "harness/scripts/verify.mjs",
+        "sha256": "1fd68b756f4d25f3b403a0b7ec96a2ccb45330cce815fb464b4d133fc84b1884",
+        "bytes": 122828
+      },
+      {
+        "path": "docs/product-capability-inventory.json",
+        "sha256": "becec010f7a9c39243ad8abc5c70ce13177f798a54cbfcaccafec629f8790707",
+        "bytes": 140814
+      },
+      {
+        "path": "harness/config/verify-case-completion.v1.json",
+        "sha256": "ecf4219e57de7576ab8bd01c0cdb763837bd47bd4cc9d37237a15d219b66fd5f",
+        "bytes": 71471
+      }
+    ],
+    "differingTargets": [],
+    "targetsIdentical": true,
+    "wholeTreeFileCount": {
+      "registrationFirst": 4849,
+      "s2First": 4849
+    },
+    "wholeTreeDigestSha256": {
+      "registrationFirst": "d264947495c627359893f97e3ca29b8d99774b4da9155d61ca76114755426a97",
+      "s2First": "3858bcd9e583b2618cec00c7ff2d66a1fbe518f3d746e19e199c4a3c44dfcb07"
+    },
+    "wholeTreeIdentical": false,
+    "differingPathCount": 2,
+    "differingPaths": [
+      "docs/product-capability-inventory.json.orig",
+      "harness/scripts/verify.mjs.orig"
+    ]
+  },
+  "regproofResultFile": {
+    "path": "specs/sprint-alfred-epic/evidence/night-2026-10-05/regproof-result.json",
+    "readable": true,
+    "fileSha256": "318fd343b6d8b11c37baae8112ca097f6a94360880a96c4c02f112ee6be25457",
+    "schema": "pipeline.alfred.regproof.v1",
+    "headSha": "bcdeab014db38e645256c1455a882a5a3ecc31db",
+    "recordsEndStateTargetHashes": false,
+    "recordedTargetHashes": {
+      "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552"
+    },
+    "inputsEqualCurrent": true,
+    "inputMismatches": [],
+    "stagesAfterS2EqualS2FirstRun": true,
+    "stagesAfterBothEqualS2FirstRun": true,
+    "facadeHashEqualsS2FirstRun": true,
+    "note": "the earlier file records only the facade's after-copy sha256, not the end-state hashes of all targets, so the S2-first order was re-run inside this driver"
+  },
+  "steps": [
+    {
+      "id": "head-sha",
+      "stage": "setup",
+      "description": "record the HEAD commit that is exported",
+      "status": "ok",
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 24,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "8945c3343f9e43c498ce4a1b386686493b31922630d02c26aeb1314f4400cb79",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "97407974f1cc02204d8fbe903e44f9cb5eb32471"
+      ],
+      "stderrTail": []
+    },
+    {
+      "id": "clean-scratch",
+      "stage": "setup",
+      "description": "remove stale exports and tar from a previous attempt (scratch/PKGFIX only)",
+      "status": "ok",
+      "argv": [
+        "fs.rmSync",
+        "<repo>/scratch/PKGFIX/tree",
+        "<repo>/scratch/PKGFIX/tree-s2first",
+        "<repo>/scratch/PKGFIX/head.tar"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 2,
+      "detail": null
+    },
+    {
+      "id": "git-archive",
+      "stage": "setup",
+      "description": "export HEAD as a tar",
+      "status": "ok",
+      "argv": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=scratch/PKGFIX/head.tar",
+        "HEAD"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 281,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [],
+      "stderrTail": []
+    },
+    {
+      "id": "mkdir-trees",
+      "stage": "setup",
+      "description": "create the two export directories",
+      "status": "ok",
+      "argv": [
+        "fs.mkdirSync",
+        "<tree>",
+        "<tree-s2first>",
+        "{recursive:true}"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 2,
+      "detail": null
+    },
+    {
+      "id": "tar-extract-rf",
+      "stage": "setup",
+      "description": "extract the export for the registration-first order",
+      "status": "ok",
+      "argv": [
+        "tar",
+        "-xf",
+        "scratch/PKGFIX/head.tar",
+        "-C",
+        "scratch/PKGFIX/tree"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 1448,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [],
+      "stderrTail": []
+    },
+    {
+      "id": "tar-extract-sf",
+      "stage": "setup",
+      "description": "extract the export for the s2-first order",
+      "status": "ok",
+      "argv": [
+        "tar",
+        "-xf",
+        "scratch/PKGFIX/head.tar",
+        "-C",
+        "scratch/PKGFIX/tree-s2first"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 1514,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [],
+      "stderrTail": []
+    },
+    {
+      "id": "tree-sanity",
+      "stage": "setup",
+      "description": "both exports hold the files the later steps use",
+      "status": "ok",
+      "argv": [
+        "fs.existsSync",
+        "<tree>|<tree-s2first>",
+        "harness/scripts/verify.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 3,
+      "detail": {
+        "checked": [
+          "harness/scripts/verify.mjs",
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+          "harness/verify-suites.json"
+        ]
+      }
+    },
+    {
+      "id": "rf-baseline-suite-registration",
+      "stage": "baseline (unpatched export of HEAD)",
+      "description": "check-verify-suite-registration against the export",
+      "status": "non-zero-or-error",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-suite-registration.mjs",
+        "--root",
+        "<tree>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 2,
+      "signal": null,
+      "error": null,
+      "durationMs": 92,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 28,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "f78ba19fe01a15a5e686a112a0c1e49e93814b0a117313d629b1d0254c256b8a",
+      "stdoutTail": [],
+      "stderrTail": [
+        "UNREGISTERED harness/scripts/guard-split-map.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/post-compact-reground.fanout.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/stop-fanout.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/design-advisor-provenance.flap3.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/fanout-governor.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/fanout-ledger.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/governance-event-store.win-fsync.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/hardened-private-directory.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/runtime-handover-projection.win-path.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/slice-queue.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/hook-currentness.digest-once.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/slice-queue.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/skills/close-block/close-block-fanout-report.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "Verify suite registration check failed: 27 finding(s) (27 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired)."
+      ]
+    },
+    {
+      "id": "rf-baseline-case-completion",
+      "stage": "baseline (unpatched export of HEAD)",
+      "description": "check-verify-case-completion against the export",
+      "status": "ok",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-case-completion.mjs",
+        "--root",
+        "<tree>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 1223,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "2d86dc705953fa334b2ad734e782aaba00d7a668195f3dbd59f2e5e4ea3fa015",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "Verify case-completion registry valid: 297 entries, 290 conservatively classified suites."
+      ],
+      "stderrTail": []
+    },
+    {
+      "id": "rf-rp-test-registrations",
+      "stage": "registration package",
+      "description": "apply specs/sprint-alfred-epic/design/verify-registration-package-1/test-registrations.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\verify-registration-package-1\\test-registrations.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 25,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "35a06592c9657d3f0877fe9759bbb8f6ad84c7b361caef6b1a50b84fcaba8633",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file harness/scripts/verify.mjs"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "rf-rp-case-completion-dispositions",
+      "stage": "registration package",
+      "description": "apply specs/sprint-alfred-epic/design/verify-registration-package-1/case-completion-dispositions.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\verify-registration-package-1\\case-completion-dispositions.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 25,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "4b5ca3275f16c868ed72c21dd8d1ce24571c0509be41c93bde5a45e6f25d2995",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file harness/config/verify-case-completion.v1.json"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "rf-rp-inventory-surfaces",
+      "stage": "registration package",
+      "description": "apply specs/sprint-alfred-epic/design/verify-registration-package-1/inventory-surfaces.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\verify-registration-package-1\\inventory-surfaces.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 24,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "06baf1f80c61c50ae142f44ccb2505d99693614febc3723221412dd07f0efbe1",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file docs/product-capability-inventory.json"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "rf-afterRegistration-suite-registration",
+      "stage": "after the registration package (registration-first)",
+      "description": "check-verify-suite-registration against the export",
+      "status": "non-zero-or-error",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-suite-registration.mjs",
+        "--root",
+        "<tree>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 2,
+      "signal": null,
+      "error": null,
+      "durationMs": 89,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 5,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "054a095d9f31f5a380b3c62b10a15788cc6a452e05cb9f07245fc6b2e6710ddd",
+      "stdoutTail": [],
+      "stderrTail": [
+        "UNREGISTERED harness/scripts/guard-split-map.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "Verify suite registration check failed: 4 finding(s) (4 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired)."
+      ]
+    },
+    {
+      "id": "rf-afterRegistration-case-completion",
+      "stage": "after the registration package (registration-first)",
+      "description": "check-verify-case-completion against the export",
+      "status": "ok",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-case-completion.mjs",
+        "--root",
+        "<tree>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 1211,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "d2b50279e27289530396bbdb4ff161be72916f470a305e63d270e9e7344dc78c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "Verify case-completion registry valid: 304 entries, 297 conservatively classified suites."
+      ],
+      "stderrTail": []
+    },
+    {
+      "id": "rf-s2-protected-baseline",
+      "stage": "S2 package",
+      "description": "apply specs/sprint-alfred-epic/design/s2-package-1/protected-baseline.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\s2-package-1\\protected-baseline.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 26,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "51caf1b670e34f3017c5ec87a7ad2c085fe784d05741ddc8ae8dde24100ba07b",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file plugins/pipeline-core/protected-baseline.json"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "rf-s2-facade-copy",
+      "stage": "S2 package",
+      "description": "copy the facade over the guard-lifecycle-ready hook in the export",
+      "status": "ok",
+      "argv": [
+        "fs.copyFileSync",
+        "specs/sprint-alfred-epic/design/s2-package-1/guard-lifecycle-ready.facade.mjs",
+        "<tree>/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 4,
+      "detail": {
+        "targetExistedBefore": true,
+        "beforeBytes": 437003,
+        "afterBytes": 4832,
+        "afterLineCount": 75,
+        "afterSha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552"
+      }
+    },
+    {
+      "id": "rf-s2-verify-registration",
+      "stage": "S2 package",
+      "description": "apply specs/sprint-alfred-epic/design/s2-package-1/verify-registration.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\s2-package-1\\verify-registration.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 25,
+      "stdoutLineCount": 2,
+      "stderrLineCount": 0,
+      "stdoutSha256": "326902f3fde80560b4bdc9a362bf7cd7e83d1adca51248e5afa0d7fdaec85dc0",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file harness/scripts/verify.mjs",
+        "Hunk #2 succeeded at 489 (offset 15 lines)."
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": [
+        "Hunk #2 succeeded at 489 (offset 15 lines)."
+      ]
+    },
+    {
+      "id": "rf-s2-inventory-surfaces",
+      "stage": "S2 package",
+      "description": "apply specs/sprint-alfred-epic/design/s2-package-1/inventory-surfaces.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\s2-package-1\\inventory-surfaces.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 25,
+      "stdoutLineCount": 2,
+      "stderrLineCount": 0,
+      "stdoutSha256": "7b35e2849e531858fc9353825ddb61e720867c406622c7e5007329990365449c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file docs/product-capability-inventory.json",
+        "Hunk #1 succeeded at 455 (offset 9 lines)."
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": [
+        "Hunk #1 succeeded at 455 (offset 9 lines)."
+      ]
+    },
+    {
+      "id": "rf-afterBoth-suite-registration",
+      "stage": "after both packages (registration-first, end state)",
+      "description": "check-verify-suite-registration against the export",
+      "status": "non-zero-or-error",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-suite-registration.mjs",
+        "--root",
+        "<tree>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 2,
+      "signal": null,
+      "error": null,
+      "durationMs": 88,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 3,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "1a16517942a044bea5015462ff4850c8d6d5fcf5e7bb4676e6a1ea949253273b",
+      "stdoutTail": [],
+      "stderrTail": [
+        "UNREGISTERED plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "Verify suite registration check failed: 2 finding(s) (2 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired)."
+      ]
+    },
+    {
+      "id": "rf-afterBoth-case-completion",
+      "stage": "after both packages (registration-first, end state)",
+      "description": "check-verify-case-completion against the export",
+      "status": "ok",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-case-completion.mjs",
+        "--root",
+        "<tree>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 1220,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "d2b50279e27289530396bbdb4ff161be72916f470a305e63d270e9e7344dc78c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "Verify case-completion registry valid: 304 entries, 297 conservatively classified suites."
+      ],
+      "stderrTail": []
+    },
+    {
+      "id": "rf-check-verify-mjs",
+      "stage": "extra (registration-first end state)",
+      "description": "node --check on the patched Verify entry point",
+      "status": "ok",
+      "argv": [
+        "node",
+        "--check",
+        "<tree>\\harness\\scripts\\verify.mjs"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 41,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [],
+      "stderrTail": []
+    },
+    {
+      "id": "rf-check-guard-lifecycle-ready",
+      "stage": "extra (registration-first end state)",
+      "description": "node --check on the facade",
+      "status": "ok",
+      "argv": [
+        "node",
+        "--check",
+        "<tree>\\plugins\\pipeline-core\\hooks\\guard-lifecycle-ready.mjs"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 39,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [],
+      "stderrTail": []
+    },
+    {
+      "id": "rf-end-state",
+      "stage": "end state (registration-first)",
+      "description": "sha256 of every patched target plus a whole-tree digest of the export",
+      "status": "ok",
+      "argv": [
+        "fs.readFileSync+sha256",
+        "<tree>",
+        "5 targets + whole tree"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 883,
+      "detail": {
+        "targets": [
+          {
+            "path": "plugins/pipeline-core/protected-baseline.json",
+            "sha256": "091a984e98b3f30839cb0d07c4e41e188d84f8a1c15c035ee967e2d62d6daa29",
+            "bytes": 2613
+          },
+          {
+            "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+            "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+            "bytes": 4832
+          },
+          {
+            "path": "harness/scripts/verify.mjs",
+            "sha256": "1fd68b756f4d25f3b403a0b7ec96a2ccb45330cce815fb464b4d133fc84b1884",
+            "bytes": 122828
+          },
+          {
+            "path": "docs/product-capability-inventory.json",
+            "sha256": "becec010f7a9c39243ad8abc5c70ce13177f798a54cbfcaccafec629f8790707",
+            "bytes": 140814
+          },
+          {
+            "path": "harness/config/verify-case-completion.v1.json",
+            "sha256": "ecf4219e57de7576ab8bd01c0cdb763837bd47bd4cc9d37237a15d219b66fd5f",
+            "bytes": 71471
+          }
+        ],
+        "wholeTree": {
+          "fileCount": 4849,
+          "nonFileEntries": 0,
+          "digestSha256": "d264947495c627359893f97e3ca29b8d99774b4da9155d61ca76114755426a97"
+        }
+      }
+    },
+    {
+      "id": "sf-s2-protected-baseline",
+      "stage": "S2 package",
+      "description": "apply specs/sprint-alfred-epic/design/s2-package-1/protected-baseline.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree-s2first>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\s2-package-1\\protected-baseline.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 26,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "51caf1b670e34f3017c5ec87a7ad2c085fe784d05741ddc8ae8dde24100ba07b",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file plugins/pipeline-core/protected-baseline.json"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "sf-s2-facade-copy",
+      "stage": "S2 package",
+      "description": "copy the facade over the guard-lifecycle-ready hook in the export",
+      "status": "ok",
+      "argv": [
+        "fs.copyFileSync",
+        "specs/sprint-alfred-epic/design/s2-package-1/guard-lifecycle-ready.facade.mjs",
+        "<tree>/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 3,
+      "detail": {
+        "targetExistedBefore": true,
+        "beforeBytes": 437003,
+        "afterBytes": 4832,
+        "afterLineCount": 75,
+        "afterSha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552"
+      }
+    },
+    {
+      "id": "sf-s2-verify-registration",
+      "stage": "S2 package",
+      "description": "apply specs/sprint-alfred-epic/design/s2-package-1/verify-registration.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree-s2first>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\s2-package-1\\verify-registration.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 24,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "35a06592c9657d3f0877fe9759bbb8f6ad84c7b361caef6b1a50b84fcaba8633",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file harness/scripts/verify.mjs"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "sf-s2-inventory-surfaces",
+      "stage": "S2 package",
+      "description": "apply specs/sprint-alfred-epic/design/s2-package-1/inventory-surfaces.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree-s2first>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\s2-package-1\\inventory-surfaces.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 25,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "06baf1f80c61c50ae142f44ccb2505d99693614febc3723221412dd07f0efbe1",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file docs/product-capability-inventory.json"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "sf-afterS2-suite-registration",
+      "stage": "after the S2 package (s2-first)",
+      "description": "check-verify-suite-registration against the export",
+      "status": "non-zero-or-error",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-suite-registration.mjs",
+        "--root",
+        "<tree-s2first>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 2,
+      "signal": null,
+      "error": null,
+      "durationMs": 102,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 26,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "a4e09e2383c798e1aaafe9fe7369974b22f0840240d0ee12dbc332d453286905",
+      "stdoutTail": [],
+      "stderrTail": [
+        "UNREGISTERED plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/post-compact-reground.fanout.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/hooks/stop-fanout.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/design-advisor-provenance.flap3.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/fanout-governor.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/fanout-ledger.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/governance-event-store.win-fsync.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/hardened-private-directory.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/runtime-handover-projection.win-path.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/lib/slice-queue.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/hook-currentness.digest-once.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/slice-queue.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/skills/close-block/close-block-fanout-report.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "Verify suite registration check failed: 25 finding(s) (25 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired)."
+      ]
+    },
+    {
+      "id": "sf-afterS2-case-completion",
+      "stage": "after the S2 package (s2-first)",
+      "description": "check-verify-case-completion against the export",
+      "status": "ok",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-case-completion.mjs",
+        "--root",
+        "<tree-s2first>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 1293,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "2d86dc705953fa334b2ad734e782aaba00d7a668195f3dbd59f2e5e4ea3fa015",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "Verify case-completion registry valid: 297 entries, 290 conservatively classified suites."
+      ],
+      "stderrTail": []
+    },
+    {
+      "id": "sf-rp-test-registrations",
+      "stage": "registration package",
+      "description": "apply specs/sprint-alfred-epic/design/verify-registration-package-1/test-registrations.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree-s2first>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\verify-registration-package-1\\test-registrations.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 31,
+      "stdoutLineCount": 13,
+      "stderrLineCount": 0,
+      "stdoutSha256": "11e6537016a025c2401e8c0612774d82e2a5ef2663e51130ae96120060628ea3",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file harness/scripts/verify.mjs",
+        "Hunk #1 succeeded at 307 (offset 1 line).",
+        "Hunk #2 succeeded at 311 (offset 1 line).",
+        "Hunk #3 succeeded at 322 (offset 1 line).",
+        "Hunk #4 succeeded at 332 (offset 1 line).",
+        "Hunk #5 succeeded at 343 (offset 1 line).",
+        "Hunk #6 succeeded at 409 (offset 1 line).",
+        "Hunk #7 succeeded at 480 (offset 1 line).",
+        "Hunk #8 succeeded at 609 (offset 2 lines).",
+        "Hunk #9 succeeded at 634 (offset 2 lines).",
+        "Hunk #10 succeeded at 716 (offset 2 lines).",
+        "Hunk #11 succeeded at 727 (offset 2 lines).",
+        "Hunk #12 succeeded at 927 (offset 2 lines)."
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": [
+        "Hunk #1 succeeded at 307 (offset 1 line).",
+        "Hunk #2 succeeded at 311 (offset 1 line).",
+        "Hunk #3 succeeded at 322 (offset 1 line).",
+        "Hunk #4 succeeded at 332 (offset 1 line).",
+        "Hunk #5 succeeded at 343 (offset 1 line).",
+        "Hunk #6 succeeded at 409 (offset 1 line).",
+        "Hunk #7 succeeded at 480 (offset 1 line).",
+        "Hunk #8 succeeded at 609 (offset 2 lines).",
+        "Hunk #9 succeeded at 634 (offset 2 lines).",
+        "Hunk #10 succeeded at 716 (offset 2 lines).",
+        "Hunk #11 succeeded at 727 (offset 2 lines).",
+        "Hunk #12 succeeded at 927 (offset 2 lines)."
+      ]
+    },
+    {
+      "id": "sf-rp-case-completion-dispositions",
+      "stage": "registration package",
+      "description": "apply specs/sprint-alfred-epic/design/verify-registration-package-1/case-completion-dispositions.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree-s2first>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\verify-registration-package-1\\case-completion-dispositions.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 28,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "4b5ca3275f16c868ed72c21dd8d1ce24571c0509be41c93bde5a45e6f25d2995",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file harness/config/verify-case-completion.v1.json"
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": []
+    },
+    {
+      "id": "sf-rp-inventory-surfaces",
+      "stage": "registration package",
+      "description": "apply specs/sprint-alfred-epic/design/verify-registration-package-1/inventory-surfaces.patch (patch -p1)",
+      "status": "ok",
+      "argv": [
+        "patch",
+        "-p1",
+        "-d",
+        "<tree-s2first>",
+        "-i",
+        "<repo>\\specs\\sprint-alfred-epic\\design\\verify-registration-package-1\\inventory-surfaces.patch"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 25,
+      "stdoutLineCount": 11,
+      "stderrLineCount": 0,
+      "stdoutSha256": "69e49a1160342ca9a9d56e1f63fccdd5bd18d37978d59036b3151b95af3184cc",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "patching file docs/product-capability-inventory.json",
+        "Hunk #7 succeeded at 461 (offset 2 lines).",
+        "Hunk #8 succeeded at 555 (offset 2 lines).",
+        "Hunk #9 succeeded at 581 (offset 2 lines).",
+        "Hunk #10 succeeded at 621 (offset 2 lines).",
+        "Hunk #11 succeeded at 644 (offset 2 lines).",
+        "Hunk #12 succeeded at 753 (offset 2 lines).",
+        "Hunk #13 succeeded at 771 (offset 2 lines).",
+        "Hunk #14 succeeded at 1335 (offset 2 lines).",
+        "Hunk #15 succeeded at 1831 (offset 2 lines).",
+        "Hunk #16 succeeded at 2429 (offset 2 lines)."
+      ],
+      "stderrTail": [],
+      "offsetOrFuzzLines": [
+        "Hunk #7 succeeded at 461 (offset 2 lines).",
+        "Hunk #8 succeeded at 555 (offset 2 lines).",
+        "Hunk #9 succeeded at 581 (offset 2 lines).",
+        "Hunk #10 succeeded at 621 (offset 2 lines).",
+        "Hunk #11 succeeded at 644 (offset 2 lines).",
+        "Hunk #12 succeeded at 753 (offset 2 lines).",
+        "Hunk #13 succeeded at 771 (offset 2 lines).",
+        "Hunk #14 succeeded at 1335 (offset 2 lines).",
+        "Hunk #15 succeeded at 1831 (offset 2 lines).",
+        "Hunk #16 succeeded at 2429 (offset 2 lines)."
+      ]
+    },
+    {
+      "id": "sf-afterBoth-suite-registration",
+      "stage": "after both packages (s2-first, end state)",
+      "description": "check-verify-suite-registration against the export",
+      "status": "non-zero-or-error",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-suite-registration.mjs",
+        "--root",
+        "<tree-s2first>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 2,
+      "signal": null,
+      "error": null,
+      "durationMs": 90,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 3,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "1a16517942a044bea5015462ff4850c8d6d5fcf5e7bb4676e6a1ea949253273b",
+      "stdoutTail": [],
+      "stderrTail": [
+        "UNREGISTERED plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "UNREGISTERED plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs is a *.test.mjs suite under a registered root with no verify.mjs registration entry",
+        "Verify suite registration check failed: 2 finding(s) (2 unregistered, 0 honoured exclusion(s), 0 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired)."
+      ]
+    },
+    {
+      "id": "sf-afterBoth-case-completion",
+      "stage": "after both packages (s2-first, end state)",
+      "description": "check-verify-case-completion against the export",
+      "status": "ok",
+      "argv": [
+        "node",
+        "harness/scripts/check-verify-case-completion.mjs",
+        "--root",
+        "<tree-s2first>"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 1216,
+      "stdoutLineCount": 1,
+      "stderrLineCount": 0,
+      "stdoutSha256": "d2b50279e27289530396bbdb4ff161be72916f470a305e63d270e9e7344dc78c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [
+        "Verify case-completion registry valid: 304 entries, 297 conservatively classified suites."
+      ],
+      "stderrTail": []
+    },
+    {
+      "id": "sf-check-verify-mjs",
+      "stage": "extra (s2-first end state)",
+      "description": "node --check on the patched Verify entry point",
+      "status": "ok",
+      "argv": [
+        "node",
+        "--check",
+        "<tree-s2first>\\harness\\scripts\\verify.mjs"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 42,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [],
+      "stderrTail": []
+    },
+    {
+      "id": "sf-check-guard-lifecycle-ready",
+      "stage": "extra (s2-first end state)",
+      "description": "node --check on the facade",
+      "status": "ok",
+      "argv": [
+        "node",
+        "--check",
+        "<tree-s2first>\\plugins\\pipeline-core\\hooks\\guard-lifecycle-ready.mjs"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 39,
+      "stdoutLineCount": 0,
+      "stderrLineCount": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutTail": [],
+      "stderrTail": []
+    },
+    {
+      "id": "sf-end-state",
+      "stage": "end state (s2-first)",
+      "description": "sha256 of every patched target plus a whole-tree digest of the export",
+      "status": "ok",
+      "argv": [
+        "fs.readFileSync+sha256",
+        "<tree>",
+        "5 targets + whole tree"
+      ],
+      "cwd": "<repo>",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "durationMs": 868,
+      "detail": {
+        "targets": [
+          {
+            "path": "plugins/pipeline-core/protected-baseline.json",
+            "sha256": "091a984e98b3f30839cb0d07c4e41e188d84f8a1c15c035ee967e2d62d6daa29",
+            "bytes": 2613
+          },
+          {
+            "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+            "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+            "bytes": 4832
+          },
+          {
+            "path": "harness/scripts/verify.mjs",
+            "sha256": "1fd68b756f4d25f3b403a0b7ec96a2ccb45330cce815fb464b4d133fc84b1884",
+            "bytes": 122828
+          },
+          {
+            "path": "docs/product-capability-inventory.json",
+            "sha256": "becec010f7a9c39243ad8abc5c70ce13177f798a54cbfcaccafec629f8790707",
+            "bytes": 140814
+          },
+          {
+            "path": "harness/config/verify-case-completion.v1.json",
+            "sha256": "ecf4219e57de7576ab8bd01c0cdb763837bd47bd4cc9d37237a15d219b66fd5f",
+            "bytes": 71471
+          }
+        ],
+        "wholeTree": {
+          "fileCount": 4849,
+          "nonFileEntries": 0,
+          "digestSha256": "3858bcd9e583b2618cec00c7ff2d66a1fbe518f3d746e19e199c4a3c44dfcb07"
+        }
+      }
+    }
+  ],
+  "fallbackRedactions": 0,
+  "residualHostPathCheck": {
+    "hits": 0
+  }
+}
