@@ -110,3 +110,10 @@ One production edit, at `gitleaks.mjs:281-283`: after `relative(...)`, convert t
 elsewhere with a stated reason). Red on this host exactly for the nested absolute shapes and the defensive
 relative-backslash shape; green for depth 0, the relative-forward shape, and the over-fix guards (external path
 and a finding in a different tree not suppressed, backslash entry still malformed, different secret and different line not suppressed).
+
+## Correction (2026-10-06, after the fix and its Critic round)
+
+The fourth existing `gitleaks.test.mjs` failure (the real-binary case at line 468) is NOT detection-side: its assertion
+counts findings at the depth-1 path `other/copy.ndjson`, and it passes after `e92635db7`, which changes only
+`normalizeCandidateFindingPath`. It is the same nested-path normalisation defect. Source: Critic record
+`../critic-2026-10-05/glwin.md` F1.
