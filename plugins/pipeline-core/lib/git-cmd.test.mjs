@@ -790,7 +790,12 @@ for (const [cmd, why] of GPGL9_FAIL_CLOSED_TABLE) {
 // `{`, `,`, `}` and `..` as ordinary word characters and check #5 fires only on `$(`, `${` and the backtick, so the
 // push word never appears as a token: neither the whole-string `git push` regex, nor the positional branches (`git push`
 // / `git -C <dir> push`, after `NAME=value` and `env`), nor the wrapper branch, nor checks #1 to #6 read it.
-// Brace expansion exists in bash, zsh and ksh but not in POSIX sh or dash, so the wrapper case uses `bash -c`.
+// Brace expansion exists in bash (also when bash is invoked as `sh`, which is what `sh` is on Git for Windows and macOS),
+// in zsh and in ksh; only a strict POSIX sh such as dash lacks it. The wrapper row below uses `bash -c`; the table that
+// follows it (GPGL9T3_BRACE_WRAPPER_TABLE) pins the other routed wrappers whose shell brace-expands: sh, zsh, ssh and
+// the `.exe` and path-qualified spellings. The classifier cannot know which shell a runner applies, so it classifies
+// under every reading (git-cmd.mjs, the fail-closed rule in `commandIsGitPush`): a wrapper that may brace-expand must
+// route its inner command to the push gate.
 // A `{x..x}` sequence with equal endpoints is a single element (`{s..s}` is `s`), which keeps the executed command
 // exact where a comma list would duplicate a word. Each why-string names the shape and the command bash executes; those
 // expansions are static (bash brace-expansion grammar), not run at authoring time: a bash probe was refused by a guard.
@@ -837,6 +842,57 @@ const GPGL9T2_BRACE_EXPANSION_TABLE = [
 for (const [cmd, why] of GPGL9T2_BRACE_EXPANSION_TABLE) {
   const out = commandIsGitPush(cmd);
   record(`GPGL9T2-BRACE-EXPANSION ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
+// ---- commandIsGitPush: brace-expansion pushes behind every other shell wrapper the classifier routes (GPGL-9t3) ----
+// Test-only pin, RED by design, positive-only, same contract and shape as the table above. The wrapper branch of
+// `commandIsGitPush` (the `shellWrapperPush` regex in git-cmd.mjs) routes `bash`, `sh`, `zsh`, `dash`, `pwsh`,
+// `powershell`, `cmd` and `ssh`, each with an optional `.exe`, and takes the executable name as the last path segment
+// after a leading `NAME=value` run and `env`. It then looks only for the literal `git push` inside one wrapper word,
+// so a brace list inside that word (`git {push,origin} main`) never reads as a push. Pinned here: the routed wrappers
+// whose shell brace-expands (bash, sh, zsh, and ssh through the remote login shell or the local shell). NOT pinned:
+// dash (a strict POSIX sh, no brace expansion), pwsh, powershell and cmd (no bash brace grammar); a row there would
+// assert a push the shell does not run, which is the false-positive side and waits on the PO decision, question Q12.
+// Every expansion below is static (shell grammar) and was not executed at authoring time: a shell probe is refused by
+// a guard. Comma lists only: the one brace form every brace-expanding shell shares, with no sequence endpoint rules to
+// get wrong. The why-string of each row names the wrapper and the command its shell executes.
+const GPGL9T3_BRACE_WRAPPER_TABLE = [
+  // A: zsh -c
+  ["zsh -c 'git {push,origin} main'", "zsh -c brace-expands the single-quoted string; zsh runs: git push origin main"],
+  ['zsh -c "git {push,origin,main}"', "zsh -c with a double-quoted string holding no substitution; zsh runs: git push origin main"],
+  ["zsh -c 'git -C repo {push,origin} main'", "zsh -c, brace list behind -C <dir>; zsh runs: git -C repo push origin main"],
+  ["zsh -c '{git,push,origin,main}'", "zsh -c, the whole inner command is one brace list, git included; zsh runs: git push origin main"],
+  ["zsh -c 'echo ok; git {push,origin} main'", "zsh -c, brace list after an inner semicolon; zsh runs: git push origin main"],
+  ["zsh.exe -c 'git {push,origin} main'", "zsh.exe spelling, the wrapper regex admits an optional .exe; zsh runs: git push origin main"],
+  ["/bin/zsh -c 'git {push,origin} main'", "path-qualified zsh, the executable name is the last path segment; zsh runs: git push origin main"],
+  ["zsh -c 'git push{,} origin main'", "ALREADY CAUGHT: the push word is literal inside the wrapper string, only a brace group trails it; zsh runs: git push push origin main"],
+  // B: sh -c (sh is bash on Git for Windows and macOS, and brace-expands)
+  ["sh -c 'git {push,origin} main'", "sh -c brace-expands where sh is bash; sh runs: git push origin main"],
+  ['sh -c "git {push,--force} origin main"', "sh -c with a double-quoted string, brace list yields push and a flag; sh runs: git push --force origin main"],
+  ["sh -c '{git,-C,repo,push} origin main'", "sh -c, brace list yields git, -C, its directory and the push word; sh runs: git -C repo push origin main"],
+  ["sh -c 'cd repo && git {push,origin} main'", "sh -c, brace list after an inner AND-list operator; sh runs: git push origin main"],
+  ["sh.exe -c 'git {push,origin} main'", "sh.exe spelling, the wrapper regex admits an optional .exe; sh runs: git push origin main"],
+  ["/bin/sh -c 'git {push,origin} main'", "path-qualified sh, the executable name is the last path segment; sh runs: git push origin main"],
+  // C: further bash spellings (the plain `bash -c 'git {push,origin} main'` row is in the table above)
+  ["bash.exe -c 'git {push,origin} main'", "bash.exe spelling, the wrapper regex admits an optional .exe; bash runs: git push origin main"],
+  ["/usr/bin/bash -c 'git {push,origin} main'", "path-qualified bash, the executable name is the last path segment; bash runs: git push origin main"],
+  ["bash -lc 'git {push,origin} main'", "bash with the combined -lc flag word; bash runs: git push origin main"],
+  ['bash -c "git {push,origin} main"', "bash -c with a double-quoted string holding no substitution; bash runs: git push origin main"],
+  // D: ssh, where the REMOTE login shell (bash or zsh in practice) expands a quoted command
+  ['ssh host "git {push,origin} main"', "ssh with a double-quoted remote command, expanded by the remote login shell; the remote shell runs: git push origin main"],
+  ["ssh user@host 'git {push,origin} main'", "ssh user@host with a single-quoted remote command; the remote shell runs: git push origin main"],
+  ["ssh host 'cd repo && git {push,origin} main'", "ssh with a remote AND-list; the remote shell runs: cd repo && git push origin main"],
+  ['ssh -p 2222 host "git {push,origin} main"', "ssh with an option before the host; the remote shell runs: git push origin main"],
+  ['ssh.exe host "git {push,origin} main"', "ssh.exe spelling, the wrapper regex admits an optional .exe; the remote shell runs: git push origin main"],
+  ["ssh host git {push,origin} main", "ssh with an UNQUOTED remote command: the LOCAL shell brace-expands, ssh then sends: git push origin main"],
+  ['ssh host "git push{,} origin main"', "ALREADY CAUGHT: the push word is literal inside the wrapper string, only a brace group trails it; the remote shell runs: git push push origin main"],
+  // E: a NAME=value run or env before the wrapper (the detection skips both)
+  ["env GIT_TERMINAL_PROMPT=0 zsh -c 'git {push,origin} main'", "behind env and a NAME=value assignment; env runs zsh, which runs: git push origin main"],
+  ["GIT_TERMINAL_PROMPT=0 sh -c 'git {push,origin} main'", "behind a NAME=value assignment; sh runs: git push origin main"],
+];
+for (const [cmd, why] of GPGL9T3_BRACE_WRAPPER_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL9T3-BRACE-WRAPPER ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
 }
 
 // ---- Summary ------------------------------------------------------------------------------
