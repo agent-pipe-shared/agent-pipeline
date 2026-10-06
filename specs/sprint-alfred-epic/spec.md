@@ -2311,7 +2311,7 @@ Acceptance cases (§22.0 matrix):
   `DWP-REBIND-ARTIFACT-LOST` with the attended prerequisite; no artifact is
   regenerated and no prior evidence is reused.
 
-### 22.6 R7-6 — Signing prerequisites: key directory and toolchain
+### 22.6 R7-6 — Signing readiness: key directory and a read-only probe
 
 Rows owned: T14, T15.
 
@@ -2322,124 +2322,100 @@ Contract:
   preparation and `sign-intent` resolve it in this order: explicit argument, the
   machine-wide value, the legacy per-repository private-state value (read-only
   fallback, reported as legacy), absent. When it is absent the result is the
-  typed `SIGN-KEY-DIRECTORY-UNSET` with a typed setup action
-  (`set-po-key-directory`, `mutation: true`, no signature) taking the value the
-  PO states in chat; the setting grants no trust, because signatures still
-  verify only against the committed trust anchor. The agent never lists or
-  reads the key directory (the §21.2 credential-root list is unchanged). The
-  check of key directory against trust anchor runs inside a Pipeline script and
-  reports only `match`, `no-key-for-anchor`, `directory-missing` or
-  `unreadable`, never key material. A key that matches no anchor is the
-  attended one-time key setup of §21.0, not a new act.
-- **The Pipeline resolves its own signing toolchain (T15), and no agent action
-  can change it.** Today `sign-intent` spawns the bare name `openssl` with
-  `shell: false` (`command()` in `po-human-approval.mjs`), so the executable
-  that is handed the PO's private-key path and runs the passphrase prompt is
-  whatever the platform's executable search finds first, with nothing about its
-  location or content checked. The resolved executable is a trust decision, not
-  a convenience. The session runs as the same OS user that owns most
-  user-writable locations, so integrity cannot rest on where the executable
-  lives: it rests on a digest the PO pinned, and the location rule below is
-  defence in depth. R7-6 constrains it as follows:
-  - **Order.** `openssl` is resolved by the Pipeline as an absolute path, never
-    from the signing terminal's PATH alone: (1) the pinned path, only if the PO
-    has pinned one (last sub-bullet), and then only that path; (2) the
-    executable bundled with the Git installation, derived at run time from the
-    resolved git executable (candidate sub-directories are data, not code);
-    (3) each PATH entry in order. A pinned path that is missing, fails the
-    location rule or has a digest that differs from its pin is refused with its
-    typed finding; resolution does not fall through to (2) or (3), which would
-    hide that the PO's pin was bypassed.
-  - **The pin: path and sha256 together, in a protected credential root.** The
-    PO pins the toolchain's sha256 together with its path in the attended key
-    setup (last sub-bullet). The pin is stored inside the PO key directory,
-    which is on the §21.2 credential-root list (every spelling denied to agent
-    reads); R7-6 requires that the guard refuses every agent read and every
-    agent write of that directory on every lane (Read, Write, Edit, Bash and
-    PowerShell), which R7-6e proves lane by lane. A Pipeline script reads the
-    pin and reports only `pinned`, `unpinned` or a typed mismatch, never key
-    material, and honours it only from a key directory that returned `match`
-    against the committed trust anchor. Any resolved executable whose sha256
-    differs from the pinned digest is refused (`openssl-pin-mismatch`) before
-    any prompt. Without a pin only (2) and (3) apply, and the signing
-    confirmation marks the executable `unpinned` and shows its path and sha256;
-    the PO may still decline there.
-  - **Location rule (defence in depth; every candidate, pinned or automatic).**
-    Both the path as given and its fully resolved real path (every symlink,
-    junction and short-name component resolved; case-insensitive comparison on
-    win32) lie outside every Git working tree (the project root and every
-    worktree of the repository), outside `scratch/`, outside every plugin cache
-    or data directory the session writes, and outside the OS temporary
-    directory and the session scratch directory. On POSIX neither the file nor
-    any ancestor directory is writable by group or other; win32 applies the
-    equivalent ACL test (no write, modify or delete access for any principal
-    other than administrators and the system); a candidate whose location
-    cannot be established is not accepted. A link (symlink or junction) into a
-    forbidden location, or a link placed inside one, is refused by the same
-    rule. A relative PATH entry (`.` or empty) is never accepted. A location
-    that the session's own OS user can write (owner-writable on POSIX,
-    user-writable by ACL on win32) is reachable by the session, so it passes
-    only under a matching pin: an unpinned candidate, from (2) or (3), is
-    accepted only when neither the file nor any ancestor directory is writable
-    by that user. A matching pin relieves no other class.
-  - **The probe is necessary and never sufficient.** A candidate that passes
-    the location rule is accepted only if an Ed25519 capability probe also
-    succeeds: a sign and verify round trip with a throwaway key in a temporary
-    directory outside every repository, touching no PO key. The probe shows
-    capability, not trust: a candidate that passes the probe but fails the
-    location rule is refused.
-  - **`sign-intent` resolves it again, in the signing terminal.** The
-    resolution made at preparation and the spawn made later in the signing
-    terminal are different moments in possibly different environments (PATH,
-    Git installation), so `sign-intent` itself resolves, location-checks and
-    digest-checks the executable in the signing terminal immediately before the
-    prompt, by the same order, pin and rule. The provenance, real path and
-    sha256 shown at preparation (the §21.3 hand-over text) are part of the
-    signed intent text, as the absolute expiry is (§21.3): a different
-    provenance, path or digest in the signing terminal is refused before any
-    prompt with the typed `toolchain-drift` result, which names both values
-    (prepared and resolved). Otherwise the confirmation the PO reads before
-    entering the passphrase is built by `sign-intent` from its own resolution
-    and shows the provenance (`pinned`, `git-bundled` or `path`), the `unpinned`
-    mark where it applies, the real path and the sha256. The digest is
-    recomputed immediately before the spawn, and a mismatch refuses signing
-    before any prompt. The child is started by absolute path with
-    `shell: false`. Persisted reports and receipts carry the provenance and the
-    sha256 and a path redacted per §22.0; the signed intent is a device-local
-    ceremony artifact, not a report.
-  - **Only the PO sets the pin.** The pin (`poToolchainPath` with its sha256) is
-    one machine-wide value pair per OS user account, stored inside the PO key
-    directory above, outside every repository and outside `.git`. It is
-    optional and established only in the PO's attended external terminal, as
-    part of the one-time key setup of §21.0 (signature class 1 of the §22.0
-    signature rule: no new act and no extra signature): that step resolves the
-    executable, shows its path and sha256 and stores the pair only after the PO
-    confirms it. A later change of the pinned executable, for example after a
-    Git update, is the PO re-running that attended step. No agent-executable
-    action sets or changes the pin or the signing executable: no catalogue
-    entry, no `nextAction` (whatever its `requiresConfirmation`) and no setup
-    action, including `set-po-key-directory`, accepts it. The protection of its
-    storage is the credential-root denial above, not the project-root boundary.
+  typed `SIGN-KEY-DIRECTORY-UNSET` (probe class `key-directory-unset`) with a
+  typed setup action (`set-po-key-directory`, `mutation: true`, no signature)
+  taking the value the PO states in chat; the setting grants no trust, because
+  signatures still verify only against the committed trust anchor. The agent
+  never lists or reads the key directory (the §21.2 credential-root list is
+  unchanged). A key that matches no anchor is the attended one-time key setup of
+  §21.0, not a new act.
+- **The Pipeline chooses no signing executable (T15).** `sign-intent` keeps
+  spawning the bare name `openssl` with `shell: false` (`command()` in
+  `po-human-approval.mjs`). The executable that receives the PO's private-key
+  path and runs the passphrase prompt is therefore the one the platform's own
+  name lookup finds on the PATH of the PO's attended signing terminal, an
+  environment the PO owns. The Pipeline never selects, configures, pins or
+  stores a path for a signing executable and never spawns one by a
+  Pipeline-chosen path, because a Pipeline-chosen executable would receive the
+  PO's key. The signing spawn and the probe below use one spawn helper whose
+  executable is the constant `openssl`; it has no executable parameter, so no
+  code path can hand it another one (R7-6e).
+- **Decision #18 is delivered as detection and a PO-applied repair.** PO
+  decision 2026-10-06 #18 (`design-input.md`) asks for the signing toolchain to
+  be checked before a ceremony and "resolved by the Pipeline itself". R7-6
+  delivers it as detection and a typed repair that the PO applies in their own
+  terminal, not as a Pipeline-resolved executable, because a Pipeline-chosen
+  executable would receive the PO's key (rationale: the independent Critic
+  rounds 1 to 3 of 2026-10-07). This reading of decision #18 is presented to the
+  PO at the final approval.
+- **The signing-readiness probe (read-only).** One probe with three steps:
+  - (a) *Resolve:* it starts `openssl` through the spawn helper with a harmless
+    argument, so the name is resolved by the same lookup the signing spawn uses.
+    A start failure is `openssl-not-on-path`.
+  - (b) *Capability:* an Ed25519 sign and verify round trip with a throwaway key
+    in a temporary directory outside every repository (unique name, owner-only
+    where the platform supports it), using the same `pkeyutl` sign options as
+    `sign-intent`. The directory is removed after a pass and after every
+    failure. The round trip touches no PO key and shows capability, not trust. A
+    failing round trip is `openssl-no-ed25519`.
+  - (c) *Key directory:* the setting resolves, by the order of the first bullet,
+    to an existing readable directory, and the digest of the public key found
+    there equals one recorded in the committed trust anchor. The probe reads the
+    public key and the anchor and never opens the private key file.
 
-  A failing spawn reports its exit code and a bounded, path-redacted stderr
-  head instead of a bare "openssl failed".
-- **Before a ceremony, never during.** `prepare-for-signature` runs both checks
-  before it hands the PO a command. When one is blocked, no command is handed
-  over, no signing window starts (§21.3) and no ceremony request is created.
-  `sign-intent` repeats the toolchain resolution in the signing terminal as
-  stated above, and its own refusals occur before any prompt.
+  Each step reports as a §22.7 finding (`signing-toolchain` for (a) and (b),
+  `po-key-directory` and `trust-anchor-match` for (c)) with the closed fields
+  `status`, `cause` and `repair`; R7-7 embeds these results unchanged. The
+  `cause` of a non-ok result begins with exactly one class below, followed by
+  bounded, path-redacted detail (§22.0) and never key bytes. A failing probe
+  spawn reports its exit code and a bounded stderr head; the signing spawn
+  inherits the terminal for the passphrase prompt, so it reports the exit code
+  only. The closed classes, each with the repair its result carries:
+  - `openssl-not-on-path` (`attended`): add a directory holding an OpenSSL with
+    Ed25519 support to the PATH of the terminal that signs, in that terminal's
+    own shell. Where a Git installation is found, derived at run time from the
+    resolved git executable (candidate directory names are data, not code), and
+    its native `bin` directory holds an `openssl` file (a stat, never a spawn),
+    the result names that directory as the candidate to add. It is a
+    suggestion: the re-run probe in that terminal is its only test.
+  - `openssl-no-ed25519` (`attended`): the `openssl` the lookup finds fails the
+    round trip; put an OpenSSL build with Ed25519 support earlier on that
+    terminal's PATH (the Git candidate above where one exists) and re-run.
+  - `key-directory-unset` (`repairable`): `set-po-key-directory`, naming the
+    existing setting `poKeyDirectory` (first bullet).
+  - `key-directory-missing` (`repairable`): the stored value names no directory;
+    `set-po-key-directory` with the corrected value the PO states.
+  - `key-directory-unreadable` (`attended`): the PO makes the directory readable
+    to their own OS user.
+  - `key-anchor-mismatch` (`attended`): no public key there matches the
+    committed trust anchor; the PO points the setting at the directory that
+    holds the anchored key, or performs the one-time key setup of §21.0
+    (signature class 1).
+- **Where it runs.** At plugin install and update, where it is printed and never
+  fails the install; at bootstrap, where it is reported with its repair and is
+  not gating (R7-7); and before `prepare-for-signature` hands the PO a signing
+  command. There a failing probe means no command is handed over, no signing
+  window starts (§21.3) and no ceremony request is created, and the result
+  carries the typed repair, so a signature attempt never discovers the failure
+  first. The preparing process and the PO's signing terminal can have different
+  PATHs (T15: the shell the agent ran in found `openssl`, the PO's terminal did
+  not), so a pass at preparation describes the preparing process's environment
+  and the hand-over text says so. `sign-intent` therefore runs steps (a) to (c)
+  itself in the signing terminal, before any prompt and before any process
+  receives a key path: only that run observes the environment that will start
+  the signer, and a failure there ends before the prompt with the same typed
+  result and repair. After a repair the agent re-runs `prepare-for-signature`
+  (agent-executable), which starts a new window.
+- **What the probe never does.** It never reads private key material, never
+  passes a PO key path to any process, never spawns anything by an absolute
+  path, never changes a setting, a PATH or an installation, and never lets a
+  persisted report or receipt carry a host path or a key byte.
 
-Typed repair: `set-po-key-directory` (agent-executable; key directory only).
-For the toolchain there is no agent-executable setup action: the Pipeline's own
-resolution, else the attended prerequisite naming the finding
-(`openssl-missing`, `openssl-no-ed25519`, `openssl-pin-mismatch`,
-`toolchain-drift`, or `openssl-untrusted-location` with the rule class, a closed
-list: `in-repository`, `plugin-cache-or-data`, `os-temp`, `session-scratch`,
-`group-other-writable`, `owner-writable-unpinned`, `link` or `pinned-invalid`).
-The attended repair is installing the toolchain outside the forbidden
-locations, or the PO's own (re-)pinning in the key-setup step; after it the
-agent re-runs `prepare-for-signature` (agent-executable), which starts a new
-window.
+Typed repair: `set-po-key-directory` (agent-executable; the key directory only)
+for `key-directory-unset` and `key-directory-missing`. Every other class is a
+typed attended prerequisite (§22.0) that the PO applies in their own terminal or
+key setup; no agent-executable action changes a PATH, installs a toolchain or
+names a signing executable.
 
 Acceptance cases (§22.0 matrix: R7-6a…R7-6f each run on the win32 and POSIX
 dialects, in the source checkout and in the consumer-layout fixture):
@@ -2447,71 +2423,57 @@ dialects, in the source checkout and in the consumer-layout fixture):
 - R7-6a: With the machine-wide value set and the repository value unset, a
   second repository on the same machine resolves it with no new act. With both
   unset the result is `SIGN-KEY-DIRECTORY-UNSET` with the typed setup action;
-  after the agent runs it, `prepare-for-signature` passes. An agent Read or Grep
-  of the directory is refused, and no report contains key bytes.
-- R7-6b: With a PATH that lacks `openssl` but a Git-distribution layout fixture
-  (outside every repository and agent-writable location) holding a stub that
-  passes the probe, the stub resolves by absolute path and the confirmation
-  marks it `unpinned`. A pinned path (matching digest) outside the forbidden
-  locations resolves first and is shown as `pinned`; a pinned path that fails
-  the location rule, is missing, or has a digest that differs from its pin is
-  refused with no fall-through. A stub failing the Ed25519 probe yields
-  `openssl-no-ed25519`; none yields `openssl-missing` with the attended
-  prerequisite. In every failing case `prepare-for-signature` hands over no
-  command and starts no window.
-- R7-6c: A failing `openssl` stub yields a result with exit code and bounded
-  stderr head and no host path.
-- R7-6d (negative, location and pin): every stub below passes the Ed25519 probe
-  and is refused (`openssl-untrusted-location` with its rule class, or
-  `openssl-pin-mismatch` where stated); `prepare-for-signature` hands over no
-  command, starts no window and creates no ceremony request, and the stub is
-  never started with a PO key path. One case per rule class. (i)
-  `in-repository`: a path inside the repository working tree, and inside a
-  second worktree. (ii) `in-repository`: a path inside `scratch/`. (iii)
-  `plugin-cache-or-data`: a path inside a plugin cache or data directory the
-  session writes. (iv) `os-temp`: a path inside the OS temporary directory.
-  (v) `session-scratch`: a path inside the session scratch directory. (vi)
-  `group-other-writable`: a path in a directory writable by group or other
-  (POSIX mode bits; the equivalent ACL on win32), refused with and without a
-  matching pin. (vii) A path in a directory writable by the session's own OS
-  user: without a pin it is refused as `owner-writable-unpinned`; with a pin
-  whose digest differs from the stub's it is refused as `openssl-pin-mismatch`;
-  as a control, the same stub with a matching pin is accepted and shown as
-  `pinned`. (viii) `link`: a path that is a symlink (POSIX) or a symlink or
-  junction (win32) from an allowed-looking directory into the repository or
-  `scratch/`, and one that is a link placed inside an agent-writable tree.
-  (ix) Each of (i) to (vi) and (viii) also as a Git-bundled candidate and as a
-  PATH entry, and with a matching pin where a pin can name it (a matching pin
-  relieves none of them). (x) Alternative spellings of an in-repository
-  location: case-folded, drive-relative, `\\?\`-prefixed and 8.3 short-name
-  forms on win32; `..` segments and a relative PATH entry on POSIX. A fixture
-  host that cannot create a link type reports that case `not-run`, which fails
-  the matrix; it never skips.
-- R7-6e (negative, no agent route, every lane): no catalogue entry and no
-  `nextAction` emitted by any R7 outcome carries a value for the signing
-  executable or its pin. An agent attempt to set either through
-  `set-po-key-directory`, through any other catalogued verb, or by writing the
-  pin or path storage inside the PO key directory is refused with its typed code
-  and leaves state byte-identical, on each lane separately: a Write and an Edit
-  to it; a Bash-lane command that writes it (a redirect, `tee`, `cp`); and a
-  PowerShell-lane command that writes it (`Set-Content`, `Out-File`,
-  `Copy-Item`). Reads of that storage on the Read, Grep, Bash and PowerShell
-  lanes are refused too. State byte-identity covers the pin storage, the
-  repository tree and the private state. A static scan fails on any
-  `nextAction` template, catalogue entry or setup action that accepts either.
-- R7-6f (confirmation and drift): the signing confirmation, built by
-  `sign-intent` in the signing terminal, shows provenance, the `unpinned` mark
-  where it applies, real path and sha256 of the resolved executable before the
-  passphrase prompt, and they equal the values bound in the signed intent. (i)
-  A stub whose bytes change between resolution and spawn is refused before any
-  prompt; with a pin the result is `openssl-pin-mismatch`, without one it is
-  `toolchain-drift`. (ii) A different environment resolves a different
-  executable: prepare with one PATH or Git layout, then run `sign-intent` in an
-  environment (another PATH, another Git installation) whose resolution yields a
-  different stub, and one with identical bytes at a different path; each is
-  refused before any prompt with `toolchain-drift` naming both values (prepared
-  and resolved), and neither stub is started with a PO key path. (iii) A
-  persisted receipt carries provenance and sha256 and no host path.
+  after the agent runs it, the `po-key-directory` finding is `ok`. An agent Read
+  or Grep of the directory is refused, and no report contains key bytes.
+- R7-6b (resolution and capability): (i) With a PATH that lacks `openssl` and no
+  Git installation layout, the probe returns `openssl-not-on-path` with the
+  generic PATH repair. (ii) With a PATH that lacks `openssl` and a
+  Git-distribution layout fixture (outside every repository) holding an
+  `openssl` stub in its native `bin` directory, the result is
+  `openssl-not-on-path` and names that directory as the candidate (redacted in
+  the persisted form); the spawn spy records that the stub was not started; after
+  the fixture terminal's PATH is changed to include the directory, the re-run
+  probe finds the stub through the PATH and passes. (iii) A PATH stub that fails
+  the Ed25519 round trip in each of three ways (non-zero exit on sign, a
+  signature that fails verification, no raw-sign support) yields
+  `openssl-no-ed25519`. (iv) In every failing case `prepare-for-signature`
+  hands over no command, starts no window and creates no ceremony request.
+- R7-6c: A failing `openssl` stub yields a result with the exit code and a
+  bounded stderr head and no host path; a failing signing spawn reports its exit
+  code.
+- R7-6d (where it runs): (i) At install and update a failing probe is printed
+  with its repair and the install does not fail; at bootstrap it is reported
+  with its repair and the preflight status is unchanged. (ii) The T15 replay:
+  prepare in an environment whose PATH finds a passing stub, then run
+  `sign-intent` in an environment whose PATH finds none; `sign-intent` returns
+  `openssl-not-on-path` before any prompt, no process is started with a key path,
+  and the hand-over text of the preparation states that its pass describes the
+  preparing process's environment.
+- R7-6e (negative, no Pipeline-chosen executable): a static scan and the spawn
+  spy fail on any code path in `sign-intent`, the probe, `prepare-for-signature`,
+  install or bootstrap that passes an executable other than the constant
+  `openssl` to a spawn, in particular an absolute path or one derived from a
+  candidate directory; on any setting, environment variable, catalogue entry
+  (§21.1), `nextAction` template or setup action, including
+  `set-po-key-directory`, that accepts a signing-executable value; and on any
+  stored or persisted signing-executable path or digest. Dynamically, stubs in a
+  Git-layout directory, in the repository, in `scratch/` and in the OS temporary
+  directory, none of them on the PATH, are never started in any step, and an
+  agent attempt to set a signing executable through `set-po-key-directory` or
+  any other catalogued verb is refused with a typed code and leaves state
+  byte-identical.
+- R7-6f (key directory checks, no private-key read): (i) Fixtures for a matching
+  key, a stored value that names no directory, an unreadable directory and a key
+  whose digest equals no committed anchor yield `ok`, `key-directory-missing`,
+  `key-directory-unreadable` and `key-anchor-mismatch` with the status and
+  repair stated above; a fixture host that cannot create the unreadable
+  condition reports that case `not-run`, which fails the matrix, and never skips.
+  (ii) A filesystem and spawn spy shows the probe opened only the public key and
+  the committed anchor, never a private key file (a trap private key in the
+  fixture directory is never opened), and started no process with a key path.
+  (iii) No result, report, log or receipt contains key bytes or an unredacted
+  host path. (iv) The throwaway directory of step (b) lies outside every
+  repository and is removed after a pass and after each failure class.
 
 ### 22.7 R7-7 — Environment readiness report
 
@@ -2672,8 +2634,11 @@ Contract:
     eligible, on any device and whatever the state of its owner, because its
     owner's work is bound to superseded sources and the non-destructive rule
     below makes any later integration fail closed; it assumes nothing about the
-    owner. (B) Every other registration, in particular one with the same
-    digests: only when its owner is positively `not-live` or `ended`.
+    owner. (B) A registration of the same lineage at the current or an earlier
+    revision that (A) does not cover, in particular one with the same digests:
+    only when its owner is positively `not-live` or `ended`. A registration of
+    another lineage, or of a later revision than the current one, is eligible
+    under neither branch.
 - **Verb.** A catalogue-admitted verb (§21.1, admitted in every phase that
   emits it) supersedes an eligible registration:
   `supersede-authoring-registration`, emitted by `inspect` and the preflight as
@@ -2704,8 +2669,16 @@ Contract:
     device and has no descriptor here: the §20.2 signed legacy-custody
     transaction (signature class 5), the only attended route that does not
     infer death. It is unnecessary if the owner's terminal record arrives
-    first, because the owner is then `ended` or `not-live` and branch (B)
-    applies;
+    first, because the owner is then `ended` or `not-live` and, for a
+    registration of the same lineage at the current or an earlier revision,
+    branch (B) applies;
+  - a registration of another lineage, or of a later revision than the current
+    one, whatever its digests and whatever the state of its owner: never
+    eligible, because branch (B) is closed to it by lineage or revision and not
+    by owner state. The route is the owner's terminal record where the owner is
+    `live` (its own integration result normally closes the registration), and
+    the §20.2 signed legacy-custody transaction (signature class 5) for every
+    other owner state, including `not-live` and `ended`;
   - authority held (armed override capability, open ceremony request, held
     lock): wait for the holder's terminal record, that is the consumption,
     expiry or release the Pipeline records for it; no signature;
@@ -2755,10 +2728,13 @@ consumer-layout fixture):
   owner's terminal record; (ii) an armed override capability, an open ceremony
   request or a held lock on an otherwise eligible registration, including one of
   an earlier revision: waiting for the holder's terminal record; (iii) a
-  registration of another lineage, or of a later revision, with different
-  digests and an owner that is not `not-live` or `ended`: waiting for the
-  owner's terminal record where it is `live`, the class 5 transaction where it
-  is `unavailable` or `unobserved`; (iv) unreadable, linked or ambiguous
+  registration of another lineage, or of a later revision of the same lineage,
+  whatever its digests, with its owner in each of the states `live`,
+  `unavailable`, `unobserved`, `not-live` and recorded `ended` (one fixture per
+  combination): never superseded, because branch (B) is closed to it by lineage
+  or revision and not by owner state, and the typed prerequisite names the
+  owner's terminal record where the owner is `live` and the class 5 transaction
+  for every other owner state; (iv) unreadable, linked or ambiguous
   registration bytes: the §20.2 typed `unavailable` naming the read or identity
   prerequisite. A static check fails on any R7-10 refusal that names neither
   route, and on any signature request outside class 5.
