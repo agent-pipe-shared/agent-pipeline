@@ -694,6 +694,7 @@
 | pipeline.self-application-integrity-check-absent | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.semgrep-offline-default-version-check | open | defect | pipeline | none | 2026-09-29 | — | — |
+| pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.semgrep-timeout-oversized-pipeline-state-test | closed | defect | pipeline | — | 2026-08-11 | — | — |
 | pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home | closed | workflow-improvement | pipeline | alfred | 2026-08-26 | — | — |
 | pipeline.sentinel-epic-acceptance-matrix-archive-drift | closed | defect | pipeline | — | 2026-08-19 | — | — |
@@ -840,7 +841,7 @@
 
 ## Counts
 
-- open: 175
+- open: 176
 - in_progress: 0
 - closed: 643
 - rejected: 3

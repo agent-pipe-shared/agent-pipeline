@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "09063361f649c3bb9a013d1b8cac64a8e92a7b7edea73f0d8c501c07b15f36e2"
+    "transitionHead": "054713886fe979595a3885f5749617fda9f679ca0be5f9b6ad8508aefd00b5c1"
   },
   "counts": {
-    "open": 175,
+    "open": 176,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -8973,6 +8973,16 @@
       "source": "Bounded native Semgrep controls, 2026-09-29: same executable and shipped local rules time out with default version check; disabling only that check completes valid JSON in 3615ms.",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "SEMG-d / SEMG-r measurements, Alfred night 2026-10-05/06 (specs/sprint-alfred-epic/evidence/night-2026-10-05/semgrep-scanner-error.md).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.semgrep-timeout-oversized-pipeline-state-test",
