@@ -36,7 +36,7 @@ the fixture as a regression test.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted; fix in sprint alfred.
+- **Rationale:** reproduced by GLWIN-t (`1dbcb22cc`): path separators, not line endings — a nested finding keeps its absolute path on win32 and never matches a content-v1 key (`specs/sprint-alfred-epic/evidence/night-2026-10-05/gitleaks-windows-suppression.md`). A backslash-relative finding path is normalised on win32 only, where a backslash is never a filename character; `safeAuthorityPath` stays strict for ignore-file entries.
+- **Assignment (if accepted):** red test GLWIN-t (done, `1dbcb22cc`); production fix GLWIN (separate dispatch, QG-04); Critic after the fix. The existing `gitleaks.test.mjs` failure at its real-binary ledger case is detection-side and out of this item.
+- **Date:** 2026-10-06
