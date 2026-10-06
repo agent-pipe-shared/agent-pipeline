@@ -862,7 +862,7 @@ if (isDirectlyInvoked()) {
  * over from before an install, or from before a foreign hook was placed, must never suppress
  * reporting what is really there now. Byte-for-byte the same shape as pre-push-hook-install.mjs's
  * own `planInstall`. */
-export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, pluginHooksDir = DEFAULT_PLUGIN_HOOKS_DIR, pluginScriptsDir = DEFAULT_PLUGIN_SCRIPTS_DIR } = {}) {
+export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, pluginHooksDir = DEFAULT_PLUGIN_HOOKS_DIR, pluginScriptsDir = DEFAULT_PLUGIN_SCRIPTS_DIR, inspectSource } = {}) {
   const paths = resolveGitPaths(rootDir);
   if (!paths) return { status: "repository-unresolved" };
   const { commonDir, hookPath } = paths;
@@ -882,7 +882,8 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, pl
     }
     // HOOKREFRESH-S1: same currentness reading as pre-push (lib/hook-currentness.mjs). Detection
     // only: `current` / `updateRequired` are reported, nothing is written and the marker is unchanged.
-    const currentness = assessHookCurrentness({ recordedPluginLibDir: marker.pluginLibDir, pluginLibDir });
+    // `inspectSource` is optional (HOOKREFRESH-S1c): a caller planning several hooks passes one shared inspector.
+    const currentness = assessHookCurrentness({ recordedPluginLibDir: marker.pluginLibDir, pluginLibDir, inspectSource });
     return { status: "ready-to-upgrade", hookPath, commonDir, pluginLibDir, pluginHooksDir, pluginScriptsDir, ...currentness };
   }
   const decline = readDeclineMarker(commonDir);

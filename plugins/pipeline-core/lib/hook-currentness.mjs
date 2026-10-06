@@ -17,11 +17,40 @@
  *
  * `inspectSource` is injectable so a caller that already holds the loaded tree's digest can
  * avoid a second full read of the plugin tree (the inspection is two full passes), and so a test
- * can pin the comparison without touching a real tree.
+ * can pin the comparison without touching a real tree. Each installer's `planInstall` forwards an
+ * optional `inspectSource` here; a caller that plans all three installers in one pass hands them
+ * ONE `createOnceSourceInspector(...)` so the tree is read at most once for the whole pass
+ * (HOOKREFRESH-S1c). With no `inspectSource` every `planInstall` reads the tree itself, as before.
  */
+import { resolve } from "node:path";
+
 import { inspectGitHookSourceSnapshot } from "./git-hook-runtime-snapshot.mjs";
 
 const RUNTIME_SNAPSHOT_LIB = /\/runtime-([a-f0-9]{64})\/lib$/u;
+
+/**
+ * Wraps a source inspector so each library directory is inspected at most once for the lifetime of
+ * the returned function. The inspection is lazy (nothing is read until a hook actually needs a
+ * digest) and a fault is remembered exactly like an answer: a later asker for the same directory
+ * gets the same throw instead of a second full read, which `assessHookCurrentness` turns into the
+ * same stale reading it would have produced itself. Create one per planning pass and drop it with
+ * the pass; nothing is remembered across passes.
+ */
+export function createOnceSourceInspector(inspectSource = inspectGitHookSourceSnapshot) {
+  const outcomes = new Map();
+  return (options = {}) => {
+    const dir = options?.pluginLibDir;
+    const key = typeof dir === "string" ? resolve(dir) : dir;
+    let outcome = outcomes.get(key);
+    if (!outcome) {
+      try { outcome = { value: inspectSource(options) }; }
+      catch (error) { outcome = { fault: true, error }; }
+      outcomes.set(key, outcome);
+    }
+    if (outcome.fault) throw outcome.error;
+    return outcome.value;
+  };
+}
 
 export function assessHookCurrentness({ recordedPluginLibDir, pluginLibDir, inspectSource = inspectGitHookSourceSnapshot } = {}) {
   let current = typeof recordedPluginLibDir === "string" && recordedPluginLibDir === pluginLibDir;

@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { validatePoGateProfileReceipt, poGateReceiptFingerprintMatches, poGateProfileReceiptPath } from "../lib/po-gate-authority.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+import { createOnceSourceInspector } from "../lib/hook-currentness.mjs";
 import { planInstall as planPrePushHookInstall } from "./pre-push-hook-install.mjs";
 import { planInstall as planPreCommitHookInstall } from "./pre-commit-hook-install.mjs";
 import { planInstall as planCommitMsgHookInstall } from "./commit-msg-hook-install.mjs";
@@ -58,10 +59,12 @@ const HOOK_SPECS = Object.freeze([
 
 /** A deliberately small projection over each installer's authoritative plan.
  * The installer keeps ownership/mutation rules; this function merely gives all
- * three hooks one vocabulary for bootstrap, clone and release surfaces. */
-export function projectHookProvisioning({ spec, rootDir, commonDir = null } = {}) {
+ * three hooks one vocabulary for bootstrap, clone and release surfaces.
+ * `inspectSource` (HOOKREFRESH-S1c) is the optional loaded-plugin-tree inspector shared by one planning
+ * pass; it is handed to `planInstall` only when given, so without it the call is exactly what it was. */
+export function projectHookProvisioning({ spec, rootDir, commonDir = null, inspectSource } = {}) {
   let plan;
-  try { plan = spec.planInstall({ rootDir }); } catch { plan = { status: "repository-unresolved" }; }
+  try { plan = spec.planInstall(inspectSource === undefined ? { rootDir } : { rootDir, inspectSource }); } catch { plan = { status: "repository-unresolved" }; }
   const repairAction = `node plugins/pipeline-core/scripts/${spec.installer} --install`;
   switch (plan.status) {
     case "ready-to-upgrade":
@@ -112,7 +115,10 @@ export function assessPushHookBackstop(rootDir = process.cwd(), { load = loadMan
   };
 }
 
-export function checkCloneProvisioning(rootDir = process.cwd()) {
+/** `options.inspectSource` replaces the loaded-plugin-tree inspector (a test seam); either way the
+ * three installers share ONE once-only inspector for this call, so the plugin tree's digest is read
+ * at most once per call instead of once per installer (HOOKREFRESH-S1c). */
+export function checkCloneProvisioning(rootDir = process.cwd(), options = {}) {
   const resolvedRoot = resolve(rootDir);
   const checks = [];
 
@@ -136,7 +142,8 @@ export function checkCloneProvisioning(rootDir = process.cwd()) {
 
   // Hook provisioning is intentionally projected via the installers, not merely
   // existsSync(): a present foreign/modified hook is not a usable pipeline hook.
-  for (const spec of HOOK_SPECS) checks.push(projectHookProvisioning({ spec, rootDir: resolvedRoot, commonDir }));
+  const inspectSource = createOnceSourceInspector(options?.inspectSource);
+  for (const spec of HOOK_SPECS) checks.push(projectHookProvisioning({ spec, rootDir: resolvedRoot, commonDir, inspectSource }));
 
   // 2. PO-profile receipt validity check
   let receiptPath = join(commonDir, "agent-pipeline", "po-gate", "profile-receipt.json");

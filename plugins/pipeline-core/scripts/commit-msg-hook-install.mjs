@@ -388,7 +388,7 @@ function inspectManagedInstall(commonDir, hookPath) {
   return { status: "verified", hookPath, implPath: impl, marker: markerResult.marker };
 }
 
-export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } = {}) {
+export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, inspectSource } = {}) {
   const paths = resolveGitPaths(rootDir);
   if (!paths) return { status: "repository-unresolved" };
   const inspected = inspectManagedInstall(paths.commonDir, paths.hookPath);
@@ -404,7 +404,8 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
       status: "ready-to-upgrade",
       ...paths,
       pluginLibDir,
-      ...assessHookCurrentness({ recordedPluginLibDir: inspected.marker.pluginLibDir, pluginLibDir }),
+      // `inspectSource` is optional (HOOKREFRESH-S1c): a caller planning several hooks passes one shared inspector.
+      ...assessHookCurrentness({ recordedPluginLibDir: inspected.marker.pluginLibDir, pluginLibDir, inspectSource }),
     };
   }
   return inspected;

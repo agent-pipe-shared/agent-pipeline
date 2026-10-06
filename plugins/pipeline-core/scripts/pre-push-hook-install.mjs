@@ -635,7 +635,7 @@ if (isDirectlyInvoked()) {
  * present on disk always wins over a decline record (checked first, below) -- a
  * stale decline marker left over from before an install, or from before a foreign
  * hook was placed, must never suppress reporting what is really there now. */
-export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } = {}) {
+export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, inspectSource } = {}) {
   const paths = resolveGitPaths(rootDir);
   if (!paths) return { status: "repository-unresolved" };
   const { commonDir, hookPath } = paths;
@@ -655,7 +655,8 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
     }
     // Currentness is the shared reading (lib/hook-currentness.mjs): the recorded lib path is the
     // loaded one, or its runtime snapshot digest equals the loaded tree's. Never publishes.
-    const { current, updateRequired } = assessHookCurrentness({ recordedPluginLibDir, pluginLibDir });
+    // `inspectSource` is optional (HOOKREFRESH-S1c): a caller planning several hooks passes one shared inspector.
+    const { current, updateRequired } = assessHookCurrentness({ recordedPluginLibDir, pluginLibDir, inspectSource });
     return {
       status: "ready-to-upgrade",
       hookPath,
