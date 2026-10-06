@@ -212,6 +212,7 @@
 | pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | closed | defect | pipeline | alfred | 2026-08-11 | 2026-08-25 | — |
 | pipeline.critic-scratch-name-randomness-has-no-admitted-command | open | defect | pipeline | alfred | 2026-10-06 | — | — |
+| pipeline.critic-scratch-notes-write-is-refused-again | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.critic-skip-not-an-explicit-logged-decision | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
 | pipeline.critical-command-kinds-excludes-feature-package-reconcile | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
@@ -842,7 +843,7 @@
 
 ## Counts
 
-- open: 177
+- open: 178
 - in_progress: 0
 - closed: 643
 - rejected: 3
