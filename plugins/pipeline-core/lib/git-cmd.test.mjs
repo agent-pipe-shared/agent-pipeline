@@ -781,6 +781,64 @@ for (const [cmd, why] of GPGL9_FAIL_CLOSED_TABLE) {
   record(`GPGL9-FAIL-CLOSED ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
 }
 
+// ---- commandIsGitPush: unquoted bash brace expansion spells the push word (GPGL-9t2) ----
+// Test-only pin, RED by design (a separate later dispatch makes the table green), positive-only like the table above:
+// the negative side (ordinary commands that must stay out of the push gate) waits on the PO decision, question Q12.
+// Contract: GIT-04 (the push classifier must match any `git push`); at every call site returning false means the push
+// gate never runs. Bash performs brace expansion BEFORE every other expansion: an unquoted `{a,b}` list or `{x..y}`
+// sequence becomes separate words, or pieces of one word, with no `$(`, `${` or backtick anywhere. The scanner reads
+// `{`, `,`, `}` and `..` as ordinary word characters and check #5 fires only on `$(`, `${` and the backtick, so the
+// push word never appears as a token: neither the whole-string `git push` regex, nor the positional branches (`git push`
+// / `git -C <dir> push`, after `NAME=value` and `env`), nor the wrapper branch, nor checks #1 to #6 read it.
+// Brace expansion exists in bash, zsh and ksh but not in POSIX sh or dash, so the wrapper case uses `bash -c`.
+// A `{x..x}` sequence with equal endpoints is a single element (`{s..s}` is `s`), which keeps the executed command
+// exact where a comma list would duplicate a word. Each why-string names the shape and the command bash executes; those
+// expansions are static (bash brace-expansion grammar), not run at authoring time: a bash probe was refused by a guard.
+// One case is already caught today (the push word is literal and only a brace group trails it); it stays as a pin.
+const GPGL9T2_BRACE_EXPANSION_TABLE = [
+  // A: a brace list yields the push word as the first word after git
+  ["git {push,origin} main", "brace list yields the push word and the remote; bash runs: git push origin main"],
+  ["git {push,origin,main}", "one brace list yields push, remote and ref; bash runs: git push origin main"],
+  ["git {push,--force} origin main", "brace list yields the push word and a flag; bash runs: git push --force origin main"],
+  ["git {push,origin} {main,dev}", "two brace lists, the first yields push and the remote; bash runs: git push origin main dev"],
+  ["git {push,-u,origin,main}", "one brace list yields push, a flag, remote and ref; bash runs: git push -u origin main"],
+  // B: a brace group inside the push word
+  ["git {p..p}ush origin main", "sequence group at the start of the push word; bash runs: git push origin main"],
+  ["git pu{s..s}h origin main", "sequence group in the middle of the push word; bash runs: git push origin main"],
+  ["git pus{h..h} origin main", "sequence group at the end of the push word; bash runs: git push origin main"],
+  ["git pu{sh,sh} origin main", "comma list in the middle of the push word doubles the tail; bash runs: git push push origin main (the push subcommand, remote named push)"],
+  ["git push{,} origin main", "ALREADY CAUGHT: the push word is literal, only a brace group trails it; bash runs: git push push origin main"],
+  // C: a brace group produces git itself
+  ["{git,push,origin,main}", "the whole command is one brace list, git included; bash runs: git push origin main"],
+  ["{git,push} origin main", "a brace list yields git and the push word; bash runs: git push origin main"],
+  ["g{i..i}t push origin main", "sequence group in the middle of the git word, push literal; bash runs: git push origin main"],
+  ["{git,-C,repo,push} origin main", "brace list yields git, -C, its directory and the push word; bash runs: git -C repo push origin main"],
+  // D: the same shape after a command separator
+  ["echo ok; git {push,origin} main", "after a semicolon; bash runs: git push origin main"],
+  ["cd repo && git {push,origin} main", "after an AND-list operator; bash runs: git push origin main"],
+  ["false || git {push,origin} main", "after an OR-list operator; bash runs: git push origin main"],
+  ["git status\ngit {push,origin} main", "on the line after a newline; bash runs: git push origin main"],
+  ["(git {push,origin} main)", "inside a subshell group; bash runs: git push origin main"],
+  ["true & git {push,origin} main", "after a lone background operator; bash runs: git push origin main"],
+  // E: behind -C <dir> and the other recognised global options
+  ["git -C repo {push,origin} main", "after a recognised -C option; bash runs: git -C repo push origin main"],
+  ["git -C {repo,push} origin main", "brace list yields the -C directory and the push word; bash runs: git -C repo push origin main"],
+  ["git {-C,repo,push,origin,main}", "one brace list yields -C, its directory, push, remote and ref; bash runs: git -C repo push origin main"],
+  ["cd x; git -C repo {push,origin} main", "after a semicolon and behind -C; bash runs: git -C repo push origin main"],
+  ["git --no-pager {push,origin} main", "after a recognised flag option; bash runs: git --no-pager push origin main"],
+  ["git -c color.ui=never {push,origin} main", "after a recognised -c option; bash runs: git -c color.ui=never push origin main"],
+  ["git {-C,repo} push origin main", "brace list yields -C and its directory, push word literal; bash runs: git -C repo push origin main"],
+  // F: wrapper and prefix forms
+  ["bash -c 'git {push,origin} main'", "inside a bash -c string, which the inner bash brace-expands; bash runs: git push origin main"],
+  ["GIT_TERMINAL_PROMPT=0 git {push,origin} main", "behind a NAME=value assignment; bash runs: git push origin main"],
+  ["env GIT_TERMINAL_PROMPT=0 git {push,origin} main", "behind env and a NAME=value assignment; env runs: git push origin main"],
+  ["git.exe {push,origin} main", "git.exe as the executable name; bash runs: git.exe push origin main"],
+];
+for (const [cmd, why] of GPGL9T2_BRACE_EXPANSION_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL9T2-BRACE-EXPANSION ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
