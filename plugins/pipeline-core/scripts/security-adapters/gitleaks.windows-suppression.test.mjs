@@ -28,7 +28,7 @@
  * Exit: 0 = all cases pass, non-zero = at least one case failed.
  */
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { describe } from "node:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -218,4 +218,128 @@ test("guard: an entry recorded at a different line does NOT suppress a nested fi
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ===============================================================================================
+// POSIX invariant (GLWIN-t2; Critic finding F2 in specs/sprint-alfred-epic/evidence/critic-2026-10-05/
+// glwin.md): a RELATIVE finding path containing a backslash is rewritten to `/` ONLY when
+// process.platform is "win32" -- there `\` is a path separator -- and is returned unchanged on every
+// other platform, where `\` is a legal filename character: a rewrite there would let an entry for
+// `a/b/c.txt` suppress a finding in a file literally named `a\b\c.txt` (wider suppression on POSIX).
+//
+// normalizeCandidateFindingPath() reads process.platform at CALL time, so these tests override it for
+// the duration of ONE test body and restore the original descriptor in a `finally`; they therefore run
+// -- and bite -- on every host, not only on the platform whose behaviour they pin. The last test of the
+// block proves the restoration. Mutations of gitleaks.mjs these tests are meant to catch:
+//   M1  drop the `process.platform !== "win32"` condition of the relative branch;
+//   M2  replace the absolute branch's `.split(sep).join("/")` by a blanket `.replace(/\\/g, "/")`
+//       (only observable where `sep` is `/`, i.e. on a POSIX host -- hence the POSIX-only cell below).
+// ===============================================================================================
+
+const REAL_PLATFORM = process.platform;
+const REAL_PLATFORM_DESCRIPTOR = Object.getOwnPropertyDescriptor(process, "platform");
+const SYNTHETIC_ROOT = "synthetic-root"; // never consulted: a relative finding path does not touch rootDir
+const BACKSLASH_PATH = "a\\b\\c.txt";
+const SLASH_PATH = "a/b/c.txt";
+
+async function withPlatform(platform, body) {
+  Object.defineProperty(process, "platform", { value: platform, configurable: true });
+  try {
+    assert.equal(process.platform, platform, `the platform override to "${platform}" did not take effect`);
+    return await body();
+  } finally {
+    if (REAL_PLATFORM_DESCRIPTOR === undefined) delete process.platform;
+    else Object.defineProperty(process, "platform", REAL_PLATFORM_DESCRIPTOR);
+  }
+}
+
+describe("posix-invariant: a backslash in a relative finding path is rewritten to a slash only on win32", () => {
+  // (a) linux, both field spellings; (b) darwin, one case. Strict equality of the string: unchanged.
+  for (const [platform, field] of [["linux", "File"], ["linux", "file"], ["darwin", "File"]]) {
+    test(`posix-invariant: normalizeCandidateFindingPath() returns a relative backslash path unchanged | platform ${platform} | field ${field}`, async () => {
+      await withPlatform(platform, () => {
+        const finding = { [field]: BACKSLASH_PATH, RuleID: RULE };
+        const normalized = normalizeCandidateFindingPath(finding, SYNTHETIC_ROOT);
+        assert.strictEqual(normalized[field], BACKSLASH_PATH, `a backslash path must never be rewritten on ${platform}`);
+        assert.deepStrictEqual(normalized, { [field]: BACKSLASH_PATH, RuleID: RULE });
+      });
+    });
+  }
+
+  // (c) the positive control: the very same input IS rewritten on win32, so (a)/(b) are not vacuous.
+  for (const field of ["File", "file"]) {
+    test(`posix-invariant: control | normalizeCandidateFindingPath() rewrites the same relative backslash path to forward slashes | platform win32 | field ${field}`, async () => {
+      await withPlatform("win32", () => {
+        const normalized = normalizeCandidateFindingPath({ [field]: BACKSLASH_PATH, RuleID: RULE }, SYNTHETIC_ROOT);
+        assert.strictEqual(normalized[field], SLASH_PATH);
+      });
+    });
+  }
+
+  // (d) suppression level: the digest of a content-v1 entry binds its path, so an entry for `a/b/c.txt`
+  // can suppress a finding reported at `a\b\c.txt` only if the adapter rewrites that path first.
+  test("posix-invariant: run() does NOT suppress a finding at the literal path a\\b\\c.txt with a content-v1 entry for a/b/c.txt | platform linux", async () => {
+    const root = makeRoot("glwin-posix-run-");
+    const scrub = scrubber(root);
+    try {
+      const entry = authorityEntry(SLASH_PATH);
+      const result = await withPlatform("linux", () => runAdapter(root, [reportedFinding(BACKSLASH_PATH)], `${entry}\n`));
+      assert.equal(result.status, "FINDINGS", `a literal backslash filename must stay unsuppressed on linux; got ${scrub(JSON.stringify(result))}`);
+      assert.equal(result.ignored.findingCount, 0, "nothing may be reported as suppressed");
+      assert.equal(result.findings.length, 1);
+      assert.strictEqual(result.findings[0].path, BACKSLASH_PATH, "the retained finding keeps its literal path");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("posix-invariant: control | run() DOES suppress the same finding with the same entry | platform win32", async () => {
+    const root = makeRoot("glwin-posix-run-ctrl-");
+    const scrub = scrubber(root);
+    try {
+      const entry = authorityEntry(SLASH_PATH);
+      const result = await withPlatform("win32", () => runAdapter(root, [reportedFinding(BACKSLASH_PATH)], `${entry}\n`));
+      assert.equal(result.status, "PASS", `the entry must suppress on win32; got ${scrub(JSON.stringify(result))}`);
+      assert.equal(result.findings.length, 0);
+      assert.equal(result.ignored.findingCount, 1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Addition beyond the briefed (a)-(d) (reported as such): the absolute branch of the same function,
+  // `.split(sep).join("/")`, is the other place a blanket backslash rewrite could land (M2). It differs
+  // from a platform-separator split only where `sep` is `/` and a real file name contains `\`, which
+  // exists on POSIX hosts only -- so this cell is skipped on native Windows.
+  test(
+    "posix-invariant: an absolute path to a file whose literal name contains a backslash is not rewritten | real platform, no override",
+    { skip: IS_WINDOWS ? "a backslash cannot be part of a file name on Windows; this cell runs on POSIX hosts only" : undefined },
+    async () => {
+      const root = makeRoot("glwin-posix-file-");
+      const scrub = scrubber(root);
+      try {
+        const filePath = join(root, "a\\b.txt");
+        writeFileSync(filePath, "synthetic fixture content\n");
+        const reported = reportedFinding(filePath);
+        assert.strictEqual(normalizeCandidateFindingPath(reported, root).File, filePath, "an in-root file named a\\b.txt must keep its path");
+        const result = await runAdapter(root, [reported], `${authorityEntry("a/b.txt")}\n`);
+        assert.equal(result.status, "FINDINGS", `an entry for a/b.txt must not suppress the file named a\\b.txt; got ${scrub(JSON.stringify(result.findings))}`);
+        assert.equal(result.ignored.findingCount, 0);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test("posix-invariant: withPlatform() restores process.platform even when the body throws", async () => {
+    await assert.rejects(withPlatform("linux", () => { throw new Error("synthetic body failure"); }), /synthetic body failure/);
+    assert.strictEqual(process.platform, REAL_PLATFORM);
+  });
+
+  // Must stay the LAST test of the block: it proves every override above was undone.
+  test("posix-invariant: process.platform is restored to the host value after the overriding tests", () => {
+    assert.strictEqual(process.platform, REAL_PLATFORM);
+    assert.strictEqual(IS_WINDOWS, process.platform === "win32");
+    assert.deepStrictEqual(Object.getOwnPropertyDescriptor(process, "platform"), REAL_PLATFORM_DESCRIPTOR);
+  });
 });
