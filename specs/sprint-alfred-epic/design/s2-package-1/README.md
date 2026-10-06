@@ -50,14 +50,13 @@ still required (MP-07). New suite names may also need `verify-phase:` surfaces i
 | `plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs` | `nova-verify-journal-drvfs-hint-tests` |
 | `plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs` | `guard-push-gitleaks-prefix-tests` |
 | `plugins/pipeline-core/skills/close-block/close-block-fanout-report.test.mjs` | `close-block-fanout-report-tests` |
-| `plugins/pipeline-core/lib/test-support/private-tmp.test.mjs` | `private-tmp-tests` |
 | `plugins/pipeline-core/scripts/hook-refresh-detection.test.mjs` | `hook-refresh-detection-tests` |
 | `plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs` | `clone-hook-readiness-rollback-tests` (caseCompletion CHRB001-CHRB009) |
 
 Extended 2026-10-06 (REGPATCH2, REGPATCH3) with the tonight-slice suites. After the REGPATCH3 edit,
 `git apply --check` on `test-registrations.patch` alone exited 0 (`scratch/REGPATCH3/apply-check.log`); the
-2026-10-05 "applies cleanly" line above is the older check for the other two patches. `private-tmp-tests` points at a
-helper that is committed separately (TMPDACL).
+2026-10-05 "applies cleanly" line above is the older check for the other two patches. A former `private-tmp-tests`
+entry was dropped (REGPATCH8) because its helper was reverted in `20dd195ed`.
 
 ## Registration location
 
@@ -149,10 +148,17 @@ real-path run is the last apply-order step.
 | 20 | `nova-verify-journal-drvfs-hint-tests` | none needed | `deterministic-verification` |
 | 21 | `guard-push-gitleaks-prefix-tests` | none needed | `deterministic-verification` |
 | 22 | `close-block-fanout-report-tests` | none needed | `deterministic-verification` |
-| 23 | `private-tmp-tests` | none needed | `deterministic-verification` |
-| 24 | `hook-refresh-detection-tests` | none needed | `deterministic-verification` |
-| 25 | `clone-hook-readiness-rollback-tests` | `required` entry (patch), inline CHRB001-CHRB009 | `setup-and-runtime-projection` |
-| 26 | `hook-currentness-digest-once-tests` | none needed: `classifyVulnerableSuite` returns `null` (`check-verify-case-completion.mjs:426-443`: node:test file with more than one `test(` call, so not `node-test-single`; no `check`/`run` wrapper, `:412-425`); no case IDs registered, so no inline policy | `setup-and-runtime-projection` |
+| 23 | `hook-refresh-detection-tests` | none needed | `deterministic-verification` |
+| 24 | `clone-hook-readiness-rollback-tests` | `required` entry (patch), inline CHRB001-CHRB009 | `setup-and-runtime-projection` |
+| 25 | `hook-currentness-digest-once-tests` | none needed: `classifyVulnerableSuite` returns `null` (`check-verify-case-completion.mjs:426-443`: node:test file with more than one `test(` call, so not `node-test-single`; no `check`/`run` wrapper, `:412-425`); no case IDs registered, so no inline policy | `setup-and-runtime-projection` |
+
+#### Changed 2026-10-06 (REGPATCH8): `private-tmp-tests` removed
+
+The TMPDACL helper and its test were reverted (`20dd195ed`), so the suite's entry is removed from
+`test-registrations.patch` (later new-side starts shift by one) and its surface from `inventory-surfaces.patch` (that
+hunk had no other change and is removed entirely; later new-side starts shift by one). The table above now has 25 rows;
+the REGPATCH7 section below speaks of row 26 and of the pre-REGPATCH8 hunk headers. `git apply --check` on both patches:
+exit 0 (orchestrator run, console only). The scratch simulation was not re-run.
 
 #### Staged 2026-10-06 (REGPATCH7): row 26, `hook-currentness-digest-once-tests`
 

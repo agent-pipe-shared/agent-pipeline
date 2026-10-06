@@ -32,33 +32,32 @@
 +  { name: "pipeline-start-preflight-session-intent-tests", file: join(pluginScriptsDir, "pipeline-start-preflight.session-intent.test.mjs") },
 +  { name: "pipeline-start-preflight-path-spelling-tests", file: join(pluginScriptsDir, "pipeline-start-preflight.path-spelling.test.mjs") },
    { name: "runner-usage-v1-tests", file: join(libDir, "runner-usage-v1.test.mjs") },
-@@ -465,2 +479,5 @@ const TEST_SUITES = [
+@@ -465,2 +479,4 @@ const TEST_SUITES = [
    { name: "private-overlay-activation-e2e-tests", file: join(pluginScriptsDir, "private-overlay-activation.e2e.test.mjs") },
 +  { name: "hardened-private-directory-tests", file: join(libDir, "hardened-private-directory.test.mjs") },
 +  { name: "hardened-private-directory-install-tests", file: join(libDir, "hardened-private-directory.install.test.mjs") },
-+  { name: "private-tmp-tests", file: join(libDir, "test-support", "private-tmp.test.mjs") },
    { name: "codex-private-overlay-activation-tests", file: join(pluginScriptsDir, "codex-private-overlay-activation.test.mjs") },
-@@ -473,2 +490,3 @@ const TEST_SUITES = [
+@@ -473,2 +489,3 @@ const TEST_SUITES = [
    { name: "agents-adapter-migration-tests", file: join(scriptDir, "check-agents-adapter-migration.test.mjs") },
 +  { name: "guard-split-map-tests", file: join(scriptDir, "guard-split-map.test.mjs") },
    { name: "agents-adapter-migration-check", file: join(scriptDir, "check-agents-adapter-migration.mjs") },
-@@ -592,2 +610,3 @@ const TEST_SUITES = [
+@@ -592,2 +609,3 @@ const TEST_SUITES = [
    { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
 +  { name: "nova-verify-journal-drvfs-hint-tests", file: join(pluginScriptsDir, "verify-journal.drvfs-hint.test.mjs") },
    { name: "test-case-completion-tests", file: join(libDir, "test-case-completion.test.mjs") },
-@@ -616,2 +635,3 @@ const TEST_SUITES = [
+@@ -616,2 +634,3 @@ const TEST_SUITES = [
    { name: "governance-event-store-tests", file: join(libDir, "governance-event-store.test.mjs") },
 +  { name: "governance-event-store-win-fsync-tests", file: join(libDir, "governance-event-store.win-fsync.test.mjs") },
    { name: "governance-event-core-tests", file: join(libDir, "governance-event.test.mjs") },
-@@ -697,2 +717,3 @@ const TEST_SUITES = [
+@@ -697,2 +716,3 @@ const TEST_SUITES = [
    { name: "gitleaks-tests", file: join(pluginScriptsDir, "security-adapters", "gitleaks.test.mjs") },
 +  { name: "gitleaks-repair-ignore-cli-tests", file: join(pluginScriptsDir, "gitleaks-repair-ignore.cli.test.mjs") },
    { name: "license-check-tests", file: join(pluginScriptsDir, "security-adapters", "license-check.test.mjs") },
-@@ -707,2 +728,3 @@ const TEST_SUITES = [
+@@ -707,2 +727,3 @@ const TEST_SUITES = [
    { name: "guard-push-decision-reference-tests", file: join(hooksDir, "guard-push-decision-reference.test.mjs") },
 +  { name: "guard-push-gitleaks-prefix-tests", file: join(hooksDir, "guard-push-gitleaks-prefix.test.mjs") },
    { name: "control-execution-lifecycle-event-tests", file: join(libDir, "control-execution-lifecycle-event.test.mjs") },
-@@ -906,2 +928,6 @@ const TEST_SUITES = [
+@@ -906,2 +927,6 @@ const TEST_SUITES = [
    { name: "design-advisor-provenance-tests", file: join(libDir, "design-advisor-provenance.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC10C001","RC10C002","RC10C003","RC10C004"],maxBytes:65536} },
 +  { name: "design-advisor-provenance-flap3-tests", file: join(libDir, "design-advisor-provenance.flap3.test.mjs") },
 +  { name: "hook-refresh-detection-tests", file: join(pluginScriptsDir, "hook-refresh-detection.test.mjs") },

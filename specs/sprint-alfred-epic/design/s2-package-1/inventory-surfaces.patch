@@ -101,15 +101,7 @@ diff --git a/docs/product-capability-inventory.json b/docs/product-capability-in
          "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
          "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
          "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-tests",
-@@ -618,6 +635,7 @@
-         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-tests",
-         "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
-         "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
-+        "verify-phase:harness/scripts/verify.mjs:private-tmp-tests",
-         "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
-         "verify-phase:harness/scripts/verify.mjs:project-activation-tests",
-         "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
-@@ -627,6 +645,7 @@
+@@ -627,6 +644,7 @@
          "verify-phase:harness/scripts/verify.mjs:project-onboarding-foreign-residue-unit-tests",
          "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
          "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-argv-closure-tests",
@@ -117,7 +109,7 @@ diff --git a/docs/product-capability-inventory.json b/docs/product-capability-in
          "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-pre-push-hook-offer-tests",
          "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
          "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-unborn-head-tests",
-@@ -735,6 +754,8 @@
+@@ -735,6 +753,8 @@
          "verify-phase:harness/scripts/verify.mjs:setup-check-tests",
          "verify-phase:harness/scripts/verify.mjs:setup-tests",
          "verify-phase:harness/scripts/verify.mjs:signing-ceremony-tests",
@@ -126,7 +118,7 @@ diff --git a/docs/product-capability-inventory.json b/docs/product-capability-in
          "verify-phase:harness/scripts/verify.mjs:source-observation-tests",
          "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
          "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
-@@ -751,6 +772,7 @@
+@@ -751,6 +771,7 @@
          "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-check",
          "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-tests",
          "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
@@ -134,7 +126,7 @@ diff --git a/docs/product-capability-inventory.json b/docs/product-capability-in
          "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
          "verify-phase:harness/scripts/verify.mjs:suite-registration-check",
          "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
-@@ -1314,7 +1336,9 @@
+@@ -1314,7 +1335,9 @@
          "setup:setup.mjs:setup",
          "verify-phase:harness/scripts/verify.mjs:antigravity-start-hint-tests",
          "verify-phase:harness/scripts/verify.mjs:bound-design-line-endings-tests",
@@ -145,7 +137,7 @@ diff --git a/docs/product-capability-inventory.json b/docs/product-capability-in
        ],
        "runners": [
          "antigravity",
-@@ -1808,6 +1832,7 @@
+@@ -1808,6 +1831,7 @@
          "verify-phase:harness/scripts/verify.mjs:governance-event-core-tests",
          "verify-phase:harness/scripts/verify.mjs:governance-event-projection-tests",
          "verify-phase:harness/scripts/verify.mjs:governance-event-store-tests",
@@ -153,7 +145,7 @@ diff --git a/docs/product-capability-inventory.json b/docs/product-capability-in
          "verify-phase:harness/scripts/verify.mjs:governance-gate-action-tests",
          "verify-phase:harness/scripts/verify.mjs:governance-recovery-reconciliation-action-tests",
          "verify-phase:harness/scripts/verify.mjs:governance-review-action-tests",
-@@ -2405,6 +2430,7 @@
+@@ -2405,6 +2429,7 @@
          "verify-phase:harness/scripts/verify.mjs:resume-hint-scripts-tests",
          "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
          "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-tests",
