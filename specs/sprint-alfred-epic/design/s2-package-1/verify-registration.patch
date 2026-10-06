@@ -8,3 +8,7 @@
    { name: "lifecycle-denial-loop-tests", file: join(libDir, "lifecycle-denial-loop.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC16C001","RC16C002","RC16C003","RC16C004","RC16C005","RC16C006","RC16C007","RC16C008","RC16C009","RC16C010","RC16C011","RC16C012","RC16C013","RC16C014","RC16C015","RC16C016","RC16C017","RC16C018","RC16C019","RC16C020"],maxBytes:65536} },
    { name: "lifecycle-denial-loop-guard-tests", file: join(hooksDir, "lifecycle-denial-loop-guard.test.mjs"), caseCompletion: {schema:"pipeline.verify-case-completion-policy.v1",caseIds:["RC04C001","RC04C002","RC04C003","RC04C004","RC04C005"],maxBytes:65536} },
    { name: "pipeline-state-revocation-tests", file: join(pluginScriptsDir, "pipeline-state-revocation.test.mjs") },
+@@ -473,2 +474,3 @@ const TEST_SUITES = [
+   { name: "agents-adapter-migration-tests", file: join(scriptDir, "check-agents-adapter-migration.test.mjs") },
++  { name: "guard-split-map-tests", file: join(scriptDir, "guard-split-map.test.mjs") },
+   { name: "agents-adapter-migration-check", file: join(scriptDir, "check-agents-adapter-migration.mjs") },
