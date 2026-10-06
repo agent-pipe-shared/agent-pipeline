@@ -134,6 +134,11 @@ test("(b1) defect: the live finding carries a DIFFERENT value at the new line ->
     assert.equal(result.ok, false, "a different value at the same path/rule/column must NOT be re-bound: nobody reviewed it");
     assert.equal(typeof result.reason, "string", "a refusal must carry a reason");
     assert.ok(result.reason.length > 0, "a refusal must carry a non-empty reason");
+    // The Proposal requires a TYPED reason: pin the exact prefix so a refusal for any other cause (or an untyped one) cannot satisfy this case.
+    assert.ok(
+      result.reason.startsWith("value-binding-mismatch:"),
+      `the refusal reason must start with the typed prefix "value-binding-mismatch:", got: ${result.reason}`,
+    );
     assert.equal(fixture.calls.length, 1, "the refusal must come from the live scan result, i.e. after exactly one scan -- not from an earlier precondition");
   } finally {
     rmSync(fixture.rootDir, { recursive: true, force: true });
