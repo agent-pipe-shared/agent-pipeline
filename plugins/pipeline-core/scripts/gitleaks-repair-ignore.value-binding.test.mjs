@@ -8,8 +8,10 @@
  * sha256 over all five). The line binding exists to force a fresh review whenever what sits at the
  * location is no longer what was reviewed. `repairStaleIgnoreEntry()` re-binds a stale entry to the
  * line a live finding moved to, so it may only do that when the live finding carries the SAME value
- * the removed entry was computed for. Today it selects the live finding by path + rule + column only
- * and never compares values, so a DIFFERENT value at the same location would be silently suppressed.
+ * the removed entry was computed for. It selects the live finding by path + rule + column, recomputes
+ * that finding's digest at the old line and refuses with a reason starting `value-binding-mismatch:`
+ * on a mismatch, so a DIFFERENT value at the same location is never silently suppressed. This suite
+ * is the regression pin for that refusal.
  *
  * Cases (the fixtures of (a) and (b*) differ ONLY in the value the live scan reports, which is what
  * rules out any other refusal path as the cause of a refusal):
