@@ -272,13 +272,26 @@ function authorityKey(finding) {
 // physical regular candidate descendant before computing that authority key.  External,
 // missing, linked, or otherwise ambiguous paths remain untouched and therefore cannot match
 // an authority entry.
+//
+// Content-v1 authorities always use `/` separators (safeAuthorityPath rejects `\`), so the
+// normalized path must use `/` on every platform: `relative()` returns the platform separator
+// (`\` on native Windows), which is converted to `/` BEFORE the strict validator runs.  A
+// relative finding path with `\` separators is normalized the same way, on win32 only -- there
+// `\` is a path separator and never a legal filename character, whereas on POSIX it is a legal
+// filename character and is never rewritten.  The validator itself stays strict because it also
+// validates ignore-file entries.
 export function normalizeCandidateFindingPath(finding, rootDir) {
   const field = typeof finding?.File === "string" ? "File" : typeof finding?.file === "string" ? "file" : null;
-  if (field === null || !isAbsolute(finding[field])) return finding;
+  if (field === null) return finding;
+  if (!isAbsolute(finding[field])) {
+    if (process.platform !== "win32" || !finding[field].includes("\\")) return finding;
+    const separatorPath = finding[field].split("\\").join("/");
+    return safeAuthorityPath(separatorPath) ? { ...finding, [field]: separatorPath } : finding;
+  }
   try {
     const physicalRoot = realpathSync(rootDir);
     const physicalFile = realpathSync(finding[field]);
-    const repositoryPath = relative(physicalRoot, physicalFile);
+    const repositoryPath = relative(physicalRoot, physicalFile).split(sep).join("/");
     if (!safeAuthorityPath(repositoryPath)) return finding;
     return { ...finding, [field]: repositoryPath };
   } catch {
