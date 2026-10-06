@@ -649,6 +649,69 @@ for (const [cmd, why] of GPGL7_NEGATIVE_TABLE) {
   record(`GPGL7-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
 }
 
+// ---- commandIsGitPush: shell expansion and typographic quotes fail closed (GPGL-8t, Critic F-1 / F-2) ----
+// Test-only pin, RED by design: a separate later dispatch makes GPGL8_FAIL_CLOSED_TABLE green. The contract is
+// the GPGL-7 fix-verification Critic record (specs/sprint-alfred-epic/evidence/critic-2026-10-05/
+// gpgl-7-fix-verification.md, findings F-1 and F-2) and the backlog item's "Fail closed" proposal: where the
+// classifier cannot tell what a shell will execute, "not a push" is the unsafe answer, because at every call site
+// returning false means the push gate never runs.
+//   F-2: `$`, `(`, `{` and the backtick are ordinary word characters, so a push word produced by an expansion in
+//     command position never reads `push` (`git $(echo push) origin main`), and a real push inside a
+//     double-quoted `$(...)` is blanked as quoted prose. Under Bash each of them runs a real push.
+//   F-1: PowerShell takes typographic quotes (double U+201C-U+201E, single U+2018-U+201B) as string delimiters,
+//     but the scanner closes a span only on the ASCII quote, so an ASCII-opened string closed by a typographic
+//     quote hides the `git push` statement that follows it. The typographic quotes are \u escapes so this file
+//     stays ASCII.
+const GPGL8_FAIL_CLOSED_TABLE = [
+  // (a) POSIX command substitution produces the push word after git
+  ["git $(echo push) origin main", "(a) command substitution spells the push word"],
+  ["git $(printf push) origin main", "(a) a different substituting command"],
+  ["echo hi; git $(echo push) origin HEAD:refs/heads/feat/x", "(a) behind another command, with a remote and a refspec"],
+  ["git -C repo $(echo push) origin main", "(a) after a recognised -C option"],
+  // (b) backtick substitution produces the push word after git
+  ["git `echo push` origin main", "(b) backtick substitution spells the push word"],
+  ["git `printf push` --force origin main", "(b) a different substituting command, with a flag"],
+  ["echo hi; git `echo push` origin main", "(b) behind another command"],
+  // (c) parameter expansion produces the push word after git
+  ["git ${X:-push} origin main", "(c) a default-value expansion spells the push word"],
+  ["P=push; git ${P} origin main", "(c) a plain braced expansion of a variable assigned just before"],
+  ["git ${PUSH_CMD:-push} --force origin main", "(c) a default-value expansion, with a flag"],
+  // (d) a real git push inside a double-quoted $(...) argument of another command
+  ['echo "$(git push origin main)"', "(d) the push is the whole double-quoted substitution"],
+  ['git commit -m "$(git push origin main)"', "(d) a git command whose message argument executes a push"],
+  ['echo "result: $(git push --force origin main) done"', "(d) the push sits between prose inside the double-quoted argument"],
+  ['printf "%s" "$(git -C repo push origin main)"', "(d) a recognised -C option inside the double-quoted substitution"],
+  // (e) an ASCII-opened double-quoted string closed by a typographic double quote
+  ['echo "x”; git push origin main; echo “y"', "(e) closed by U+201D, then a push statement and a string reopened by U+201C"],
+  ['echo "x“; git push origin main; echo ”y"', "(e) closed by U+201C, reopened by U+201D"],
+  ['git log "x”; git push --force origin main; echo “y"', "(e) the same behind a git command, the middle statement a force push"],
+  ['echo “x"; git push origin main; echo "y”', "(e) mirror: opened by a typographic quote, closed by the ASCII quote"],
+  // (f) the single-quote analogue
+  ["echo 'x’; git push origin main; echo ‘y'", "(f) closed by U+2019, then a push statement and a string reopened by U+2018"],
+  ["echo 'x‘; git push origin main; echo ’y'", "(f) closed by U+2018, reopened by U+2019"],
+  ["git log 'x’; git push --force origin main; echo ‘y'", "(f) the same behind a git command, the middle statement a force push"],
+  ["echo ‘x'; git push origin main; echo 'y’", "(f) mirror: opened by a typographic quote, closed by the ASCII quote"],
+];
+for (const [cmd, why] of GPGL8_FAIL_CLOSED_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL8-FAIL-CLOSED ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
+}
+
+// Ordinary commands that carry none of the shapes above stay out of the push gate.
+const GPGL8_NEGATIVE_TABLE = [
+  ["git status", "a read-only git command"],
+  ["git log --oneline", "a read-only git command with a flag"],
+  ['git commit -m "plain message"', "an ordinary double-quoted commit message"],
+  ["echo “hello”", "a typographic-quoted word with no git word anywhere"],
+  ["echo $(date)", "a non-git command using command substitution"],
+  ["echo `date`", "a non-git command using backtick substitution"],
+  ["echo ${HOME}", "a non-git command using parameter expansion"],
+];
+for (const [cmd, why] of GPGL8_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GPGL8-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} expected=false out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
