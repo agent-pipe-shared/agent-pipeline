@@ -22,7 +22,7 @@
     },
     {
       "id": "PB-GUARD-HOOKS",
-      "pathPattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$",
+      "pathPattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$",
       "class": "hook",
       "rationale": "Authority-bearing guard hook implementations cannot be weakened by an unbriefed mutation route."
     },
