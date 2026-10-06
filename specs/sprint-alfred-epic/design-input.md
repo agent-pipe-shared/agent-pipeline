@@ -161,6 +161,43 @@ readiness review):
     and no intermediate signature is asked of the PO for course runs,
     evidence writes, continuity registration or revision cycles.
 
+### PO decisions of 2026-10-06 (chat, during the device switch to the second PC)
+
+Trigger: bringing the IC-2d candidate up on a second PC took hours of blocks
+that no agent could clear on its own (toil log T1–T17: a Git for Windows
+2.56.0 `NUL` regression hidden behind `GS-GIT-UNAVAILABLE`, pre-ready lockdown
+preventing diagnosis, the approval-bound design package stored in the ignored
+root `evidence/` and absent on the second device, backlog writes refused,
+`reopen-design` as the only recovery, two signatures spent only on continuity
+mechanics, signing failing on a missing key-directory setting and on `openssl`
+not being on the signing terminal's PATH).
+
+17. Product goal, binding for 0.7.0: the Pipeline is built so that an agent
+    flows through bootstrap, install, recovery, device switch and lifecycle
+    repair without hurdles. Every block comes with an agent-executable fix;
+    the human is needed only where a real signature is required. This makes
+    decisions 15 and 16 concrete and is not new authority.
+18. The device-switch findings T1–T17 are fixed in the next candidate (0.7.0),
+    not deferred: Git null-device handling that works across Git for Windows
+    builds; diagnosable preflight failures with a typed read-only probe;
+    approval-bound artifacts stored tracked and travelling with the branch,
+    with an approval refused up front when a bound path is not tracked;
+    backlog and documentation writes admitted in every lifecycle state; a
+    rebind-on-another-device route instead of a forced `reopen-design` when
+    PRD and spec are unchanged; sanctioned continuity verbs so supersede and
+    re-registration need no signature; course outputs writable by the agent;
+    lifecycle state committable through its own writer; handover/close
+    listing every device-bound artifact; one machine-wide key-directory
+    setting; the signing toolchain (`openssl`, key directory, trust anchor)
+    checked before a ceremony and resolved by the Pipeline itself; one
+    environment readiness report (known-bad Git versions, signing toolchain,
+    pre-push hook, tracked digest-bound files) with a typed repair action per
+    finding; the same denial and recovery route on the PowerShell and Bash
+    lanes.
+19. Environment prerequisites are checked at install and bootstrap, reported
+    with a concrete repair action, and never discovered for the first time at
+    a signature.
+
 Each decision has an owner and an acceptance case in the "PO decisions → owner
 and case" section of `traceability.md`.
 
