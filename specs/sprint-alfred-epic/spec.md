@@ -2036,8 +2036,9 @@ signature classes. Each is defined outside §22, and R7 adds none:
    reviewed and signed once by the PO. R7-1 relies on it only where it says
    that protected sites change through it.
 5. The §20.2 signed legacy-custody transaction, with the attended external
-   route of §20.1 (RV-8…RV-11). R7-2 relies on it only as the attended route
-   for descriptors it must not archive.
+   route of §20.1 (RV-8…RV-11). R7-2 and R7-10 rely on it only as the attended
+   route for the descriptors and registrations they must not archive or
+   supersede.
 
 No R7 mechanic (diagnosis, archival, provisioning, rebind of an unchanged
 approval, key-directory or toolchain setup, state commits, superseding a stale
@@ -2335,66 +2336,110 @@ Contract:
   `shell: false` (`command()` in `po-human-approval.mjs`), so the executable
   that is handed the PO's private-key path and runs the passphrase prompt is
   whatever the platform's executable search finds first, with nothing about its
-  location checked. The resolved executable is a trust decision, not a
-  convenience, and R7-6 constrains it as follows:
+  location or content checked. The resolved executable is a trust decision, not
+  a convenience. The session runs as the same OS user that owns most
+  user-writable locations, so integrity cannot rest on where the executable
+  lives: it rests on a digest the PO pinned, and the location rule below is
+  defence in depth. R7-6 constrains it as follows:
   - **Order.** `openssl` is resolved by the Pipeline as an absolute path, never
-    from the signing terminal's PATH alone: (1) the configured path, only if
-    the PO has set one (last sub-bullet); (2) the executable bundled with the
-    Git installation, derived at run time from the resolved git executable
-    (candidate sub-directories are data, not code); (3) each PATH entry in
-    order. A configured path that is missing or fails the location rule is
-    refused with its typed finding; resolution does not fall through to (2) or
-    (3), which would hide that the PO's setting was bypassed.
-  - **Location rule (every candidate, configured or automatic).** Both the path
-    as given and its fully resolved real path (every symlink, junction and
-    short-name component resolved; case-insensitive comparison on win32) lie
-    outside every Git working tree (the project root and every worktree of the
-    repository), outside `scratch/`, outside every plugin cache or data
-    directory the session writes, and outside the OS temporary directory and
-    the session scratch directory. On POSIX neither the file nor any ancestor
-    directory is writable by group or other; win32 applies the equivalent ACL
-    test, and a candidate whose location cannot be established is not
-    accepted. A link (symlink or junction) into a forbidden location, or a link
-    placed inside one, is refused by the same rule. A relative PATH entry (`.`
-    or empty) is never accepted.
+    from the signing terminal's PATH alone: (1) the pinned path, only if the PO
+    has pinned one (last sub-bullet), and then only that path; (2) the
+    executable bundled with the Git installation, derived at run time from the
+    resolved git executable (candidate sub-directories are data, not code);
+    (3) each PATH entry in order. A pinned path that is missing, fails the
+    location rule or has a digest that differs from its pin is refused with its
+    typed finding; resolution does not fall through to (2) or (3), which would
+    hide that the PO's pin was bypassed.
+  - **The pin: path and sha256 together, in a protected credential root.** The
+    PO pins the toolchain's sha256 together with its path in the attended key
+    setup (last sub-bullet). The pin is stored inside the PO key directory,
+    which is on the §21.2 credential-root list (every spelling denied to agent
+    reads); R7-6 requires that the guard refuses every agent read and every
+    agent write of that directory on every lane (Read, Write, Edit, Bash and
+    PowerShell), which R7-6e proves lane by lane. A Pipeline script reads the
+    pin and reports only `pinned`, `unpinned` or a typed mismatch, never key
+    material, and honours it only from a key directory that returned `match`
+    against the committed trust anchor. Any resolved executable whose sha256
+    differs from the pinned digest is refused (`openssl-pin-mismatch`) before
+    any prompt. Without a pin only (2) and (3) apply, and the signing
+    confirmation marks the executable `unpinned` and shows its path and sha256;
+    the PO may still decline there.
+  - **Location rule (defence in depth; every candidate, pinned or automatic).**
+    Both the path as given and its fully resolved real path (every symlink,
+    junction and short-name component resolved; case-insensitive comparison on
+    win32) lie outside every Git working tree (the project root and every
+    worktree of the repository), outside `scratch/`, outside every plugin cache
+    or data directory the session writes, and outside the OS temporary
+    directory and the session scratch directory. On POSIX neither the file nor
+    any ancestor directory is writable by group or other; win32 applies the
+    equivalent ACL test (no write, modify or delete access for any principal
+    other than administrators and the system); a candidate whose location
+    cannot be established is not accepted. A link (symlink or junction) into a
+    forbidden location, or a link placed inside one, is refused by the same
+    rule. A relative PATH entry (`.` or empty) is never accepted. A location
+    that the session's own OS user can write (owner-writable on POSIX,
+    user-writable by ACL on win32) is reachable by the session, so it passes
+    only under a matching pin: an unpinned candidate, from (2) or (3), is
+    accepted only when neither the file nor any ancestor directory is writable
+    by that user. A matching pin relieves no other class.
   - **The probe is necessary and never sufficient.** A candidate that passes
     the location rule is accepted only if an Ed25519 capability probe also
     succeeds: a sign and verify round trip with a throwaway key in a temporary
     directory outside every repository, touching no PO key. The probe shows
     capability, not trust: a candidate that passes the probe but fails the
     location rule is refused.
-  - **The PO sees what receives the passphrase.** The signing confirmation the
-    PO reads before entering the passphrase (the §21.3 hand-over text) shows
-    the resolved executable's provenance (`configured`, `git-bundled` or
-    `path`), its real path and its sha256. The digest is recomputed
-    immediately before the spawn, and a mismatch refuses signing before any
-    prompt. The child is started by absolute path with `shell: false`.
-    Persisted reports and receipts carry the provenance and the sha256 and a
-    path redacted per §22.0.
-  - **Only the PO sets the path.** The configured path (`poToolchainPath`) is
-    one machine-wide value per OS user account, stored outside every repository
-    and outside `.git`. It is established only in the PO's attended external
-    terminal, as part of the one-time key setup of §21.0 (signature class 1 of
-    the §22.0 signature rule: no new act and no extra signature). No
-    agent-executable action sets or changes the signing executable: no
-    catalogue entry, no `nextAction` (whatever its `requiresConfirmation`) and
-    no setup action, including `set-po-key-directory`, accepts it, and the
-    guard refuses an agent write to its storage location as a write outside the
-    project root.
+  - **`sign-intent` resolves it again, in the signing terminal.** The
+    resolution made at preparation and the spawn made later in the signing
+    terminal are different moments in possibly different environments (PATH,
+    Git installation), so `sign-intent` itself resolves, location-checks and
+    digest-checks the executable in the signing terminal immediately before the
+    prompt, by the same order, pin and rule. The provenance, real path and
+    sha256 shown at preparation (the §21.3 hand-over text) are part of the
+    signed intent text, as the absolute expiry is (§21.3): a different
+    provenance, path or digest in the signing terminal is refused before any
+    prompt with the typed `toolchain-drift` result, which names both values
+    (prepared and resolved). Otherwise the confirmation the PO reads before
+    entering the passphrase is built by `sign-intent` from its own resolution
+    and shows the provenance (`pinned`, `git-bundled` or `path`), the `unpinned`
+    mark where it applies, the real path and the sha256. The digest is
+    recomputed immediately before the spawn, and a mismatch refuses signing
+    before any prompt. The child is started by absolute path with
+    `shell: false`. Persisted reports and receipts carry the provenance and the
+    sha256 and a path redacted per §22.0; the signed intent is a device-local
+    ceremony artifact, not a report.
+  - **Only the PO sets the pin.** The pin (`poToolchainPath` with its sha256) is
+    one machine-wide value pair per OS user account, stored inside the PO key
+    directory above, outside every repository and outside `.git`. It is
+    optional and established only in the PO's attended external terminal, as
+    part of the one-time key setup of §21.0 (signature class 1 of the §22.0
+    signature rule: no new act and no extra signature): that step resolves the
+    executable, shows its path and sha256 and stores the pair only after the PO
+    confirms it. A later change of the pinned executable, for example after a
+    Git update, is the PO re-running that attended step. No agent-executable
+    action sets or changes the pin or the signing executable: no catalogue
+    entry, no `nextAction` (whatever its `requiresConfirmation`) and no setup
+    action, including `set-po-key-directory`, accepts it. The protection of its
+    storage is the credential-root denial above, not the project-root boundary.
 
   A failing spawn reports its exit code and a bounded, path-redacted stderr
   head instead of a bare "openssl failed".
 - **Before a ceremony, never during.** `prepare-for-signature` runs both checks
   before it hands the PO a command. When one is blocked, no command is handed
   over, no signing window starts (§21.3) and no ceremony request is created.
+  `sign-intent` repeats the toolchain resolution in the signing terminal as
+  stated above, and its own refusals occur before any prompt.
 
 Typed repair: `set-po-key-directory` (agent-executable; key directory only).
 For the toolchain there is no agent-executable setup action: the Pipeline's own
 resolution, else the attended prerequisite naming the finding
-(`openssl-missing`, `openssl-no-ed25519`, or `openssl-untrusted-location` with
-the rule class `in-repository`, `agent-writable`, `link` or
-`configured-invalid`). The attended repair is installing the toolchain outside
-the forbidden locations, or the PO's own key-setup step.
+(`openssl-missing`, `openssl-no-ed25519`, `openssl-pin-mismatch`,
+`toolchain-drift`, or `openssl-untrusted-location` with the rule class, a closed
+list: `in-repository`, `plugin-cache-or-data`, `os-temp`, `session-scratch`,
+`group-other-writable`, `owner-writable-unpinned`, `link` or `pinned-invalid`).
+The attended repair is installing the toolchain outside the forbidden
+locations, or the PO's own (re-)pinning in the key-setup step; after it the
+agent re-runs `prepare-for-signature` (agent-executable), which starts a new
+window.
 
 Acceptance cases (§22.0 matrix: R7-6a…R7-6f each run on the win32 and POSIX
 dialects, in the source checkout and in the consumer-layout fixture):
@@ -2406,38 +2451,66 @@ dialects, in the source checkout and in the consumer-layout fixture):
   of the directory is refused, and no report contains key bytes.
 - R7-6b: With a PATH that lacks `openssl` but a Git-distribution layout fixture
   (outside every repository and agent-writable location) holding a stub that
-  passes the probe, the stub resolves by absolute path. A PO-configured path
-  outside the forbidden locations resolves first; a configured path that fails
-  the location rule is refused with no fall-through. A stub failing the
-  Ed25519 probe yields `openssl-no-ed25519`; none yields `openssl-missing` with
-  the attended prerequisite. In every failing case `prepare-for-signature`
-  hands over no command and starts no window.
+  passes the probe, the stub resolves by absolute path and the confirmation
+  marks it `unpinned`. A pinned path (matching digest) outside the forbidden
+  locations resolves first and is shown as `pinned`; a pinned path that fails
+  the location rule, is missing, or has a digest that differs from its pin is
+  refused with no fall-through. A stub failing the Ed25519 probe yields
+  `openssl-no-ed25519`; none yields `openssl-missing` with the attended
+  prerequisite. In every failing case `prepare-for-signature` hands over no
+  command and starts no window.
 - R7-6c: A failing `openssl` stub yields a result with exit code and bounded
   stderr head and no host path.
-- R7-6d (negative, location): every stub below passes the Ed25519 probe and is
-  refused with `openssl-untrusted-location` and its rule class;
-  `prepare-for-signature` hands over no command, starts no window and creates
-  no ceremony request, and the stub is never started with a PO key path. (i) A
-  configured path inside the repository working tree, and inside a second
-  worktree. (ii) A configured path inside `scratch/`. (iii) A configured path
-  that is a symlink (POSIX) or a symlink or junction (win32) from an
-  allowed-looking directory into the repository or `scratch/`, and one that is
-  a link placed inside an agent-writable tree. (iv) The same three shapes as a
-  Git-bundled candidate and as a PATH entry. (v) Alternative spellings of an
-  in-repository location: case-folded, drive-relative, `\\?\`-prefixed and 8.3
-  short-name forms on win32; `..` segments and a relative PATH entry on POSIX.
-  A fixture host that cannot create a link type reports that case `not-run`,
-  which fails the matrix; it never skips.
-- R7-6e (negative, no agent route): no catalogue entry and no `nextAction`
-  emitted by any R7 outcome carries a value for the signing executable. An
-  agent attempt to set it through `set-po-key-directory`, through any other
-  catalogued verb, or through a Write or Edit to its storage location is
-  refused with its typed code and leaves state byte-identical. A static scan
-  fails on any `nextAction` template, catalogue entry or setup action that
-  accepts it.
-- R7-6f (confirmation): the hand-over text shows provenance, real path and
-  sha256 of the resolved executable before the passphrase prompt; a stub whose
-  bytes change between resolution and spawn is refused before any prompt; a
+- R7-6d (negative, location and pin): every stub below passes the Ed25519 probe
+  and is refused (`openssl-untrusted-location` with its rule class, or
+  `openssl-pin-mismatch` where stated); `prepare-for-signature` hands over no
+  command, starts no window and creates no ceremony request, and the stub is
+  never started with a PO key path. One case per rule class. (i)
+  `in-repository`: a path inside the repository working tree, and inside a
+  second worktree. (ii) `in-repository`: a path inside `scratch/`. (iii)
+  `plugin-cache-or-data`: a path inside a plugin cache or data directory the
+  session writes. (iv) `os-temp`: a path inside the OS temporary directory.
+  (v) `session-scratch`: a path inside the session scratch directory. (vi)
+  `group-other-writable`: a path in a directory writable by group or other
+  (POSIX mode bits; the equivalent ACL on win32), refused with and without a
+  matching pin. (vii) A path in a directory writable by the session's own OS
+  user: without a pin it is refused as `owner-writable-unpinned`; with a pin
+  whose digest differs from the stub's it is refused as `openssl-pin-mismatch`;
+  as a control, the same stub with a matching pin is accepted and shown as
+  `pinned`. (viii) `link`: a path that is a symlink (POSIX) or a symlink or
+  junction (win32) from an allowed-looking directory into the repository or
+  `scratch/`, and one that is a link placed inside an agent-writable tree.
+  (ix) Each of (i) to (vi) and (viii) also as a Git-bundled candidate and as a
+  PATH entry, and with a matching pin where a pin can name it (a matching pin
+  relieves none of them). (x) Alternative spellings of an in-repository
+  location: case-folded, drive-relative, `\\?\`-prefixed and 8.3 short-name
+  forms on win32; `..` segments and a relative PATH entry on POSIX. A fixture
+  host that cannot create a link type reports that case `not-run`, which fails
+  the matrix; it never skips.
+- R7-6e (negative, no agent route, every lane): no catalogue entry and no
+  `nextAction` emitted by any R7 outcome carries a value for the signing
+  executable or its pin. An agent attempt to set either through
+  `set-po-key-directory`, through any other catalogued verb, or by writing the
+  pin or path storage inside the PO key directory is refused with its typed code
+  and leaves state byte-identical, on each lane separately: a Write and an Edit
+  to it; a Bash-lane command that writes it (a redirect, `tee`, `cp`); and a
+  PowerShell-lane command that writes it (`Set-Content`, `Out-File`,
+  `Copy-Item`). Reads of that storage on the Read, Grep, Bash and PowerShell
+  lanes are refused too. State byte-identity covers the pin storage, the
+  repository tree and the private state. A static scan fails on any
+  `nextAction` template, catalogue entry or setup action that accepts either.
+- R7-6f (confirmation and drift): the signing confirmation, built by
+  `sign-intent` in the signing terminal, shows provenance, the `unpinned` mark
+  where it applies, real path and sha256 of the resolved executable before the
+  passphrase prompt, and they equal the values bound in the signed intent. (i)
+  A stub whose bytes change between resolution and spawn is refused before any
+  prompt; with a pin the result is `openssl-pin-mismatch`, without one it is
+  `toolchain-drift`. (ii) A different environment resolves a different
+  executable: prepare with one PATH or Git layout, then run `sign-intent` in an
+  environment (another PATH, another Git installation) whose resolution yields a
+  different stub, and one with identical bytes at a different path; each is
+  refused before any prompt with `toolchain-drift` naming both values (prepared
+  and resolved), and neither stub is started with a PO key path. (iii) A
   persisted receipt carries provenance and sha256 and no host path.
 
 ### 22.7 R7-7 — Environment readiness report
@@ -2568,57 +2641,130 @@ Rows owned: T8.
 Why this contract exists: §21.5 (R5-6) states that the coordinator records
 authoring itself and that a design revision keeps the submission lineage. It
 does not state what happens to a registered authoring dispatch that already
-exists when `submit-plan` has to run: one of an earlier revision, or one whose
-sources are committed at the bound digests while its result artifacts are
-absent on this device. That is the T8 case, and this section states the
-obligation. §21 is unchanged.
+exists when `submit-plan` has to run and the registration blocks the idle
+continuity it needs: one of an earlier revision, or one whose owner has ended.
+That is the T8 case, and this section states the obligation. §21 is unchanged.
+Whether a registration may be retired is decided only from positive facts the
+Pipeline's own records show, never from a guess that its owner is dead (§20.1).
 
 Contract:
 
-- **Definition.** A stale authoring registration is a registered authoring
-  dispatch in continuity that blocks the idle continuity `submit-plan` needs
-  and that either belongs to an earlier revision of the same submission
-  lineage, or has its sources committed (tracked and clean, R7-3) at the bound
-  digests while its result artifacts are absent on this device.
+- **Owner vocabulary (§20.2, RV-1).** The owner of a registration is observed
+  as `live` or `not-live` only where platform evidence supports it (the §20
+  native owner observation), as `unavailable` (V2 null runtime) or as
+  `unobserved` (V1 field absent, or no descriptor of that owner session on this
+  device, as on a fresh clone or for a registration made on another device).
+  A session end the Pipeline itself recorded is `ended` (R7-2). `unavailable`
+  and `unobserved` never mean `not-live`, and owner death is never inferred
+  from elapsed time, a reboot, absent result artifacts or a change of device.
+- **Eligibility: positive conditions only.** A registration may be superseded
+  only when every one of the following holds:
+  - it blocks the idle continuity `submit-plan` needs, and its bytes are
+    readable with a known schema and a recorded digest (otherwise the result is
+    the §20.2 typed `unavailable` naming the read or identity prerequisite);
+  - the Pipeline's own records show zero authority bound to it: no armed
+    override capability, no open ceremony request, no held lock (an axis
+    independent of owner state);
+  - and exactly one of two branches applies. (A) Earlier revision: its recorded
+    submission lineage equals the current submission's, its recorded revision
+    is earlier than the current revision and its recorded authority digest set
+    differs from the current submission's. That positive fact alone makes it
+    eligible, on any device and whatever the state of its owner, because its
+    owner's work is bound to superseded sources and the non-destructive rule
+    below makes any later integration fail closed; it assumes nothing about the
+    owner. (B) Every other registration, in particular one with the same
+    digests: only when its owner is positively `not-live` or `ended`.
 - **Verb.** A catalogue-admitted verb (§21.1, admitted in every phase that
-  emits it) supersedes it: `supersede-authoring-registration`, emitted by
-  `inspect` and the preflight as a typed `nextAction` (`mutation: true`,
-  `requiresConfirmation: false`, closed `expected.schema`, no `--by` PO actor).
-  The coordinator's own writer runs it, so no hand-built `continuity-cas`
-  request, no override and no signature is involved. The superseded
-  registration is archived with its bytes preserved and a receipt recorded (as
-  in R7-2); State, `activeFeature`, proofs, the submission lineage and history
+  emits it) supersedes an eligible registration:
+  `supersede-authoring-registration`, emitted by `inspect` and the preflight as
+  a typed `nextAction` (`mutation: true`, `requiresConfirmation: false`, closed
+  `expected.schema`, no `--by` PO actor). The coordinator's own writer runs it,
+  so no hand-built `continuity-cas` request, no override and no signature is
+  involved. State, `activeFeature`, proofs, the submission lineage and history
   are unchanged.
-- **Never inferred.** A registration whose owner is live or unobservable (the
-  §20 native owner observation), that holds any authority (armed override
-  capability, open ceremony request, held lock), or whose sources are modified,
-  untracked or at other digests is not superseded by this verb. The result is
-  the typed attended prerequisite (RV-11); §20 is unchanged and no PO click is
-  added.
+- **Non-destructive by construction.** The verb retires nothing but the
+  registration. The registration's bytes and its result-path namespace (the
+  paths its dispatch was to write results to) are preserved and archived with a
+  receipt recorded (as in R7-2); no file in that namespace is deleted,
+  rewritten or reused by a later registration. The receipt belongs to the
+  continuity record, not to device-local state, so every checkout that holds
+  the record sees that the registration was retired. A later integration of the
+  superseded registration by its owner, live or not, on this or another device,
+  is a compare-and-set against the retired record and fails closed with the
+  typed result `superseded` naming the receipt: it never silently overwrites
+  the current submission, the archive or the namespace, and the registration
+  and every result byte the owner produced stay as they were. The owner's work
+  then re-enters only through the coordinator for the current revision (R5-6).
+- **Refusal and its named route.** A registration that is not eligible is not
+  superseded and nothing is mutated; the result is the typed attended
+  prerequisite (RV-11), which names its concrete route and never only a code:
+  - owner `live`: wait for the owner's terminal record (its session end or its
+    integration result as the Pipeline records it); no signature;
+  - owner `unavailable` or `unobserved`, including an owner that ran on another
+    device and has no descriptor here: the §20.2 signed legacy-custody
+    transaction (signature class 5), the only attended route that does not
+    infer death. It is unnecessary if the owner's terminal record arrives
+    first, because the owner is then `ended` or `not-live` and branch (B)
+    applies;
+  - authority held (armed override capability, open ceremony request, held
+    lock): wait for the holder's terminal record, that is the consumption,
+    expiry or release the Pipeline records for it; no signature;
+  - bytes unreadable, linked or ambiguous: the §20.2 typed `unavailable` naming
+    the read or identity prerequisite; class 5 applies once the bytes are
+    unambiguous.
 - **Afterwards.** `submit-plan` runs with zero overrides, zero signatures and
   zero PO terminal commands. Re-registration for a revision cycle stays with
   the coordinator (R5-6, row T9).
 
-Typed repair: `supersede-authoring-registration` (agent-executable), or the
-RV-11 attended prerequisite.
+Typed repair: `supersede-authoring-registration` (agent-executable) for an
+eligible registration; for every other registration the RV-11 attended
+prerequisite naming the route above.
 
 Acceptance cases (§22.0 matrix: win32 and POSIX dialects, source checkout and
 consumer-layout fixture):
 
-- R7-10a: A registered authoring dispatch of an earlier revision, with sources
-  committed at the bound digests, blocks `submit-plan`. The typed action
-  supersedes it, `submit-plan` then succeeds, and the counts of overrides,
-  signatures and PO terminal commands are all zero; the archived bytes equal
-  the original and a receipt exists.
-- R7-10b: A fresh clone of an approved, committed fixture (fresh private state,
-  result artifacts absent) carries a registration whose sources are committed
-  at the bound digests. It is superseded the same way with the same zero counts.
-- R7-10c: A live owner, an unobservable owner, an armed capability, an open
-  ceremony request, a held lock, and sources that are modified, untracked or at
-  other digests are each not superseded; each returns the typed attended
-  prerequisite and zero mutation occurs.
-- R7-10d: Running the action twice is a no-op the second time, and the
-  PowerShell and Bash lanes give the same result (R7-8).
+- R7-10a (branch A, earlier revision): a registered authoring dispatch whose
+  recorded lineage is the current one, whose recorded revision is earlier and
+  whose authority digests differ from the current submission blocks
+  `submit-plan`. In each of (i) the owner `ended` on this device, (ii) the
+  registration made on another device (fresh clone of an approved, committed
+  fixture, fresh private state, owner `unobserved`, result artifacts absent) and
+  (iii) the owner `live`, the typed action supersedes it, `submit-plan` then
+  succeeds, and the counts of overrides, signatures and PO terminal commands are
+  all zero; the archived bytes equal the original, a receipt exists and the
+  result-path namespace is preserved. (iv) The superseded owner, from a second
+  checkout, then attempts to integrate: the result is the typed `superseded`
+  naming the receipt, and the registration, the namespace and every result byte
+  it produced are byte-identical before and after, with the State digest
+  unchanged by the attempt.
+- R7-10b (branch B, same digests): (i) a registration with the same digests
+  whose owner ran on another device and is `unobserved` here (fresh clone of an
+  approved, committed fixture, fresh private state, result artifacts absent) is
+  not superseded: the result is the typed attended prerequisite naming the
+  §20.2 signed legacy-custody transaction (class 5), and zero mutation occurs.
+  (ii) The same with the owner `unavailable` (V2 null runtime). (iii) The same
+  registration with its owner recorded `ended` (or reporting `not-live`) is
+  superseded with the same zero counts and the same preserved bytes, receipt
+  and namespace. (iv) The owner of (iii), attempting to integrate afterwards,
+  gets the typed `superseded` with the bytes preserved. In every case elapsed
+  time, a reboot and absent result artifacts alone never make an owner
+  `not-live`.
+- R7-10c (refusals, each with its route): each of the following is not
+  superseded, returns the typed attended prerequisite naming its concrete route
+  and causes zero mutation: (i) same digests and a `live` owner: waiting for the
+  owner's terminal record; (ii) an armed override capability, an open ceremony
+  request or a held lock on an otherwise eligible registration, including one of
+  an earlier revision: waiting for the holder's terminal record; (iii) a
+  registration of another lineage, or of a later revision, with different
+  digests and an owner that is not `not-live` or `ended`: waiting for the
+  owner's terminal record where it is `live`, the class 5 transaction where it
+  is `unavailable` or `unobserved`; (iv) unreadable, linked or ambiguous
+  registration bytes: the §20.2 typed `unavailable` naming the read or identity
+  prerequisite. A static check fails on any R7-10 refusal that names neither
+  route, and on any signature request outside class 5.
+- R7-10d: Running the action twice is a no-op the second time, which returns a
+  typed result naming the receipt, and the PowerShell and Bash lanes give the
+  same result (R7-8).
 
 ### 22.11 Sequencing and completion
 
