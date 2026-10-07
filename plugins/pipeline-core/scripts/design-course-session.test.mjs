@@ -14,7 +14,7 @@ import { buildDesignCourseProducerAction, executeDesignCourseProducer, inspectDe
 export const completionCases = [];
 function test(name, run) { completionCases.push({ id: `K3C${String(completionCases.length + 1).padStart(3, "0")}`, name, run }); }
 const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const root = "/physical/repository";
+const root = resolve("/physical/repository");
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const sources = Object.fromEntries(["input", "prd", "spec", "design", "traceability"].map((name, index) => [name,
   { path: `docs/${name}.md`, sha256: String(index).repeat(64) }]));
