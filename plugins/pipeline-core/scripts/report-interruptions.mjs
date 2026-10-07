@@ -63,11 +63,14 @@ export function parseReportInterruptionsArgs(argv) {
   let dispatchId = null;
   let format = "json";
   let help = false;
+  let writeBaseline = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
       help = true;
+    } else if (arg === "--write-baseline") {
+      writeBaseline = true;
     } else if (arg === "--root") {
       i++;
       if (i >= argv.length || argv[i].startsWith("--")) {
@@ -168,6 +171,7 @@ export function parseReportInterruptionsArgs(argv) {
       packageId,
       dispatchId,
       format,
+      writeBaseline,
     },
   };
 }
@@ -442,6 +446,24 @@ export function generateInterruptionReport(options, ports = productionPorts) {
   return { ok: true, format, output, report };
 }
 
+/** Aggregate-only AC-6 baseline (ruling 15): never receipt content. Atomic temp-file + rename. */
+export function writeBaseline(root, aggregate, ports = productionPorts) {
+  const baseline = {
+    window: aggregate.window,
+    coverage: aggregate.coverage,
+    registrySha256: aggregate.registrySha256,
+    limitations: Array.isArray(aggregate.limitations) ? aggregate.limitations : [],
+    generatedAt: new Date().toISOString(),
+  };
+  const dir = join(root, "telemetry");
+  const target = join(dir, "interruption-baseline.json");
+  const temp = join(dir, `.interruption-baseline.${process.pid}.tmp`);
+  ports.io.mkdirSync(dir, { recursive: true });
+  ports.io.writeFileSync(temp, `${JSON.stringify(baseline, null, 2)}\n`);
+  ports.io.renameSync(temp, target);
+  return target;
+}
+
 export function main(argv = process.argv.slice(2), ports = productionPorts) {
   try {
     const parsed = parseReportInterruptionsArgs(argv);
@@ -452,7 +474,7 @@ export function main(argv = process.argv.slice(2), ports = productionPorts) {
     }
 
     if (parsed.help) {
-      process.stdout.write("Usage: report-interruptions.mjs --root ROOT [--from ISO] [--through ISO] [--feature ID] [--package ID] [--dispatch ID] [--format json|text]\n");
+      process.stdout.write("Usage: report-interruptions.mjs --root ROOT [--from ISO] [--through ISO] [--feature ID] [--package ID] [--dispatch ID] [--format json|text] [--write-baseline]\n");
       process.exitCode = 0;
       return 0;
     }
@@ -463,6 +485,8 @@ export function main(argv = process.argv.slice(2), ports = productionPorts) {
       process.exitCode = 2;
       return 2;
     }
+
+    if (parsed.options.writeBaseline) writeBaseline(parsed.options.root, result.report.aggregate, ports);
 
     process.stdout.write(result.output);
     process.exitCode = 0;

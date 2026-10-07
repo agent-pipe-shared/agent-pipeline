@@ -503,6 +503,26 @@ export function aggregateInterruptionReceipts(input, registry) {
   } catch (error) { return { ok: false, code: diagnostic(error), aggregate: null }; }
 }
 
+/**
+ * AC-6 promotion check (ruling 15). `baseline` is the exact bytes (string) of the tracked
+ * baseline file; `poApproval` is `{ baselineSha256 }`. Elapsed time is never an input.
+ * Returns "unavailable" | "report-only" | "calibrated-pass".
+ */
+export function evaluatePromotionEvidence({ baseline, poApproval } = {}) {
+  if (typeof baseline !== "string") return "unavailable";
+  let parsed;
+  try { parsed = JSON.parse(baseline); } catch { return "unavailable"; }
+  const plain = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  if (!plain(parsed) || !plain(parsed.window) || !plain(parsed.coverage)) return "unavailable";
+  if (!plain(parsed.window.start) || !plain(parsed.window.end)) return "unavailable";
+  const coverage = Object.values(parsed.coverage);
+  if (coverage.length === 0) return "unavailable";
+  if (coverage.some((status) => status === "unknown")) return "report-only";
+  if (parsed.window.start.value === null || parsed.window.end.value === null) return "report-only";
+  const digest = createHash("sha256").update(Buffer.from(baseline, "utf8")).digest("hex");
+  return plain(poApproval) && poApproval.baselineSha256 === digest ? "calibrated-pass" : "report-only";
+}
+
 function diagnostic(error) {
   try {
     const descriptor = error !== null && typeof error === "object" ? Object.getOwnPropertyDescriptor(error, "message") : null;
