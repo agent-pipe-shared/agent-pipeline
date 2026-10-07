@@ -1046,7 +1046,62 @@ const Q12X_PUSH_NEXT_TO_HEREDOC_TABLE = [
 ];
 recordQ12Table("Q12-X: PUSH-NEXT-TO-HEREDOC-CANDIDATE", true, Q12X_PUSH_NEXT_TO_HEREDOC_TABLE);
 
-// ---- Summary ------------------------------------------------------------------------------
+// ---- commandIsGitPush: the four bypasses the Q12 Critic found in round 1, both sides (Q12-T4) ----
+// Test-only pin, written BEFORE the fix (QG-04): on the classifier as committed, the four candidate tables below are RED and the
+// control table is GREEN. Contract: PO decisions J, S and X, specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md rows J,
+// S and X; findings F1-F4 of specs/sprint-alfred-epic/evidence/critic-2026-10-07/q12-round1.md. The second column of every row
+// states the bash semantics that make the command a push (or, in the control table, data). Every command text below is DATA: it
+// is handed to `commandIsGitPush` and never executed. Where a shape needs a backslash it is built at runtime from
+// String.fromCharCode(92), so the source carries no escaping that could be misread; the other strings are ordinary JS strings.
+// Every case id in this block starts with Q12-C: so one search over a run's output lists the state of all of them.
+const Q12C_BS = String.fromCharCode(92);
+
+// F1 (regression of d9b4bf031; decisions B and S): a git word spelled with quote characters is still the git word once bash
+// removes the quotes, and an expansion after it can still produce the push word, so these are candidates.
+const Q12C_F1_QUOTED_GIT_WORD_EXPANSION_TABLE = [
+  ['g"i"t $(echo push) origin main', "bash removes the quotes so the command word is git; the $( ) substitution then yields the word push"],
+  ['g"i"t `echo push` origin main', "bash removes the quotes so the command word is git; the backtick substitution then yields the word push"],
+  ['g"i"t ${X:-push} origin main', "bash removes the quotes so the command word is git; the parameter expansion falls back to the word push"],
+  ["g''it $(echo push) origin main", "an empty quote pair inside the word is removed by bash, so the command word is git; the substitution yields push"],
+];
+recordQ12Table("Q12-C: F1-QUOTED-GIT-WORD-EXPANSION-CANDIDATE", true, Q12C_F1_QUOTED_GIT_WORD_EXPANSION_TABLE);
+
+// F2 (decision S, "a git word formed by brace expansion counts as a git word"): bash performs brace expansion BEFORE quote
+// removal, so an alternative that carries quoting or a backslash is spelled out as separate words and then unquoted. Each
+// command below becomes `git push origin main`, so each is a candidate.
+const Q12C_F2_BRACE_QUOTED_ALTERNATIVE_TABLE = [
+  ['{g"i"t,push} origin main', "brace expansion yields the words g\"i\"t and push; quote removal turns the first into git"],
+  ["{g''it,push} origin main", "brace expansion yields the words g''it and push; quote removal turns the first into git"],
+  ['{"g"it,push} origin main', "brace expansion yields the words \"g\"it and push; quote removal turns the first into git"],
+  ["{g" + Q12C_BS + "it,push} origin main", "brace expansion yields the words g<backslash>it and push; the backslash escapes a plain letter, so the first word is git"],
+];
+recordQ12Table("Q12-C: F2-BRACE-QUOTED-ALTERNATIVE-CANDIDATE", true, Q12C_F2_BRACE_QUOTED_ALTERNATIVE_TABLE);
+
+// F3 (decision X, the shell-receiver side): a pipe at the end of a line continues the pipeline on the next command line, and a
+// here-document body is read after the line that opened it. So the body below reaches the `sh` that follows the terminator, and
+// the shell runs it. The units of the command are separated by line breaks, but the pipeline is one command: a candidate.
+const Q12C_F3_PIPELINE_ACROSS_LINE_BREAK_TABLE = [
+  ["cat <<EOF |\ngit push origin main\nEOF\nsh", "cat forwards the body through the line-continued pipe into sh, which runs the body as commands"],
+];
+recordQ12Table("Q12-C: F3-PIPELINE-ACROSS-LINE-BREAK-CANDIDATE", true, Q12C_F3_PIPELINE_ACROSS_LINE_BREAK_TABLE);
+
+// F4 (decision X, the shell-receiver side): a receiver named by a quoted path is still the receiver; the quotes only keep a
+// space inside one word. The here-document body is the program that bash (or sh) reads from its standard input and runs.
+const Q12C_F4_QUOTED_PATH_RECEIVER_TABLE = [
+  ['"/c/Program Files/git/bin/bash" <<EOF\ngit push origin main\nEOF', "the double-quoted word is one path naming bash, which runs the here-document body"],
+  ["'/c/Program Files/Git/bin/sh' <<EOF\ngit push origin main\nEOF", "the single-quoted word is one path naming sh, which runs the here-document body"],
+];
+recordQ12Table("Q12-C: F4-QUOTED-PATH-RECEIVER-CANDIDATE", true, Q12C_F4_QUOTED_PATH_RECEIVER_TABLE);
+
+// Controls (decision X, the data side): whatever the fix does for F1-F4, a here-document that no shell or interpreter receives
+// stays data and stays NOT a candidate. These are GREEN before the fix and must stay GREEN after it.
+const Q12C_CONTROL_DATA_HEREDOC_TABLE = [
+  ["git commit -F - <<'EOF'\nfix: push docs\nEOF", "git commit reads its message from the here-document: the body is data, a single-quoted delimiter so nothing in it is expanded"],
+  ["cat <<EOF |\ntr a-z A-Z\nEOF", "cat only forwards the here-document body as data; no shell or interpreter receives it, the only command named after the pipe is tr"],
+];
+recordQ12Table("Q12-C: CONTROL-DATA-HEREDOC-NOT-CANDIDATE", false, Q12C_CONTROL_DATA_HEREDOC_TABLE);
+
+// ---- Summary------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
 if (failures.length > 0) {
