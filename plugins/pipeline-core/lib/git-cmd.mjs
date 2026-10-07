@@ -700,8 +700,9 @@ function hasGitWord(cmd) {
 // command this view cannot name and fail closed: a compound command's closer (`... done <<EOF` feeds every command in
 // the loop) and the `.` builtin in command position. The price is a spurious gate run for a data here-document in a unit
 // that also names such a word (`git add -- node <<EOF`) or whose body holds a `<<` line next to a shell word: the safe
-// direction. NOT covered, because decision X lists receivers and does not model every command that runs text from
-// standard input (xargs, at, ed, sqlite3, php, lua, awk -f -): see the header of `commandIsGitPush`.
+// direction. Decision AF extends the list with command RUNNERS (`hasRunnerHeredocReceiver`, below): xargs, at, batch, ed,
+// ex, sqlite3, php, lua and `awk -f -`. Still NOT covered, because the decisions list receivers and do not model every
+// command that runs text from standard input: see the header of `commandIsGitPush`.
 const HEREDOC_RECEIVER_NAMES = new Set([
   "sh", "bash", "zsh", "ksh", "dash", "ash", "fish", "csh", "tcsh",
   "node", "nodejs", "python", "py", "perl", "ruby",
@@ -709,13 +710,24 @@ const HEREDOC_RECEIVER_NAMES = new Set([
   "source", "exec",
 ]);
 const HEREDOC_COMPOUND_CLOSERS = new Set(["done", "fi", "esac"]);
+// Decision AF: command RUNNERS, commands that execute their standard input as commands or as a program that can run
+// commands. xargs appends the words it reads to its own argv and runs the result; at and batch hand the text to a shell as a
+// job script; ed and ex run `!command`; sqlite3 runs `.shell`; php and lua read a program that shells out. `luajit` is lua
+// under its other name. awk is a runner only when its PROGRAM comes from standard input (`awk -f -`): see `unitHasAwkStdinProgram`.
+const HEREDOC_RUNNER_NAMES = new Set(["xargs", "at", "batch", "ed", "ex", "sqlite3", "php", "lua", "luajit"]);
+const HEREDOC_AWK_NAMES = new Set(["awk", "gawk", "mawk", "nawk"]);
+// The program-file options of awk (`-f`, and gawk's `-E` / `--exec` / `--file`) and the words that name standard input.
+const AWK_PROGRAM_FILE_OPTIONS = new Set(["-f", "-E", "--file", "--exec"]);
+const STDIN_FILE_WORD_RE = /^(?:-|\/dev\/stdin|\/dev\/fd\/0|\/proc\/self\/fd\/0)$/u;
+const AWK_STDIN_PROGRAM_OPTION_RE = /^(?:-[fE]|--file=|--exec=)(?:-|\/dev\/stdin|\/dev\/fd\/0|\/proc\/self\/fd\/0)$/u;
 // Probes a glob word is tested against: every receiver name, its `.exe` spelling, and a versioned python.
 const HEREDOC_GLOB_PROBES = [...HEREDOC_RECEIVER_NAMES, "python3"].flatMap((name) => [name, `${name}.exe`]);
+const HEREDOC_RUNNER_GLOB_PROBES = [...HEREDOC_RUNNER_NAMES, ...HEREDOC_AWK_NAMES].flatMap((name) => [name, `${name}.exe`]);
 const HEREDOC_UNIT_SEPARATOR_RE = /\n|;|&&|\|\||(?<![<>|&])&(?!>)/u;
 const HEREDOC_WORD_SPLIT_RE = /[\s|<>&]+/u;
 
-/** True when a glob word (`*`, `?`, `[...]`) could expand to a receiver name; unreadable globs answer true. */
-function globCouldNameReceiver(base) {
+/** True when a glob word (`*`, `?`, `[...]`) could expand to one of `probes`; unreadable globs answer true. */
+function globCouldName(base, probes) {
   const source = base
     .replace(/[.+^${}()|\\]/gu, "\\$&")
     .replace(/\[[^\]]*\]/gu, ".")
@@ -724,19 +736,55 @@ function globCouldNameReceiver(base) {
     .replace(/\?/gu, ".");
   try {
     const re = new RegExp(`^${source}$`, "u");
-    return HEREDOC_GLOB_PROBES.some((probe) => re.test(probe));
+    return probes.some((probe) => re.test(probe));
   } catch {
     return true;
   }
 }
 
+/** The lowercase basename of one word of a command, quotes removed and a `.exe` suffix dropped (a quoted path stays one word). */
+function heredocWordBase(word) {
+  const unquoted = word.replace(/['"‘-‟]/gu, "");
+  return unquoted.slice(Math.max(unquoted.lastIndexOf("/"), unquoted.lastIndexOf("\\")) + 1).toLowerCase().replace(/\.exe$/u, "");
+}
+
+/** True when `base` is in `names`, also without a trailing version (`python3.11`, `lua5.4`, `php8.2`). */
+function baseIsNamed(base, names) {
+  return names.has(base) || names.has(base.replace(/[0-9][0-9.]*$/u, ""));
+}
+
 /** True when one word of a command names a shell or interpreter (see the block comment above). */
 function isHeredocReceiverWord(word) {
-  const unquoted = word.replace(/['"‘-‟]/gu, "");
-  const base = unquoted.slice(Math.max(unquoted.lastIndexOf("/"), unquoted.lastIndexOf("\\")) + 1).toLowerCase().replace(/\.exe$/u, "");
+  const base = heredocWordBase(word);
   if (base === "") return false;
-  if (HEREDOC_RECEIVER_NAMES.has(base) || HEREDOC_RECEIVER_NAMES.has(base.replace(/[0-9][0-9.]*$/u, ""))) return true;
-  return /[*?[]/u.test(base) && globCouldNameReceiver(base);
+  if (baseIsNamed(base, HEREDOC_RECEIVER_NAMES)) return true;
+  return /[*?[]/u.test(base) && globCouldName(base, HEREDOC_GLOB_PROBES);
+}
+
+/** True when one word of a command names a command runner of decision AF (xargs, at, ed, sqlite3, ...). */
+function isHeredocRunnerWord(word) {
+  const base = heredocWordBase(word);
+  if (base === "") return false;
+  if (baseIsNamed(base, HEREDOC_RUNNER_NAMES)) return true;
+  return /[*?[]/u.test(base) && globCouldName(base, HEREDOC_RUNNER_GLOB_PROBES);
+}
+
+/** True when one word of a command names awk (or a glob that could): decision AF reads its program from `-f -` only. */
+function isHeredocAwkWord(word) {
+  const base = heredocWordBase(word);
+  if (base === "") return false;
+  if (baseIsNamed(base, HEREDOC_AWK_NAMES)) return true;
+  return /[*?[]/u.test(base) && globCouldName(base, HEREDOC_RUNNER_GLOB_PROBES);
+}
+
+/** True when the words of a unit pass awk its PROGRAM on standard input: `-f -`, `-f /dev/stdin`, `-f-`, `--file=-`, ... */
+function unitHasAwkStdinProgram(words) {
+  const plain = words.map((word) => word.replace(/['"‘-‟]/gu, ""));
+  return plain.some(
+    (word, index) =>
+      AWK_STDIN_PROGRAM_OPTION_RE.test(word) ||
+      (AWK_PROGRAM_FILE_OPTIONS.has(word) && STDIN_FILE_WORD_RE.test(plain[index + 1] ?? "")),
+  );
 }
 
 // F3: a pipe at the end of a line continues the pipeline on the next command line, and a here-document body is read right
@@ -779,18 +827,53 @@ function unitHasShellHeredocReceiver(unit) {
   return words.some(isHeredocReceiverWord);
 }
 
-/** True when `cmd` hands a `<<` text to a shell or interpreter (PO decision X). */
-function hasShellHeredocReceiver(cmd) {
+/**
+ * True when one unit of the view hands a `<<` text to a command runner (PO decision AF): a word naming xargs, at, batch, ed,
+ * ex, sqlite3, php or lua, or awk with its program on standard input (`awk -f -`). Like the shell test, ANY word of the unit
+ * counts, so a path, a `.exe` or version suffix, a wrapper word (`sudo xargs`) and a glob that could expand to a runner are
+ * found as well; `awk NF <<EOF` (the here-document is awk's INPUT) is not a runner.
+ */
+function unitHasRunnerHeredocReceiver(unit) {
+  if (!unit.includes("<<")) return false;
+  const words = unit.split(HEREDOC_WORD_SPLIT_RE).filter((word) => word !== "");
+  if (words.some(isHeredocRunnerWord)) return true;
+  return words.some(isHeredocAwkWord) && unitHasAwkStdinProgram(words);
+}
+
+/** True when some unit of `cmd`, in the plain view or with its closed here-document bodies folded out, passes `unitTest`. */
+function hasHeredocReceiver(cmd, unitTest) {
   if (!cmd.includes("<<")) return false;
   for (const reading of [READING_POSIX, READING_WINDOWS_PATH, READING_POWERSHELL]) {
     // F4: the receiver view keeps a quoted path (`"/c/Program Files/git/bin/bash"`) as one readable word.
     const view = scanShell(cmd, reading, true).view;
     const folded = foldHeredocBodies(view).replace(PIPE_LINE_CONTINUATION_RE, "$1 ");
     for (const text of [view, folded]) {
-      if (text.split(HEREDOC_UNIT_SEPARATOR_RE).some(unitHasShellHeredocReceiver)) return true;
+      if (text.split(HEREDOC_UNIT_SEPARATOR_RE).some(unitTest)) return true;
     }
   }
   return false;
+}
+
+/** True when `cmd` hands a `<<` text to a shell or interpreter (PO decision X). */
+function hasShellHeredocReceiver(cmd) {
+  return hasHeredocReceiver(cmd, unitHasShellHeredocReceiver);
+}
+
+/** True when `cmd` hands a `<<` text to a command runner (PO decision AF; see `unitHasRunnerHeredocReceiver`). */
+function hasRunnerHeredocReceiver(cmd) {
+  return hasHeredocReceiver(cmd, unitHasRunnerHeredocReceiver);
+}
+
+/**
+ * True when `cmd` holds a `git` word a command runner could execute (decision AF). The body of a runner's here-document is
+ * a program in a language of its own (`ed`: `!git push`, sqlite3: `.shell git push`, lua: `os.execute"git push"`), so the
+ * word is not required to stand at a shell executable boundary: it is `git` as a word anywhere, written out or once the
+ * shell has removed quotes and escapes (`!g''it`), or the boundary-anchored git word of the marker rule (`hasGitWord`: a
+ * brace-expanded `{git,push}`).
+ */
+function hasRunnerGitWord(cmd) {
+  if (GIT_WORD_RE.test(cmd) || hasGitWord(cmd)) return true;
+  return [READING_POSIX, READING_WINDOWS_PATH, READING_POWERSHELL].some((reading) => GIT_WORD_RE.test(scanShell(cmd, reading).view));
 }
 
 /** True when `cmd` carries a fail-closed marker (see `commandIsGitPush`). */
@@ -873,15 +956,33 @@ function hasFailClosedMarker(cmd) {
  *
  * NOT modelled, still open (QG-06 needs an owner and an expiry set by the dispatcher; tracked in
  * backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md): PowerShell here-strings
- * (`@"..."@`) hold no marker of the list above. Likewise, decision X names its receivers and does not model every command
- * that runs text from standard input: a here-document fed to xargs, at, ed, sqlite3, php, lua or `awk -f -` is data to
- * this rule (an extension of the receiver list is a new PO decision, not a test edit).
+ * (`@"..."@`) hold no marker of the list above. Likewise, the receiver lists of decisions X and AF do not model every
+ * command that runs text from standard input (vi/vim `-es`, `busybox` applets, ...): a here-document fed to one of those is
+ * data to this rule (an extension of the receiver list is a new PO decision, not a test edit).
+ *
+ * DECISION AF (command runners, a rule after the marker rule, see `hasRunnerHeredocReceiver`): a here-document or here-string
+ * received by xargs, at, batch, ed, ex, sqlite3, php, lua (and luajit) or by awk with its program on standard input
+ * (`awk -f -`, `-f /dev/stdin`, `-f-`, `--file=-`, gawk `-E -`) is treated like one received by a shell: the command is a
+ * candidate when the text holds a `git` word anywhere (`hasRunnerGitWord`: `!git` for ed and ex, `.shell git` for sqlite3, a
+ * word inside a program string), whether or not a push word is spelled out. The receiver is found like a shell receiver
+ * (any word of the unit, path, `.exe`/version suffix, wrapper word, glob, quoted path, here-document piped into it, a
+ * receiver after the body). perl, python, ruby and node reading `-` or stdin were receivers already. `awk NF <<EOF` (the
+ * here-document is awk's input) and any other command stay data. ACCEPTED FALSE POSITIVES of this rule: a runner
+ * here-document in a text that merely mentions git, for example `xargs echo <<EOF` with a body line `git status`, and a
+ * data here-document whose opener line holds a word that is also a runner name (`git add -- ed <<EOF`).
+ *
+ * HERE-DOCUMENT OPENER LINE: only the body (the lines after the opener line up to the terminator) is data. The rest of the
+ * opener line is command text, so `cat <<EOF && git push origin main` / body / `EOF` is a candidate (`classifyPush` keeps
+ * that rest when it removes the body).
  *
  * Returns `true` for a candidate, `false` for a command the rule proves plain.
  */
 export function commandIsGitPush(cmd) {
   if (typeof cmd !== "string" || cmd === "") return false;
   if (hasGitWord(cmd) && hasFailClosedMarker(cmd)) return true;
+  // Decision AF: a here-document fed to a command runner is a program the runner executes, so it is treated like one fed to a
+  // shell. The git word it needs is read more loosely than the marker rule's (see `hasRunnerGitWord`): `ed` runs `!git push`.
+  if (hasRunnerHeredocReceiver(cmd) && hasRunnerGitWord(cmd)) return true;
   // No marker. A backslash has three readings: a POSIX escape (`p\ush` is `push`), a Windows path separator
   // (`C:\Git\bin\git.exe push`) and the ordinary character PowerShell takes it for (`\"` closes a double-quoted span,
   // `\ ` ends a word). Which shell a runner applies is not known here, so classify under all three and fail closed
@@ -904,7 +1005,8 @@ function classifyPush(cmd, reading) {
   if (hasQuotedGitWordBeforePushWord(cmd, scan.words)) return true;
   const normalized = normalizeGlobalGitOptions(view.toLowerCase());
   // `source` with here-document BODIES removed (data, never command text); pathological input degrades to the
-  // unstripped text.
+  // unstripped text. Only the body (the lines after the opener line, up to the terminator) is data: the rest of the OPENER
+  // line is command text and is kept (`cat <<EOF && git push origin main` runs the push as its own command).
   const withoutHeredocBodies = (source) => {
     const opener = /(^|\s)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/u;
     let text = source;
@@ -926,7 +1028,8 @@ function classifyPush(cmd, reading) {
       // any `<<` delete the remainder of the command -- the arithmetic-shift fail-open.
       // Strip nothing and detect against the whole command instead.
       if (found === null) return source;
-      text = `${text.slice(0, openerStart)}\n${text.slice(bodyStart + found.index + found[0].length)}`;
+      const restOfOpenerLine = text.slice(afterOpener, bodyStart);
+      text = `${text.slice(0, openerStart)}${restOfOpenerLine}\n${text.slice(bodyStart + found.index + found[0].length)}`;
     }
     // Bounded-scan exhaustion: fall back to the unstripped command. Over-detection is
     // the safe direction; this is the branch that must never silently open the gate.
