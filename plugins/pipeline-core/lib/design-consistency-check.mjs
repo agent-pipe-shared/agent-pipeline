@@ -390,7 +390,8 @@ export function parseTraceabilityIds(text) {
     if (fenced || !trimmed.startsWith("|")) continue;
     const rest = trimmed.slice(1);
     const close = rest.indexOf("|");
-    let cell = (close < 0 ? rest : rest.slice(0, close)).trim();
+    if (close < 0) continue;
+    let cell = rest.slice(0, close).trim();
     if (cell.length >= 2 && cell.startsWith("`") && cell.endsWith("`")) cell = cell.slice(1, -1);
     if (isRequirementId(cell)) ids.push(cell);
   }
@@ -424,6 +425,9 @@ export function checkDesignConsistency(input) {
     if (!bound.has(path)) fail("pathStates holds an entry for a path that is not bound");
   }
   assertSourceStates(stateByPath, submission, prdBytes, specBytes, companions);
+  for (const path of bound) {
+    if (!stateByPath.has(path)) fail("pathStates must hold an entry for every bound path");
+  }
   if (traceability !== null && stateByPath.has(traceability.path) && stateByPath.get(traceability.path).sha256 !== sha256Of(traceability.bytes)) {
     fail("the traceability pathStates digest must be the digest of the traceability bytes");
   }
