@@ -19,7 +19,7 @@
 // SCRATCH-SWEEP-NOT-A-REPOSITORY).
 import { execFileSync } from 'node:child_process';
 import { lstatSync, realpathSync, unlinkSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 import { assessScratchDurability, planSweep } from '../lib/scratch-retention.mjs';
@@ -90,7 +90,7 @@ function applyPlan(root, now) {
       const stat = lstatSync(full);
       if (stat.isSymbolicLink() || !stat.isFile()) continue;
       const inner = relative(physicalScratch, realpathSync(full));
-      if (inner === '' || inner.startsWith('..') || inner.startsWith(sep)) continue;
+      if (inner === '' || inner.startsWith('..') || inner.startsWith(sep) || isAbsolute(inner) || /^[A-Za-z]:/u.test(inner)) continue;
       unlinkSync(full);
       deleted.push(rel);
     } catch {
