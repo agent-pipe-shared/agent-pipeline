@@ -11,6 +11,11 @@
  * for the full QUOTE-STRIPPING / LOWERCASE NORMALIZATION / GLOBAL-OPTION
  * NORMALIZATION invariants this code implements; this module only relocates the
  * logic, it does not alter it).
+ *
+ * The push classifier `commandIsGitPush` below implements PO decisions B (the Q12 option-B fail-closed marker rule),
+ * J (a backslash inside a path token is no marker), S (an escaped quote and a brace-expanded git word are candidates)
+ * and X (a here-document is a marker only when a shell or interpreter receives it), see
+ * specs/sprint-alfred-epic/plans/po-decisions-2026-10-06.md row Q12 and po-decisions-2026-10-07.md rows J, S and X.
  */
 
 /**
@@ -129,10 +134,7 @@ function readDoubleQuoted(cmd, open) {
  *     a part that holds structural characters, which is blanked to `''` exactly like `stripQuotedSegments`
  *     blanks quoted prose, so `echo "git push"` is not a push;
  *   unterminated: an unclosed quote or a trailing lone backslash -- the text cannot be parsed with certainty;
- *   escapedQuoteOutsideQuotes: a backslash-escaped quote outside every quote, the shape that used to fake a span;
- *   quotedSubstitutionWithGit: a double-quoted span whose raw text holds `$(` or a backtick TOGETHER WITH a git
- *     word at an executable boundary (GPGL-8). The span is blanked in the view, but any shell runs the
- *     substitution, so `echo "$(git push origin main)"` is a push the view cannot show.
+ *   escapedQuoteOutsideQuotes: a backslash-escaped quote outside every quote, the shape that used to fake a span.
  * `reading` picks how a backslash is read (three readings, GPGL-7):
  *   READING_POSIX (default): an unquoted backslash escapes the next character; inside double quotes it escapes
  *     only `"`, `\`, `$`, a backtick and a newline.
@@ -158,21 +160,12 @@ const READING_POWERSHELL = "powershell";
 const POWERSHELL_DOUBLE_QUOTES = new Set(['"', "“", "”", "„"]);
 const POWERSHELL_SINGLE_QUOTES = new Set(["'", "‘", "’", "‚", "‛"]);
 
-// A double-quoted span that runs a substitution (`$(` or a backtick) -- the substitution body is executable text
-// the blanked view cannot show (GPGL-8).
-const SUBSTITUTION_MARKER_RE = /\$\(|`/u;
-
 /** A PowerShell span whose opening quote is at `open`: it ends at the next character of the same quote class. */
 function readPowerShellQuoted(cmd, open, closers) {
   for (let i = open + 1; i < cmd.length; i += 1) {
     if (closers.has(cmd[i])) return { end: i, content: cmd.slice(open + 1, i) };
   }
   return { end: -1, content: cmd.slice(open + 1) };
-}
-
-/** True when a double-quoted span's raw text holds a substitution and a git word an executable could stand on. */
-function holdsSubstitutionAndGitWord(spanText) {
-  return SUBSTITUTION_MARKER_RE.test(spanText) && GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(spanText);
 }
 
 function scanShell(cmd, reading = READING_POSIX) {
@@ -184,7 +177,6 @@ function scanShell(cmd, reading = READING_POSIX) {
   let sawAny = false;
   let unterminated = false;
   let escapedQuoteOutsideQuotes = false;
-  let quotedSubstitutionWithGit = false;
 
   const endWord = () => {
     if (!sawAny) return;
@@ -241,23 +233,14 @@ function scanShell(cmd, reading = READING_POSIX) {
       continue;
     }
     let span = null;
-    let doubleQuoteClass = false;
-    if (powershell && POWERSHELL_DOUBLE_QUOTES.has(ch)) {
-      span = readPowerShellQuoted(cmd, i, POWERSHELL_DOUBLE_QUOTES);
-      doubleQuoteClass = true;
-    } else if (powershell && POWERSHELL_SINGLE_QUOTES.has(ch)) span = readPowerShellQuoted(cmd, i, POWERSHELL_SINGLE_QUOTES);
+    if (powershell && POWERSHELL_DOUBLE_QUOTES.has(ch)) span = readPowerShellQuoted(cmd, i, POWERSHELL_DOUBLE_QUOTES);
+    else if (powershell && POWERSHELL_SINGLE_QUOTES.has(ch)) span = readPowerShellQuoted(cmd, i, POWERSHELL_SINGLE_QUOTES);
     else if (ch === "$" && cmd[i + 1] === "'" && !powershell) span = readAnsiCQuoted(cmd, i + 1);
     else if (ch === "'") span = readSingleQuoted(cmd, i);
-    else if (ch === '"') {
-      span = readDoubleQuoted(cmd, i);
-      doubleQuoteClass = true;
-    }
+    else if (ch === '"') span = readDoubleQuoted(cmd, i);
     if (span !== null) {
       sawAny = true;
       word += span.content;
-      if (doubleQuoteClass && holdsSubstitutionAndGitWord(cmd.slice(i + 1, span.end === -1 ? cmd.length : span.end))) {
-        quotedSubstitutionWithGit = true;
-      }
       if (span.end === -1) {
         unterminated = true;
         view += cmd.slice(i);
@@ -274,7 +257,7 @@ function scanShell(cmd, reading = READING_POSIX) {
     i += 1;
   }
   endWord();
-  return { words, view, unterminated, escapedQuoteOutsideQuotes, quotedSubstitutionWithGit };
+  return { words, view, unterminated, escapedQuoteOutsideQuotes };
 }
 
 // ---- global git option recognition ----------------------------------------------------
@@ -441,8 +424,11 @@ export function refMatchesPattern(ref, pattern) {
 const GIT_WORD_RE = /\bgit(?:\.exe)?\b/iu;
 
 // A `git`/`git.exe` word at a position an executable can occupy (see the boundary rule of
-// GIT_EXECUTABLE_THEN_OPTION_RE below), without requiring a following option.
-const GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b/iu;
+// GIT_EXECUTABLE_THEN_OPTION_RE below), without requiring a following option. This is the "git word" of the
+// fail-closed marker rule (`commandIsGitPush`): start of text, whitespace, `;` `&` `|` `(`, a backtick, a quote, a
+// path separator, and -- because bash brace expansion can spell the git word (PO decision S: `{git,push}`) -- `{`
+// and `,`.
+const GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE = /(?:^|[\s;&|(`'"/\\{,])git(?:\.exe)?\b/iu;
 
 // A quoted executable name: a quote, an optional path ending in a separator, `git`/`git.exe`,
 // then a quote (`"git"`, `'git.exe'`, `"/usr/bin/git"`, `"C:\Git Tools\cmd\git.exe"`).
@@ -478,165 +464,321 @@ function hasQuotedGitWordBeforePushWord(cmd, tokens) {
 // `gitleaks detect --no-git --redact` call was routed to the push gate as ambiguous.
 const GIT_EXECUTABLE_THEN_OPTION_RE = /(?:^|[\s;&|(`'"/\\])git(?:\.exe)?\b\s+-\S/iu;
 
-// Fail-closed check #5's pattern (GPGL-8). `$(` and `${` start an expansion; a backtick starts or ends one (see
-// `gitWordBeforeShellExpansion` for the parity rule). In the detection view only UNQUOTED text can hold these
-// characters: a quoted part holding one is blanked, never inlined.
-const SHELL_EXPANSION_START_RE = /\$[({]|`/u;
-// Where one simple command ends for check #5: `;`, `|`, a newline, `&&`, a lone `&` (not part of a redirection such
-// as `2>&1` or `&>`), or the `)` that closes a substitution the git word itself sits in (`$(git rev-parse HEAD)`).
-const SIMPLE_COMMAND_END_RE = /[;|)\r\n]|&&|(?<![<>])&(?![<>])/u;
+// ---- the fail-closed marker rule (PO decision Q12 option B, narrowed by decisions J and X, extended by S) ---------
+//
+// Why a rule on markers and not a model of what the shell will run: every shape-specific check this file used to
+// carry (a `$(` here, a quoted substitution there, an escaped terminator, a brace list) was a deny-list entry for one
+// way a shell can spell the push word, and the list never converged -- each Critic round found the next spelling.
+// The marker rule inverts it: a text is plain until proven otherwise.
+
+// Marker characters. `$` (every expansion form, PowerShell variables, `$"..."` locale quoting), a backtick
+// (substitution, the PowerShell escape), `{` (parameter and brace expansion) and `(` `)` (substitution, subshell,
+// PowerShell grouping) each let a shell spell the push word at run time. A non-ASCII quote character (U+2018 to
+// U+201F) is a string delimiter to PowerShell and an ordinary character to every other reading, so what it encloses
+// cannot be located with certainty. Written as escapes so this file stays ASCII. `<<` (here-document, `<<-`, the
+// `<<<` here-string) is NOT in this list: since decision X it is a marker only when a shell or interpreter receives
+// it (`hasShellHeredocReceiver`).
+const FAIL_CLOSED_MARKER_RE = /[$`{()]|[\u2018-\u201F]/u;
+
+// A nested shell invocation: the quoted string after the flag is a whole second command line that this file's view
+// blanks as quoted prose (`bash -c 'git --no-pager push'`). `bash|sh|dash|zsh|ksh|csh|tcsh|fish|ash` with a `-c`
+// flag word (`-c`, `-lc`, `-ic`), `cmd`/`cmd.exe` with `/c` or `/k`, `pwsh|powershell` with `-c`/`-Command`. Up to eight
+// words, none of them a command separator, may sit between the shell word and the flag. `ssh` is not a shell word here
+// (it is routed by the wrapper branch of `classifyPush`).
+const NESTED_POSIX_SHELL_RE =
+  /(?:^|[\s;&|(`'"/\\])(?:ba|z|da|k|c|fi|tc|a)?sh(?:\.exe)?(?:\s+[^\s;&|]+){0,8}?\s+-[A-Za-z]*c[A-Za-z]*(?![\w-])/iu;
+const NESTED_WINDOWS_SHELL_RE =
+  /(?:^|[\s;&|(`'"/\\])(?:cmd(?:\.exe)?(?:\s+[^\s;&|]+){0,8}?\s+\/[ck]|(?:pwsh|powershell)(?:\.exe)?(?:\s+[^\s;&|]+){0,8}?\s+-c[A-Za-z]*)(?![\w-])/iu;
+
+// Decision J: a backslash is NOT a marker when it only occurs inside a path token, where it separates path segments and
+// has no quoting or escape function. A path token is a WHOLE word (preceded by whitespace or the start of the text,
+// followed by whitespace, `;` `&` `|` or the end), and only made of segment characters, so nothing that could act as an
+// escape or a quote hides inside it:
+//   - a drive path `X:\seg\seg`, unquoted, single-quoted or double-quoted (a quoted one may hold spaces);
+//   - a relative path `seg\seg\seg`, unquoted, single-quoted or double-quoted;
+//   - a drive path ending in a backslash: unquoted when whitespace or the end follows (`-C C:\repo\ status`), single-quoted
+//     always (`'C:\repo\'`), double-quoted only when the closing quote is the last non-blank text of the command (`"C:\repo\"`
+//     -- a shell may read that `\"` as an escaped quote, which is harmless only when nothing follows it; the tolerance of
+//     `readDoubleQuoted`).
+// Anything else with a backslash -- an escaped letter in a word (`pu\sh`), a backslash next to a quote, a doubled backslash,
+// a backslash before a newline, a path glued to a quote or an operator -- stays a marker. A path-shaped word such as `pu\sh`
+// is exempt from the MARKER, not from detection: the unmarked classification below reads it under all three readings and
+// still sees `push`. Decision S: a backslash adjacent to a quote inside a double-quoted span that is not a path token
+// (`"say \"hi\""`) is a marker, an accepted false positive; write commit messages with single quotes.
+const PATH_SEGMENT = String.raw`[A-Za-z0-9_.@+~-]+`;
+const PATH_SEGMENT_QUOTED = String.raw`[A-Za-z0-9_.@+~ -]+`;
+const DRIVE_ROOT = String.raw`[A-Za-z]:\\`;
+const PATH_TOKEN_END = String.raw`(?=[\s;&|]|$)`;
+const PATH_TOKEN_RE = new RegExp(
+  [
+    // unquoted drive path, last character a path character
+    String.raw`(?<!\S)${DRIVE_ROOT}(?:${PATH_SEGMENT}\\)*${PATH_SEGMENT}${PATH_TOKEN_END}`,
+    // unquoted drive path ending in a backslash, a space or tab (or the end) after it
+    String.raw`(?<!\S)${DRIVE_ROOT}(?:${PATH_SEGMENT}\\)*(?=[ \t]|$)`,
+    // unquoted relative path
+    String.raw`(?<!\S)${PATH_SEGMENT}(?:\\${PATH_SEGMENT})+${PATH_TOKEN_END}`,
+    // single-quoted drive path (a trailing backslash is literal in every shell) or relative path
+    String.raw`(?<!\S)'(?:${DRIVE_ROOT}(?:${PATH_SEGMENT_QUOTED}\\)*(?:${PATH_SEGMENT_QUOTED})?|${PATH_SEGMENT_QUOTED}(?:\\${PATH_SEGMENT_QUOTED})+)'${PATH_TOKEN_END}`,
+    // double-quoted drive path or relative path, last character a path character
+    String.raw`(?<!\S)"(?:${DRIVE_ROOT}(?:${PATH_SEGMENT_QUOTED}\\)*${PATH_SEGMENT_QUOTED}|${PATH_SEGMENT_QUOTED}(?:\\${PATH_SEGMENT_QUOTED})+)"${PATH_TOKEN_END}`,
+    // double-quoted drive path ending in a backslash, the closing quote the last non-blank text of the command
+    String.raw`(?<!\S)"${DRIVE_ROOT}(?:${PATH_SEGMENT_QUOTED}\\)*"(?=\s*$)`,
+  ].join("|"),
+  "gu",
+);
+
+/** True when `cmd` still holds a backslash after every path token (decision J) is taken out of it. */
+function hasBackslashOutsidePathTokens(cmd) {
+  return cmd.includes("\\") && cmd.replace(PATH_TOKEN_RE, " ").includes("\\");
+}
+
+// ---- brace expansion (PO decision S: a git word formed by brace expansion counts) ----------------------------------
+// Bash expands an unquoted `{a,b}` list or `{x..y}` sequence before every other expansion, so `{git,push}` and `g{i..i}t`
+// spell the git word without it ever appearing as a token. Only what the git-word test needs is modelled: comma lists
+// (nested ones too) and single-character `{a..z}` sequences. A word that would expand to more than
+// BRACE_EXPANSION_CAP alternatives, or that is longer than BRACE_WORD_MAX_LENGTH, is treated as if it spelled the git
+// word: the safe direction.
+const BRACE_EXPANSION_CAP = 256;
+const BRACE_WORD_MAX_LENGTH = 4096;
+
+/** The characters of a single-character range such as `a..e`, ascending or descending. */
+function singleCharacterRange(from, to) {
+  const first = from.codePointAt(0);
+  const last = to.codePointAt(0);
+  const step = first <= last ? 1 : -1;
+  const characters = [];
+  for (let code = first; ; code += step) {
+    characters.push(String.fromCodePoint(code));
+    if (code === last) return characters;
+  }
+}
+
+/** The first expandable brace group of `text` (a comma list or a single-character range), or null. */
+function findBraceGroup(text) {
+  for (let open = text.indexOf("{"); open !== -1; open = text.indexOf("{", open + 1)) {
+    let depth = 0;
+    let close = -1;
+    const commas = [];
+    for (let i = open; i < text.length; i += 1) {
+      const ch = text[i];
+      if (ch === "{") depth += 1;
+      else if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          close = i;
+          break;
+        }
+      } else if (ch === "," && depth === 1) commas.push(i);
+    }
+    if (close === -1) continue;
+    let alternatives = null;
+    if (commas.length > 0) {
+      alternatives = [];
+      let from = open + 1;
+      for (const comma of commas) {
+        alternatives.push(text.slice(from, comma));
+        from = comma + 1;
+      }
+      alternatives.push(text.slice(from, close));
+    } else {
+      const range = /^([A-Za-z0-9])\.\.([A-Za-z0-9])$/u.exec(text.slice(open + 1, close));
+      if (range !== null) alternatives = singleCharacterRange(range[1], range[2]);
+    }
+    if (alternatives !== null) return { open, close, alternatives };
+  }
+  return null;
+}
+
+/** Every brace expansion of one word, or null when there would be more than BRACE_EXPANSION_CAP. */
+function expandBraceWord(word) {
+  const done = [];
+  const pending = [word];
+  while (pending.length > 0) {
+    const text = pending.pop();
+    const group = findBraceGroup(text);
+    if (group === null) done.push(text);
+    else {
+      for (const alternative of group.alternatives) {
+        pending.push(`${text.slice(0, group.open)}${alternative}${text.slice(group.close + 1)}`);
+      }
+    }
+    if (done.length + pending.length > BRACE_EXPANSION_CAP) return null;
+  }
+  return done;
+}
 
 /**
- * gitWordBeforeShellExpansion(text) -- true when a `git`/`git.exe` word at an executable boundary is followed, in
- * the same simple command, by unquoted expansion syntax (`$(`, `${`, a backtick). Whatever the expansion produces
- * is unknown to a static reading: it can spell the subcommand (`git $(echo push) origin main`), a global option
- * value that swallows the push word, or a whole extra word, so the real subcommand position cannot be located
- * and "not a push" would be a guess (GPGL-8). `text` is the lowercased view with here-document bodies removed.
- * A backtick both opens and closes, so a git word that itself sits inside a backtick pair (an odd number of
- * backticks before it) does not count its own closing backtick: `` x=`git rev-parse HEAD` `` is not flagged,
- * `` git `echo push` origin main `` is.
+ * True when `cmd` holds a git word: `git`/`git.exe` at an executable boundary (GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE),
+ * written out or formed by brace expansion of one word of the text.
  */
-function gitWordBeforeShellExpansion(text) {
-  const gitWord = /(^|[\s;&|(`'"/\\])(git(?:\.exe)?)\b/giu;
-  let match;
-  while ((match = gitWord.exec(text)) !== null) {
-    const afterGit = match.index + match[0].length;
-    const rest = text.slice(afterGit);
-    const end = rest.search(SIMPLE_COMMAND_END_RE);
-    const command = end === -1 ? rest : rest.slice(0, end);
-    if (/\$[({]/u.test(command)) return true;
-    const backticksAfter = command.split("`").length - 1;
-    const backticksBefore = text.slice(0, match.index + match[1].length).split("`").length - 1;
-    if (backticksAfter > (backticksBefore % 2 === 1 ? 1 : 0)) return true;
+function hasGitWord(cmd) {
+  if (GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(cmd)) return true;
+  if (!cmd.includes("{")) return false;
+  for (const word of cmd.split(/[\s;&|()<>]+/u)) {
+    if (!word.includes("{")) continue;
+    if (word.length > BRACE_WORD_MAX_LENGTH) return true;
+    const expansions = expandBraceWord(word);
+    if (expansions === null || expansions.some((expansion) => GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(expansion))) return true;
   }
   return false;
 }
 
+// ---- here-document receivers (PO decision X) ---------------------------------------------------------------------
+// `<<` (a here-document, `<<-`, the `<<<` here-string) hands text to a command. When that command is a shell or
+// interpreter the text is a program it runs, so the operator is a fail-closed marker; when it is anything else
+// (`git commit -F - <<EOF`, `cat <<EOF > notes.txt`) the text is data and the operator marks nothing. Every other marker
+// still decides on the whole text, a here-document body included (an unquoted delimiter is expanded by the shell).
+//
+// The receiver is read from the detection view of `scanShell` (structure kept, quoted prose blanked), under all three
+// readings of a backslash. The view is cut into units at a newline, `;`, `&&`, `||` and a lone `&`, but NOT at a pipe:
+// a unit is a whole pipeline, so `cat <<EOF | sh` (the body is forwarded to a shell) is a shell receiver. A unit that
+// holds `<<` is a shell receiver when ANY of its words names a shell or interpreter, so the receiver is found through a
+// path, a `.exe` or version suffix and a wrapper word (`/usr/bin/env bash`, `sudo python3.11`, `exec sh`); a word with a
+// glob character that could expand to such a name (`/bin/ba?h`) counts as well. Two more shapes forward the text to a
+// command this view cannot name and fail closed: a compound command's closer (`... done <<EOF` feeds every command in
+// the loop) and the `.` builtin in command position. The price is a spurious gate run for a data here-document in a unit
+// that also names such a word (`git add -- node <<EOF`) or whose body holds a `<<` line next to a shell word: the safe
+// direction. NOT covered, because decision X lists receivers and does not model every command that runs text from
+// standard input (xargs, at, ed, sqlite3, php, lua, awk -f -): see the header of `commandIsGitPush`.
+const HEREDOC_RECEIVER_NAMES = new Set([
+  "sh", "bash", "zsh", "ksh", "dash", "ash", "fish", "csh", "tcsh",
+  "node", "nodejs", "python", "py", "perl", "ruby",
+  "pwsh", "powershell", "cmd", "eval", "ssh",
+  "source", "exec",
+]);
+const HEREDOC_COMPOUND_CLOSERS = new Set(["done", "fi", "esac"]);
+// Probes a glob word is tested against: every receiver name, its `.exe` spelling, and a versioned python.
+const HEREDOC_GLOB_PROBES = [...HEREDOC_RECEIVER_NAMES, "python3"].flatMap((name) => [name, `${name}.exe`]);
+const HEREDOC_UNIT_SEPARATOR_RE = /\n|;|&&|\|\||(?<![<>|&])&(?!>)/u;
+const HEREDOC_WORD_SPLIT_RE = /[\s|<>&]+/u;
+
+/** True when a glob word (`*`, `?`, `[...]`) could expand to a receiver name; unreadable globs answer true. */
+function globCouldNameReceiver(base) {
+  const source = base
+    .replace(/[.+^${}()|\\]/gu, "\\$&")
+    .replace(/\[[^\]]*\]/gu, ".")
+    .replace(/[[\]]/gu, "\\$&")
+    .replace(/\*/gu, ".*")
+    .replace(/\?/gu, ".");
+  try {
+    const re = new RegExp(`^${source}$`, "u");
+    return HEREDOC_GLOB_PROBES.some((probe) => re.test(probe));
+  } catch {
+    return true;
+  }
+}
+
+/** True when one word of a command names a shell or interpreter (see the block comment above). */
+function isHeredocReceiverWord(word) {
+  const unquoted = word.replace(/['"‘-‟]/gu, "");
+  const base = unquoted.slice(Math.max(unquoted.lastIndexOf("/"), unquoted.lastIndexOf("\\")) + 1).toLowerCase().replace(/\.exe$/u, "");
+  if (base === "") return false;
+  if (HEREDOC_RECEIVER_NAMES.has(base) || HEREDOC_RECEIVER_NAMES.has(base.replace(/[0-9][0-9.]*$/u, ""))) return true;
+  return /[*?[]/u.test(base) && globCouldNameReceiver(base);
+}
+
+/** True when `cmd` hands a `<<` text to a shell or interpreter (PO decision X). */
+function hasShellHeredocReceiver(cmd) {
+  if (!cmd.includes("<<")) return false;
+  for (const reading of [READING_POSIX, READING_WINDOWS_PATH, READING_POWERSHELL]) {
+    for (const unit of scanShell(cmd, reading).view.split(HEREDOC_UNIT_SEPARATOR_RE)) {
+      if (!unit.includes("<<")) continue;
+      const words = unit.split(HEREDOC_WORD_SPLIT_RE).filter((word) => word !== "");
+      if (words.length > 0 && (words[0] === "." || HEREDOC_COMPOUND_CLOSERS.has(words[0]))) return true;
+      if (words.some(isHeredocReceiverWord)) return true;
+    }
+  }
+  return false;
+}
+
+/** True when `cmd` carries a fail-closed marker (see `commandIsGitPush`). */
+function hasFailClosedMarker(cmd) {
+  return (
+    FAIL_CLOSED_MARKER_RE.test(cmd) ||
+    NESTED_POSIX_SHELL_RE.test(cmd) ||
+    NESTED_WINDOWS_SHELL_RE.test(cmd) ||
+    hasBackslashOutsidePathTokens(cmd) ||
+    hasShellHeredocReceiver(cmd)
+  );
+}
+
 /**
- * commandIsGitPush(cmd) -- the ONE source of truth for "is this command a git push",
- * extracted VERBATIM from guard-push.mjs's own three-branch `isPush` computation
- * (former lines ~239-336: the heredoc-aware whole-string-regex branch tested against
- * `commandRegion`, the env-skipping positional `directPush` branch, and the
- * `shellWrapperPush` branch). Every caller that needs to know "will guard-push.mjs
- * treat this as a push" MUST call this function instead of independently
- * hand-maintaining a partial reimplementation of it -- a caller that reimplements only
- * the whole-string branch silently loses detection for shapes like
- * `git.exe -C repo push origin main`, `sh -c "git push origin main"`,
- * `bash -c 'git push'`, or `ssh host "git push"` (NVA-A7FIX-1/2, Critic F-1).
+ * commandIsGitPush(cmd) -- the ONE source of truth for "is this command a git push CANDIDATE", the question every
+ * caller needs answered before it decides whether guard-push.mjs runs at all (codex-pretool-guard.mjs's prefilter;
+ * guard-push.mjs's own `if (!isPush) process.exit(0)` fast path). At those call sites returning `false` and returning
+ * "I cannot tell" have the EXACT SAME effect -- the push gate never runs -- so for this classifier "not a push" is the
+ * unsafe answer, and the function is an ALLOWLIST of plain commands, not a deny-list of push spellings (PO decision Q12,
+ * option B, "fail-closed marker", 2026-10-06; narrowed by decisions J and X and extended by decision S, 2026-10-07;
+ * recorded in specs/sprint-alfred-epic/plans/po-decisions-2026-10-06.md row Q12 and po-decisions-2026-10-07.md rows J, S
+ * and X). Every
+ * caller MUST call this function instead of hand-maintaining a partial reimplementation of it (NVA-A7FIX-1/2, Critic
+ * F-1). `cmd` is the ALREADY-PREPARED command string a caller hands in -- for guard-push.mjs its own
+ * `commandAfterDocumentedOverridePrefix` output; this function performs no guard-specific pre-processing.
  *
- * `cmd` is the ALREADY-PREPARED command string a caller hands in -- for guard-push.mjs,
- * that is its own `commandAfterDocumentedOverridePrefix` output (documented-override-
- * prefix stripping is guard-push-specific pre-processing that stays there); this
- * function performs no guard-specific pre-processing of its own and has no knowledge of
- * that prefix.
+ * The rule, in order:
+ *   1. GIT WORD. `git` or `git.exe` at an executable boundary of the raw text: the start, after whitespace, `;` `&` `|`
+ *      `(`, a backtick, a quote, a path separator (`/` `\`), or -- decision S, bash brace expansion -- after `{` or
+ *      `,`. A git word formed by brace expansion (`{git,push}`, `g{i..i}t`) counts: brace groups of a word (comma
+ *      lists, nested ones too, and single-character `{a..z}` ranges) are expanded to their alternatives before the
+ *      test. No git word, no marker rule (an unrelated command is never a candidate on the marker rule's account).
+ *   2. MARKERS. With a git word present, the text is a push CANDIDATE (`true`) when it holds ANY of:
+ *        - `$`, a backtick, `{`, `(` or `)`;
+ *        - `<<` (also `<<-` and the `<<<` here-string) when a shell or interpreter receives it (decision X): sh, bash,
+ *          zsh, ksh, dash, ash, fish, csh, tcsh, node, python, perl, ruby, pwsh, powershell, cmd, eval, ssh -- named
+ *          through a path, a `.exe` or version suffix, a wrapper word or a glob, and including a here-document piped
+ *          into one (`cat <<EOF | sh`); `source`, `exec`, the `.` builtin and a compound command's closer
+ *          (`done <<EOF`) fail closed as well. A here-document fed to any other command (`git commit -F - <<EOF`,
+ *          `cat <<EOF > notes.txt`) is data and is no marker by itself; see `hasShellHeredocReceiver`;
+ *        - a non-ASCII quote character (U+2018 to U+201F);
+ *        - a nested shell invocation: `bash|sh|dash|zsh|ksh|csh|tcsh|fish|ash` with `-c` (also `-lc`), `cmd|cmd.exe` with
+ *          `/c` or `/k`, `pwsh|powershell` with `-c`/`-Command`;
+ *        - a backslash, EXCEPT inside a path token (decision J, see PATH_TOKEN_RE): a drive path `X:\...` (a quoted one,
+ *          and one ending in a backslash before its closing quote, included) or a relative path whose backslashes only
+ *          separate segments. Decision S: a backslash adjacent to a quote inside a double-quoted span that is not a
+ *          path token (`git commit -m "say \"hi\""`) IS a marker.
+ *      A candidate is routed to guard-push.mjs, which does the real evaluation and refuses every non-exact push; a
+ *      spurious run costs nothing a missed push does not.
+ *   3. NO MARKER: the exact `push` subcommand detection, `classifyPush`, applies. It is run under all three readings of
+ *      a backslash (a POSIX escape, a Windows path separator, the ordinary character PowerShell takes it for; ANY
+ *      reading classifying as a push is enough, GPGL-5/6/7) and keeps its own fail-closed checks: #1 an unterminated
+ *      quote anywhere in a command that mentions git; #2 a git word followed by an option the global-option whitelist
+ *      does not know (so `git --totally-unknown-flag status` is a candidate, while `gitleaks detect --no-git --redact`
+ *      is not: the git word only counts where an executable can stand, GPGL-2; a whitespace-separated literal `git`
+ *      ARGUMENT such as `gitleaks git --redact` is indistinguishable from the executable and stays a candidate); #3 a
+ *      backslash-escaped quote outside every quote beside a git word; #4 a QUOTED git executable name with a push word
+ *      later in the command (GPGL-3). Checks #5 and #6 of earlier revisions (a shell expansion after a git word, a
+ *      double-quoted substitution holding a git word) were shape-specific deny-list entries and are replaced by the
+ *      marker rule; their shapes are all markers.
  *
- * Branch 1 (whole-string): tests `/\bgit\s+push\b/` against the quote-stripped,
- * lowercased, global-option-normalized command with here-document BODIES removed --
- * catches forms the positional branches below cannot see, such as
- * `git --git-dir=<path> push` and repeated `-C` overrides that `normalizeGlobalGitOptions`
- * folds away. The heredoc-body removal is here so a heredoc's DATA (not command text)
- * can never be mistaken for a push and can never glue two lines into a false match
- * either; on unbounded/pathological input it degrades to over-detection (fail-closed),
- * never under.
+ * ACCEPTED FALSE POSITIVES (the cost of option B, pinned by tests on purpose; fixing one by exempting an expansion
+ * reopens the bypass class and needs a new PO decision, not a test edit): `git commit -m "$(date)"` and
+ * `git diff $(git merge-base HEAD main)` (a `$`), any commit message with an escaped quote (`git commit -m "say \"hi\""`,
+ * decision S -- use single quotes in commit messages), a `{`, `(` or `)` anywhere in a command that mentions git
+ * (`git commit -m '{"a":1}'`, a here-document commit message whose body holds a parenthesis), a `-c` after a shell word
+ * (`bash -lc 'git status'`), a data here-document in a unit that also names a shell word (`git add -- node <<EOF`).
  *
- * Branch 2 (`directPush`, positional): matches `git`/`git.exe` directly followed by
- * `push` or `-C <dir> push`, after skipping a leading run of `NAME=value` assignments
- * and an optional `env` -- so `FOO=bar git push` and `env git push` are still detected
- * positionally.
+ * Without a marker the three branches of `classifyPush` apply (extracted VERBATIM from guard-push.mjs's own `isPush`
+ * computation): branch 1 tests `/\bgit\s+push\b/` against the quote-stripped, lowercased, global-option-normalized view
+ * with here-document bodies removed (so `git --git-dir=<path> push` and repeated `-C` overrides fold away); branch 2
+ * (`directPush`) matches `git`/`git.exe` directly followed by `push` or `-C <dir> push` after a leading run of
+ * `NAME=value` assignments and an optional `env`; branch 3 (`shellWrapperPush`) matches a
+ * `sh|bash|zsh|dash|pwsh|powershell|cmd|ssh` wrapper whose argument contains `git ... push`.
  *
- * Branch 3 (`shellWrapperPush`, positional): matches a `sh`/`bash`/`zsh`/`dash`/`pwsh`/
- * `powershell`/`cmd`/`ssh` wrapper whose argument contains `git ... push`.
+ * NOT modelled, still open (QG-06 needs an owner and an expiry set by the dispatcher; tracked in
+ * backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md): PowerShell here-strings
+ * (`@"..."@`) hold no marker of the list above. Likewise, decision X names its receivers and does not model every command
+ * that runs text from standard input: a here-document fed to xargs, at, ed, sqlite3, php, lua or `awk -f -` is data to
+ * this rule (an extension of the receiver list is a new PO decision, not a test edit).
  *
- * Fail-closed on uncertainty (NVA-PUSHCLASS-1, GPGL-3), checked BEFORE the three branches
- * and independently of them: at every call site this function has (codex-pretool-guard.mjs's
- * prefilter deciding whether guard-push.mjs runs at all; guard-push.mjs's own `if
- * (!isPush) process.exit(0)` fast path), returning `false` and returning "I cannot tell"
- * currently have the EXACT SAME effect -- the push gate never runs. For an ordinary
- * function that is a reasonable simplification; for a gate's own classifier it is the
- * wrong default, because it silently converts "unrecognized" into "definitely safe". So
- * this function now over-approximates on purpose in six situations, at the cost of
- * occasionally routing a genuinely non-push command to guard-push.mjs for nothing:
- * guard-push.mjs does the real evaluation once it actually runs, and a spurious run costs
- * nothing a missed push does not.
- *   1. An unresolvable quoting state anywhere in a command that mentions `git`/`git.exe`
- *      at all (an unterminated `'` or `"`) -- `stripQuotedSegments` and `tokenizeArgv`
- *      both assume balanced quoting, so downstream token boundaries cannot be trusted.
- *   2. A `git`/`git.exe` occurrence still immediately followed (after every RECOGNIZED
- *      global option has already been collapsed away by `normalizeGlobalGitOptions`) by a
- *      token that starts with `-` -- that token names a global option this file's
- *      whitelist does not know, so its value-consuming shape (does it take a value at
- *      all? space-separated or `=`-only? can the value contain more `-`-prefixed text?)
- *      is unknown, and the real subcommand position cannot be located with certainty.
- *      The `git` word only counts where an executable can stand (GPGL-2): at the start of
- *      the command, or preceded by whitespace, a shell operator (`;` `&` `|` `(` -- which
- *      also covers `$(` -- or a backtick), a quote, or a path separator (`/` `\`). A `git`
- *      preceded by `-`, `=`, `.` or a word character is part of an option or a longer
- *      word (`--no-git`, `--exclude=git`, `xgit`), never an executable, so a tool that
- *      merely carries such text (`gitleaks detect --no-git --redact`) is not routed to the
- *      push gate. A whitespace-separated literal `git` ARGUMENT (`gitleaks git --redact`)
- *      is deliberately still indistinguishable from the executable and stays refused:
- *      fail-closed, accepted.
- *   3. A backslash-escaped quote (`\'` or `\"`) OUTSIDE every quote, together with a
- *      `git`/`git.exe` word at an executable boundary (the same boundary rule as check #2,
- *      no option required) -- and NO push-word requirement (GPGL-3). GPGL-4 narrowed this
- *      with a raw-text push-word conjunct; GPGL-5 removed it again because a push word split
- *      by interior quotes (`pu"sh"`) never appears as that token in raw text (Critic finding
- *      F1: `echo \'; git pu"sh" origin main; echo \'`). A shell treats an escaped quote as a
- *      literal character, so text between two of them is executed. The scanner now follows
- *      that, and this check stays as a backstop that does not depend on the scanner being
- *      right about everything after the escape. An escaped quote INSIDE a double-quoted span
- *      or an ANSI-C `$'...'` string is parsed by the scanner and is not a trigger, which keeps
- *      `git commit -m "say \"hi\""` and `git log --grep "a \"push\" word"` out of the push gate.
- *      Detection itself (the three branches and checks #2/#4) runs on the DEQUOTED words and
- *      view, never on raw text: `git pu"sh"`, `g"it" push` and `git p\ush` all read `git push`.
- *      A backslash is read three ways and ANY reading classifying as a push is enough (GPGL-7):
- *      as a POSIX escape, as a Windows path separator before an ordinary character, and as the
- *      ordinary character PowerShell takes it for (`\<space>` ends a word, `\"` closes a
- *      double-quoted span, so `git -C <drive>:\repo\ push` and `echo "x\"; git push; echo \"y"`
- *      both classify). An unterminated quote or a trailing lone backslash fails closed under #1
- *      as well. COVERED for PowerShell: the literal backslash (GPGL-7) and the typographic quote
- *      delimiters (GPGL-8: double U+201C, U+201D, U+201E; single U+2018, U+2019, U+201A, U+201B --
- *      a span opened by one character of its class is closed by any other of that class, so an
- *      ASCII-opened string closed by a typographic quote no longer hides the statement after it).
- *      NOT modelled, still open (QG-06 needs an owner and an expiry set by the dispatcher; tracked in
- *      backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md): the
- *      backtick escape (`` `" ``) inside double quotes, and here-strings (`@"..."@`). Checks #5 and
- *      #6 fail closed on a backtick next to a git word; that is over-approximation, not a model of
- *      the escape. Also not modelled, with no backlog item yet: quote characters nested inside a
- *      double-quoted `$(...)` (`echo "$(echo "x"; git push)"`) -- the scanner closes the span at the
- *      inner quote and reads the push as the text of a later span, and check #6 only sees a span
- *      whose OWN raw text holds both the substitution and the git word. Doubled quotes (`""`, `''`)
- *      need no model: they toggle the span twice and so hide the same text.
- *   4. A QUOTED git executable name (`"git"`, `'git.exe'`, a quoted path ending in git)
- *      with a push word later in the command (GPGL-3). Quote-stripping blanks `"git"`, so
- *      neither the whole-string branch nor the global-option collapse ever sees the
- *      executable, and the positional branch only knows `push` / `-C <dir> push` directly
- *      after it -- `"git" --unknown-opt push` and `"git" -c a=b push` evaded all three.
- *   5. Shell expansion syntax (`$(`, `${`, a backtick) OUTSIDE quotes, anywhere after a
- *      `git`/`git.exe` word at an executable boundary within the same simple command (GPGL-8).
- *      `$`, `(`, `{` and the backtick are ordinary word characters to the scanner, so what an
- *      expansion produces is unknown: `git $(echo push) origin main`, `` git `printf push` ``,
- *      `git ${X:-push} origin main` and `git -C $(echo a b) push` all read as something other
- *      than a push although a shell runs one. A simple command ends at `;`, `|`, a newline, `&&`,
- *      a lone `&` or the `)` closing a substitution the git word itself sits in, so
- *      `cd $(git rev-parse --show-toplevel)` and `` x=`git rev-parse HEAD` `` stay out of the
- *      push gate. Accepted over-approximation: `git diff $(git merge-base HEAD main)` is routed
- *      to the gate. A `$(...)` or backtick WITHIN QUOTES is check #6's concern.
- *   6. A double-quoted span whose raw text holds `$(` or a backtick together with a git word at an
- *      executable boundary (GPGL-8): the view blanks the span, but any shell runs the
- *      substitution, so `echo "$(git push origin main)"` is a push. Accepted over-approximation:
- *      a double-quoted substitution that merely contains a git word, such as a heredoc commit
- *      message `"$(cat <<'EOF' ... git ... EOF)"`, is routed to the gate.
- *
- * Returns `true` if any fail-closed check fires, or if ANY of the three branches
- * match.
+ * Returns `true` for a candidate, `false` for a command the rule proves plain.
  */
 export function commandIsGitPush(cmd) {
   if (typeof cmd !== "string" || cmd === "") return false;
-  // A backslash has three readings: a POSIX escape (`p\ush` is `push`), a Windows path separator
-  // (`C:\Git\bin\git.exe push`) and the ordinary character PowerShell takes it for (`\"` closes a
-  // double-quoted span, `\ ` ends a word). Which shell a runner applies is not known here, so classify
-  // under all three and fail closed when ANY reading is a push (GPGL-5, GPGL-7).
+  if (hasGitWord(cmd) && hasFailClosedMarker(cmd)) return true;
+  // No marker. A backslash has three readings: a POSIX escape (`p\ush` is `push`), a Windows path separator
+  // (`C:\Git\bin\git.exe push`) and the ordinary character PowerShell takes it for (`\"` closes a double-quoted span,
+  // `\ ` ends a word). Which shell a runner applies is not known here, so classify under all three and fail closed
+  // when ANY reading is a push (GPGL-5, GPGL-7).
   return (
     classifyPush(cmd, READING_POSIX) || classifyPush(cmd, READING_WINDOWS_PATH) || classifyPush(cmd, READING_POWERSHELL)
   );
@@ -653,11 +795,9 @@ function classifyPush(cmd, reading) {
     (GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(cmd) || GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(view))
   ) return true;
   if (hasQuotedGitWordBeforePushWord(cmd, scan.words)) return true;
-  // Fail-closed check #6 (GPGL-8): a double-quoted `$(...)` or backtick span that also holds a git word.
-  if (scan.quotedSubstitutionWithGit) return true;
   const normalized = normalizeGlobalGitOptions(view.toLowerCase());
   // `source` with here-document BODIES removed (data, never command text); pathological input degrades to the
-  // unstripped text. Applied to the option-collapsed text below and, for check #5, to the uncollapsed view.
+  // unstripped text.
   const withoutHeredocBodies = (source) => {
     const opener = /(^|\s)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/u;
     let text = source;
@@ -686,15 +826,10 @@ function classifyPush(cmd, reading) {
     return source;
   };
   const commandRegion = withoutHeredocBodies(normalized);
-  // Fail-closed check #2 (see this function's own header): every RECOGNIZED global
-  // option has already been collapsed away by normalizeGlobalGitOptions above, so a
-  // `git`/`git.exe` still immediately followed by a `-`-prefixed token here names an
-  // option this file does not know how to consume. Do not guess "not a push".
+  // Fail-closed check #2 (see `commandIsGitPush`): every RECOGNIZED global option has already been collapsed away by
+  // normalizeGlobalGitOptions above, so a `git`/`git.exe` still immediately followed by a `-`-prefixed token here names
+  // an option this file does not know how to consume. Do not guess "not a push".
   if (GIT_EXECUTABLE_THEN_OPTION_RE.test(commandRegion)) return true;
-  // Fail-closed check #5 (GPGL-8): shell expansion syntax in the arguments of a git word at an executable boundary.
-  // Run on the view BEFORE option collapse -- an expansion that holds whitespace (`-C $(echo a b)`) would otherwise
-  // be split by the option-value token and its remainder read as the subcommand.
-  if (SHELL_EXPANSION_START_RE.test(view) && gitWordBeforeShellExpansion(withoutHeredocBodies(view.toLowerCase()))) return true;
   const rawDetectionTokens = scan.words;
   // Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
   // `env git push` are still detected POSITIONALLY.
