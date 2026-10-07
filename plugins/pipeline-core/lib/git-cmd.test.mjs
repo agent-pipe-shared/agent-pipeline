@@ -1146,6 +1146,7 @@ recordQ12Table("Q12-AF: SQLITE3-CANDIDATE", true, Q12AF_SQLITE3_TABLE);
 // Scripting languages whose program is the here-document: php with no file argument, lua with no script, awk with -f - or
 // -f /dev/stdin all read the program from standard input, and the program calls the language's own shell-out function.
 const Q12AF_SCRIPT_LANGUAGE_TABLE = [
+  // body contains marker characters — pins the end state, not the receiver rule alone
   ['php <<EOF\n<?php system("git push origin main");\nEOF', "php reads its program from standard input; system() runs git push origin main"],
   ['lua <<EOF\nos.execute("git push origin main")\nEOF', "lua reads its program from standard input; os.execute runs git push origin main"],
   ['awk -f - <<EOF\nBEGIN { system("git push origin main") }\nEOF', "awk -f - reads the program from standard input; the BEGIN block calls system(), which runs git push origin main"],
@@ -1155,6 +1156,7 @@ recordQ12Table("Q12-AF: SCRIPT-LANGUAGE-CANDIDATE", true, Q12AF_SCRIPT_LANGUAGE_
 
 // The interpreters decision X already names, reading the program from - (standard input): the program shells out to git push.
 const Q12AF_INTERPRETER_STDIN_TABLE = [
+  // body contains marker characters — pins the end state, not the receiver rule alone
   ['perl - <<EOF\nsystem("git push origin main")\nEOF', "perl - reads the program from standard input; system() runs git push origin main"],
   ['python - <<EOF\nimport os; os.system("git push origin main")\nEOF', "python - reads the program from standard input; os.system runs git push origin main"],
   ["ruby - <<EOF\n`git push origin main`\nEOF", "ruby - reads the program from standard input; the backtick literal runs git push origin main"],
@@ -1162,12 +1164,22 @@ const Q12AF_INTERPRETER_STDIN_TABLE = [
 ];
 recordQ12Table("Q12-AF: INTERPRETER-STDIN-CANDIDATE", true, Q12AF_INTERPRETER_STDIN_TABLE);
 
+// bodies contain no fail-closed marker characters, so these rows prove the AF receiver rule, not the marker
+const Q12AF_MARKER_FREE_BODY_TABLE = [
+  ['lua <<EOF\nos.execute "git push origin main"\nEOF', "marker-free body: lua reads its program from standard input; os.execute runs git push origin main"],
+  ['perl - <<EOF\nsystem "git push origin main"\nEOF', "marker-free body: perl - reads the program from standard input; system runs git push origin main"],
+  ['ruby - <<EOF\nsystem "git push origin main"\nEOF', "marker-free body: ruby - reads the program from standard input; system runs git push origin main"],
+  ['perl <<EOF\nsystem "git push origin main"\nEOF', "marker-free body: perl with no - and no file argument reads its program from standard input; system runs git push origin main"],
+];
+recordQ12Table("Q12-AF: MARKER-FREE-BODY-CANDIDATE", true, Q12AF_MARKER_FREE_BODY_TABLE);
+
 // Controls (decision X, the data side, kept by decision AF): a here-document that no shell, interpreter or command runner runs
 // as commands stays data and stays NOT a candidate, even when it names the push phrase.
 const Q12AF_CONTROL_DATA_HEREDOC_TABLE = [
   ["xargs echo <<EOF\nhello\nEOF", "xargs runs echo with the word hello: nothing git-related is run, the body is only an argument"],
   ["sqlite3 db.sqlite <<EOF\nselect 1;\nEOF", "sqlite3 runs the SQL statement select 1; against db.sqlite: plain SQL, no .shell dot-command"],
-  ["awk '{print}' <<EOF\ngit push origin main\nEOF", "the awk program {print} is on argv; the here-document is only its input data, which awk prints and never runs"],
+  // `{` on argv is a fail-closed marker regardless of the heredoc (option B; decision S accepted that cost), so the previous row was a briefing error
+  ["awk NF <<EOF\ngit push origin main\nEOF", "the awk program NF is on argv; the here-document is only its input data, which awk filters and never runs"],
   ["git commit -F - <<'EOF'\nfix: push docs\nEOF", "git commit reads its message from the here-document: the body is data, a single-quoted delimiter so nothing in it is expanded"],
 ];
 recordQ12Table("Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE", false, Q12AF_CONTROL_DATA_HEREDOC_TABLE);
