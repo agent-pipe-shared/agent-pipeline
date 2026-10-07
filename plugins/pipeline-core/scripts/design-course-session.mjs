@@ -445,10 +445,18 @@ export async function writeVerifiedReadinessPreparation({
     if (!rel || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { ok: false, code: "DESIGN-COURSE-PREPARATION-PATH" };
     const parentInfo = lstatSync(dirname(target));
     if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink() || realpathSync(dirname(target)) !== dirname(target)) return { ok: false, code: "DESIGN-COURSE-PREPARATION-PARENT" };
+    let boundPathIgnored = false;
     try {
       runGit("git", ["check-ignore", "--quiet", "--", preparationPath], { cwd: repoRoot, timeout: 10_000,
         shell: false, stdio: ["ignore", "ignore", "ignore"] });
-    } catch { return { ok: false, code: "DESIGN-COURSE-PREPARATION-MUST-BE-IGNORED" }; }
+      boundPathIgnored = true; // exit 0: the path is git-ignored
+    } catch (error) {
+      if (error?.status !== 1) throw error; // exit 1 = not ignored (proceed); anything else is a git failure
+    }
+    if (boundPathIgnored) {
+      return { ok: false, code: "DESIGN-COURSE-BOUND-PATH-IGNORED",
+        repair: `re-run the producer with the tracked output prefix specs/${featureId}/evidence/design-course/${runner}` };
+    }
     try { lstatSync(target); return { ok: false, code: "DESIGN-COURSE-PREPARATION-EXISTS" }; }
     catch (error) { if (error?.code !== "ENOENT") throw error; }
     const temporary = join(dirname(target), `design-preparation-tmp-${randomUUID()}.json`);

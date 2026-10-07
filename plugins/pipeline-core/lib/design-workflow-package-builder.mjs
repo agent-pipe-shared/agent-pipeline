@@ -171,13 +171,12 @@ export function buildDesignWorkflowPackageV2({
 
     const target = physicalParent(root, packagePath);
     finalPath = target.absolute;
-    if (!ignored(root, packagePath)) return fail("DWP2-BUILDER-OUTPUT-NOT-IGNORED");
+    if (ignored(root, packagePath)) return fail("DWP2-BUILDER-OUTPUT-IGNORED");
     try { lstatSync(finalPath); return fail("DWP2-BUILDER-OUTPUT-EXISTS"); }
     catch (error) { if (error?.code !== "ENOENT") throw error; }
 
     const tempName = `dwp2-${randomBytes(16).toString("hex")}.json`;
     const tempRelative = relative(root, join(target.parent, tempName)).split(sep).join("/");
-    if (!ignored(root, tempRelative)) return fail("DWP2-BUILDER-TEMP-NOT-IGNORED");
     temporaryPath = join(target.parent, tempName);
     writeExclusiveDurable(temporaryPath, packageBytes);
     const tempStat = lstatSync(temporaryPath);
