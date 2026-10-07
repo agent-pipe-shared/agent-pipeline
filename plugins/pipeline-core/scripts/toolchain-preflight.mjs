@@ -413,7 +413,13 @@ async function locateKeyDirectory(rootDir, signingDeps) {
     return { directory: null, legacy: false, invalid };
   }
   if (resolution?.status === "resolved" && usable(resolution.directory)) return { directory: resolution.directory, legacy: resolution.legacy === true, invalid: null };
-  // Unset, or a resolved value that is not an absolute path: treated as unset.
+  // A resolved value that is not an absolute path is a usage error, never "unset" (R7-6-F8).
+  if (resolution?.status === "resolved" && typeof resolution.directory === "string" && resolution.directory.trim() !== "") {
+    const source = String(resolution.source ?? "environment");
+    const invalid = { findingId: "po-key-directory", status: "attended", cause: `key-directory-not-absolute: the PO key directory taken from the ${source} is a relative path; an absolute path is required`, repair: attendedPrerequisite("po-key-directory-absolute", "set the PO key directory to an absolute path in your own terminal, then re-run the readiness report.") };
+    return { directory: null, legacy: false, invalid };
+  }
+  // Unset: no tier supplied a directory.
   return { directory: null, legacy: false, invalid: null };
 }
 
