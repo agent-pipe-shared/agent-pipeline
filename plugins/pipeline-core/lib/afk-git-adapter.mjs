@@ -76,7 +76,7 @@ function trustedEnvironment(extra = {}) {
 function runGit(root, args, { input = null, env = {}, accepted = [0] } = {}) {
   const outcome = spawnSync("git", [
     "-C", root,
-    "-c", "core.hooksPath=/dev/null",
+    "-c", `core.hooksPath=${GIT_NULL_DEVICE}`,
     "-c", "core.fsmonitor=false",
     "-c", "filter.lfs.required=false",
     ...args,

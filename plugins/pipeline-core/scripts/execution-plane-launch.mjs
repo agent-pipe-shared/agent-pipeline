@@ -46,6 +46,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import { createLocalWorkerPool } from "../lib/local-worker-pool.mjs";
 import {
   LOCAL_WORKER_SUPERVISOR_REQUEST_SCHEMA,
@@ -167,7 +168,7 @@ function git(args, cwd) {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" },
+    env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_TERMINAL_PROMPT: "0" },
   }).trim();
 }
 

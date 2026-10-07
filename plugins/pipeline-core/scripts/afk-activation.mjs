@@ -20,6 +20,7 @@ import {
 import { executeAfkActivationHostTransaction } from "../lib/afk-transaction-host.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 
 export const EXIT = Object.freeze({ OK: 0, BLOCKED: 2 });
 export const MAX_STDIN_BYTES = 262_144;
@@ -43,7 +44,7 @@ function git(root, args, accepted = [0]) {
       PATH: process.env.PATH,
       HOME: process.env.HOME,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
       GIT_TERMINAL_PROMPT: "0",
       GIT_PAGER: "cat",
     },

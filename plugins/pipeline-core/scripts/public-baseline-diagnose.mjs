@@ -14,6 +14,7 @@ import {
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 
 export const DIAGNOSIS_SCHEMA = "pipeline.public-baseline-diagnosis.v1";
 export const HOST_SCHEMA = "pipeline.public-baseline-host-calibration.v1";
@@ -151,7 +152,7 @@ export function mayConfirmAgain(priorAttempts, signature) {
 }
 
 function safeProcessEnvironment(source = process.env) {
-  const result = { CI: "1", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" };
+  const result = { CI: "1", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE };
   for (const key of ["PATH", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT", "WINDIR", "PATHEXT"]) {
     if (typeof source[key] === "string") result[key] = source[key];
   }

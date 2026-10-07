@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 
 import {
   createFreshnessHostAction,
@@ -48,7 +49,7 @@ const WSL_SYSTEM_GIT = "/usr/bin/git";
 const WSL_SYSTEM_GIT_ENV = Object.freeze({
   GIT_ASKPASS: "/bin/false",
   GIT_CONFIG_COUNT: "0",
-  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
   GIT_CONFIG_NOSYSTEM: "1",
   GIT_OPTIONAL_LOCKS: "0",
   GIT_TERMINAL_PROMPT: "0",

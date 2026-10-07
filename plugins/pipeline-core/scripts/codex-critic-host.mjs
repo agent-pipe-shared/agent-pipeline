@@ -62,6 +62,7 @@ import { PROGRESS_COMPONENTS, admitReviewAttempt, evaluateProgress } from "../li
 import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_PIPELINE_ROOT = resolve(HERE, "..", "..", "..");
@@ -457,7 +458,7 @@ function gitEnv() {
     LC_ALL: "C.UTF-8",
     GIT_OPTIONAL_LOCKS: "0",
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
     GIT_ATTR_NOSYSTEM: "1",
   };
 }
@@ -477,7 +478,7 @@ export function runGit(repoRoot, args, options = {}) {
   // index check. This happens before Git can dereference a redirected index.
   regularGitIndex(repoRoot, { allowMissing: args[0] === "checkout" });
   return run("git", [
-    "-c", "core.hooksPath=/dev/null",
+    "-c", `core.hooksPath=${GIT_NULL_DEVICE}`,
     "-c", "core.fsmonitor=false",
     "-c", "core.untrackedCache=false",
     "-c", "core.preloadIndex=false",
@@ -818,7 +819,7 @@ export function createDisposableCheckout(sourceRoot, reviewDir, commit, dispatch
   });
   runGit(reviewDir, ["checkout", "--quiet", "--detach", commit]);
   runGit(reviewDir, ["remote", "remove", "origin"]);
-  runGit(reviewDir, ["config", "--local", "core.hooksPath", "/dev/null"]);
+  runGit(reviewDir, ["config", "--local", "core.hooksPath", GIT_NULL_DEVICE]);
   assertDisposableCheckout(reviewDir, commit);
   const marker = join(reviewDir, ".git", "pipeline-codex-review.json");
   writeFileSync(marker, canonicalJson({

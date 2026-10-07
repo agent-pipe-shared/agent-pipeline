@@ -696,7 +696,7 @@ function createWorkspace(request, worker, stateRoot) {
   const workspacePath = join(workspacesRoot, worker.leaseId);
   if (relative(workspacesRoot, workspacePath).split(sep).includes("..") || existsSync(workspacePath)) throw new Error("LWS-WORKSPACE-EXISTS");
   runGit(request.git.executable, [
-    "-c", "core.hooksPath=/dev/null",
+    "-c", `core.hooksPath=${GIT_NULL_DEVICE}`,
     "-c", "protocol.file.allow=always",
     "clone", "--local", "--no-hardlinks", "--no-checkout", "--",
     request.repository.sourceRoot, workspacePath,
@@ -704,7 +704,7 @@ function createWorkspace(request, worker, stateRoot) {
   chmodSync(workspacePath, 0o700);
   if (!securePrivateDirectory(workspacePath)) throw new Error("LWS-WORKSPACE-PRIVATE");
   runGit(request.git.executable, [
-    "-C", workspacePath, "-c", "core.hooksPath=/dev/null",
+    "-C", workspacePath, "-c", `core.hooksPath=${GIT_NULL_DEVICE}`,
     "checkout", "--detach", request.repository.candidateCommit,
   ]);
   const head = runGit(request.git.executable, ["-C", workspacePath, "rev-parse", "HEAD"]).trim();
