@@ -1,0 +1,23 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "DIAG-2",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261006045652.380eb7fa",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "commits": [],
+  "resultSha256": null,
+  "report": { "changedFiles": ["specs/sprint-alfred-epic/evidence/diag-2-closeout-failures.md"], "text": null },
+  "log": [
+    { "phase": "opening", "toolUses": 2 },
+    { "phase": "failure-1 diagnosed (reproduced, evidence/diag-2-1.txt)", "toolUses": 23 },
+    { "phase": "budget checkpoint: failure 2 not examined; writing partial note", "toolUses": 26 }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 1, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T4"
+  }
+}
