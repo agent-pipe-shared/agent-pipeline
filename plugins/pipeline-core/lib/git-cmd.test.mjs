@@ -1101,6 +1101,77 @@ const Q12C_CONTROL_DATA_HEREDOC_TABLE = [
 ];
 recordQ12Table("Q12-C: CONTROL-DATA-HEREDOC-NOT-CANDIDATE", false, Q12C_CONTROL_DATA_HEREDOC_TABLE);
 
+// ---- commandIsGitPush: heredocs received by command runners, both sides (PO decision AF, Q12-T5) ----
+// Test-only pin, written BEFORE the classifier fix (QG-04). Contract: PO decision AF (2026-10-07), recorded in
+// specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md row AF, which extends the receiver list of decision X (row X): a
+// here-document (`<<`, `<<-`) or here-string (`<<<`) received by a command RUNNER (a command that executes its input as
+// commands, or as a program that can run commands) is treated like one received by a shell. The body is classified, and the
+// command is a push candidate when the body, or the runner's argv joined with a body line (for example `xargs git` plus the
+// body line `push origin main`), can push. Data here-documents to any other command stay data (decision X). Backlog item:
+// backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md.
+// The second column of every row states the bash (or runner) semantics that make the command a push (or, in the control table,
+// data). Every command text below is DATA: it is handed to `commandIsGitPush` and never executed. The candidate tables fail on a
+// classifier that treats a heredoc fed to a non-shell command as plain data; the control table fails on a classifier that treats
+// every heredoc as a marker. Every case id in this block starts with Q12-AF: so one search over a run's output lists all of them.
+
+// The runner's argv and the body line together form the push: xargs appends the words it reads from standard input to its
+// command, so `xargs git` plus the body line `push origin main` runs `git push origin main`. The here-string feeds the same words.
+const Q12AF_ARGV_JOINED_TABLE = [
+  ["xargs git <<EOF\npush origin main\nEOF", "xargs reads the words push origin main from the here-document and runs git push origin main"],
+  ["xargs -n3 git <<EOF\npush origin main\nEOF", "xargs -n3 passes at most three words per run: it runs git push origin main with the three body words"],
+  ['xargs git <<< "push origin main"', "the here-string supplies the same words on xargs standard input: xargs runs git push origin main"],
+];
+recordQ12Table("Q12-AF: ARGV-JOINED-RUNNER-CANDIDATE", true, Q12AF_ARGV_JOINED_TABLE);
+
+// Schedulers read a command script from standard input and run it with a shell.
+const Q12AF_SCHEDULER_TABLE = [
+  ["at now <<EOF\ngit push origin main\nEOF", "at reads the here-document as a job script and runs it with sh at the given time (now): it runs git push origin main"],
+  ["batch <<EOF\ngit push origin main\nEOF", "batch reads the here-document as a job script and runs it with sh when the load permits: it runs git push origin main"],
+];
+recordQ12Table("Q12-AF: SCHEDULER-CANDIDATE", true, Q12AF_SCHEDULER_TABLE);
+
+// Line editors read editor commands from standard input; a line starting with ! runs the rest as a shell command.
+const Q12AF_LINE_EDITOR_TABLE = [
+  ["ed -s <<EOF\n!git push origin main\nq\nEOF", "ed reads editor commands from the here-document; the ! command runs git push origin main in a shell, then q quits"],
+  ["ex -s <<EOF\n!git push origin main\nEOF", "ex reads editor commands from the here-document; the ! command runs git push origin main in a shell"],
+];
+recordQ12Table("Q12-AF: LINE-EDITOR-CANDIDATE", true, Q12AF_LINE_EDITOR_TABLE);
+
+// The sqlite3 shell reads SQL and dot-commands from standard input; the .shell dot-command runs the rest in a shell.
+const Q12AF_SQLITE3_TABLE = [
+  ["sqlite3 <<EOF\n.shell git push origin main\nEOF", "the sqlite3 shell reads dot-commands from the here-document; .shell runs git push origin main"],
+];
+recordQ12Table("Q12-AF: SQLITE3-CANDIDATE", true, Q12AF_SQLITE3_TABLE);
+
+// Scripting languages whose program is the here-document: php with no file argument, lua with no script, awk with -f - or
+// -f /dev/stdin all read the program from standard input, and the program calls the language's own shell-out function.
+const Q12AF_SCRIPT_LANGUAGE_TABLE = [
+  ['php <<EOF\n<?php system("git push origin main");\nEOF', "php reads its program from standard input; system() runs git push origin main"],
+  ['lua <<EOF\nos.execute("git push origin main")\nEOF', "lua reads its program from standard input; os.execute runs git push origin main"],
+  ['awk -f - <<EOF\nBEGIN { system("git push origin main") }\nEOF', "awk -f - reads the program from standard input; the BEGIN block calls system(), which runs git push origin main"],
+  ['awk -f /dev/stdin <<EOF\nBEGIN { system("git push origin main") }\nEOF', "awk -f /dev/stdin reads the program from standard input; the BEGIN block calls system(), which runs git push origin main"],
+];
+recordQ12Table("Q12-AF: SCRIPT-LANGUAGE-CANDIDATE", true, Q12AF_SCRIPT_LANGUAGE_TABLE);
+
+// The interpreters decision X already names, reading the program from - (standard input): the program shells out to git push.
+const Q12AF_INTERPRETER_STDIN_TABLE = [
+  ['perl - <<EOF\nsystem("git push origin main")\nEOF', "perl - reads the program from standard input; system() runs git push origin main"],
+  ['python - <<EOF\nimport os; os.system("git push origin main")\nEOF', "python - reads the program from standard input; os.system runs git push origin main"],
+  ["ruby - <<EOF\n`git push origin main`\nEOF", "ruby - reads the program from standard input; the backtick literal runs git push origin main"],
+  ['node - <<EOF\nrequire("child_process").execSync("git push origin main")\nEOF', "node - reads the program from standard input; execSync runs git push origin main"],
+];
+recordQ12Table("Q12-AF: INTERPRETER-STDIN-CANDIDATE", true, Q12AF_INTERPRETER_STDIN_TABLE);
+
+// Controls (decision X, the data side, kept by decision AF): a here-document that no shell, interpreter or command runner runs
+// as commands stays data and stays NOT a candidate, even when it names the push phrase.
+const Q12AF_CONTROL_DATA_HEREDOC_TABLE = [
+  ["xargs echo <<EOF\nhello\nEOF", "xargs runs echo with the word hello: nothing git-related is run, the body is only an argument"],
+  ["sqlite3 db.sqlite <<EOF\nselect 1;\nEOF", "sqlite3 runs the SQL statement select 1; against db.sqlite: plain SQL, no .shell dot-command"],
+  ["awk '{print}' <<EOF\ngit push origin main\nEOF", "the awk program {print} is on argv; the here-document is only its input data, which awk prints and never runs"],
+  ["git commit -F - <<'EOF'\nfix: push docs\nEOF", "git commit reads its message from the here-document: the body is data, a single-quoted delimiter so nothing in it is expanded"],
+];
+recordQ12Table("Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE", false, Q12AF_CONTROL_DATA_HEREDOC_TABLE);
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
