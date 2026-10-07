@@ -47,7 +47,7 @@ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
-import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
@@ -323,6 +323,30 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
     // a test that wants a hermetic result overrides `homedirFn` (mirrors
     // `critical-action-authorization.test.mjs`'s `machinePlaneFixture()`), and a production
     // caller that overrides nothing gets the real machine, exactly like `authorizeRecordedPush`.
+    // R7-6-F6 (Elephant rulings (3) and (8), PO decision AC): resolve the approval key directory
+    // through the ONE shared resolver, not through the machine plane alone. The real gate
+    // (`localOperatorAnchorFor`) proves only the machine-wide default key, so first-use pinning
+    // accepts only a result whose tier is "machine-plane": every other resolved tier (flag,
+    // environment, legacy repository scope) is refused here -- never green for a key the real gate
+    // would refuse -- and a consulted-but-invalid store is a failure distinct from an absent one.
+    const resolution = resolvePoKeyDirectory({
+      repoRoot: dir,
+      dependencies: { ...deps, readMachinePlaneFn: deps.readMachinePlaneFn ?? deps.readMachinePlane ?? readMachinePlane },
+    });
+    if (resolution.status === "invalid") {
+      return {
+        id, ok: false,
+        message: `posture: unrestricted, once (trust-on-first-use) -- but TRUST-ANCHOR-MISSING: project/critical-human-proof.json declares no trustAnchor and no trustAnchors, and the store that names this machine's approval key directory is invalid (${resolution.store}: ${resolution.code}), so no first-use key can be proved.`,
+        remedy: "fix or remove the invalid key-directory store (machine-wide: ~/.agent-pipeline/machine.json; legacy per-repository: this repository's remembered PO key-directory store), then retry",
+      };
+    }
+    if (resolution.status === "resolved" && resolution.source !== "machine-plane") {
+      return {
+        id, ok: false,
+        message: `posture: unrestricted, once (trust-on-first-use) -- but TRUST-ANCHOR-MISSING: project/critical-human-proof.json declares no trustAnchor and no trustAnchors, and the approval key directory here resolves through the ${resolution.source} tier, but only the machine-wide default key (poKeyDirectory in ~/.agent-pipeline/machine.json) can be pinned on first use -- the real push gate proves no other key, so the open-verification route is unavailable until the key is registered as the machine-wide default.`,
+        remedy: "register the key to pin as this machine's default (poKeyDirectory in ~/.agent-pipeline/machine.json), or pin a trustAnchor explicitly in project/critical-human-proof.json before the first push",
+      };
+    }
     const resolveLocalAnchor = deps.resolveLocalOperatorKeyAnchor ?? resolveLocalOperatorKeyAnchor;
     const localAnchor = resolveLocalAnchor(deps);
     if (localAnchor === null) {
@@ -333,13 +357,12 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
       };
     }
     // The resolver above proves the key through the machine plane's poKeyDirectory ->
-    // trust-policy.json chain. Carry that SAME registered directory forward so the complete
-    // push-prepare flow signs with the key whose provenance made this TOFU check green. Do
-    // not fall through to parseHumanArgs() here: its higher-precedence repo-scoped tier may
-    // legitimately name a different directory, which would discard the provenance binding.
-    const readLocalPlane = deps.readMachinePlane ?? readMachinePlane;
-    const localPlane = readLocalPlane(deps);
-    const directory = localPlane.status === "valid" ? localPlane.plane?.poKeyDirectory : null;
+    // trust-policy.json chain. Carry that SAME directory forward -- the one the shared resolver
+    // proved (source "machine-plane" here; every other tier was refused above) -- so the complete
+    // push-prepare flow signs with the key whose provenance made this TOFU check green. Do not
+    // fall through to parseHumanArgs() here: its higher-precedence tiers may legitimately name a
+    // different directory, which would discard the provenance binding.
+    const directory = resolution.status === "resolved" ? resolution.directory : null;
     if (typeof directory !== "string" || directory.length === 0) {
       return {
         id, ok: false,
@@ -359,6 +382,19 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
   const parseArgsForDirectory = deps.parseHumanArgs ?? parseHumanArgs;
   const resolved = parseArgsForDirectory(["verify", "--repo-root", dir], deps.humanArgsDeps ?? {});
   if (resolved.error) {
+    // R7-6-F6: an explicit empty set accepts any well-formed key, so an ABSENT key directory stays
+    // ok:true ("no key yet"). A consulted-but-INVALID store is different -- the shared resolver
+    // (the same call, same dependencies, parseHumanArgs() just made) refuses to treat it as absent,
+    // and so does this check: it fails closed rather than reporting green with no key proved.
+    const storeInvalid = anchors.length === 0
+      && resolvePoKeyDirectory({ repoRoot: dir, dependencies: deps.humanArgsDeps ?? {} }).status === "invalid";
+    if (storeInvalid) {
+      return {
+        id, ok: false,
+        message: `posture: ${posture}; the store that names the approval key directory is invalid, so no key can be proved and the empty set cannot be read as "no key yet" (${resolved.error}).`,
+        remedy: "fix or remove the invalid key-directory store (machine-wide: ~/.agent-pipeline/machine.json; legacy per-repository: this repository's remembered PO key-directory store), then retry",
+      };
+    }
     return {
       id, ok: anchors.length === 0,
       message: `posture: ${posture}; the local approval directory could not be resolved (${resolved.error}).`,
