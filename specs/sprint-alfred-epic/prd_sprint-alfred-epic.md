@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: a34cdd04da924e92ad4948c41fe0f518453f4aace69620cb3211a90796d1ccdd -->
+<!-- technical-spec-sha256: 3e5f94106f363ffe6f523dc1378a4c9096ec843522c3e1f0a2f64c9d8a40d48f -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -928,13 +928,16 @@ prevented diagnosis, the approval-bound design package stored in the ignored
 root `evidence/` and absent on the second device, backlog writes refused,
 `reopen-design` as the only recovery, signatures spent on continuity mechanics,
 and signing failing on a missing key-directory setting and on `openssl` missing
-from the signing terminal's PATH. Seventeen rows (T1–T17) were recorded.
+from the signing terminal's PATH. Seventeen rows (T1–T17) were recorded on
+2026-10-06 and three more (T18–T20) on 2026-10-07: preparation scripts refused
+in `draft`, parallel tool calls refused on the dispatch-budget lock, and a
+subagent's bootstrap receipt blocked by the preflight spelling.
 
 **Scope.** Spec §22 adds the workstream R7, agent-recoverable operation and
-device portability. Every row T1–T17 is fixed in 0.7.0 and owned exactly once:
-thirteen by the R7 contracts R7-1…R7-8 and R7-10, four mapped to the R1, R3, R4 and R5
-contracts that already cover them (T4, T9, T10, T13). `traceability.md`
-carries the 17-row map and AC-37 is the acceptance row. Nothing in §§1–14 or in
+device portability. Every row T1–T20 is fixed in 0.7.0 and owned exactly once:
+fifteen by the R7 contracts R7-1…R7-8, R7-10 and R7-11, five mapped to the R1,
+R3, R4 and R5 contracts that already cover them (T4, T9, T10, T13, T18).
+`traceability.md` carries the 20-row map and AC-37 is the acceptance row. Nothing in §§1–14 or in
 Spec §§1–21 is reduced, and AC-32 is unchanged.
 
 **PO decisions (2026-10-06).** Recorded in `design-input.md` (decisions 17–19;
@@ -951,14 +954,32 @@ owners and cases in `traceability.md`):
   a concrete repair action, and never discovered for the first time at a
   signature.
 
+**PO decisions (2026-10-07).** Recorded in `design-input.md` (decisions 20–26;
+owners and cases in `traceability.md`):
+
+- The signing toolchain is checked by a read-only readiness probe with a typed
+  repair the PO applies in their own shell; the Pipeline never chooses the
+  executable that receives the PO's key (#20).
+- That readiness check runs in the PO's signing terminal before the signing
+  command is handed over (#21).
+- A registered authoring dispatch may be superseded without a signature when
+  its digests are the same and its owner is `unobserved` (#22), or when it is
+  of another lineage or a later revision and its owner is `not-live` or
+  `ended` (#23).
+- The shipped attended orphan-archive route stays for `unavailable` and
+  `unobserved` owners; the zero-click route covers only positively ended
+  sessions (#24).
+- A re-approval after a lost bound artifact reuses no earlier course or
+  readiness evidence (#25).
+- Parallel subagent dispatch is a required, supported mode; the dispatch-budget
+  accounting never refuses a call because another call holds its lock (#26).
+
 **Non-goals.** No new PO interaction class, no weakening of credential-root
 protection, the §20 recovery contract (no inference of owner death) or design
 authority sealing, and no regeneration of a lost bound artifact presented as
-the original. One question stays open for the PO and is recorded in
-`traceability.md` (T7): whether a re-approval may reuse earlier course and
-readiness evidence when only a bound artifact was lost and PRD and Spec are
-unchanged.
+the original. Reuse of earlier evidence after a lost bound artifact is
+excluded (decision #25).
 
 **Success.** AC-37 passes in the source checkout and in the consumer-layout
 fixture on both dialects, including the device-switch walk, and every row
-T1–T17 traces to exactly one owner in `traceability.md`.
+T1–T20 traces to exactly one owner in `traceability.md`.

@@ -192,22 +192,38 @@ and AC-37 is additional to AC-32):
 | Decision | Owner | Spec § / cases | Acceptance |
 |---|---|---|---|
 | #17 product goal: agent flows through bootstrap, install, recovery, device switch and lifecycle repair without hurdles; every block has an agent-executable fix; the human only for a real signature | R7 (governing requirement; makes 2026-10-04 #15 and #16 concrete) | §22.0 governing requirement, typed repair rule and signature rule; R7-9a, R7-9b | AC-37 (AC-32 unchanged) |
-| #18 device-switch findings T1–T17 fixed in 0.7.0, none deferred | R7 for 13 rows; R1, R3, R4, R5 for the 4 mapped rows | §22.0 row ownership; R7-1…R7-8, R7-10; mapped-row replay in R7-9 | AC-37; mapped rows also AC-26, AC-28, AC-29, AC-30 |
-| #19 environment prerequisites checked at install and bootstrap, with a concrete repair action, never first discovered at a signature | R7 | §22.0 prerequisites; R7-7 (report), R7-6 (signing prerequisites) | AC-37 |
+| #18 device-switch findings T1–T17 fixed in 0.7.0, none deferred (the register now holds T1–T20, see the 2026-10-07 decisions below) | R7 for the owned rows; R1, R3, R4, R5 for the mapped rows (T1–T20: 15 owned by R7, 5 mapped, 20 in total) | §22.0 row ownership; R7-1…R7-8, R7-10, R7-11; mapped-row replay in R7-9 | AC-37; mapped rows also AC-26, AC-28, AC-29, AC-30 |
+| #19 environment prerequisites checked at install and bootstrap, with a concrete repair action, never first discovered at a signature | R7 | §22.0 prerequisites; R7-7 (report), R7-6 (signing prerequisites; the readiness check handed over before the signing command, R7-6d(ii), R7-6d(iii)) | AC-37 |
 
-Mapped decisions: 2026-10-06 #17–#19 (3 of 3); 2026-10-04 #1–#16 (16 of 16);
-2026-10-03 decisions #1–#4 and the route and hotfix decisions (6 rows).
+2026-10-07 decisions (device switch, morning chat; `design-input.md` decisions
+20–26, Spec §22; this subsection extends the section's scope to the 2026-10-07
+decisions, and AC-37 is additional to AC-32):
 
-## 2026-10-06 device-switch map (T1–T17)
+| Decision | Owner | Spec § / cases | Acceptance |
+|---|---|---|---|
+| #20 the signing toolchain of decision #18 is delivered as a read-only signing-readiness probe with a typed repair the PO applies in their own shell; the Pipeline never chooses the executable that receives the PO's key | R7 (R7-6) | §22.6 "Decision #18 is delivered as detection and a PO-applied repair"; R7-6b, R7-6e | AC-37 |
+| #21 a readiness check runs in the PO's signing terminal BEFORE the signing command is handed over; a signature attempt never discovers a missing or unusable `openssl` first | R7 (R7-6) | §22.6 "Where it runs"; R7-6d(ii), R7-6d(iii), R7-6d(iv) | AC-37 |
+| #22 a registered authoring dispatch with the same digests whose owner is `unobserved` is superseded without a signature (non-destructive supersede) | R7 (R7-10) | §22.10 eligibility branch (B), same-digest clause; R7-10b(i), R7-10b(ii) | AC-37 |
+| #23 the same for a registration of another lineage or a later revision whose owner is positively `not-live` or `ended` | R7 (R7-10) | §22.10 eligibility branch (C); R7-10c(iii) | AC-37 |
+| #24 the shipped attended orphan-archive route stays for owners `unavailable` or `unobserved`; the zero-click route only for positively ended sessions | R7 (R7-2) | §22.2 "Never inferred; two routes by owner state"; §22.0 signature rule; R7-2b, R7-2c | AC-37 |
+| #25 a re-approval after a lost bound artifact does not reuse earlier course or readiness evidence (fail closed) | R7 (R7-5) | §22.5 `DWP-REBIND-ARTIFACT-LOST`; R7-5c | AC-37 |
+| #26 parallel subagent dispatch is a required, supported mode on every runner and platform; the dispatch-budget accounting never refuses a call because another call holds its lock (T19; T20 via the SubagentStart receipt) | R7 (R7-11) | §22.11 R7-11; R7-11a…R7-11e | AC-37 |
 
-Rows T1–T17 are the toil rows recorded during the device switch (the working
+Mapped decisions: 2026-10-07 #20–#26 (7 of 7); 2026-10-06 #17–#19 (3 of 3);
+2026-10-04 #1–#16 (16 of 16); 2026-10-03 decisions #1–#4 and the route and
+hotfix decisions (6 rows).
+
+## 2026-10-06/07 device-switch map (T1–T20)
+
+Rows T1–T20 are the toil rows recorded during the device switch (the working
 log was an ignored scratch note, so the finding is repeated here and in Spec
-§22.0). This map is complete: one row per T-row, each owned by exactly one R7
-contract (Spec §22.1–§22.8 and §22.10) or mapped to the existing owner whose approved
-scope already covers it. T-rows are not findings-register IDs and do not change
-the 77-row map above or its counts.
+§22.0; T1–T17 on 2026-10-06, T18–T20 on 2026-10-07). This map is complete: one
+row per T-row, each owned by exactly one R7 contract (Spec §22.1–§22.8, §22.10
+and §22.11) or mapped to the existing owner whose approved scope already covers
+it. T-rows are not findings-register IDs and do not change the 77-row map above
+or its counts.
 
-map rows: 17
+map rows: 20
 
 | Row | Finding | Owner | Spec § / cases | Acceptance | Source |
 |---|---|---|---|---|---|
@@ -217,28 +233,30 @@ map rows: 17
 | T4 | Pre-push hook absent on the second device, PO confirmation | R3 (K6-2) | §21.3 R3-2; §22.7 R7-7e; replay §22.9 | AC-28, AC-37 | toil row only |
 | T5 | Approval-bound package in the ignored root `evidence/` | R7-3 | §22.3 R7-3a, R7-3b, R7-3d | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
 | T6 | Backlog writes refused while the package is unverifiable | R7-4 | §22.4 R7-4a | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
-| T7 | Only `reopen-design` offered as recovery on a new device | R7-5 | §22.5 R7-5a, R7-5b, R7-5c (`verified` route); lost-artifact sub-case: PO decision required, see below | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
-| T8 | Clearing the registered authoring dispatch needs `continuity-cas` and a signed override | R7-10 | §22.10 R7-10a, R7-10b, R7-10c, R7-10d | AC-37 | toil row only |
+| T7 | Only `reopen-design` offered as recovery on a new device | R7-5 | §22.5 R7-5a, R7-5b, R7-5c (`verified` route); lost-artifact sub-case decided (PO decision 2026-10-07 #25: fail closed, no earlier evidence reused), see below | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
+| T8 | Clearing the registered authoring dispatch needs `continuity-cas` and a signed override (agent-fixable without a signature, decisions #22, #23) | R7-10 | §22.10 R7-10a, R7-10b, R7-10c, R7-10d | AC-37 | toil row only |
 | T9 | Re-registering an authoring dispatch needs a signed override | R5 | §21.5 coordinator; R5-6; R1 catalogue admits the verb; replay §22.9 | AC-30, AC-37 | toil row only |
 | T10 | Course outputs under `evidence/` not writable in design phase | R1 | §21.1 K5-8; R1-1; replay §22.9 | AC-26, AC-37 | toil row only |
 | T11 | `project/pipeline-state.json` commit refused in design phase | R7-4 | §22.4 R7-4b | AC-37 | toil row only |
 | T12 | Handover did not list device-bound artifacts | R7-3 | §22.3 R7-3c | AC-37 | `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md` |
 | T13 | No wired Claude Advisor route; one-time exception rationale every course | R4 | §21.4 Advisor exception and role-route preflight (K3-2); R4-1, R4-2; replay §22.9 | AC-29, AC-37 | toil row only |
 | T14 | Key directory per repository in non-travelling private state | R7-6 | §22.6 R7-6a | AC-37 | toil row only |
-| T15 | `openssl` taken from the terminal PATH only | R7-6 | §22.6 R7-6b, R7-6c | AC-37 | toil row only |
+| T15 | `openssl` taken from the terminal PATH only; a missing or unusable `openssl` first discovered at `sign-intent` (now a readiness check in the signing terminal BEFORE the signing command, decision #21) | R7-6 | §22.6 R7-6b, R7-6c, R7-6d(ii), R7-6d(iii) | AC-37 | toil row only |
 | T16 | Bootstrap checks none of the preconditions that later block | R7-7 | §22.7 R7-7a…R7-7e | AC-37 | toil row only |
 | T17 | PowerShell lane `continuity-cas` denial has no override route | R7-8 | §22.8 R7-8a, R7-8b, R7-8c | AC-37 | toil row only |
+| T18 | Pipeline-owned preparation scripts the templates prescribe (Critic-input strip, Goldfish commit producer) refused as opaque execution in `draft` | R1 | §21.1 R1-1; replay §22.9 R7-9c | AC-26, AC-37 | toil row only |
+| T19 | Parallel tool calls of one dispatch refused with `counter-lock-busy`; the caller never retries | R7-11 | §22.11 R7-11a…R7-11d | AC-37 | `2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md` |
+| T20 | A subagent's bootstrap preflight refused unless spelled exactly; the receipt gate then blocks its first write | R7-11 | §22.11 R7-11e | AC-37 | `2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md` |
 
 Owner counts (equal to the Spec §22.0 statement): R7-1 2, R7-2 1, R7-3 2,
-R7-4 2, R7-5 1, R7-6 2, R7-7 1, R7-8 1, R7-10 1 (13 owned by R7); mapped: R1 1 (T10),
-R3 1 (T4), R4 1 (T13), R5 1 (T9); total 17. R7-9 owns no row.
+R7-4 2, R7-5 1, R7-6 2, R7-7 1, R7-8 1, R7-10 1, R7-11 2 (15 owned by R7);
+mapped: R1 2 (T10, T18), R3 1 (T4), R4 1 (T13), R5 1 (T9) (5 mapped); total 20.
+R7-9 owns no row.
 
-**Open PO question (T7 sub-case, not decided here).** PRD and Spec unchanged,
-but a bound artifact (package, course or readiness evidence) exists only on an
-unreachable device: may a re-approval reuse the earlier course and readiness
-evidence bound to the unchanged PRD/Spec digests, or must the evidence be
-regenerated (a repeated course)? Spec §22.5 fails closed meanwhile and reuses
-nothing.
+**T7 lost-artifact sub-case (decided, PO decision 2026-10-07 #25).** When PRD
+and Spec are unchanged but a bound artifact exists only on an unreachable
+device, a re-approval reuses no earlier course or readiness evidence; Spec
+§22.5 fails closed and the evidence is regenerated.
 
 ## Evidence and authority limits
 
