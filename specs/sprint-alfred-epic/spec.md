@@ -1975,9 +1975,10 @@ an owned ID is a reproduction step for that sub-aspect, not a second owner.
 
 ## 22. 2026-10-06 device switch: agent-recoverable operation and device portability (R7)
 
-Source of findings: PO decisions 17–19 of 2026-10-06 (`design-input.md`) and
-the toil rows T1–T17 recorded while the approved candidate was brought up on a
-second device. The toil log was a working note in the ignored `scratch/`
+Source of findings: PO decisions 17–19 of 2026-10-06 and 20–26 of 2026-10-07
+(`design-input.md`) and the toil rows T1–T20 recorded while the approved
+candidate was brought up on a second device (T1–T17 on 2026-10-06, T18–T20 on
+2026-10-07). The toil log was a working note in the ignored `scratch/`
 directory, so this section carries each row's finding and cost itself. Three
 tracked backlog items hold the sharpest defects:
 `backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md`,
@@ -1986,9 +1987,9 @@ and
 `backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md`.
 This section is additive. It does not relax §§1–21 and grants no
 implementation authority. It is complete in itself: §22.0 lists every row
-T1–T17 exactly once, owned by one R7 contract or mapped to the existing owner
+T1–T20 exactly once, owned by one R7 contract or mapped to the existing owner
 whose approved scope already covers it, and `traceability.md` repeats the same
-ownership as a map whose row count equals 17. It records no Advisor answer, no
+ownership as a map whose row count equals 20. It records no Advisor answer, no
 readiness, no approval and no host evidence.
 
 ### 22.0 Scope rule, governing requirement and row ownership
@@ -1999,11 +2000,14 @@ lifecycle repair without hurdles. Every block comes with an agent-executable
 fix, and the human is needed only where a real signature is required. This
 makes decisions 15 and 16 of 2026-10-04 concrete; it is not new authority.
 
-**Scope rule (decision #18).** All 17 rows are fixed in the next candidate
-(0.7.0), none deferred. Each row is owned by exactly one R7 contract
-(§22.1–§22.8 and §22.10) or mapped to the existing owner named below. A mapped
-row gets no second contract here; §22.9 only adds a replay obligation on the
-owner's fixture.
+**Scope rule (decisions #18 and #26).** All 20 rows are fixed in the next
+candidate (0.7.0), none deferred: T1–T17 by decision #18; T18–T20 were recorded
+on 2026-10-07 and join the same register under the same rule (decision #26
+decides T19, and T20 is closed by the SubagentStart receipt of the PO decision
+"bootstrap receipt option B", R7-11). Each row is owned by exactly one R7
+contract (§22.1–§22.8, §22.10 and §22.11) or mapped to the existing owner named
+below. A mapped row gets no second contract here; §22.9 only adds a replay
+obligation on the owner's fixture.
 
 **Prerequisites (decision #19).** Environment prerequisites are checked at
 install and bootstrap, reported with a concrete repair action, and never
@@ -2038,13 +2042,18 @@ signature classes. Each is defined outside §22, and R7 adds none:
 5. The §20.2 signed legacy-custody transaction, with the attended external
    route of §20.1 (RV-8…RV-11). R7-2 and R7-10 rely on it only as the attended
    route for the descriptors and registrations they must not archive or
-   supersede.
+   supersede (R7-2: a descriptor that holds authority; R7-10: the refusals that
+   name it).
 
 No R7 mechanic (diagnosis, archival, provisioning, rebind of an unchanged
-approval, key-directory or toolchain setup, state commits, superseding a stale
-authoring registration) needs a signature of any class. R7 adds no interaction
-to scenarios A–D of R3-1. R7-9b checks every R7 case and doc against exactly
-this enumeration.
+approval, key-directory or toolchain setup, the signing-readiness check, state
+commits, superseding a stale authoring registration, bounded waiting on the
+dispatch-budget lock) needs a signature of any class. R7 adds no interaction to
+scenarios A–D of R3-1. The one attended confirmation that remains in R7 is not
+a signature: the shipped orphan-archive route of R7-2 (PO decision 2026-10-07
+#24) is one confirmation with `--by` attribution, a recovery act outside the
+happy-path count of §21.0, and not a signature class. R7-9b checks every R7
+case and doc against exactly this enumeration.
 
 **Consumer and platform universality (§21.0 applies unchanged).** Every R7
 case runs against the source checkout and against a consumer-layout fixture
@@ -2056,7 +2065,7 @@ user home are derived at run time and redacted in every report. Any new schema
 id an implementation adds is registered in the §9 registry in the same change;
 the closed field and enum lists below are normative.
 
-**Row ownership (13 rows owned by R7, 4 mapped; the Owner column names exactly
+**Row ownership (15 rows owned by R7, 5 mapped; the Owner column names exactly
 one owner per row).**
 
 | Row | Finding and cost | Owner |
@@ -2078,18 +2087,22 @@ one owner per row).**
 | T15 | `sign-intent` spawned bare `openssl` from PATH; the one Git for Windows ships was not on the signing terminal's PATH (second failed attempt, PO PATH surgery) | R7-6 |
 | T16 | Bootstrap does not check preconditions that later block (known-bad Git, signing toolchain, key directory against trust anchor, hooks, tracked bound files) | R7-7 |
 | T17 | `continuity-cas` from the PowerShell lane returned `GUARD-POWERSHELL-GRAMMAR` with no override route; only the Bash lane offered the ceremony | R7-8 |
+| T18 | Pipeline-prescribed preparation scripts (`dispatch-record-strip-for-critic.mjs`, `goldfish-commit-command-flow.mjs`) were refused in `draft` as opaque script execution with only a signed-override route, so a Critic was dispatched without its stripped record and a Goldfish fell back to hand-composed git commands | R1 (§21.1 catalogue, R1-1) |
+| T19 | Parallel tool calls of one subagent race that agent's dispatch-budget counter lock: the second call is refused `DISPATCH-BUDGET-INPUT-INVALID (counter-lock-busy)`, reads included (one dispatch stopped at call 4; dispatches had to be serialized) | R7-11 |
+| T20 | A subagent's bootstrap receipt was recorded only by a preflight whose spelling the draft-phase guard admits; any other spelling was refused as opaque script execution and the receipt gate then blocked the subagent's first Write (one dispatch stopped; briefings had to carry the exact spelling) | R7-11 |
 
-Rows: 17. Owned by R7: 13 (T1, T2, T3, T5, T6, T7, T8, T11, T12, T14, T15,
-T16, T17: R7-1 two, R7-2 one, R7-3 two, R7-4 two, R7-5 one, R7-6 two, R7-7 one,
-R7-8 one, R7-10 one). Mapped to existing owners: 4 (T4, T9, T10, T13). R7-9
-owns no row. Total 17. T-rows are not findings-register IDs, and the 77-ID map
-of §21 is unchanged.
+Rows: 20. Owned by R7: 15 (T1, T2, T3, T5, T6, T7, T8, T11, T12, T14, T15,
+T16, T17, T19, T20: R7-1 two, R7-2 one, R7-3 two, R7-4 two, R7-5 one, R7-6 two,
+R7-7 one, R7-8 one, R7-10 one, R7-11 two). Mapped to existing owners: 5 (T4, T9,
+T10, T13, T18). R7-9 owns no row. Total 20. T-rows are not findings-register
+IDs, and the 77-ID map of §21 is unchanged.
 
 Secondary references are not owners: T4 is also exercised by the R7-7 report
 (case R7-7e) and by the replay in R7-9; T9 is also exercised by the R1
-catalogue admission of the verb (§21.1); T7's lost-artifact sub-case is the
-open PO question recorded in `traceability.md`; T8 has an R5-6 neighbour (the
-coordinator records authoring itself, §21.5), which does not state the
+catalogue admission of the verb (§21.1); T18 is also exercised by the named
+replay step and case R7-9c; T7's lost-artifact sub-case is decided (PO decision
+2026-10-07 #25: fail closed, nothing reused, §22.5); T8 has an R5-6 neighbour
+(the coordinator records authoring itself, §21.5), which does not state the
 clearing obligation that R7-10 states.
 
 ### 22.1 R7-1 — Git child environment and diagnosable failure
@@ -2165,24 +2178,49 @@ Contract:
   descriptor to the archive with its bytes preserved and a receipt recorded. It
   grants no authority and leaves State, `activeFeature`, proofs and history
   unchanged (the §20.2 exclusions).
-- **Never inferred.** A descriptor whose owner observation is `unavailable` (V2
-  null runtime) or `unobserved` (V1 absent), or that holds any authority, is
-  not archived by this route. The result is the typed attended prerequisite
-  (RV-11) and the §20.2 signed legacy-custody transaction stays the only
-  attended route. This route adds no PO click and does not weaken §20.
+- **Never inferred; two routes by owner state (PO decision 2026-10-07 #24).**
+  The zero-click route above applies only where the owner is positively
+  `not-live` (the §20 native owner observation) or recorded `ended` by the
+  Pipeline itself. A descriptor whose owner observation is `unavailable` (V2
+  null runtime) or `unobserved` (V1 absent) is never archived by that route and
+  its owner is never inferred dead. For such a descriptor with zero authority
+  the route is the shipped attended orphan-archive route
+  (`plugins/pipeline-core/scripts/session-cleanup.mjs archive-orphan`: one PO
+  confirmation with `--by` attribution, no signature), which stays as shipped
+  and which R7 does not change. That confirmation is a recovery act, the typed
+  attended prerequisite (RV-11) the PO clears, and sits outside the happy-path
+  count of §21.0 as the §20.1 attended route does; it is not a signature class
+  and not a per-feature or one-time-onboarding decision. A descriptor that holds
+  any authority is archived by neither route: the result is the typed attended
+  prerequisite (RV-11) and the §20.2 signed legacy-custody transaction stays the
+  only attended route for it. R7-2 adds no PO click to the happy path and does
+  not weaken §20.
 
-Typed repair: `archive-orphan-session`, or the RV-11 attended prerequisite.
+Typed repair: `archive-orphan-session` (agent-executable, owners positively
+`not-live` or `ended`), or the RV-11 attended prerequisite: the shipped
+`archive-orphan` confirmation for a zero-authority descriptor of an
+`unavailable` or `unobserved` owner, the §20.2 transaction for a descriptor that
+holds authority.
 
 Acceptance cases (§22.0 matrix):
 
 - R7-2a: Two descriptors of an ended session with zero authority are archived
   by the typed action with no PO input; the archived bytes are identical to the
   originals, a receipt exists, and the State digest is unchanged.
-- R7-2b: Descriptors with a null owner runtime, with the field absent, with an
-  armed capability and with a registered authoring dispatch are not archived;
-  each returns the typed attended prerequisite and zero mutation occurs.
-- R7-2c: The preflight lists the orphans with the `nextAction`, and executing it
-  twice is a no-op the second time.
+- R7-2b: (i) A zero-authority descriptor with a null owner runtime
+  (`unavailable`) and one with the owner field absent (`unobserved`) are not
+  archived by the typed zero-click action: each returns the typed attended
+  prerequisite naming the shipped `archive-orphan` route (one confirmation with
+  `--by`, no signature) and zero mutation occurs; the shipped route then
+  archives each with preserved bytes and a receipt, and no signature is
+  requested. (ii) A descriptor with an armed capability and one with a
+  registered authoring dispatch are archived by neither route; each returns the
+  typed attended prerequisite naming the §20.2 transaction and zero mutation
+  occurs. (iii) The R3-1 happy-path counts of scenarios A–D are unchanged: the
+  attended confirmation appears only in these recovery fixtures.
+- R7-2c: The preflight lists the orphans with the `nextAction` (positively
+  ended owners) or the attended prerequisite (other owner states), and executing
+  the `nextAction` twice is a no-op the second time.
 
 ### 22.3 R7-3 — Digest-bound artifacts are tracked and travel
 
@@ -2288,15 +2326,15 @@ Contract:
 - **`digest-set-changed`.** When PRD or Spec bytes differ, the route refuses;
   the final plan approval is then the only signature and is requested once, as
   in §21.0.
-- **`DWP-REBIND-ARTIFACT-LOST`.** When PRD and Spec are unchanged but a bound
-  artifact exists only on an unreachable device, the Pipeline never regenerates
-  the artifact and treats it as equal (its bytes embed `createdAt` and
-  host-observed digests, so they are not reproducible). The result is the typed
-  attended prerequisite: retrieve the bound bytes from the origin device, or
-  re-approve. Whether a re-approval may reuse prior course and readiness
-  evidence bound to unchanged PRD/Spec digests is an open PO question (see
-  `traceability.md`); until it is decided the route fails closed and reuses
-  nothing.
+- **`DWP-REBIND-ARTIFACT-LOST` (decided, PO decision 2026-10-07 #25).** When PRD
+  and Spec are unchanged but a bound artifact exists only on an unreachable
+  device, the Pipeline never regenerates the artifact and treats it as equal
+  (its bytes embed `createdAt` and host-observed digests, so they are not
+  reproducible). The result is the typed attended prerequisite: retrieve the
+  bound bytes from the origin device, or re-approve. A re-approval after a lost
+  bound artifact does not reuse earlier course or readiness evidence bound to
+  the unchanged PRD/Spec digests: the route fails closed and reuses nothing, so
+  the evidence is produced again by a repeated course before the re-approval.
 
 Typed repair: `rebind-approval` (agent-executable, no signature on `verified`);
 the attended prerequisite for the other two outcomes.
@@ -2364,8 +2402,8 @@ Contract:
   delivers it as detection and a typed repair that the PO applies in their own
   terminal, not as a Pipeline-resolved executable, because a Pipeline-chosen
   executable would receive the PO's key (rationale: the independent Critic
-  rounds 1 to 3 of 2026-10-07). This reading of decision #18 is presented to the
-  PO at the final approval.
+  rounds 1 to 3 of 2026-10-07). This reading of decision #18, to probe and not
+  to choose, was decided by the PO (decision 2026-10-07 #20).
 - **The signing-readiness probe (read-only).** One probe with three steps:
   - (a) *Resolve:* it starts `openssl` through the spawn helper with a harmless
     argument, so the name is resolved by the same lookup the signing spawn uses.
@@ -2411,19 +2449,39 @@ Contract:
     (signature class 1).
 - **Where it runs.** At plugin install and update, where it is printed and never
   fails the install; at bootstrap, where it is reported with its repair and is
-  not gating (R7-7); and before `prepare-for-signature` hands the PO a signing
-  command. There a failing probe means no command is handed over, no signing
-  window starts (§21.3) and no ceremony request is created, and the result
-  carries the typed repair, so a signature attempt never discovers the failure
-  first. The preparing process and the PO's signing terminal can have different
-  PATHs (T15: the shell the agent ran in found `openssl`, the PO's terminal did
-  not), so a pass at preparation describes the preparing process's environment
-  and the hand-over text says so. `sign-intent` therefore runs steps (a) to (c)
-  itself in the signing terminal, before any prompt and before any process
-  receives a key path: only that run observes the environment that will start
-  the signer, and a failure there ends before the prompt with the same typed
-  result and repair. After a repair the agent re-runs `prepare-for-signature`
-  (agent-executable), which starts a new window.
+  not gating (R7-7); inside `prepare-for-signature`; and in the PO's signing
+  terminal as a readiness check handed over BEFORE the signing command (PO
+  decision 2026-10-07 #21; decision #19: a signature attempt never discovers a
+  missing or unusable `openssl` first).
+  - *Inside `prepare-for-signature`.* A failing probe there means no command of
+    any kind is handed over, no signing window starts (§21.3) and no ceremony
+    request is created, and the result carries the typed repair. A pass there
+    describes only the preparing process's environment, because the preparing
+    process and the PO's signing terminal can have different PATHs (T15: the
+    shell the agent ran in found `openssl`, the PO's terminal did not); the
+    hand-over text says so.
+  - *In the signing terminal, before the signing command.* `prepare-for-signature`
+    hands the PO a read-only readiness-check command FIRST (`mutation: false`;
+    steps (a) to (c) only; no prompt, no key path passed to any process, no
+    signature). The signing command is handed over only after that check has
+    passed in the same terminal, so a missing or unusable `openssl` ends at the
+    check with the typed result and its repair, before any passphrase prompt.
+    The signing window (§21.3) starts when the signing command is handed over,
+    not at the check. The check is a step inside the one signing interaction
+    the PO already has (final plan approval or push approval, §21.0 counting
+    rule): the same ceremony in the same terminal, with no decision, no
+    signature and no signature class of its own. A passing check records a
+    device-local observation bound to the prepared ceremony request (closed
+    fields: request identifier, check time, result class; no host path, no key
+    byte) in private state, and the signing command is released only against
+    that observation; the exact release mechanism is fixed by the
+    implementation and pinned by R7-6d. After a repair the agent re-runs
+    `prepare-for-signature` (agent-executable), which hands the check over again.
+  - *`sign-intent` (defence in depth).* `sign-intent` keeps its own run of steps
+    (a) to (c), before any prompt and before any process receives a key path,
+    for a PO who skips the check or whose environment changed after it; a failure
+    there ends before the prompt with the same typed result and repair. It is not
+    the place where a missing or unusable `openssl` is meant to be found first.
 - **What the probe never does.** It never reads private key material, never
   passes a PO key path to any process, never spawns anything by an absolute
   path, never changes a setting, a PATH or an installation, and never lets a
@@ -2461,12 +2519,25 @@ dialects, in the source checkout and in the consumer-layout fixture):
   code.
 - R7-6d (where it runs): (i) At install and update a failing probe is printed
   with its repair and the install does not fail; at bootstrap it is reported
-  with its repair and the preflight status is unchanged. (ii) The T15 replay:
-  prepare in an environment whose PATH finds a passing stub, then run
-  `sign-intent` in an environment whose PATH finds none; `sign-intent` returns
-  `openssl-not-on-path` before any prompt, no process is started with a key path,
-  and the hand-over text of the preparation states that its pass describes the
-  preparing process's environment.
+  with its repair and the preflight status is unchanged. (ii) The T15 replay
+  with the readiness check before the signing command (PO decision 2026-10-07
+  #21): prepare in an environment whose PATH finds a passing stub; the hand-over
+  contains the read-only readiness-check command and not the signing command,
+  and its text states that the preparation's pass describes the preparing
+  process's environment. Run the check in an environment whose PATH finds no
+  `openssl`: it returns `openssl-not-on-path` with the repair, no prompt appears,
+  no process is started with a key path, the signing command is never handed
+  over and no signing window starts. Re-run it where the PATH finds the passing
+  stub: it passes, an observation bound to the request is recorded, and only
+  then is the signing command handed over and the window started. A static check
+  fails if any ceremony hand-over carries the signing command before that
+  observation exists. (iii) Defence in depth: `sign-intent` run in an
+  environment whose PATH finds no `openssl` (check skipped, or environment
+  changed after it) returns `openssl-not-on-path` before any prompt and starts no
+  process with a key path. No case or document names `sign-intent` as the place a
+  missing or unusable `openssl` is first found. (iv) The check adds no PO
+  decision and no signature class to the §21.0 counting rule or to the R3-1
+  scenarios: it is a read-only step of the same signing interaction.
 - R7-6e (negative, no Pipeline-chosen executable): a static scan and the spawn
   spy fail on any code path in `sign-intent`, the probe, `prepare-for-signature`,
   install or bootstrap that passes an executable other than the constant
@@ -2603,6 +2674,14 @@ Contract:
   - T13 (R4-1, R4-2): a Claude design course ends through the role-route
     preflight, with no per-course exception rationale when the route is
     `native` or labelled `fallback-self-dispatch`.
+  - T18 (R1-1): the R1-1 catalogue enumeration also covers every Pipeline-owned
+    preparation script that the dispatch templates and `agent-obligations.md`
+    prescribe (the Critic-input strip script `dispatch-record-strip-for-critic.mjs`
+    and the Goldfish commit-command producer `goldfish-commit-command-flow.mjs`
+    are the named ones). Each is admitted by the guard in every lifecycle state,
+    `draft` included, from the repository path and from the installed plugin
+    path, with zero overrides and zero signatures; a different script with the
+    same basename stays refused.
 - **AC-32 is unchanged.** R7 cases are additional. Its host matrix and pass
   rule stay as written, and a device-switch host run is extra evidence, not a
   substitute.
@@ -2618,11 +2697,16 @@ Acceptance cases (§22.0 matrix):
   overrides and zero signatures.
 - R7-9b: A static check fails if any R7 case or doc asks the PO for a signature
   outside the five classes enumerated in the §22.0 signature rule; if AC-32's
-  row text changes; if the T-map (the §22.0 table and the T1–T17 map of
+  row text changes; if the T-map (the §22.0 table and the T1–T20 map of
   `traceability.md`) lacks a row, has an owner cell naming more than one owner,
-  or states owner counts other than 13 R7-owned, 4 mapped and 17 in total; or
+  or states owner counts other than 15 R7-owned, 5 mapped and 20 in total; or
   if any catalogue entry, `nextAction` template or setup action accepts a
   signing-executable value (R7-6e).
+- R7-9c (T18 replay): the R1-1 enumeration fails when a preparation script
+  prescribed by the dispatch templates or `agent-obligations.md` is missing from
+  the catalogue, and the two named scripts are admitted in `draft` on the win32
+  and POSIX dialects, in the source checkout and in the consumer-layout fixture,
+  with zero overrides.
 
 ### 22.10 R7-10 — Stale authoring registration: supersede without an override
 
@@ -2636,6 +2720,13 @@ continuity it needs: one of an earlier revision, or one whose owner has ended.
 That is the T8 case, and this section states the obligation. §21 is unchanged.
 Whether a registration may be retired is decided only from positive facts the
 Pipeline's own records show, never from a guess that its owner is dead (§20.1).
+PO decisions 2026-10-07 #22 and #23 widen the eligible set without changing
+that rule: supersede is non-destructive (bytes and result namespace archived,
+the owner's later integration fails closed), so a supersede that rests on the
+digests, the absence of bound authority and, where required, a positive owner
+state assumes nothing about an `unobserved` owner. The T8 incident shape (a
+registration made on another device, same digests, owner `unobserved` here) is
+therefore fixed by an agent-executable action.
 
 Contract:
 
@@ -2655,18 +2746,26 @@ Contract:
   - the Pipeline's own records show zero authority bound to it: no armed
     override capability, no open ceremony request, no held lock (an axis
     independent of owner state);
-  - and exactly one of two branches applies. (A) Earlier revision: its recorded
-    submission lineage equals the current submission's, its recorded revision
-    is earlier than the current revision and its recorded authority digest set
-    differs from the current submission's. That positive fact alone makes it
-    eligible, on any device and whatever the state of its owner, because its
-    owner's work is bound to superseded sources and the non-destructive rule
-    below makes any later integration fail closed; it assumes nothing about the
-    owner. (B) A registration of the same lineage at the current or an earlier
-    revision that (A) does not cover, in particular one with the same digests:
-    only when its owner is positively `not-live` or `ended`. A registration of
-    another lineage, or of a later revision than the current one, is eligible
-    under neither branch.
+  - and exactly one of three branches applies. (A) Earlier revision: its
+    recorded submission lineage equals the current submission's, its recorded
+    revision is earlier than the current revision and its recorded authority
+    digest set differs from the current submission's. That positive fact alone
+    makes it eligible, on any device and whatever the state of its owner,
+    because its owner's work is bound to superseded sources and the
+    non-destructive rule below makes any later integration fail closed; it
+    assumes nothing about the owner. (B) A registration of the same lineage at
+    the current or an earlier revision that (A) does not cover: when its owner
+    is positively `not-live` or `ended`; and, where its recorded authority
+    digest set equals the current submission's (the same digests), also when
+    its owner is `unobserved`, for instance a registration made on another
+    device with no descriptor of its owner here (PO decision 2026-10-07 #22).
+    The `unobserved` clause rests on the same digests, the zero-authority
+    condition and the non-destructive rule, not on any belief about the owner;
+    an `unobserved` owner is still never treated as `not-live`. (C) A
+    registration of another lineage, or of a later revision than the current
+    one, whatever its digests: only when its owner is positively `not-live` or
+    `ended` (PO decision 2026-10-07 #23). An `unobserved` owner under (C), and
+    an `unavailable` owner under (B) or (C), are not eligible.
 - **Verb.** A catalogue-admitted verb (§21.1, admitted in every phase that
   emits it) supersedes an eligible registration:
   `supersede-authoring-registration`, emitted by `inspect` and the preflight as
@@ -2693,20 +2792,23 @@ Contract:
   prerequisite (RV-11), which names its concrete route and never only a code:
   - owner `live`: wait for the owner's terminal record (its session end or its
     integration result as the Pipeline records it); no signature;
-  - owner `unavailable` or `unobserved`, including an owner that ran on another
-    device and has no descriptor here: the §20.2 signed legacy-custody
-    transaction (signature class 5), the only attended route that does not
-    infer death. It is unnecessary if the owner's terminal record arrives
-    first, because the owner is then `ended` or `not-live` and, for a
-    registration of the same lineage at the current or an earlier revision,
-    branch (B) applies;
+  - owner `unavailable`, for any registration that branch (A) does not cover:
+    the §20.2 signed legacy-custody transaction (signature class 5), the only
+    attended route that does not infer death. It is unnecessary if the owner's
+    terminal record arrives first, because the owner is then `ended` or
+    `not-live` and branch (B) or (C) applies;
+  - owner `unobserved` (including an owner that ran on another device and has no
+    descriptor here) for a registration that neither branch (A) nor the
+    same-digest clause of branch (B) covers (another lineage, a later revision,
+    or the current revision with different digests): the same §20.2 transaction
+    (signature class 5), unnecessary if the owner's terminal record arrives
+    first;
   - a registration of another lineage, or of a later revision than the current
-    one, whatever its digests and whatever the state of its owner: never
-    eligible, because branch (B) is closed to it by lineage or revision and not
-    by owner state. The route is the owner's terminal record where the owner is
-    `live` (its own integration result normally closes the registration), and
-    the §20.2 signed legacy-custody transaction (signature class 5) for every
-    other owner state, including `not-live` and `ended`;
+    one, whatever its digests, whose owner is `live`: the owner's terminal
+    record (its own integration result normally closes the registration); with
+    an owner `unavailable` or `unobserved`: the §20.2 transaction (signature
+    class 5); with an owner positively `not-live` or `ended` it is eligible
+    under branch (C) and is not refused;
   - authority held (armed override capability, open ceremony request, held
     lock): wait for the holder's terminal record, that is the consumption,
     expiry or release the Pipeline records for it; no signature;
@@ -2738,18 +2840,23 @@ consumer-layout fixture):
   naming the receipt, and the registration, the namespace and every result byte
   it produced are byte-identical before and after, with the State digest
   unchanged by the attempt.
-- R7-10b (branch B, same digests): (i) a registration with the same digests
-  whose owner ran on another device and is `unobserved` here (fresh clone of an
-  approved, committed fixture, fresh private state, result artifacts absent) is
-  not superseded: the result is the typed attended prerequisite naming the
-  §20.2 signed legacy-custody transaction (class 5), and zero mutation occurs.
-  (ii) The same with the owner `unavailable` (V2 null runtime). (iii) The same
-  registration with its owner recorded `ended` (or reporting `not-live`) is
-  superseded with the same zero counts and the same preserved bytes, receipt
-  and namespace. (iv) The owner of (iii), attempting to integrate afterwards,
-  gets the typed `superseded` with the bytes preserved. In every case elapsed
-  time, a reboot and absent result artifacts alone never make an owner
-  `not-live`.
+- R7-10b (branch B, same digests; PO decision #22): (i) a registration with the
+  same digests whose owner ran on another device and is `unobserved` here (fresh
+  clone of an approved, committed fixture, fresh private state, result artifacts
+  absent) is superseded by the typed action with zero overrides, zero
+  signatures and zero PO terminal commands, the archived bytes equal the
+  original, a receipt exists and the result-path namespace is preserved; the
+  owner, integrating afterwards from a second checkout, gets the typed
+  `superseded` with the bytes preserved. (ii) The same registration with the
+  owner `unavailable` (V2 null runtime) is not superseded: the result is the
+  typed attended prerequisite naming the §20.2 signed legacy-custody
+  transaction (class 5), and zero mutation occurs. (iii) The same registration
+  with its owner recorded `ended` (or reporting `not-live`) is superseded with
+  the same zero counts and the same preserved bytes, receipt and namespace.
+  (iv) The owner of (iii), attempting to integrate afterwards, gets the typed
+  `superseded` with the bytes preserved. In every case elapsed time, a reboot
+  and absent result artifacts alone never make an owner `not-live`; (i) rests
+  on the same digests, not on that.
 - R7-10c (refusals, each with its route): each of the following is not
   superseded, returns the typed attended prerequisite naming its concrete route
   and causes zero mutation: (i) same digests and a `live` owner: waiting for the
@@ -2757,27 +2864,115 @@ consumer-layout fixture):
   request or a held lock on an otherwise eligible registration, including one of
   an earlier revision: waiting for the holder's terminal record; (iii) a
   registration of another lineage, or of a later revision of the same lineage,
-  whatever its digests, with its owner in each of the states `live`,
-  `unavailable`, `unobserved`, `not-live` and recorded `ended` (one fixture per
-  combination): never superseded, because branch (B) is closed to it by lineage
-  or revision and not by owner state, and the typed prerequisite names the
-  owner's terminal record where the owner is `live` and the class 5 transaction
-  for every other owner state; (iv) unreadable, linked or ambiguous
-  registration bytes: the §20.2 typed `unavailable` naming the read or identity
-  prerequisite. A static check fails on any R7-10 refusal that names neither
-  route, and on any signature request outside class 5.
+  whatever its digests (PO decision #23), with its owner in each of the states
+  `live`, `unavailable`, `unobserved`, `not-live` and recorded `ended` (one
+  fixture per combination): with the owner `not-live` or `ended` it is
+  superseded under branch (C) with zero overrides, zero signatures, zero PO
+  terminal commands, preserved bytes, a receipt and the preserved namespace;
+  with the owner `live`, `unavailable` or `unobserved` it is not superseded,
+  zero mutation occurs, and the typed prerequisite names the owner's terminal
+  record where the owner is `live` and the class 5 transaction for the other two
+  owner states; (iv) unreadable, linked or ambiguous registration bytes: the
+  §20.2 typed `unavailable` naming the read or identity prerequisite. A static
+  check fails on any R7-10 refusal that names neither route, and on any
+  signature request outside class 5.
 - R7-10d: Running the action twice is a no-op the second time, which returns a
   typed result naming the receipt, and the PowerShell and Bash lanes give the
   same result (R7-8).
 
-### 22.11 Sequencing and completion
+### 22.11 R7-11 — Parallel dispatch is supported
 
-R7-1 and R7-2 join step 1 of §21.7 (they unblock bootstrap on a second device).
-R7-3, R7-4, R7-5, R7-8 and R7-10 join the R1 catalogue work and step 3 (R7-3
-lands before R5 finalises the course outputs it writes; the R7-10 verb is a
-catalogue entry shared with the R5 coordinator). R7-6 and R7-7 join the R3
-slice and the hook-and-commit-policy integration slice. R7-9a is part of the
-final integration. R7 is complete only when R7-1a…R7-9b and R7-10a…R7-10d pass
-in the source checkout and in the consumer-layout fixture on both dialects.
+Rows owned: T19, T20 (PO decision 2026-10-07 #26).
+
+Why this contract exists: parallel subagent dispatch is a required, supported
+mode on every runner and platform (decision #26). The dispatch-budget
+accounting must never refuse a call only because another call holds its lock,
+and a subagent's bootstrap must not depend on the spelling of the preflight
+command.
+
+Measured facts (source read 2026-10-07 of
+`plugins/pipeline-core/hooks/guard-dispatch-budget.mjs`; they describe the
+defect and are not a design):
+
+- The hook keeps one counter and one binding lock per agent: `counterPath`
+  returns `dispatch-budget/<agentId>.json` under the git common directory and
+  the lock is `<counter path>.binding.lock`. Different agents therefore never
+  share a lock. The corrected T19 finding is that parallel DISPATCHES of
+  different agents do not contend, while parallel TOOL CALLS of ONE agent do.
+- `acquireDispatchBudgetCounterLock` returns `counter-lock-busy` immediately
+  when a live owner holds the lock, and the caller turns every non-acquired
+  result into `invalidBudgetInputBlocked` (`DISPATCH-BUDGET-INPUT-INVALID`)
+  with no retry, although the code comment states that this contention "must
+  remain retryable by the caller". A second parallel call of one subagent is
+  therefore refused, reads included.
+- A subagent's bootstrap receipt is recorded only by a preflight whose spelling
+  the draft-phase guard admits (T20).
+
+Contract:
+
+- **Wait, then count once.** A call that finds the counter lock held by a live
+  owner waits with bounded backoff and then proceeds; it does not return
+  `counter-lock-busy` to its caller. The total wait is bounded by a ceiling of a
+  few seconds; the exact value is fixed by the implementation, exported as a
+  named constant and pinned by a test (R7-11d). Every call that obtains the
+  lock, at once or after waiting, is counted exactly once against the working
+  cap; a refused or timed-out call is never counted. The cap, closing-act and
+  grant rules are unchanged.
+- **Typed timeout.** Only after the bound expires is the call refused, with the
+  typed code `counter-lock-timeout`, which names the holder's age (bounded,
+  path-redacted) and carries the typed repair: retry the call (the holder
+  releases the lock when its own call completes), or, where the holder's owner
+  record is provably dead, the existing dead-owner reclaim path. A malformed,
+  unsafe or ambiguous lock stays fail-closed under its existing codes; waiting
+  applies only to a live owner and to the publishing transition the source
+  already calls retryable.
+- **Isolation between agents.** Locks and counters stay per agent. A held lock
+  of one agent never delays or refuses a call of another, and parallel
+  dispatches of different agents each keep their own counter and cap.
+- **Receipt at SubagentStart (T20).** A subagent's bootstrap receipt is recorded
+  at `SubagentStart` (PO decision "bootstrap receipt option B" of
+  `specs/sprint-alfred-epic/plans/po-decisions-2026-10-06.md`), so the receipt
+  gate does not depend on any preflight spelling and briefings need no exact
+  spelling. A runner without a `SubagentStart` event gets a typed `unavailable`
+  naming its route, never a silent gap (§21.0).
+- **Protected site.** `guard-dispatch-budget.mjs` changes through the existing
+  protected-site route (§22.0 signature class 4) where it is a protected-baseline
+  surface; R7-11 grants no exception and no new signature class.
+
+Typed repair: retry, or the existing dead-owner reclaim, for
+`counter-lock-timeout`; no PO act and no signature.
+
+Acceptance cases (§22.0 matrix: R7-11a…R7-11e each run on the win32 and POSIX
+dialects, in the source checkout and in the consumer-layout fixture):
+
+- R7-11a: N (at least 4) concurrent tool calls of one fixture subagent are all
+  admitted and the counter advances by exactly N (no lost update, no double
+  count); none returns `counter-lock-busy` or `DISPATCH-BUDGET-INPUT-INVALID`.
+- R7-11b: A lock left by a crashed holder (provably dead owner record) is
+  recovered through the existing dead-owner path without waiting out the bound;
+  the call is admitted and counted once; a malformed lock stays fail-closed.
+- R7-11c: Two agents dispatched in parallel, each making concurrent calls, keep
+  separate counters and caps; a lock held for agent A leaves agent B's call
+  admitted with no wait.
+- R7-11d: A lock held by a live owner beyond the bound yields
+  `counter-lock-timeout` naming the holder's age; nothing is counted and no
+  counter changes; the measured wait is above zero and not above the named
+  constant plus scheduling tolerance; a holder that releases within the bound
+  lets the call through, counted once.
+- R7-11e: The first Write of a freshly started subagent, whose bootstrap receipt
+  was never produced by any preflight call, is admitted in the draft phase; the
+  receipt is recorded by `SubagentStart`.
+
+### 22.12 Sequencing and completion
+
+R7-1, R7-2 and R7-11 join step 1 of §21.7 (R7-1 and R7-2 unblock bootstrap on a
+second device; R7-11 removes a refusal every parallel dispatch of the later
+steps would hit). R7-3, R7-4, R7-5, R7-8 and R7-10 join the R1 catalogue work
+and step 3 (R7-3 lands before R5 finalises the course outputs it writes; the
+R7-10 verb is a catalogue entry shared with the R5 coordinator). R7-6 and R7-7
+join the R3 slice and the hook-and-commit-policy integration slice. R7-9a is
+part of the final integration. R7 is complete only when R7-1a…R7-9c,
+R7-10a…R7-10d and R7-11a…R7-11e pass in the source checkout and in the
+consumer-layout fixture on both dialects.
 Independent Critic review, Verify, security and PO acceptance remain separate
 gates.
