@@ -957,6 +957,9 @@ export async function runSecurityScan({
           rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
           entry = scannerEntry(adapter, result, fileSha256(inst.path));
           if (key === "semgrep") {
+            // SEM-F: a degraded-coverage result (warn-level PartialParsing only) is merged onto the
+            // entry's existing {subject, exclusions} coverage object, never replacing those keys.
+            if (result.coverage) entry.coverage = { ...entry.coverage, ...result.coverage };
             // Explicit unknown: robust descriptor/candidate provenance is unavailable.
             diagnosticRecords.push({
               tool: "semgrep",
@@ -1095,7 +1098,10 @@ function statusLabel(status) {
 function printSummary(evidence) {
   for (const s of evidence.scanners) {
     const reasonSuffix = s.reason ? ` -- ${s.reason}` : "";
-    console.log(`${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}`);
+    const coverageSuffix = s.coverage?.status === "degraded" && Array.isArray(s.coverage.files)
+      ? ` -- coverage: degraded (${s.coverage.files.length} files partially parsed)`
+      : "";
+    console.log(`${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}${coverageSuffix}`);
   }
   const verdict = evidence.exitCode === 0 ? "CLEAN" : evidence.exitCode === 1 ? "WARNING" : "BLOCKING";
   console.log(`\nVerdict: ${verdict} (thresholds: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);

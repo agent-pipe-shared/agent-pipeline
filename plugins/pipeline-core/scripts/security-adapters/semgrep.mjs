@@ -17,6 +17,17 @@
  * missing `results[]` is a scanner error, even when stdout otherwise looks like a clean
  * report. This fail-closed rule deliberately avoids a false PASS after a partial/error run.
  *
+ * PARTIAL-PARSING EXCEPTION (PO decision 2026-10-06 "Semgrep", option B, "Warnung = Hinweis"):
+ * a body whose errors[] entries ALL carry `level: "warn"` AND a `type` naming `PartialParsing`
+ * (semgrep encodes it as the string or as an array whose first element is the name) is still a
+ * completed scan with degraded coverage -- the files semgrep could only partly parse. The result
+ * keeps its PASS/FINDINGS status, classification and findings exactly as for a clean body and
+ * gains an additive `coverage: { status: "degraded", reason: "partial-parsing", files: [...] }`
+ * (paths relative to the scan root, forward slashes, never absolute). No `coverage` field means
+ * full coverage. Every other shape keeps the whole result a scanner error: any other level
+ * (`error`), any other type (including `Timeout`), a missing level/type/path, a path outside the
+ * scan root, a non-array errors[] or an unreadable entry. Fail closed, never a false PASS.
+ *
  * SEVERITY MAPPING (per briefing, semgrep's three native severities -- high confidence, not
  * a guess): `extra.severity` "ERROR" -> high, "WARNING" -> medium, "INFO" -> info. Any other
  * or missing value maps defensively to "medium" (never silently dropped, never crashes).
@@ -32,7 +43,7 @@
  */
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter as PATH_DELIM, join as pathJoin } from "node:path";
+import { delimiter as PATH_DELIM, isAbsolute as pathIsAbsolute, join as pathJoin, posix as pathPosix, relative as pathRelative, win32 as pathWin32 } from "node:path";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { observeSemgrepChild } from "../../lib/security-scanner-diagnostics.mjs";
@@ -90,6 +101,45 @@ function mapSemgrepSeverity(extraSeverity) {
   if (extraSeverity === "WARNING") return "medium";
   if (extraSeverity === "INFO") return "info";
   return "medium"; // defensive fallback for an unrecognized/missing severity string
+}
+
+const PARTIAL_PARSING_TYPE = "PartialParsing";
+
+// semgrep encodes an errors[] entry's `type` either as a plain string ("Timeout") or as an array
+// whose first element is the name (["PartialParsing", [{path,start,end}]]).
+function semgrepErrorTypeName(type) {
+  if (typeof type === "string") return type;
+  if (Array.isArray(type) && typeof type[0] === "string") return type[0];
+  return null;
+}
+
+// A path semgrep reported, as a scan-root-relative forward-slash path -- or null when it cannot be
+// named that way (not a string, empty, outside the scan root, another drive/absolute flavor).
+// Never returns an absolute path: coverage.files and every line printed from it stay host-neutral.
+function scanRootRelativePath(file, rootDir) {
+  if (typeof file !== "string" || file.length === 0) return null;
+  const hostAbsolute = pathIsAbsolute(file);
+  if (!hostAbsolute && (pathPosix.isAbsolute(file) || pathWin32.isAbsolute(file))) return null;
+  const relativePath = hostAbsolute ? pathRelative(rootDir, file) : file;
+  const segments = relativePath.replaceAll("\\", "/").split("/").filter((segment) => segment !== "" && segment !== ".");
+  if (segments.length === 0 || segments.includes("..") || /^[A-Za-z]:/.test(segments[0])) return null;
+  return segments.join("/");
+}
+
+// Sorted, de-duplicated scan-root-relative files when EVERY errors[] entry is a readable
+// `level: "warn"` PartialParsing entry naming a file under the scan root; null for anything else
+// (empty/non-array errors, another level or type -- Timeout included -- or an unreadable entry).
+function degradedPartialParsingFiles(errors, rootDir) {
+  if (!Array.isArray(errors) || errors.length === 0) return null;
+  const files = new Set();
+  for (const entry of errors) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return null;
+    if (entry.level !== "warn" || semgrepErrorTypeName(entry.type) !== PARTIAL_PARSING_TYPE) return null;
+    const file = scanRootRelativePath(entry.path, rootDir);
+    if (file === null) return null;
+    files.add(file);
+  }
+  return [...files].sort();
 }
 
 function cleanupScratch(path) {
@@ -181,14 +231,20 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
     };
   }
 
+  let coverage;
   if (parsed.errors !== undefined && (!Array.isArray(parsed.errors) || parsed.errors.length > 0)) {
-    return {
-      status: "ERROR",
-      classification: "scanner_error",
-      findings: [],
-      raw: stdout,
-      reason: "semgrep JSON contains an error payload",
-    };
+    const partiallyParsed = degradedPartialParsingFiles(parsed.errors, rootDir);
+    if (partiallyParsed === null) {
+      return {
+        status: "ERROR",
+        classification: "scanner_error",
+        findings: [],
+        raw: stdout,
+        reason: "semgrep JSON contains an error payload",
+      };
+    }
+    // Only warn-level PartialParsing entries: the scan completed, some files were parsed in part.
+    coverage = { status: "degraded", reason: "partial-parsing", files: partiallyParsed };
   }
 
   const findings = parsed.results.map((r) => ({
@@ -200,7 +256,9 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
     msg: r?.extra?.message ?? r?.check_id ?? "semgrep finding",
   }));
 
-  return { status: findings.length > 0 ? "FINDINGS" : "PASS", classification: findings.length > 0 ? "findings" : "success", findings, raw: stdout };
+  const completed = { status: findings.length > 0 ? "FINDINGS" : "PASS", classification: findings.length > 0 ? "findings" : "success", findings, raw: stdout };
+  if (coverage) completed.coverage = coverage; // additive: absent means full coverage
+  return completed;
 }
 
 /**
@@ -262,7 +320,9 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
       "zero child exit AND a JSON body carrying a results[] array AND no error payload -- only this combination is a completed scan (PASS/FINDINGS based on findings.length)",
     nonzero: "scanner_error (ERROR) -- any nonzero child exit, fail-closed regardless of stdout content",
     errorPayload:
-      "scanner_error (ERROR) -- JSON body carries a non-empty errors[] array, even at exit 0 with an otherwise clean-looking results[] array",
+      "scanner_error (ERROR) -- JSON body carries a non-empty errors[] array (or a non-array errors), even at exit 0 with an otherwise clean-looking results[] array, EXCEPT the all-warn PartialParsing case described under partialParsing",
+    partialParsing:
+      "degraded coverage, not scanner_error -- ONLY when EVERY errors[] entry has level \"warn\" AND a type naming PartialParsing (string, or array whose first element is the name) AND a path under the scan root: status stays PASS/FINDINGS and classification success/findings exactly as for a clean body, findings are kept, and the result gains coverage { status: \"degraded\", reason: \"partial-parsing\", files: [<scan-root-relative forward-slash paths>] }; no coverage field means full coverage. Any other level, any other type (including Timeout) or an unreadable entry keeps the WHOLE result scanner_error (PO decision 2026-10-06 \"Semgrep\", option B)",
     missingResults:
       "scanner_error (ERROR) -- JSON body lacks a results[] array (or it is not an array), even at exit 0 and even if stdout otherwise looks like a clean report",
   }),
