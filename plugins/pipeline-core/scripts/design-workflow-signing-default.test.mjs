@@ -41,7 +41,9 @@ function fixture(t){
  const r=loadRunnerProfilesV3Registry(),config={schema:'pipeline.user.v3',language:{human_facing:'en',agent_facing:'en'},agent_runtime:'other',runners:{enabled:['claude','codex'],default:'codex'},routing:{profiles:r.profiles,duties:r.duties},usage:{common_projection:'pipeline.runner-usage.v1',raw_persistence:'none'},autonomy:{push_policy:'gated',branch_model:'feature-branch',wip_limit:1},gates:{dev_plan:'blocking',push:'blocking',security:'warn',claude_md_max_lines:300},session:{keep_awake:true},critic_export:r.criticExportPolicy};
  assert.equal(validatePipelineUserV3(config).ok,true);assert.deepEqual(parseYaml(yaml(config)),config);put('pipeline.user.yaml',yaml(config));
  const sources=Object.fromEntries(['input','prd','spec','design','traceability'].map(name=>{const path=`specs/synthetic/${name}.md`,data=Buffer.from(`# Synthetic ${name}\nSynthetic isolated authority, not provider evidence.\n`);put(path,data);return[name,{path,sha256:sha(data)}];}));
- git(['add','pipeline.user.yaml','specs']);git(['commit','--quiet','-m','Synthetic canonical design authority']);
+ const pair=generateKeyPairSync('ed25519'),publicKey=pair.publicKey.export({type:'spki',format:'pem'}).toString(),trustPolicy={keyReference:'synthetic-dwp-fixture-key',publicKeySha256:sha(publicKey)};
+ put('project/critical-human-proof.json',JSON.stringify({schema:'pipeline.critical-human-proof-policy.v3',requiredKinds:['governance-fork-disposition'],waivedKinds:[],trustAnchors:[{keyReference:trustPolicy.keyReference,publicKeySha256:trustPolicy.publicKeySha256}]}));
+ git(['add','pipeline.user.yaml','specs','project']);git(['commit','--quiet','-m','Synthetic canonical design authority']);
  const candidate={commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])},topology=resolvePoGateRepositoryTopology(root),repoFingerprint=derivePoGateRepositoryFingerprint({gitCommonDir:topology.gitCommonDir,primaryRoot:topology.primaryRoot});
  const resolved=resolveV3DutyRoute({rootDir:root,dutyId:'readiness',runner:'claude',candidateCommit:candidate.commit});
  const route=Object.fromEntries(['model','effort','sourceSha256','candidateCommit'].map(k=>[k,resolved[k]]));assert.equal(resolved.state,'default');
@@ -58,7 +60,6 @@ function fixture(t){
  const readCandidate=()=>({commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])});
  const read=()=>readDesignWorkflowPackageFromRepository({repoRoot:root,packagePath:refs.package,readCandidate});assert.equal(read().ok,true,JSON.stringify(read()));
  const prepared=createDesignWorkflowPackageApprovalRequest({repoRoot:root,packagePath:refs.package,readCandidate,featureId:pkg.featureId,planPath:sources.prd.path,planSha256:sources.prd.sha256,specPath:sources.spec.path,specSha256:sources.spec.sha256});assert.equal(prepared.ok,true,JSON.stringify(prepared));
- const pair=generateKeyPairSync('ed25519'),publicKey=pair.publicKey.export({type:'spki',format:'pem'}).toString(),trustPolicy={keyReference:'synthetic-dwp-fixture-key',publicKeySha256:sha(publicKey)};
  writeFileSync(join(keys,'po-private.pem'),pair.privateKey.export({type:'pkcs8',format:'pem'}),{mode:0o600});writeFileSync(join(keys,'po-public.pem'),publicKey);writeFileSync(join(keys,'trust-policy.json'),JSON.stringify({...trustPolicy,humanName:'Synthetic Test Operator'}));
  const requestPath='scratch/dwp-request.json';put(requestPath,bytes(prepared.request));return {root,keys,put,git,read,request:prepared.request,requestPath,trustPolicy,refs,sources,candidate,readCandidate};
 }
