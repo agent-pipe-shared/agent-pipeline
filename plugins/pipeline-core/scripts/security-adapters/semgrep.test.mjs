@@ -204,6 +204,48 @@ for (const [label, entry] of UNELIGIBLE_ENTRIES) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// SEM-T2 -- pins for two review findings on the degraded-coverage change (b765974b0 / 28eac0677).
+//
+// S2 (out-of-root paths): `scanRootRelativePath` must return null -- so the whole entry is a
+// scanner_error -- for a path that is not under the scan root, including the win32 flavours a
+// host `relative()` happily "relativises": a UNC path and an extended-length path. The function
+// is module-private and takes no injectable path module, so the two win32 flavours can only be
+// observed through run() on a win32 host; they are SKIPPED (visibly, with this reason) elsewhere.
+// The missing-path case is platform-neutral and always runs. RED BY DESIGN on win32: today both
+// win32 flavours come back as a degraded-coverage file named "server/share/x.mjs" / "?/D:/other/x.mjs".
+//
+// S4 (descriptor honesty): the exit-zero entry of CAPABILITY_CONTRACT_V2.exitCodeMapping (key
+// `completed`; the briefing called it "zero", no such key exists) says an errors[]-free body is
+// "the only" completed scan and so contradicts the `partialParsing` key beside it. RED BY DESIGN.
+// ---------------------------------------------------------------------------
+const WIN32_ONLY_SKIP = process.platform === "win32"
+  ? false
+  : `win32-only: UNC/extended-length semantics need the host win32 path module (scanRootRelativePath has no injectable path module); skipped on ${process.platform}`;
+const OUT_OF_ROOT_ENTRIES = [
+  ["warn PartialParsing with no path at all (missing path)", { code: 3, level: "warn", type: ["PartialParsing", []], message: "<redacted>" }, false],
+  ["warn PartialParsing naming a UNC path (\\\\server\\share\\x.mjs)", partialParsingEntry({ file: "\\\\server\\share\\x.mjs" }), WIN32_ONLY_SKIP],
+  ["warn PartialParsing naming an extended-length path (\\\\?\\D:\\other\\x.mjs)", partialParsingEntry({ file: "\\\\?\\D:\\other\\x.mjs" }), WIN32_ONLY_SKIP],
+];
+for (const [label, entry, skip] of OUT_OF_ROOT_ENTRIES) {
+  test(`SEM-T2 (S2): ${label} stays ERROR/scanner_error`, { skip }, async () => {
+    const result = await runFixture({ version: "1.172.0", results: [], errors: [entry], paths: { scanned: [] } });
+    assertScannerError(result);
+    assert.equal(result.coverage, undefined, "an out-of-root path must never surface as degraded coverage");
+  });
+}
+
+test("SEM-T2 (S4): CAPABILITY_CONTRACT_V2.exitCodeMapping's exit-zero entry names the warn-level partial-parsing exception it would otherwise contradict", () => {
+  const mapping = CAPABILITY_CONTRACT_V2.exitCodeMapping;
+  assert.equal(typeof mapping.partialParsing, "string", "the partialParsing key is the settled behaviour this test measures the exit-zero entry against");
+  assert.equal(Object.hasOwn(mapping, "completed"), true, "the exit-zero entry is keyed `completed`");
+  for (const key of ["completed", "zero"]) {
+    if (Object.hasOwn(mapping, key)) {
+      assert.match(mapping[key], /partial/i, `exitCodeMapping.${key} says an error-free body is the only completed scan without naming the warn-level partial-parsing exception`);
+    }
+  }
+});
+
 test("SEM-T (h): a clean run with an empty errors[] stays PASS with no degraded coverage", async () => {
   const result = await runFixture({ version: "1.172.0", results: [], errors: [], paths: { scanned: [] } });
   assert.equal(result.status, "PASS");
