@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.authoring-route-record.v1",
   "featureId": "sprint-alfred-epic",
-  "dispatchId": "ALFRED-REV5B-AUTHOR-20261007",
-  "supersedes": "ALFRED-REV5-AUTHOR-20261006 (its Advisor course is terminal for the pre-readiness sources; a child course requires a new authoring dispatch id)",
+  "dispatchId": "ALFRED-REV5C-AUTHOR-20261007",
+  "supersedes": "ALFRED-REV5B-AUTHOR-20261007, which superseded ALFRED-REV5-AUTHOR-20261006 (each Advisor course is terminal for its sources; a child course requires a new authoring dispatch id)",
   "attemptId": "attempt-1",
   "packageId": "greenfield-0.7-remediation",
   "actionId": "complete-and-integrate-approved-slices",
@@ -19,7 +19,7 @@
   "review": {
     "criticRounds": 4,
     "finalRoundVerdict": "partial (no PASS); open items resolved by PO decisions 2026-10-07 #20-#26",
-    "readiness": "ALFRED-READINESS-20261007 on 48733052d: not-ready (two blocking findings), closed in 49b41f5c1 (design.md R7 counts; branch A narrowed, PO decision #27)",
+    "readiness": "ALFRED-READINESS-20261007 on 48733052d: not-ready (two blocking findings), closed in 49b41f5c1 (design.md R7 counts; branch A narrowed, PO decision #27); ALFRED-READINESS-R5C-20261007 on 8f476711a: not-ready (R7-6 check vs 21.3 one-command rule; T20 decision outside the sources), closed in the following commit (21.3 reconciliation; decision #28 carried into design-input)",
     "furtherCritic": "suspended by PO decision 2026-10-07 (time pressure); the decision #20-#26 text (251e411aa, ca7a325b7) is not independently reviewed"
   }
 }

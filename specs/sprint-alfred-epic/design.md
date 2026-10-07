@@ -162,7 +162,7 @@ artifacts, writes in every state, approval rebind, a read-only signing-readiness
 probe, one readiness report, shell-lane parity, supersede of a stale authoring
 registration, parallel dispatch on the budget lock), and five rows (T4, T9,
 T10, T13, T18) are mapped to the R1, R3, R4 and R5 contracts that already cover
-them. R7-9 replays the mapped rows. PO decisions 17–27 (`design-input.md`)
+them. R7-9 replays the mapped rows. PO decisions 17–28 (`design-input.md`)
 bind the amendment; Spec §22.12 sequences it. `traceability.md` carries the
 20-row map; AC-37 is additional to AC-32.
 

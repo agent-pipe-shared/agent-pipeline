@@ -1523,8 +1523,11 @@ Contract:
     admits.
 - **Ceremony mechanics.** Signing intents work on unborn HEAD. All agent-side
   preparation runs in session (K4-3); R1's catalogue admits the commands, but
-  the preparation is owned here. The PO receives one command per decision,
-  rendered without backslash line continuation and within 100 columns per
+  the preparation is owned here. The PO receives one decision-bearing
+  command per decision; the read-only signing-readiness check of §22.6
+  (R7-6), handed over before the signing command in the same terminal, bears
+  no decision and is counted with that signing command as one interaction in
+  the R3-1 inventory and the §21.0 counting rule. Each command is rendered without backslash line continuation and within 100 columns per
   physical line (the digest may be split into variable-assignment chunks as
   today). The PO never copies JSON back.
   - The signing window starts when the signing command is handed to the PO
@@ -1975,7 +1978,7 @@ an owned ID is a reproduction step for that sub-aspect, not a second owner.
 
 ## 22. 2026-10-06 device switch: agent-recoverable operation and device portability (R7)
 
-Source of findings: PO decisions 17–19 of 2026-10-06 and 20–27 of 2026-10-07
+Source of findings: PO decisions 17–19 and 28 of 2026-10-06 and 20–27 of 2026-10-07
 (`design-input.md`) and the toil rows T1–T20 recorded while the approved
 candidate was brought up on a second device (T1–T17 on 2026-10-06, T18–T20 on
 2026-10-07). The toil log was a working note in the ignored `scratch/`
@@ -2003,8 +2006,8 @@ makes decisions 15 and 16 of 2026-10-04 concrete; it is not new authority.
 **Scope rule (decisions #18 and #26).** All 20 rows are fixed in the next
 candidate (0.7.0), none deferred: T1–T17 by decision #18; T18–T20 were recorded
 on 2026-10-07 and join the same register under the same rule (decision #26
-decides T19, and T20 is closed by the SubagentStart receipt of the PO decision
-"bootstrap receipt option B", R7-11). Each row is owned by exactly one R7
+decides T19, and T20 is closed by the SubagentStart receipt of PO decision #28
+in `design-input.md`, R7-11). Each row is owned by exactly one R7
 contract (§22.1–§22.8, §22.10 and §22.11) or mapped to the existing owner named
 below. A mapped row gets no second contract here; §22.9 only adds a replay
 obligation on the owner's fixture.
@@ -2537,7 +2540,10 @@ dialects, in the source checkout and in the consumer-layout fixture):
   process with a key path. No case or document names `sign-intent` as the place a
   missing or unusable `openssl` is first found. (iv) The check adds no PO
   decision and no signature class to the §21.0 counting rule or to the R3-1
-  scenarios: it is a read-only step of the same signing interaction.
+  scenarios: it is a read-only step of the same signing interaction, and §21.3
+  (ceremony mechanics) states this explicitly, so the R3-1 inventory counts the
+  check and the signing command as one interaction with one decision and the
+  R3-1 and R7-6 cases cannot fail each other.
 - R7-6e (negative, no Pipeline-chosen executable): a static scan and the spawn
   spy fail on any code path in `sign-intent`, the probe, `prepare-for-signature`,
   install or bootstrap that passes an executable other than the constant
@@ -2936,8 +2942,7 @@ Contract:
   of one agent never delays or refuses a call of another, and parallel
   dispatches of different agents each keep their own counter and cap.
 - **Receipt at SubagentStart (T20).** A subagent's bootstrap receipt is recorded
-  at `SubagentStart` (PO decision "bootstrap receipt option B" of
-  `specs/sprint-alfred-epic/plans/po-decisions-2026-10-06.md`), so the receipt
+  at `SubagentStart` (PO decision #28 in `design-input.md`), so the receipt
   gate does not depend on any preflight spelling and briefings need no exact
   spelling. A runner without a `SubagentStart` event gets a typed `unavailable`
   naming its route, never a silent gap (§21.0).

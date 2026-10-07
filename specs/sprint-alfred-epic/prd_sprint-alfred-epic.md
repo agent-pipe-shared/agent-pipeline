@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 436372e5e5423052dda4cad93a1ec05d42858391a05ea1e94e334cb944fb9982 -->
+<!-- technical-spec-sha256: 141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -954,7 +954,7 @@ owners and cases in `traceability.md`):
   a concrete repair action, and never discovered for the first time at a
   signature.
 
-**PO decisions (2026-10-07).** Recorded in `design-input.md` (decisions 20–27;
+**PO decisions (2026-10-07).** Recorded in `design-input.md` (decisions 20–28;
 owners and cases in `traceability.md`):
 
 - The signing toolchain is checked by a read-only readiness probe with a typed
@@ -974,6 +974,9 @@ owners and cases in `traceability.md`):
   readiness evidence (#25).
 - Parallel subagent dispatch is a required, supported mode; the dispatch-budget
   accounting never refuses a call because another call holds its lock (#26).
+- A subagent's bootstrap receipt is recorded by a SubagentStart hook, so no
+  preflight spelling matters (#28, decided 2026-10-06 and carried into the
+  sources).
 
 **Non-goals.** No new PO interaction class, no weakening of credential-root
 protection, the §20 recovery contract (no inference of owner death) or design

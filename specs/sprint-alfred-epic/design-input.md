@@ -231,6 +231,14 @@ not being on the signing terminal's PATH).
     owner is never superseded, and an `unavailable` or `unobserved` owner of
     such a registration takes the §20.2 route.
 
+28. (Decided 2026-10-06 in the morning chat, option "B: Writer exportieren
+    (Recommended)", recorded at the time in
+    `plans/po-decisions-2026-10-06.md`; carried here so the approved sources
+    hold it.) The bootstrap receipt writer is exported in the signed guard
+    package and the receipt is recorded by a SubagentStart hook, so the
+    receipt means "started under the hook" and no preflight spelling matters
+    (T20).
+
 Each decision has an owner and an acceptance case in the "PO decisions → owner
 and case" section of `traceability.md`.
 

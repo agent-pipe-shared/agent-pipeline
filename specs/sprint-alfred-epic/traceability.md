@@ -207,10 +207,11 @@ decisions, and AC-37 is additional to AC-32):
 | #23 the same for a registration of another lineage or a later revision whose owner is positively `not-live` or `ended` | R7 (R7-10) | §22.10 eligibility branch (C); R7-10c(iii) | AC-37 |
 | #24 the shipped attended orphan-archive route stays for owners `unavailable` or `unobserved`; the zero-click route only for positively ended sessions | R7 (R7-2) | §22.2 "Never inferred; two routes by owner state"; §22.0 signature rule; R7-2b, R7-2c | AC-37 |
 | #25 a re-approval after a lost bound artifact does not reuse earlier course or readiness evidence (fail closed) | R7 (R7-5) | §22.5 `DWP-REBIND-ARTIFACT-LOST`; R7-5c | AC-37 |
-| #26 parallel subagent dispatch is a required, supported mode on every runner and platform; the dispatch-budget accounting never refuses a call because another call holds its lock (T19; T20 via the SubagentStart receipt) | R7 (R7-11) | §22.11 R7-11; R7-11a…R7-11e | AC-37 |
+| #26 parallel subagent dispatch is a required, supported mode on every runner and platform; the dispatch-budget accounting never refuses a call because another call holds its lock (T19; T20 via the SubagentStart receipt of decision #28) | R7 (R7-11) | §22.11 R7-11; R7-11a…R7-11e | AC-37 |
+| #28 (2026-10-06 morning, carried from `plans/po-decisions-2026-10-06.md`) the bootstrap receipt is recorded by a SubagentStart hook from the exported writer in the signed guard package; no preflight spelling matters (T20) | R7 (R7-11) | §22.11 "Receipt at SubagentStart (T20)"; R7-11e | AC-37 |
 | #27 signature-free supersede stays within #22/#23: an earlier-revision registration with different digests is eligible only with a positively `not-live` or `ended` owner; a `live` owner is never superseded | R7 (R7-10) | §22.10 eligibility branch (A); R7-10a(i)…R7-10a(v) | AC-37 |
 
-Mapped decisions: 2026-10-07 #20–#27 (8 of 8); 2026-10-06 #17–#19 (3 of 3);
+Mapped decisions: 2026-10-07 #20–#28 (9 of 9, #28 carried from 2026-10-06); 2026-10-06 #17–#19 (3 of 3);
 2026-10-04 #1–#16 (16 of 16); 2026-10-03 decisions #1–#4 and the route and
 hotfix decisions (6 rows).
 
