@@ -1133,5 +1133,39 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         assert.ok(!fx.exists(rel), 'the file is gone from disk');
       }));
   });
+
+  /**
+   * C-S-T7: two more preview-vs-apply mismatches (Critic CS3-1, CS3-2). The apply-time check keeps a
+   * first-level regular file named "dispatch" (its regex matches the bare name) and a first-level name
+   * starting with two dots (inner.startsWith('..')), though --check may plan them. If --check does not
+   * plan the fixture, the case asserts consistency instead: absent from the plan and still on disk.
+   */
+  describe('C-S-T7: first-level names that --apply keeps although --check plans them', () => {
+    function previewApplyAgree(fx, rel) {
+      writeAged(fx, rel, 40);
+      const previewed = parseStdout(runCli(fx, [...realClockArgs(fx), '--check'])).plan.delete;
+      const result = runCli(fx, [...realClockArgs(fx), '--apply']);
+      assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
+      const report = parseStdout(result);
+      if (previewed.includes(rel)) {
+        assert.ok(report.deleted.includes(rel), `the file --check planned is deleted by --apply: ${JSON.stringify(report.deleted)}`);
+        assert.ok(!fx.exists(rel), 'the file is gone from disk');
+      } else {
+        assert.ok(!report.plan.delete.includes(rel), `--check did not plan the file, so the apply plan must not either: ${JSON.stringify(report.plan.delete)}`);
+        assert.ok(!report.deleted.includes(rel), 'not deleted');
+        assert.ok(fx.exists(rel), 'the unplanned file is still on disk');
+      }
+    }
+
+    test('C-S-T7a: a first-level regular file named "dispatch" is deleted by --apply when --check plans it', () =>
+      inFixture({}, (fx) => {
+        previewApplyAgree(fx, 'scratch/dispatch');
+      }));
+
+    test('C-S-T7b: a first-level name starting with two dots is deleted by --apply when --check plans it', () =>
+      inFixture({}, (fx) => {
+        previewApplyAgree(fx, 'scratch/..draft.md');
+      }));
+  });
   });
 });
