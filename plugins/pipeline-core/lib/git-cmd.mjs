@@ -168,7 +168,12 @@ function readPowerShellQuoted(cmd, open, closers) {
   return { end: -1, content: cmd.slice(open + 1) };
 }
 
-function scanShell(cmd, reading = READING_POSIX) {
+// `keepQuotedPaths` (decision X, receiver detection only): a quoted part that holds structural characters is not blanked
+// to `''` but kept with every structural character except the backslash replaced by `_`, so a quoted path that names a
+// shell (`"/c/Program Files/git/bin/bash"`) stays ONE word whose basename can be read. The default view is unchanged.
+const RECEIVER_SPAN_BLANK_RE = /[\s;&|()<>`$"']/gu;
+
+function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
   const pathBackslash = reading === READING_WINDOWS_PATH;
   const powershell = reading === READING_POWERSHELL;
   const words = [];
@@ -246,7 +251,8 @@ function scanShell(cmd, reading = READING_POSIX) {
         view += cmd.slice(i);
         i = cmd.length;
       } else {
-        view += SHELL_STRUCTURAL_RE.test(span.content) ? "''" : span.content;
+        if (!SHELL_STRUCTURAL_RE.test(span.content)) view += span.content;
+        else view += keepQuotedPaths ? span.content.replace(RECEIVER_SPAN_BLANK_RE, "_") : "''";
         i = span.end + 1;
       }
       continue;
@@ -608,17 +614,73 @@ function expandBraceWord(word) {
 }
 
 /**
+ * True when `text` spells a git word, as written or once the shell has removed its quotes and escapes (F1: `g"i"t`,
+ * `g''it` and `g\it` are the word `git`). The dequoted view is read under all three readings of a backslash; a quoted part
+ * that holds structural characters is blanked in it, so prose such as `echo "git push"` still names no git word through it.
+ */
+function spellsGitWord(text) {
+  if (GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(text)) return true;
+  return [READING_POSIX, READING_WINDOWS_PATH, READING_POWERSHELL].some((reading) =>
+    GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(scanShell(text, reading).view),
+  );
+}
+
+/**
+ * The words of `cmd` split at unquoted whitespace and `;` `&` `|` `(` `)` `<` `>`, each kept as WRITTEN (quotes and
+ * backslashes included): bash performs brace expansion before it removes quotes, so the alternatives of a brace group
+ * have to be read from the raw word. A quoted part is skipped as a whole, so `{g"i"t," -c x",push}` stays one word; an
+ * unterminated quote runs to the end of the text.
+ */
+function splitRawWords(cmd) {
+  const words = [];
+  let word = "";
+  let i = 0;
+  while (i < cmd.length) {
+    const ch = cmd[i];
+    if (/[\s;&|()<>]/u.test(ch)) {
+      if (word !== "") words.push(word);
+      word = "";
+      i += 1;
+      continue;
+    }
+    let span = null;
+    let open = i;
+    if (ch === "\\") {
+      word += cmd.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    if (ch === "$" && cmd[i + 1] === "'") {
+      open = i + 1;
+      span = readAnsiCQuoted(cmd, open);
+    } else if (ch === "'") span = readSingleQuoted(cmd, i);
+    else if (ch === '"') span = readDoubleQuoted(cmd, i);
+    if (span === null) {
+      word += ch;
+      i += 1;
+      continue;
+    }
+    const stop = span.end === -1 ? cmd.length : span.end + 1;
+    word += cmd.slice(i, stop);
+    i = stop;
+  }
+  if (word !== "") words.push(word);
+  return words;
+}
+
+/**
  * True when `cmd` holds a git word: `git`/`git.exe` at an executable boundary (GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE),
- * written out or formed by brace expansion of one word of the text.
+ * written out, spelled with quotes or escapes that the shell removes (F1), or formed by brace expansion of one word of the
+ * text, where every alternative is read as written and after quote removal (F2: `{g"i"t,push}`, `{"g"it,push}`).
  */
 function hasGitWord(cmd) {
-  if (GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(cmd)) return true;
+  if (spellsGitWord(cmd)) return true;
   if (!cmd.includes("{")) return false;
-  for (const word of cmd.split(/[\s;&|()<>]+/u)) {
+  for (const word of splitRawWords(cmd)) {
     if (!word.includes("{")) continue;
     if (word.length > BRACE_WORD_MAX_LENGTH) return true;
     const expansions = expandBraceWord(word);
-    if (expansions === null || expansions.some((expansion) => GIT_WORD_AT_EXECUTABLE_BOUNDARY_RE.test(expansion))) return true;
+    if (expansions === null || expansions.some(spellsGitWord)) return true;
   }
   return false;
 }
@@ -677,15 +739,55 @@ function isHeredocReceiverWord(word) {
   return /[*?[]/u.test(base) && globCouldNameReceiver(base);
 }
 
+// F3: a pipe at the end of a line continues the pipeline on the next command line, and a here-document body is read right
+// after the line that opened it. So in `cat <<EOF |` / body / `EOF` / `sh` the receiver stands AFTER the body. The bodies
+// of the closed here-documents are therefore folded out of a second reading of the view, and a newline that follows a
+// trailing pipe is not a cut. (A newline after a trailing `&&` or `||` needs no such rule: those operators are cuts of the
+// unit on their own, and what follows them is not fed by the here-document.) The unfolded view is still read as before,
+// so the folded reading only ever ADDS a receiver. A here-document whose terminator line cannot be found, opened on a
+// line that ends in a pipe, takes the whole remaining text into its unit: the safe direction.
+const HEREDOC_OPENER_RE = /(?<!<)<<(?!<)-?[ \t]*([^\s;&|<>()]+)/gu;
+const TRAILING_PIPE_RE = /\|&?[ \t]*$/u;
+const PIPE_LINE_CONTINUATION_RE = /(\|&?)[ \t]*(?:\n[ \t]*)+/gu;
+
+/** `text` without the bodies (and terminator lines) of its here-documents; the opener lines stay. */
+function foldHeredocBodies(text) {
+  const lines = text.split("\n");
+  const kept = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    kept.push(lines[i]);
+    for (const opener of lines[i].matchAll(HEREDOC_OPENER_RE)) {
+      const terminator = lines.findIndex((line, index) => index > i && line.trim() === opener[1]);
+      if (terminator === -1) {
+        if (TRAILING_PIPE_RE.test(lines[i])) {
+          kept[kept.length - 1] = `${lines[i]} ${lines.slice(i + 1).join(" ")}`;
+          i = lines.length;
+        }
+        break;
+      }
+      i = terminator;
+    }
+  }
+  return kept.join("\n");
+}
+
+/** True when one unit of the view (see the block comment above) hands a `<<` text to a shell or interpreter. */
+function unitHasShellHeredocReceiver(unit) {
+  if (!unit.includes("<<")) return false;
+  const words = unit.split(HEREDOC_WORD_SPLIT_RE).filter((word) => word !== "");
+  if (words.length > 0 && (words[0] === "." || HEREDOC_COMPOUND_CLOSERS.has(words[0]))) return true;
+  return words.some(isHeredocReceiverWord);
+}
+
 /** True when `cmd` hands a `<<` text to a shell or interpreter (PO decision X). */
 function hasShellHeredocReceiver(cmd) {
   if (!cmd.includes("<<")) return false;
   for (const reading of [READING_POSIX, READING_WINDOWS_PATH, READING_POWERSHELL]) {
-    for (const unit of scanShell(cmd, reading).view.split(HEREDOC_UNIT_SEPARATOR_RE)) {
-      if (!unit.includes("<<")) continue;
-      const words = unit.split(HEREDOC_WORD_SPLIT_RE).filter((word) => word !== "");
-      if (words.length > 0 && (words[0] === "." || HEREDOC_COMPOUND_CLOSERS.has(words[0]))) return true;
-      if (words.some(isHeredocReceiverWord)) return true;
+    // F4: the receiver view keeps a quoted path (`"/c/Program Files/git/bin/bash"`) as one readable word.
+    const view = scanShell(cmd, reading, true).view;
+    const folded = foldHeredocBodies(view).replace(PIPE_LINE_CONTINUATION_RE, "$1 ");
+    for (const text of [view, folded]) {
+      if (text.split(HEREDOC_UNIT_SEPARATOR_RE).some(unitHasShellHeredocReceiver)) return true;
     }
   }
   return false;
@@ -720,13 +822,18 @@ function hasFailClosedMarker(cmd) {
  *      `(`, a backtick, a quote, a path separator (`/` `\`), or -- decision S, bash brace expansion -- after `{` or
  *      `,`. A git word formed by brace expansion (`{git,push}`, `g{i..i}t`) counts: brace groups of a word (comma
  *      lists, nested ones too, and single-character `{a..z}` ranges) are expanded to their alternatives before the
- *      test. No git word, no marker rule (an unrelated command is never a candidate on the marker rule's account).
+ *      test. The word is also read AFTER the shell removes quotes and escapes (F1: `g"i"t`, `g''it`, `g\it`), and every
+ *      alternative of a brace group is read as written and after quote removal (F2: `{g"i"t,push}`, `{"g"it,push}`).
+ *      No git word, no marker rule (an unrelated command is never a candidate on the marker rule's account).
  *   2. MARKERS. With a git word present, the text is a push CANDIDATE (`true`) when it holds ANY of:
  *        - `$`, a backtick, `{`, `(` or `)`;
  *        - `<<` (also `<<-` and the `<<<` here-string) when a shell or interpreter receives it (decision X): sh, bash,
  *          zsh, ksh, dash, ash, fish, csh, tcsh, node, python, perl, ruby, pwsh, powershell, cmd, eval, ssh -- named
  *          through a path, a `.exe` or version suffix, a wrapper word or a glob, and including a here-document piped
- *          into one (`cat <<EOF | sh`); `source`, `exec`, the `.` builtin and a compound command's closer
+ *          into one (`cat <<EOF | sh`), also when the pipe ends its line and the shell stands after the body
+ *          (F3: `cat <<EOF |` / body / `EOF` / `sh`), and a receiver named by a quoted path that holds whitespace
+ *          (F4: `"/c/Program Files/git/bin/bash" <<EOF`; quoted prose that ends in such a path, `-m "see docs/bash"`, is
+ *          the same accepted false positive); `source`, `exec`, the `.` builtin and a compound command's closer
  *          (`done <<EOF`) fail closed as well. A here-document fed to any other command (`git commit -F - <<EOF`,
  *          `cat <<EOF > notes.txt`) is data and is no marker by itself; see `hasShellHeredocReceiver`;
  *        - a non-ASCII quote character (U+2018 to U+201F);
