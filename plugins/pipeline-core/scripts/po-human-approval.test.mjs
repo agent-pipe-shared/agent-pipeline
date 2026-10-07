@@ -5178,6 +5178,35 @@ test("R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is 
   r76hPersonAChoosesK2("environment");
 });
 
+/** Every string anywhere in a result value, with its path, so a handed-over command cannot hide in a nested field. */
+function r76oStrings(value, path = "result", found = []) {
+  if (typeof value === "string") found.push({ path, text: value });
+  else if (Array.isArray(value)) value.forEach((entry, index) => r76oStrings(entry, `${path}[${index}]`, found));
+  else if (value !== null && typeof value === "object") for (const [key, entry] of Object.entries(value)) r76oStrings(entry, `${path}.${key}`, found);
+  return found;
+}
+
+test("R7-6o: handed-over commands carry no --directory (decision AC, test-list 12)", () => {
+  for (const route of ["default", "environment"]) {
+    const env = r76Env({ plane: "own" });
+    const directoryK2 = mkdtempSync(join(tmpdir(), "r76o-k2-"));
+    try {
+      const k1 = r76hKeyFixture(env.dirs.directory, "person-a-key-1");
+      const k2 = r76hKeyFixture(directoryK2, "person-a-key-2");
+      r76hDeclareAnchors(env.dirs.repoRoot, [k1, k2]);
+      const outcome = r76hSign(env, r76Spy("healthy", env.events), route === "environment" ? { environment: directoryK2 } : {});
+      assert.equal(outcome.threw, false, `${route}: sign-intent must complete; observed ${r76Describe(outcome)}`);
+      const strings = r76oStrings(outcome.value);
+      assert.ok(strings.length > 0, `${route}: the result carries strings to inspect`);
+      const offenders = strings.filter((entry) => entry.text.includes("--directory")).map((entry) => `${entry.path}: ${entry.text.slice(0, 160)}`);
+      assert.deepEqual(offenders, [], `${route}: no handed-over command may carry --directory; observed ${offenders.join(" | ")}`);
+    } finally {
+      rmSync(directoryK2, { recursive: true, force: true });
+      r76Release(env);
+    }
+  }
+});
+
 /** The read-only probe (steps a to c) against one key directory, with the stub OpenSSL and an injected home. */
 function r76iProbe(env, directory) {
   return probeSigningReadiness({
