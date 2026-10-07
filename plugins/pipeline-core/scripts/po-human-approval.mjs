@@ -822,7 +822,20 @@ const UNREADABLE_CODES = new Set(["EACCES", "EPERM"]);
 const NOT_STARTED_CODES = new Set(["ENOENT", "EACCES", "EPERM", "ENOTDIR"]);
 // Candidate directory NAMES inside a Git installation: data, not code.
 const GIT_NATIVE_BIN_DIRECTORIES = Object.freeze(["mingw64/bin", "usr/bin", "bin"]);
-const PATH_REDACTION = /(?:[A-Za-z]:[\\/]|(?<![\w.:-])[\\/](?=[\w.~-]))[^\s"'`<>|;,)]*/gu;
+// An absolute path can hold spaces (a Windows profile directory, a macOS home), so the generic pattern
+// cannot stop at the first space. A QUOTED absolute path is taken up to its closing quote (a quote that
+// is followed by a word character is part of the name). An UNQUOTED one continues through a space only
+// while a path separator still follows within one path component (255 characters), so the fragments of
+// a spaced directory cannot survive. redactPaths first replaces the KNOWN absolute paths by exact
+// string, which also bounds a space inside a final component that no separator follows.
+const PATH_START = String.raw`(?:[A-Za-z]:[\\/]|(?<![\w.:-])[\\/](?=[\w.~-]))`;
+const PATH_REDACTION = new RegExp(
+  String.raw`(?<quote>["'])${PATH_START}[^\r\n]*?\k<quote>(?!\w)|${PATH_START}(?:[^\s"'\x60<>|;,)]| (?=[^\\/"'\x60<>|;,)\r\n]{0,255}[\\/]))*`,
+  "gu",
+);
+const PATH_PLACEHOLDER = "<path>";
+const KNOWN_PATH_MIN_LENGTH = 4;
+const REDACTION_WINDOW_CHARS = 4096;
 
 function spawnOpenssl(args, options, dependencies) {
   const platform = dependencies.platform ?? process.platform;
@@ -838,10 +851,39 @@ function runOpenssl(args, cwd, dependencies) {
   if (result?.status !== 0) fail(`openssl failed with exit code ${result?.status ?? "none (the process did not run to completion)"}; the human terminal must complete the local prompt`);
 }
 
-const redactPaths = (value) => String(value).replace(PATH_REDACTION, "<path>");
+/** The absolute directories this process itself works in: the OS user's home and temporary directories
+ * and the working directory, each as given and as resolved. Read from the OS, never from a child. */
+function knownHostPaths() {
+  const found = [];
+  for (const read of [homedir, tmpdir, () => process.cwd()]) {
+    try {
+      const value = read();
+      if (typeof value !== "string") continue;
+      found.push(value);
+      try { found.push(realpathSync(value)); } catch { /* the plain value is still known */ }
+    } catch { /* a directory that cannot be read is not known */ }
+  }
+  return found.filter((value) => value.length >= KNOWN_PATH_MIN_LENGTH);
+}
+/** Exact-string replacement of each known absolute path in both separator forms, longest first, so a
+ * space inside a known path cannot leave a fragment. The boundary guards keep a known path from eating
+ * the front of a longer, different one. */
+function redactKnownPaths(value) {
+  const forms = new Set(knownHostPaths().flatMap((path) => [path, path.replaceAll("\\", "/"), path.replaceAll("/", "\\")]));
+  let result = String(value);
+  for (const form of [...forms].sort((left, right) => right.length - left.length)) {
+    const escaped = form.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    result = result.replace(new RegExp(String.raw`(?<![\w.~-])${escaped}(?![\w.~-])`, "gu"), PATH_PLACEHOLDER);
+  }
+  return result.replace(/(?:<path>){2,}/gu, PATH_PLACEHOLDER);
+}
+const redactPaths = (value) => redactKnownPaths(value).replace(PATH_REDACTION, (...args) => {
+  const quote = args.at(-1)?.quote;
+  return quote ? `${quote}${PATH_PLACEHOLDER}${quote}` : PATH_PLACEHOLDER;
+});
 function boundedHead(value) {
   const first = String(value ?? "").split(/\r?\n/u).map((line) => line.trim()).find((line) => line !== "") ?? "";
-  const clean = redactPaths(first).replace(/[^\x20-\x7e]/gu, "?");
+  const clean = redactPaths(first.slice(0, REDACTION_WINDOW_CHARS)).replace(/[^\x20-\x7e]/gu, "?");
   return clean.length > PROBE_STDERR_HEAD_CHARS ? `${clean.slice(0, PROBE_STDERR_HEAD_CHARS)}...` : clean;
 }
 function exitDetail(result) {
