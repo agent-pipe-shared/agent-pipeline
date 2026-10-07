@@ -812,3 +812,48 @@ test("planInstall: a decline marker never suppresses an already-installed hook",
   assert.equal(plan.status, "ready-to-upgrade");
   assert.notEqual(plan.status, "declined");
 });
+
+// A-S2b (HOOKREFRESH, PO decision M): the --install CLI must report the refusal code the install
+// path actually threw. The CLI offers no dependency seam of its own, so the throwing dependency is
+// injected from outside with a Node module-customization hook: the child resolves
+// `lib/hardened-private-directory.mjs` to a stub whose `ensureHardenedPrivateDirectory` throws an
+// error carrying the typed code PB-WINDOWS-ASSURANCE (the real helper throws exactly that code on win32).
+test("--install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "prepush-typed-refusal-"));
+  try {
+    const repoDir = join(workDir, "repo");
+    mkdirSync(repoDir);
+    const init = spawnSync("git", ["init", "-q"], { cwd: repoDir, encoding: "utf8" });
+    assert.equal(init.status, 0, init.stderr);
+    const stubSource = 'export function ensureHardenedPrivateDirectory() { throw Object.assign(new Error("fixture: private-state assurance refused"), { code: "PB-WINDOWS-ASSURANCE" }); }';
+    const hooksSource = [
+      `const STUB_URL = ${JSON.stringify(`data:text/javascript,${encodeURIComponent(stubSource)}`)};`,
+      "export async function resolve(specifier, context, nextResolve) {",
+      "  const resolved = await nextResolve(specifier, context);",
+      '  return resolved.url.endsWith("/lib/hardened-private-directory.mjs") ? { url: STUB_URL, shortCircuit: true } : resolved;',
+      "}",
+    ].join("\n");
+    const preloadPath = join(workDir, "inject-typed-refusal.mjs");
+    writeFileSync(preloadPath, [
+      'import { register } from "node:module";',
+      `register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(hooksSource)}`)});`,
+    ].join("\n"), "utf8");
+    const installer = fileURLToPath(new URL("./pre-push-hook-install.mjs", import.meta.url));
+    const result = spawnSync(process.execPath, ["--import", pathToFileURL(preloadPath).href, installer, "--install"], {
+      cwd: repoDir,
+      encoding: "utf8",
+      timeout: 60000,
+    });
+    let payload;
+    try {
+      payload = JSON.parse(result.stdout);
+    } catch {
+      assert.fail(`stdout must be one JSON object; got ${JSON.stringify(result.stdout)} (stderr: ${result.stderr})`);
+    }
+    assert.equal(payload.status, "refused");
+    assert.equal(payload.code, "PB-WINDOWS-ASSURANCE");
+    assert.equal(result.status, 1, `exit code (stderr: ${result.stderr})`);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
