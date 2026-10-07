@@ -1150,6 +1150,28 @@ for (const [label, legacy, ownerStatus] of [["V2 null-owner", false, "unavailabl
   });
 }
 
+// RV-1 (RV-S1-T): V2 `ownerRuntime: null` is `unavailable`, V1 field-absent is `unobserved`; neither
+// ever becomes `not-live`, and the orphan-archive gate treats both as eligible owner statuses.
+// The reboot clause is not applicable to the current seam: `not-live` derives only from ESRCH on the
+// recorded pid; no boot/reboot concept is consulted by inspectSessionOwnerRuntime.
+for (const [label, legacy, ownerStatus] of [["V2 null-owner", false, "unavailable"], ["V1 field-absent", true, "unobserved"]]) {
+  check(`RV-1: ${label} descriptor is ${ownerStatus}, never not-live, and the orphan-archive gate accepts it without inferring a dead owner`, () => {
+    const { primary } = repoFixture();
+    const d = orphanFixture(primary, legacy ? "rv1-v1" : "rv1-v2", { legacy });
+    const onDisk = JSON.parse(readFileSync(d.path, "utf8"));
+    if (legacy) assert.equal("ownerRuntime" in onDisk, false);
+    else assert.equal(onDisk.ownerRuntime, null);
+    const owner = inspectSessionOwnerRuntime(primary, d.sessionId);
+    assert.equal(owner.status, ownerStatus);
+    assert.notEqual(owner.status, "not-live");
+    const eligibility = archiveApi.inspectOrphanArchiveEligibility(primary, d.sessionId);
+    assert.equal(eligibility.ownerStatus, ownerStatus);
+    assert.notEqual(eligibility.ownerStatus, "not-live");
+    assert.notEqual(eligibility.code, "WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE");
+    assert.equal(archiveApi.inspectOrphanArchiveEligibility(primary, d.sessionId).ownerStatus, ownerStatus);
+  });
+}
+
 check("RF2A archive refuses a manifest, the requester's own session, digest drift, hardlink, symlink, an existing target, a placeholder operator and an observable owner, and never deletes", () => {
   const { fixture, primary } = repoFixture();
   const common = discoverRepository(primary).commonDir;
