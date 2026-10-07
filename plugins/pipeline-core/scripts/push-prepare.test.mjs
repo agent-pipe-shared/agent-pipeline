@@ -762,7 +762,7 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.match(humanText, /Step: agent push\nPOSIX:/u);
   assert.match(humanText, /PowerShell:/u);
   assert.doesNotMatch(humanText, /--directory|\/external\/po-dir/u);
-  assert.match(PIPELINE_STATE_SCRIPT_PATH, /^\/.*\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
+  assert.match(PIPELINE_STATE_SCRIPT_PATH.replaceAll("\\", "/"), /\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
   const source = readFileSync(fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "utf8");
   assert.match(source, /PIPELINE_STATE_SCRIPT_PATH, "approve-push"/u);
   assert.match(humanText, /cmd\.exe:/u);
@@ -945,7 +945,7 @@ test("pushPrepareReport: verify-evidence check reads the shared VERIFY_EVIDENCE_
   assert.equal(result.ok, true);
   const verifyCheck = result.report.checks.find((check) => check.id === "verify-evidence");
   assert.equal(verifyCheck.ok, true);
-  assert.ok(readPaths.some((path) => path.endsWith(VERIFY_EVIDENCE_DEFAULT_PATH)), "expected a read of the shared VERIFY_EVIDENCE_DEFAULT_PATH");
+  assert.ok(readPaths.some((path) => path.replaceAll("\\", "/").endsWith(VERIFY_EVIDENCE_DEFAULT_PATH)), "expected a read of the shared VERIFY_EVIDENCE_DEFAULT_PATH");
 });
 
 test("pushPrepareReport: bad argv -> {ok:false, error}", () => {
