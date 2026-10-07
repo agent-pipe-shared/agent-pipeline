@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: evidence/close-a-governance-scope-stale-worktree.txt
 created: 2026-09-28
 source: "Pre-integration verification of the S1 Governance Scope proposal in a network-off disposable Git fixture. An enrolled repository becomes inactive solely after deleting an unrelated registered worktree directory. Terminal 58232a, exit 0."
 sprint: alfred
@@ -50,3 +54,8 @@ frozen S3 dependency tree; the shared S1 correction must precede integration.
 - **Assignment:** Shared Governance Scope observer; keep historical failed
   fixture results distinct from installed-runtime claims.
 - **Date:** 2026-09-28.
+
+## Closure (2026-10-07)
+
+- **Decision:** closed — fixed in source at 26fef9e7d.
+- **Rationale:** regression test `plugins/pipeline-core/lib/governance-scope.test.mjs`, case 'closest containing nested linked worktree keeps its own decision despite a stale sibling' (enrolled and declined scopes with a removed unrelated registered worktree) passes; evidence `evidence/close-a-governance-scope-stale-worktree.txt`, exit 0.
