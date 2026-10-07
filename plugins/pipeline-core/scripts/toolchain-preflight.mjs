@@ -331,7 +331,6 @@ export const GIT_HOOKS_REPAIR_SCHEMA = "pipeline.git-hooks-repair.v1";
 export const ENVIRONMENT_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable"]);
 const FINDING_STATES = Object.freeze(["ok", "repairable", "attended", "unknown"]);
 const MAX_CAUSE_CHARS = 400;
-const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
 const MANDATORY_HOOK_IDS = Object.freeze(["pre-push-hook", "pre-commit-hook", "commit-msg-hook"]);
 const HOOK_INSTALLERS = Object.freeze({ "pre-push-hook": "./pre-push-hook-install.mjs", "pre-commit-hook": "./pre-commit-hook-install.mjs", "commit-msg-hook": "./commit-msg-hook-install.mjs" });
 const PATH_TOKEN = /(?:[A-Za-z]:[\\/]|(?<![\w.:-])[\\/](?=[\w.~-]))[^\s"'`<>|;,)]*/gu;
@@ -401,16 +400,20 @@ function gitVersionProbe({ rootDir, platform, tempDir, deps }) {
 
 async function locateKeyDirectory(rootDir, signingDeps) {
   const usable = (value) => typeof value === "string" && value.trim() !== "" && isAbsolute(value);
-  const { readMachinePlane } = await import("../lib/machine-plane.mjs");
-  const plane = readMachinePlane(signingDeps);
-  if (plane?.status === "invalid") {
-    return { directory: null, legacy: false, invalid: { findingId: "po-key-directory", status: "attended", cause: `machine-plane-invalid: the machine-scoped configuration is invalid (${String(plane.code ?? "no code")})`, repair: attendedPrerequisite("machine-plane-valid", "fix or remove the machine-scoped configuration file in your own terminal, then re-run the readiness report.") } };
+  // R7-6-F5 (PO decision AC): the ONE shared key-directory resolver, not a second copy of its order.
+  // Tiers: environment, machine plane, legacy per-repository value; a consulted store that is invalid
+  // is a failure, never "absent". Resolving a directory grants no trust; the anchor set decides.
+  const { resolvePoKeyDirectory } = await import("./po-human-approval.mjs");
+  const resolution = resolvePoKeyDirectory({ repoRoot: rootDir, dependencies: signingDeps });
+  if (resolution?.status === "invalid") {
+    const machinePlane = resolution.store === "machine-plane";
+    const invalid = machinePlane
+      ? { findingId: "po-key-directory", status: "attended", cause: `machine-plane-invalid: the machine-scoped configuration is invalid (${String(resolution.code ?? "no code")})`, repair: attendedPrerequisite("machine-plane-valid", "fix or remove the machine-scoped configuration file in your own terminal, then re-run the readiness report.") }
+      : { findingId: "po-key-directory", status: "attended", cause: `repo-scope-invalid: this repository's remembered PO key-directory store is invalid (${String(resolution.code ?? "no code")})`, repair: attendedPrerequisite("po-key-directory-store-valid", "fix or remove this repository's remembered PO key-directory store in your own terminal, then re-run the readiness report.") };
+    return { directory: null, legacy: false, invalid };
   }
-  if (plane?.status === "valid" && usable(plane.plane?.poKeyDirectory)) return { directory: plane.plane.poKeyDirectory, legacy: false, invalid: null };
-  const { resolveRepoScopedDirectory } = await import("../lib/po-key-directory.mjs");
-  const scoped = resolveRepoScopedDirectory(rootDir, signingDeps);
-  if (scoped?.status === "valid" && usable(scoped.directory)) return { directory: scoped.directory, legacy: true, invalid: null };
-  if (usable(process.env[PO_APPROVAL_DIRECTORY_ENV])) return { directory: process.env[PO_APPROVAL_DIRECTORY_ENV], legacy: false, invalid: null };
+  if (resolution?.status === "resolved" && usable(resolution.directory)) return { directory: resolution.directory, legacy: resolution.legacy === true, invalid: null };
+  // Unset, or a resolved value that is not an absolute path: treated as unset.
   return { directory: null, legacy: false, invalid: null };
 }
 
