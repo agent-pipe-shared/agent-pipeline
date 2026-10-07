@@ -4556,6 +4556,168 @@ test("R7-6f(i): an unreadable key directory yields the typed key-directory-unrea
   } finally { unreadable?.restore(); r76Release(env); }
 });
 
+/* ======================================================================
+ * R7-6-T6 (R7-6g): three signing-readiness probe defects, pinned against
+ * specs/sprint-alfred-epic/spec.md section 22.6 (Critic findings F5, F6, F8).
+ *
+ *  (i)   F5: with NO committed trust anchor, sign-intent reports
+ *        key-anchor-mismatch WITHOUT opening the private key file ("what the
+ *        probe never does": it never opens the private key).
+ *  (ii)  F6: the probe child's working directory is the OS user's home
+ *        directory, never the OS temporary directory. Section 22.6 closes its
+ *        class list at six names and has no class for "no admissible working
+ *        directory" or for "a local I/O failure while preparing the throwaway
+ *        material"; these cases therefore pin only what the spec fixes (no
+ *        temporary-directory fallback, never openssl-no-ed25519, no
+ *        replace-OpenSSL repair, a repair is carried) and assert NO positive
+ *        class name for those two situations.
+ *  (iii) F8: an absolute host path that contains a space is fully redacted
+ *        from the stderr-head detail (R7-6c, R7-6f(iii), section 22.0).
+ *
+ * Same safety rules as the R7-6 block above: every OpenSSL is a stub behind
+ * the injectable spawn seam, no prompt can block, keys are throwaway fixtures
+ * in per-test directories, the private key of the trap case is a non-key string.
+ * ====================================================================== */
+import { probeSigningReadiness } from "./po-human-approval.mjs";
+
+const R76G_SPACED_PATHS = [String.raw`C:\Users\Jane Doe\keys\x`, "/Users/Jane Doe/Library/x"];
+const R76G_SPACED_FRAGMENTS = ["Jane", "Doe", "Library", "Users"];
+const R76G_STDERR_SHAPES = [
+  { name: "path at the end of the line", line: (path) => `openssl: could not open ${path}` },
+  { name: "path in double quotes followed by more text", line: (path) => `openssl: could not open "${path}" for reading` },
+];
+
+/** A stub OpenSSL that fails every call with exit code 87 and a caller-chosen first stderr line. */
+function r76gStderrSpy(firstLine) {
+  const calls = [];
+  const spawn = (executable, args = [], options = {}) => {
+    calls.push({ executable, args: args.map(String), options });
+    return { status: 87, stdout: "", stderr: `${firstLine}\n` };
+  };
+  return { spawn, calls };
+}
+
+/** The read-only probe (steps a to c) against the env's key directory, with the home and temporary directories injected. */
+function r76gProbe(env, { home, tmp, spy }) {
+  return probeSigningReadiness({
+    repository: env.dirs.repoRoot,
+    directory: env.dirs.directory,
+    dependencies: { homedirFn: () => home, tmpdirFn: () => tmp, spawn: spy.spawn },
+  });
+}
+
+/** What section 22.6 fixes for a probe that could not run its round trip for a reason that is not the toolchain. */
+function r76gAssertNotAToolchainReplacement(result, label) {
+  assert.equal(result.ok, false, `${label}: a probe that could not complete its round trip never reports ok`);
+  const failing = result.findings.find((entry) => entry.status !== "ok");
+  assert.ok(failing, `${label}: a non-ok finding is required`);
+  assert.equal(String(failing.cause).startsWith("openssl-no-ed25519"), false, `${label}: the cause must not be classified openssl-no-ed25519 (the openssl on the PATH was not the problem); observed '${String(failing.cause).slice(0, 140)}'`);
+  assert.ok(failing.repair !== undefined && failing.repair !== null && failing.repair !== "", `${label}: a non-ok result carries its own repair (typed repair rule, section 22.0)`);
+  assert.notEqual(failing.repair?.prerequisite, "openssl-with-ed25519", `${label}: the repair must not ask the PO to replace or reorder OpenSSL`);
+  assert.equal(/ed25519/iu.test(JSON.stringify(failing.repair)), false, `${label}: the repair must not be the replace-OpenSSL repair; observed ${JSON.stringify(failing.repair).slice(0, 160)}`);
+}
+
+test("R7-6g(i) (F5): with NO committed trust anchor sign-intent reports key-anchor-mismatch without opening the private key file and without passing its path to any process", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  try {
+    keyFixture(env.dirs.directory);
+    writeFileSync(join(env.dirs.directory, "po-private.pem"), R76_TRAP);
+    assert.equal(existsSync(join(env.dirs.repoRoot, "project/critical-human-proof.json")), false, "harness: the fixture repository declares no trust anchor");
+    const spied = r76WithPrivateKeyReadSpy(() => r76Sign(env, spy));
+    const finding = r76AssertTyped(spied.result, { cls: "key-anchor-mismatch", findingId: "trust-anchor-match", status: "attended" });
+    assert.ok(finding.repair, "the repair names where the anchored key lives or the one-time key setup");
+    assert.deepEqual(spied.opened, [], "with zero committed anchors the private key file is still never read or opened (spec 22.6, what the probe never does)");
+    assert.deepEqual(r76KeyPathSpawns(spy), [], "no process may be started with the private key path");
+    assert.deepEqual(spy.calls.filter((call) => call.args.some((entry) => entry.includes(env.dirs.directory))), [], "no process receives any path inside the PO key directory");
+    assert.equal(r76Prompts(env), 0, "the typed result ends the command before any prompt");
+    assert.equal(r76Text(spied.result).includes(R76_TRAP), false, "no key byte in the result");
+  } finally { r76Release(env); }
+});
+
+test("R7-6g(ii)-a (F6): the probe child's working directory is the OS user's home directory, never the OS temporary directory", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  const scratch = mkdtempSync(join(tmpdir(), "r76g-"));
+  try {
+    r76KeyFixture(env);
+    const tmp = join(scratch, "tmp");
+    mkdirSync(tmp);
+    const result = r76gProbe(env, { home: env.home, tmp, spy });
+    assert.equal(result.ok, true, `harness: a healthy stub with a matching anchor must pass the whole probe; observed ${JSON.stringify(result.findings).slice(0, 200)}`);
+    assert.ok(spy.calls.length > 0, "harness: the probe starts openssl");
+    for (const call of spy.calls) {
+      assert.equal(typeof call.options?.cwd, "string", "every probe spawn has an explicit working directory");
+      const cwd = realpathSync(call.options.cwd);
+      assert.equal(cwd, realpathSync(env.home), `the probe spawn ${call.args.slice(0, 2).join(" ")} must run from the home directory section 22.6 names`);
+      assert.notEqual(cwd, realpathSync(tmp), "never the injected temporary directory");
+      assert.notEqual(cwd, realpathSync(tmpdir()), "never the OS temporary directory");
+    }
+  } finally { rmSync(scratch, { recursive: true, force: true }); r76Release(env); }
+});
+
+test("R7-6g(ii)-b (F6): with no admissible working directory outside every repository the probe never falls back to the OS temporary directory and is not classified openssl-no-ed25519", () => {
+  for (const variant of ["home-inside-a-repository", "home-names-no-directory"]) {
+    const env = r76Env();
+    const spy = r76Spy("healthy", env.events);
+    const scratch = mkdtempSync(join(tmpdir(), "r76g-"));
+    try {
+      const tmp = join(scratch, "tmp");
+      mkdirSync(tmp);
+      let home;
+      if (variant === "home-inside-a-repository") {
+        const fakeRepository = join(scratch, "repo");
+        mkdirSync(join(fakeRepository, ".git"), { recursive: true });
+        home = join(fakeRepository, "home");
+        mkdirSync(home);
+      } else {
+        home = join(scratch, "no-such-home");
+      }
+      assert.equal(r76OutsideEveryRepository(tmp, env.dirs.repoRoot), true, "harness: the injected temporary directory itself is admissible, so a fallback to it is observable");
+      const result = r76gProbe(env, { home, tmp, spy });
+      for (const call of spy.calls) {
+        assert.equal(typeof call.options?.cwd, "string", `${variant}: every probe spawn has an explicit working directory`);
+        const cwd = realpathSync(call.options.cwd);
+        assert.notEqual(cwd, realpathSync(tmp), `${variant}: the probe ran ${call.args.slice(0, 2).join(" ")} from the OS temporary directory; section 22.6 names the OS user's home directory and never the temporary one`);
+        assert.ok(r76OutsideEveryRepository(cwd, env.dirs.repoRoot), `${variant}: the working directory lies outside every repository`);
+      }
+      r76gAssertNotAToolchainReplacement(result, variant);
+    } finally { rmSync(scratch, { recursive: true, force: true }); r76Release(env); }
+  }
+});
+
+test("R7-6g(ii)-c (F6): a local I/O failure while preparing the throwaway material is not classified openssl-no-ed25519", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  const scratch = mkdtempSync(join(tmpdir(), "r76g-"));
+  try {
+    r76KeyFixture(env);
+    const blocker = join(scratch, "not-a-directory");
+    writeFileSync(blocker, "a regular file where the temporary directory should be, so preparing the throwaway directory fails locally");
+    const result = r76gProbe(env, { home: env.home, tmp: blocker, spy });
+    assert.ok(spy.calls.some((call) => call.args[0] === "version"), "harness: the openssl on the PATH answered its version call, so the failure is local and not a toolchain defect");
+    r76gAssertNotAToolchainReplacement(result, "local I/O failure");
+  } finally { rmSync(scratch, { recursive: true, force: true }); r76Release(env); }
+});
+
+test("R7-6g(iii) (F8): an absolute host path that contains a space is fully redacted from the stderr-head detail of a failing probe", () => {
+  for (const path of R76G_SPACED_PATHS) {
+    for (const shape of R76G_STDERR_SHAPES) {
+      const label = `${path} (${shape.name})`;
+      const env = r76Env();
+      const spy = r76gStderrSpy(shape.line(path));
+      try {
+        r76KeyFixture(env);
+        const text = r76Text(r76Sign(env, spy));
+        assert.match(text, /\b87\b/u, `${label}: harness: the failing stub's exit code reaches the result`);
+        assert.ok(text.includes("could not open"), `${label}: harness: the stderr head's own words reach the result, so the redaction is what is observed`);
+        assert.equal(text.includes(path), false, `${label}: the whole path must be redacted`);
+        for (const fragment of R76G_SPACED_FRAGMENTS) assert.equal(text.includes(fragment), false, `${label}: the fragment '${fragment}' of the path survived the redaction; observed '${text.split("\n").find((line) => line.includes(fragment))?.slice(0, 200)}'`);
+      } finally { r76Release(env); }
+    }
+  }
+});
+
 test("the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (fixtureDirs variant)", () => {
   const dirs = fixtureDirs();
   try {
