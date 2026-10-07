@@ -948,9 +948,28 @@ function unitHasShellHeredocReceiver(unit) {
   return words.some(isHeredocReceiverWord);
 }
 
+// vi and vim run as the line editor `ex` (they read ex commands, `!command` included, from standard input) when an ex-mode
+// option stands among their leading options: `-e`, `-E`, or a cluster holding one (`-es`, `-Es`); `-e`/`-E` with a separate `-s`
+// is the same thing. Without it (`vim <<EOF`) they are not receivers.
+const HEREDOC_VI_NAMES = new Set(["vi", "vim"]);
+const VI_EX_MODE_OPTION_RE = /^-[a-zA-Z]*[eE][a-zA-Z]*$/u;
+
+/** True when a word of the unit names vi or vim and an ex-mode option follows it among its leading options. */
+function unitHasViExModeReceiver(words) {
+  for (let i = 0; i < words.length; i += 1) {
+    if (!baseIsNamed(heredocWordBase(words[i]), HEREDOC_VI_NAMES)) continue;
+    for (let j = i + 1; j < words.length; j += 1) {
+      const option = words[j].replace(/['"‘-‟]/gu, "");
+      if (!option.startsWith("-")) break;
+      if (VI_EX_MODE_OPTION_RE.test(option)) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * True when one unit of the view hands a `<<` text to a command runner (PO decision AF): a word naming xargs, at, batch, ed,
- * ex, sqlite3, php or lua, or awk with its program on standard input (`awk -f -`). Like the shell test, ANY word of the unit
+ * ex, sqlite3, php or lua, vi or vim with an ex-mode option (`-e`, `-E`, `-es`, `-Es`, see `unitHasViExModeReceiver`), or awk with its program on standard input (`awk -f -`). Like the shell test, ANY word of the unit
  * counts, so a path, a `.exe` or version suffix, a wrapper word (`sudo xargs`) and a glob that could expand to a runner are
  * found as well; `awk NF <<EOF` (the here-document is awk's INPUT) is not a runner.
  */
@@ -958,6 +977,7 @@ function unitHasRunnerHeredocReceiver(unit) {
   if (!unit.includes("<<")) return false;
   const words = unit.split(HEREDOC_WORD_SPLIT_RE).filter((word) => word !== "");
   if (words.some(isHeredocRunnerWord)) return true;
+  if (unitHasViExModeReceiver(words)) return true;
   return words.some(isHeredocAwkWord) && unitHasAwkStdinProgram(words);
 }
 
@@ -1078,7 +1098,7 @@ function hasFailClosedMarker(cmd) {
  * NOT modelled, still open (QG-06 needs an owner and an expiry set by the dispatcher; tracked in
  * backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md): PowerShell here-strings
  * (`@"..."@`) hold no marker of the list above. Likewise, the receiver lists of decisions X and AF do not model every
- * command that runs text from standard input (vi/vim `-es`, `busybox` applets, ...): a here-document fed to one of those is
+ * command that runs text from standard input (`busybox` applets, ...): a here-document fed to one of those is
  * data to this rule (an extension of the receiver list is a new PO decision, not a test edit).
  *
  * DECISION AF (command runners, a rule after the marker rule, see `hasRunnerHeredocReceiver`): a here-document or here-string
