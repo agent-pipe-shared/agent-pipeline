@@ -704,3 +704,209 @@ test("U3-19: the module imports only node:crypto, the U1 and U2 modules and po-a
   const specifiers = [...source.matchAll(/\bfrom\s*["']([^"']+)["']/gu)].map((match) => match[1]);
   assert.deepStrictEqual([...new Set(specifiers)].sort(), ["./design-consistency-check.mjs", "./design-review-receipt.mjs", "./po-approval-proof.mjs", "node:crypto"]);
 });
+
+// ---------------------------------------------------------------------------
+// U3-20: a companion deleted after a round-2 receipt (U3 Critic round 1, F1 and
+// ruling (7), derived from decision Z). Contract section 4 ("no null sha256" in
+// sources) and section 6 ("an absent current file has currentSha256: null") meet
+// here: the deleted companion leaves binding.sources and appears in the delta.
+// Each case first builds its unmutated input and asserts it is accepted.
+// ---------------------------------------------------------------------------
+
+/** The sources with exactly one companion's digest nulled: the file is gone from the working tree. */
+function withDeletedCompanion(sources, path) {
+  assert.ok(sources.companions.some((companion) => companion.path === path), `fixture: ${path} is a bound companion`);
+  return {
+    prd: sources.prd,
+    spec: sources.spec,
+    companions: sources.companions.map((companion) => (companion.path === path ? { path: companion.path, sha256: null } : companion)),
+  };
+}
+
+test("U3-20: a companion deleted after a round-2 receipt is omitted from binding.sources and listed in unreviewedSourceDelta with a null current digest", () => {
+  const base = deltaScenario();
+  const unmutated = mustCreate(base);
+  assert.deepStrictEqual(unmutated.binding.sources, base.deltaSources, "fixture: the unmutated input binds all three companions");
+  assert.equal(Object.hasOwn(unmutated.binding, "unreviewedSourceDelta"), false, "fixture: the unmutated input has no unreviewed delta");
+  for (const { path, sha256: reviewedSha256 } of base.deltaSources.companions) {
+    assert.match(reviewedSha256, /^[a-f0-9]{64}$/u);
+    const scenario = { ...base, currentSources: withDeletedCompanion(base.currentSources, path) };
+    assert.deepStrictEqual(chainCauses(FEATURE, asInput(...scenario.receipts), scenario.currentSources), [], `fixture: U1 reports no inconsistency after a delta receipt (${path} deleted)`);
+    const made = create(scenario);
+    assert.equal(made.ok, true, `${path} deleted: ${JSON.stringify(made)}`);
+    assert.deepStrictEqual(Object.keys(made).sort(), ["binding", "bindingSha256", "ok"]);
+    const expected = {
+      schema: "pipeline.design-approval-binding.v1",
+      featureId: FEATURE,
+      sources: {
+        prd: base.deltaSources.prd,
+        spec: base.deltaSources.spec,
+        companions: base.deltaSources.companions.filter((companion) => companion.path !== path),
+      },
+      reviewReceipts: [
+        { path: RECEIPT_1, sha256: base.first.sha256, round: 1 },
+        { path: RECEIPT_2, sha256: base.second.sha256, round: 2 },
+      ],
+      verdict: "open-findings",
+      openFindingIds: ["F-3"],
+      unreviewedSourceDelta: [{ path, reviewedSha256, currentSha256: null }],
+    };
+    assert.equal(made.binding.sources.companions.some((companion) => companion.path === path), false, `${path} is omitted from binding.sources`);
+    assert.deepStrictEqual(made.binding, expected, `${path} deleted`);
+    assert.equal(made.bindingSha256, bindingShaOf(expected));
+    assert.deepStrictEqual(validateDesignApprovalBinding(made.binding), { ok: true, bindingSha256: made.bindingSha256 });
+    const created = mustRequest(made);
+    assert.deepStrictEqual(verify(created.request, scenario), {
+      ok: true,
+      bindingSha256: made.bindingSha256,
+      intentSha256: created.intentSha256,
+      candidate: CANDIDATE,
+      verdict: "open-findings",
+      openFindingIds: ["F-3"],
+    }, `${path} deleted: the request round-trips`);
+  }
+});
+
+test("U3-20b: an absent PRD or an absent Spec after a round-2 receipt stays a refusal (DAB-SHAPE), because the approval intent binds both digests", () => {
+  const base = deltaScenario();
+  mustCreate(base);
+  const { prd, spec, companions } = base.currentSources;
+  const variants = {
+    "absent PRD": { prd: { path: prd.path, sha256: null }, spec, companions },
+    "absent Spec": { prd, spec: { path: spec.path, sha256: null }, companions },
+  };
+  for (const [label, currentSources] of Object.entries(variants)) {
+    assertRefusal(create({ ...base, currentSources }), "DAB-SHAPE", [], label);
+  }
+});
+
+test("U3-20c: a companion deleted after an initial (round-1) receipt stays DAB-REVIEW-CHAIN with DCC-REVIEW-RECEIPT-BINDING (the delta review is still owed)", () => {
+  const base = passScenario();
+  mustCreate(base);
+  for (const { path } of base.sources.companions) {
+    const scenario = { ...base, currentSources: withDeletedCompanion(base.currentSources, path) };
+    const refusal = create(scenario);
+    assertRefusal(refusal, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-RECEIPT-BINDING"], `${path} deleted`);
+    assert.deepStrictEqual(refusal.causes, chainCauses(FEATURE, asInput(...scenario.receipts), scenario.currentSources), `${path} deleted: the causes are what the real U1 check reports`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// U3-21: negative pins for the validator rules that carry decisions U and Z
+// (U3 Critic round 1, F2, QG-11). Each mutation is applied alone to a fresh copy
+// of a binding that is first asserted to be accepted.
+// ---------------------------------------------------------------------------
+
+/** A valid round-2 binding with two open findings and no unreviewed delta. */
+function plainBinding() {
+  const binding = structuredClone(mustCreate(deltaScenario()).binding);
+  binding.openFindingIds = ["F-3", "F-5"];
+  return binding;
+}
+
+/** A valid round-2 binding with two open findings and a three-entry unreviewedSourceDelta over bound paths. */
+function driftBinding() {
+  const binding = structuredClone(mustCreate(driftScenario()).binding);
+  binding.openFindingIds = ["F-3", "F-5"];
+  return binding;
+}
+
+/** A valid round-2 binding whose delta is the deletion shape: one entry for a path the sources do not bind. */
+function deletionBinding() {
+  const binding = plainBinding();
+  binding.unreviewedSourceDelta = [{ path: `${DIR}/gone.md`, reviewedSha256: digestOf("gone"), currentSha256: null }];
+  return binding;
+}
+
+/** Entries for unbound paths, ascending by path, each a deletion: the only way to build a long valid delta. */
+const deletionEntries = (count) => Array.from({ length: count }, (_, index) => ({
+  path: `${DIR}/gone/file-${String(index).padStart(3, "0")}.md`,
+  reviewedSha256: digestOf(`gone-${index}`),
+  currentSha256: null,
+}));
+
+const strictlyAscending = (list) => list.every((entry, index) => index === 0 || entry > list[index - 1]);
+
+function assertMutationsRefused(makeBase, mutations) {
+  const base = makeBase();
+  assert.deepStrictEqual(validateDesignApprovalBinding(base), { ok: true, bindingSha256: bindingShaOf(base) }, "fixture: the unmutated binding is accepted");
+  for (const [label, mutate] of Object.entries(mutations)) {
+    const forged = structuredClone(base);
+    mutate(forged);
+    assert.notDeepStrictEqual(forged, base, `fixture: the mutation changes the binding (${label})`);
+    assertRefusal(validateDesignApprovalBinding(forged), "DAB-SHAPE", [], label);
+  }
+}
+
+test("U3-21: a verdict that disagrees with the open-finding list (pass with findings, open-findings with none) is DAB-SHAPE", () => {
+  assertMutationsRefused(plainBinding, {
+    "verdict pass with a non-empty openFindingIds": (b) => { b.verdict = "pass"; },
+    "verdict open-findings with an empty openFindingIds": (b) => { b.openFindingIds = []; },
+  });
+});
+
+test("U3-21b: an untruthful unreviewedSourceDelta entry (reviewed digest equals current digest; current digest differs from the binding's own) is DAB-SHAPE", () => {
+  assertMutationsRefused(driftBinding, {
+    "reviewedSha256 equals currentSha256": (b) => { b.unreviewedSourceDelta[0].reviewedSha256 = b.unreviewedSourceDelta[0].currentSha256; },
+    "currentSha256 differs from the binding's own digest for the path": (b) => { b.unreviewedSourceDelta[0].currentSha256 = digestOf("not-the-bound-digest"); },
+    "currentSha256 null for a path the sources bind": (b) => { b.unreviewedSourceDelta[0].currentSha256 = null; },
+  });
+});
+
+test("U3-21c: a binding path that is not a SafePath (absolute, with .., with a backslash) is DAB-SHAPE", () => {
+  const badForms = {
+    absolute: (path) => `/${path}`,
+    "parent traversal": (path) => `../${path}`,
+    backslash: (path) => path.replaceAll("/", "\\"),
+  };
+  const mutations = {};
+  for (const [form, bad] of Object.entries(badForms)) {
+    mutations[`PRD path ${form}`] = (b) => { b.sources.prd.path = bad(b.sources.prd.path); };
+    mutations[`receipt path ${form}`] = (b) => { b.reviewReceipts[0].path = bad(b.reviewReceipts[0].path); };
+  }
+  assertMutationsRefused(plainBinding, mutations);
+  const deltaMutations = {};
+  for (const [form, bad] of Object.entries(badForms)) {
+    deltaMutations[`delta path ${form}`] = (b) => { b.unreviewedSourceDelta[0].path = bad(b.unreviewedSourceDelta[0].path); };
+  }
+  assertMutationsRefused(deletionBinding, deltaMutations);
+});
+
+test("U3-21d: a PRD path equal to the Spec path, a companion equal to the PRD or Spec path, or companions not strictly ascending is DAB-SHAPE", () => {
+  assertMutationsRefused(plainBinding, {
+    "PRD path equal to the Spec path": (b) => { b.sources.prd.path = b.sources.spec.path; },
+    "companion equal to the PRD path": (b) => {
+      b.sources.companions[0].path = b.sources.prd.path;
+      assert.ok(strictlyAscending(b.sources.companions.map(({ path }) => path)), "fixture: only the overlap is wrong, the order is still ascending");
+    },
+    "companion equal to the Spec path": (b) => {
+      b.sources.companions[1].path = b.sources.spec.path;
+      assert.ok(strictlyAscending(b.sources.companions.map(({ path }) => path)), "fixture: only the overlap is wrong, the order is still ascending");
+    },
+    "companions in descending order": (b) => { b.sources.companions.reverse(); },
+    "two adjacent companions with the same path": (b) => { b.sources.companions[1] = { ...b.sources.companions[0] }; },
+  });
+});
+
+test("U3-21e: an openFindingIds list with duplicates, in the wrong order or holding an id outside the finding-id pattern is DAB-SHAPE", () => {
+  assertMutationsRefused(plainBinding, {
+    "duplicate ids": (b) => { b.openFindingIds = ["F-3", "F-3"]; },
+    "unsorted ids": (b) => { b.openFindingIds = ["F-5", "F-3"]; },
+    "id without a hyphenated segment": (b) => { b.openFindingIds = ["F3"]; },
+    "lowercase id": (b) => { b.openFindingIds = ["f-3"]; },
+    "id with a trailing space": (b) => { b.openFindingIds = ["F-3 "]; },
+    "id that is only a prefix": (b) => { b.openFindingIds = ["F-"]; },
+    "non-string id": (b) => { b.openFindingIds = [3]; },
+  });
+});
+
+test("U3-21f: an unreviewedSourceDelta of 133 entries is DAB-SHAPE, while 132 otherwise valid entries are accepted (the size cap)", () => {
+  const withEntries = (count) => () => {
+    const binding = plainBinding();
+    binding.unreviewedSourceDelta = deletionEntries(count);
+    return binding;
+  };
+  assertMutationsRefused(withEntries(132), {
+    "133 entries": (b) => { b.unreviewedSourceDelta = deletionEntries(133); },
+  });
+});
