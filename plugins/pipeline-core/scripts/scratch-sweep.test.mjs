@@ -1015,7 +1015,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
      * that makes the case what it claims to be (the relative() result of the swap target against the
      * physical scratch/): `..`-prefixed for the same-volume control, an absolute path across volumes.
      */
-    function swapAfterPlanning(t, fx, outside, acceptRelative, relativeLabel) {
+    function swapAfterPlanning(t, fx, outside, acceptRelative, relativeLabel, extraEnv = {}) {
       if (outside.skip) {
         t.skip(outside.skip);
         return;
@@ -1039,7 +1039,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
 
       const relativeToScratch = path.relative(fs.realpathSync(fx.abs('scratch')), outsideFile);
       assert.ok(acceptRelative(relativeToScratch), `precondition: relative(physical scratch/, swap target file) ${relativeLabel}: ${relativeToScratch}`);
-      const planned = parseStdout(runCli(fx, [...realClockArgs(fx), '--sweep'])).plan.delete;
+      const planned = parseStdout(runCliWith(fx, [...realClockArgs(fx), '--sweep'], { env: extraEnv })).plan.delete;
       assert.deepEqual(planned, ['scratch/a-control-old.md', 'scratch/victim/old.md'], 'both files are planned candidates before the swap');
 
       const hook = path.join(fx.cwd, 'apply-swap-hook.mjs');
@@ -1052,6 +1052,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
       const result = runCliWith(fx, [...realClockArgs(fx), '--apply'], {
         nodeArgs: ['--import', pathToFileURL(hook).href],
         env: {
+          ...extraEnv,
           C_S_T5_SWAP_TARGET: fx.abs('scratch/victim/old.md'),
           C_S_T5_SWAP_DIR: victimDir,
           C_S_T5_SWAP_LINK_TARGET: outside.dir,
@@ -1086,5 +1087,51 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
       inFixture({}, (fx) => {
         swapAfterPlanning(t, fx, createCrossVolumeDirectory(fx), (rel) => path.isAbsolute(rel), 'is an absolute path (different volume)');
       }));
+
+  /**
+   * C-S-T6: two apply-time gaps. (1) The apply-time containment check only asks "is the realpath
+   * inside scratch/", so a parent swapped after planning for a link INTO a protected part of
+   * scratch/ (a live scratch/dispatch/<dir>/ or a live plugin root) is deleted through. (2) The
+   * apply-time check treats a first-level name that starts with a letter and a colon as a drive
+   * path, so --apply keeps a file that --check listed, though the preview must equal the apply set.
+   */
+  describe('C-S-T6: apply-time gaps of scratch-sweep --apply', () => {
+    const toPosix = (rel) => rel.split(path.sep).join('/');
+
+    test('C-S-T6: a parent swapped after planning for a link INTO a live scratch/dispatch/<dir>/ is not deleted through', (t) =>
+      inFixture({}, (fx) => {
+        const liveDir = fx.abs('scratch/dispatch/live-run');
+        fs.mkdirSync(liveDir, { recursive: true });
+        swapAfterPlanning(t, fx, { dir: liveDir }, (rel) => toPosix(rel) === 'dispatch/live-run/old.md', 'lies inside the live scratch/dispatch/live-run/');
+      }));
+
+    test('C-S-T6: a parent swapped after planning for a link INTO a live plugin root under scratch/ is not deleted through', (t) =>
+      inFixture({}, (fx) => {
+        // scratchLivePluginRoots() admits CLAUDE_PLUGIN_ROOT when it has hooks/ and .claude-plugin/plugin.json.
+        const pluginRoot = fx.abs('scratch/live-plugin');
+        fs.mkdirSync(path.join(pluginRoot, 'hooks'), { recursive: true });
+        fs.mkdirSync(path.join(pluginRoot, '.claude-plugin'), { recursive: true });
+        fs.writeFileSync(path.join(pluginRoot, '.claude-plugin', 'plugin.json'), '{}\n');
+        swapAfterPlanning(t, fx, { dir: pluginRoot }, (rel) => toPosix(rel) === 'live-plugin/old.md', 'lies inside the live plugin root scratch/live-plugin/', { CLAUDE_PLUGIN_ROOT: pluginRoot });
+      }));
+
+    test('C-S-T6: a first-level scratch name starting with a letter and a colon is deleted by --apply when --check lists it', (t) =>
+      inFixture({}, (fx) => {
+        if (process.platform === 'win32') {
+          t.skip('colon is not a legal file-name character on win32');
+          return;
+        }
+        const rel = 'scratch/c:notes.md';
+        writeAged(fx, rel, 40);
+        const previewed = parseStdout(runCli(fx, [...realClockArgs(fx), '--check'])).plan.delete;
+        assert.ok(previewed.includes(rel), `--check lists the file: ${JSON.stringify(previewed)}`);
+        const result = runCli(fx, [...realClockArgs(fx), '--apply']);
+        assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
+        const report = parseStdout(result);
+        assert.ok(report.plan.delete.includes(rel), `the apply plan lists the file: ${JSON.stringify(report.plan.delete)}`);
+        assert.ok(report.deleted.includes(rel), `the file --check listed is deleted by --apply: ${JSON.stringify(report.deleted)}`);
+        assert.ok(!fx.exists(rel), 'the file is gone from disk');
+      }));
+  });
   });
 });
