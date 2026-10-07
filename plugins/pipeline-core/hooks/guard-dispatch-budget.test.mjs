@@ -1562,3 +1562,208 @@ test("R7-11d-T3: with no injected clock the wait is monotonic: Date.now jumping 
   assert.ok(result.realElapsedMs >= bound - 50, `the call gave up after only ${Math.round(result.realElapsedMs)} ms of a ${bound} ms bound`);
   assert.ok(result.realElapsedMs <= bound + 500, `the call took ${Math.round(result.realElapsedMs)} ms of real time, beyond the ${bound} ms bound plus 500 ms`);
 });
+
+// =================================================================================================
+// Task R7-11-T4: pin the split between BENIGN recovery races and GENUINE recovery failures (test-only).
+// Contract (Spec 22.11): the accounting "must never refuse a call only because another call holds its lock";
+// "a malformed, unsafe or ambiguous lock stays fail-closed; waiting applies only to a live owner"; R7-11a/b:
+// admitted and counted once. These cases define the behaviour of the REAL dead-owner recovery path of
+// acquireDispatchBudgetCounterLock, reached through the real wait loop and the real hook:
+//   1. the recovery lock vanishes between the EEXIST link attempt and the existence check (the winner finished its
+//      recovery and now holds a live main lock): not a refusal -- wait for the winner, admitted, counted once;
+//   2. the stale-recovery-lock takeover hits ENOENT (rename) or EEXIST (republish) because a parallel caller took it
+//      first: retried, admitted, counted once;
+//   3. the main-lock republish after the dead-owner rename hits ENOENT or EEXIST (a fresh caller published first):
+//      retried, admitted, counted once;
+//   4. a GENUINE I/O failure (EACCES, EPERM, EIO from the rename / unlink / link step of recovery) refuses at once,
+//      fail-closed, under its own reason code counter-lock-recovery-failed: not counter-lock-recovery-raced, never
+//      retried (no sleep), and the counter is untouched.
+// Seams: NOT acquireDispatchBudgetCounterLockFn (that would script the result). The hook forwards its own options
+// object to the real wait loop and the real single attempt as `dependencies`, so the filesystem seams linkSyncFn /
+// renameSyncFn / unlinkSyncFn wrap the REAL fs calls and deviate exactly once, at one named step. A parallel caller
+// is a real acquisition by the same child process (a live owner, as in the older R7-11 cases) that is advanced one
+// stage per injected sleep, so nothing waits in real time. The dead-owner locks are left behind by a child that has
+// exited. Each case asserts the injected step was actually reached, so no case can pass vacuously. Which of these
+// are RED or GREEN at a given commit is recorded by the evidence capture, not hard-coded here.
+// Not pinned here (adjacent, left to the fix task): a recovery lock that vanishes between the existence check and
+// the stable read, and an unlink failure of the quarantined dead lock AFTER the new main lock was published.
+// =================================================================================================
+const R711T4_RUNNER_SOURCE = String.raw`
+import { pathToFileURL } from 'node:url';
+import { existsSync, linkSync, renameSync, unlinkSync } from 'node:fs';
+
+const [, , guardPath, configB64] = process.argv;
+const cfg = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8'));
+const mod = await import(pathToFileURL(guardPath).href);
+const emit = (value) => console.log('R711-RESULT: ' + JSON.stringify(value));
+const mainPath = cfg.lockPath;
+const recoveryPath = mainPath + '.recovery';
+const trap = cfg.trap;
+const events = [];
+const held = { main: null, recovery: null };
+let fired = false;
+
+const fsError = (code, syscall) => Object.assign(new Error(code + ': simulated ' + syscall + ' failure'), { code });
+
+// The parallel caller ("winner"): REAL acquisitions through the guard's own default filesystem seams, made by this
+// process, so its lock is live (same pid) exactly like the holder of the older R7-11 cases.
+const winnerAction = (action) => {
+  if (action === 'take-main' || action === 'take-recovery') {
+    const slot = action === 'take-main' ? 'main' : 'recovery';
+    const taken = mod.acquireDispatchBudgetCounterLock(slot === 'main' ? mainPath : recoveryPath);
+    if (taken.status !== 'acquired') throw new Error('fixture winner could not ' + action + ': ' + JSON.stringify(taken));
+    held[slot] = taken.lock;
+    events.push(action);
+  } else if (action === 'release-main' || action === 'release-recovery') {
+    const slot = action === 'release-main' ? 'main' : 'recovery';
+    if (held[slot] !== null) {
+      events.push(action + ':' + mod.releaseDispatchBudgetCounterLock(held[slot]));
+      held[slot] = null;
+    }
+  } else throw new Error('unknown winner action ' + action);
+};
+
+// Where the single injected deviation happens. The conditions keep the release path of the admitted call (which
+// renames/unlinks the same main lock) from ever matching.
+const matches = (kind, a, b) => {
+  if (trap.fn !== kind) return false;
+  if (trap.target === 'recovery-link') return b === recoveryPath;
+  if (trap.target === 'stale-recovery-rename') return a === recoveryPath;
+  if (trap.target === 'stale-recovery-unlink') return typeof a === 'string' && a.startsWith(recoveryPath + '.dead.');
+  if (trap.target === 'main-rename') return a === mainPath && existsSync(recoveryPath);
+  if (trap.target === 'main-republish-link') return b === mainPath && !existsSync(mainPath);
+  throw new Error('unknown trap target ' + trap.target);
+};
+const intercept = (kind, a, b, real) => {
+  if (fired || !matches(kind, a, b)) return real();
+  fired = true;
+  events.push('trap:' + kind + ':' + trap.effect);
+  if (trap.effect === 'fail') throw fsError(trap.error, kind);
+  if (trap.effect === 'winner-then-eexist') { for (const action of trap.winner) winnerAction(action); throw fsError('EEXIST', kind); }
+  if (trap.effect === 'winner-then-real') { for (const action of trap.winner) winnerAction(action); return real(); }
+  if (trap.effect === 'real-then-winner') { const result = real(); for (const action of trap.winner) winnerAction(action); return result; }
+  throw new Error('unknown trap effect ' + trap.effect);
+};
+
+let clock = Date.now();
+const sleeps = [];
+const now = () => clock;
+const sleep = (ms) => {
+  sleeps.push(ms);
+  if (sleeps.length > 200000) throw new Error('runaway wait loop: sleep() called more than 200000 times');
+  clock += ms;
+  for (const action of (cfg.stages[sleeps.length - 1] || [])) winnerAction(action);
+};
+
+const input = { agent_id: cfg.agentId, agent_type: 'pipeline-core:goldfish-implementor', transcript_path: '/unused.jsonl', tool_name: 'Read', tool_input: { file_path: '/x' } };
+const options = {
+  rootDir: cfg.rootDir,
+  resolveGitCommonDirFn: () => cfg.commonDir,
+  resolveMaxTurnsFn: () => 50,
+  now,
+  sleep,
+  linkSyncFn: (from, to) => intercept('link', from, to, () => linkSync(from, to)),
+  renameSyncFn: (from, to) => intercept('rename', from, to, () => renameSync(from, to)),
+  unlinkSyncFn: (path) => intercept('unlink', path, undefined, () => unlinkSync(path)),
+};
+const r = mod.evaluateDispatchBudgetGuard(input, options);
+const winnerHeldAtEnd = held.main !== null || held.recovery !== null;
+const mainExistsAfter = existsSync(mainPath);
+for (const action of ['release-recovery', 'release-main']) winnerAction(action);
+emit({ exitCode: r.exitCode, stderr: String(r.stderr || ''), sleeps, events, trapFired: fired, winnerHeldAtEnd, mainExistsAfter });
+`;
+let r711t4RunnerPathCache = null;
+function r711t4RunSync(config) {
+  if (r711t4RunnerPathCache === null) {
+    r711t4RunnerPathCache = join(runnerDir, "r711-t4-runner.mjs");
+    writeFileSync(r711t4RunnerPathCache, R711T4_RUNNER_SOURCE);
+  }
+  const b64 = Buffer.from(JSON.stringify(config), "utf8").toString("base64");
+  const res = spawnSync(process.execPath, [r711t4RunnerPathCache, GUARD, b64], { input: "", encoding: "utf8", timeout: RUNNER_TIMEOUT_MS });
+  assert.equal(res.status, 0, `R7-11-T4 runner exited ${res.status} (expected 0) -- stderr: ${String(res.stderr ?? "").trim().slice(0, 800)}`);
+  return r711ParseResult(res.stdout, "recovery");
+}
+
+/** One hook call against a real dead-owner lock (plus a real stale recovery lock when asked); returns the child's observations. */
+function r711t4Call(label, { staleRecovery = false, trap, stages = [] }) {
+  const agentId = `r711-agent-t4-${label}`;
+  const fixture = r711Fixture(`t4-${label}`, [agentId]);
+  const { counterPath, lockPath } = fixture.agents[agentId];
+  const steps = [{ op: "acquireRealLock", path: lockPath }];
+  if (staleRecovery) steps.push({ op: "acquireRealLock", path: `${lockPath}.recovery` });
+  for (const left of run({ steps }).results) assert.deepEqual(left, { status: "acquired", code: null, recovered: false }, "fixture: a lock left behind by a child that has exited");
+  const before = readFileSync(counterPath, "utf8");
+  const result = r711t4RunSync({ agentId, commonDir: fixture.commonDir, rootDir: FAKE_ROOT, lockPath, trap, stages });
+  return { agentId, fixture, counterPath, before, result };
+}
+
+/** A benign recovery race: reached, not refused, waited for the winner, admitted and counted exactly once. */
+function r711t4AssertBenign({ agentId, fixture, result }, expectedWinnerEvents) {
+  assert.equal(result.trapFired, true, `the injected race was never reached on the real recovery path -- events ${JSON.stringify(result.events)}`);
+  assert.equal(result.exitCode, 0, `a benign recovery race refused the call instead of retrying it: ${result.stderr}`);
+  assert.doesNotMatch(result.stderr, /counter-lock-recovery-raced|counter-lock-recovery-failed|counter-lock-busy|counter-lock-timeout/u, "no lock refusal reaches the agent");
+  assert.equal(r711Count(fixture, agentId), 1, "admitted and counted exactly once");
+  for (const event of expectedWinnerEvents) assert.ok(result.events.includes(event), `the winner must have released (${event}) while the call waited -- events ${JSON.stringify(result.events)}`);
+  assert.equal(result.winnerHeldAtEnd, false, "the call was admitted only after the winner released: a live holder is never taken over");
+  assert.equal(result.mainExistsAfter, false, "the admitted call released its own lock");
+}
+
+test("R7-11d-T4: a recovery lock that vanishes between the EEXIST link attempt and the existence check is not a refusal: the call waits for the winner's live main lock, then is admitted and counted once", () => {
+  const call = r711t4Call("vanish", {
+    trap: { fn: "link", target: "recovery-link", effect: "winner-then-eexist", winner: ["take-main"] },
+    stages: [["release-main"]],
+  });
+  r711t4AssertBenign(call, ["release-main:true"]);
+});
+
+test("R7-11d-T4: a stale-recovery-lock takeover that hits ENOENT because a parallel caller took it first is retried, admitted and counted once", () => {
+  const call = r711t4Call("stale-enoent", {
+    staleRecovery: true,
+    trap: { fn: "rename", target: "stale-recovery-rename", effect: "winner-then-real", winner: ["take-main"] },
+    stages: [["release-main"]],
+  });
+  r711t4AssertBenign(call, ["release-main:true"]);
+});
+
+test("R7-11d-T4: a stale-recovery-lock takeover whose republish hits EEXIST because a parallel caller published first is retried, admitted and counted once", () => {
+  const call = r711t4Call("stale-eexist", {
+    staleRecovery: true,
+    trap: { fn: "unlink", target: "stale-recovery-unlink", effect: "real-then-winner", winner: ["take-recovery"] },
+    stages: [["release-recovery", "take-main"], ["release-main"]],
+  });
+  r711t4AssertBenign(call, ["release-recovery:true", "release-main:true"]);
+});
+
+test("R7-11d-T4: a main-lock republish that hits ENOENT after the dead-owner rename is retried, admitted and counted once", () => {
+  const call = r711t4Call("republish-enoent", {
+    trap: { fn: "link", target: "main-republish-link", effect: "fail", error: "ENOENT" },
+  });
+  r711t4AssertBenign(call, []);
+});
+
+const R711T4_GENUINE_FAILURES = [
+  { label: "EACCES from the rename of the dead main lock into quarantine", staleRecovery: false, trap: { fn: "rename", target: "main-rename", effect: "fail", error: "EACCES" } },
+  { label: "EIO from the link that publishes the recovery lock", staleRecovery: false, trap: { fn: "link", target: "recovery-link", effect: "fail", error: "EIO" } },
+  { label: "EPERM from the rename of a stale recovery lock", staleRecovery: true, trap: { fn: "rename", target: "stale-recovery-rename", effect: "fail", error: "EPERM" } },
+  { label: "EIO from the unlink of a stale recovery lock", staleRecovery: true, trap: { fn: "unlink", target: "stale-recovery-unlink", effect: "fail", error: "EIO" } },
+  { label: "EACCES from the link that republishes the main lock", staleRecovery: false, trap: { fn: "link", target: "main-republish-link", effect: "fail", error: "EACCES" } },
+];
+R711T4_GENUINE_FAILURES.forEach(({ label, staleRecovery, trap }, index) => {
+  test(`R7-11d-T4: a genuine I/O failure (${label}) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change`, () => {
+    const { counterPath, before, result } = r711t4Call(`io-${index}`, { staleRecovery, trap });
+    assert.equal(result.trapFired, true, `the injected I/O failure was never reached on the real recovery path -- events ${JSON.stringify(result.events)}`);
+    assert.equal(result.exitCode, 2, `a genuine recovery failure must fail closed: ${result.stderr}`);
+    assert.equal(result.sleeps.length, 0, "a genuine I/O failure is never retried: one attempt, no sleep");
+    assert.equal(readFileSync(counterPath, "utf8"), before, "a refused call changes no counter");
+    assert.match(result.stderr, /counter-lock-recovery-failed/u, `a genuine recovery failure has its own reason code: ${JSON.stringify(result.stderr)}`);
+    assert.doesNotMatch(result.stderr, /counter-lock-recovery-raced|counter-lock-timeout/u, "it is neither a recovery race nor a timeout");
+  });
+});
+
+test("R7-11d-T4: a main-lock republish that hits EEXIST because a fresh caller published first is retried, admitted and counted once", () => {
+  const call = r711t4Call("republish-eexist", {
+    trap: { fn: "link", target: "main-republish-link", effect: "winner-then-real", winner: ["take-main"] },
+    stages: [["release-main"]],
+  });
+  r711t4AssertBenign(call, ["release-main:true"]);
+});
