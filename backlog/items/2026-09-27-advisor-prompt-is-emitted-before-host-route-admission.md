@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.advisor-prompt-is-emitted-before-host-route-admission
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 4f27d3e803388c806eb22de88d97f92ead2b730e
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Codex/WSL greenfield review B2 on 2026-09-27; bridge source-order verification in specs/sprint-alfred-epic/evidence/0.7-codex-greenfield-advisor-triage-2026-09-27.md."
 sprint: alfred
@@ -50,3 +54,8 @@ create an avoidable copy in logs.
   checks include a recognizable secret-like design marker.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 4f27d3e80: advisory-route-selection.mjs / design-advisory-coordinator.mjs (4f27d3e80); tests: advisory-route-selection.test.mjs 'only matching no-child route codes and statuses validate' and codex-advisor-execution.test.mjs 'Advisor export denial refuses before any source prompt construction or child launch'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

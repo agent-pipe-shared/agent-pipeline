@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.repeated-lifecycle-denials-are-not-counted
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Claude/Windows greenfield review F-11, 2026-09-27; reported seven lifecycle refusals but denial-class telemetry contained only the outside-root read class; source says lifecycle denials remain outside that recorder."
 sprint: none
@@ -40,6 +44,11 @@ instead of recycling the same inspection instruction.
 - A fixture distinguishes a legitimate retry after state change from a loop.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: lib/lifecycle-denial-loop.mjs observeReturnedActionDenial/resetLifecycleDenial; tests: lifecycle-denial-loop.test.mjs and hooks/lifecycle-denial-loop-guard.test.mjs.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07
 
 ## Prepared Codex loop diagnosis (2026-09-28)
 

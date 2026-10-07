@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.reopened-approved-plan-blocks-po-acknowledgement
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 21b30e597dfd4c25a62d70660853e579f3447d6e
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 sprint: alfred
 done_when: manual
@@ -44,6 +48,7 @@ unapproved current submission. A live Alfred readback confirms the new path.
 
 ## Triage
 
-- **Decision:** pending
-- **Assignment:** Alfred 0.7 release blocker
-- **Date:** 2026-09-27
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 21b30e597: scripts/pipeline-state.mjs po-authority-acknowledge-plan admits the exact reopened approval; test: pipeline-state.test.mjs reopened-approved acknowledgement block (applied, plus PO-ACK-STATE refusal on broken invalidation).
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

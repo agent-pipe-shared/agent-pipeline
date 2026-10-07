@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.historical-plan-cancellation-blocks-current-withdrawal
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 3b05a045e4acfd4e2d3393b6a0c015a799c2bee6
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-28
 source: "Actual canonical cancel-submitted-plan terminal b7dcd4 exited 2 with PLAN-CANCEL-ALREADY-CANCELLED and zero mutation. The current submission differs from a historical cancellation receipt retained from 2026-09-20. Source: lib/plan-spec-state-v2.mjs cancelSubmittedPlan."
 sprint: alfred
@@ -40,7 +44,7 @@ That recovery does not fix the withdrawal route.
 
 ## Triage
 
-- **Decision:** Include this confirmed lifecycle defect in the next local candidate.
-- **Assignment:** Plan cancellation transition/schema and existing writer tests.
-  Keep shared pipeline-state integration under one owner.
-- **Date:** 2026-09-28
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 3b05a045e: lib/plan-spec-state-v2.mjs cancelSubmittedPlan with retained cancellation history (3b05a045e); tests: plan-spec-state-v2.test.mjs 'Cancellation receipt for an older submission cannot strand the exact current successor' and two siblings.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ce411d8c0a119f846348e7d7ead00706c5dedb0c1660dcb9a46c4d16e8c01480"
+    "transitionHead": "4674e477311ff4ced5b6b5c6f4846093edb0a43e65ec3be56eb3b81a14a66acd"
   },
   "counts": {
-    "open": 178,
+    "open": 170,
     "in_progress": 0,
-    "closed": 643,
+    "closed": 657,
     "rejected": 3,
     "deferred": 11
   },
@@ -569,23 +569,31 @@
     },
     {
       "id": "pipeline.advisor-evidence-read-enforces-size-limit-after-allocation",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Independent read-only source audit of canonical advisory-lifecycle-v2.mjs and Scratch Codex Advisor binding, source 98e752a9. Physical reads are unbounded before declared limits; no large or private operator file was read.",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.advisor-prompt-is-emitted-before-host-route-admission",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Codex/WSL greenfield review B2 on 2026-09-27; bridge source-order verification in specs/sprint-alfred-epic/evidence/0.7-codex-greenfield-advisor-triage-2026-09-27.md.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "4f27d3e803388c806eb22de88d97f92ead2b730e",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
@@ -999,6 +1007,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "Device switch, Claude/Windows session 2026-10-06 (IC-2d install on the second PC): onboarding inspect demanded reopen-design with DWP-PACKAGE-PHYSICAL because the approved package file does not exist on that machine.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.approval-mechanisms-require-out-of-session-po-acts",
       "status": "deferred",
       "type": "defect",
@@ -1062,33 +1080,45 @@
     },
     {
       "id": "pipeline.architecture-design-errors-omit-field-paths",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Codex/WSL greenfield review B7; source verification of architecture-design.mjs error sites on 2026-09-27.",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.architecture-fitness-model-repeats-module-fields",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Claude/Windows greenfield review F-08, 2026-09-27; architecture-design.mjs source inspection confirms module and fitness-model fields are compared for identical values.",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.architecture-materialization-requires-premature-code",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Claude/Windows greenfield review F-07, 2026-09-27; predicted blocker, not reached live. Source confirms nonempty contract and verification files are required by architecture-design.mjs before materialization.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.atomic-prd-approval-without-mutation",
@@ -1581,13 +1611,17 @@
     },
     {
       "id": "pipeline.browser-preflight-misses-missing-host-library",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "PO-supplied Agy consumer test-results/*/error-context.md, 2026-09-27; direct 0.7 browser-evidence-preflight.mjs run against the same private fixture returned BEP-BROWSER-E2E-READY despite missing libnspr4.so.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
@@ -1999,13 +2033,17 @@
     },
     {
       "id": "pipeline.codex-compact-sessionstart-json-rejects-measurement-fields",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Repeated PO report after Codex Compact; strict wire-contract reproduction and committed bounded recovery in f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
@@ -2685,6 +2723,16 @@
       "closureEvidence": "backlog/items/2026-08-18-critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate.md"
     },
     {
+      "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-06/07 (Alfred design revision 5, workstream R7); PO statement 2026-10-07: running more than one follow-up Critic is fatal and a recurring defect; follow-ups must be diff Critics only.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.critic-route-pre-check-not-in-force-in-installed-plugin",
       "status": "closed",
       "type": "defect",
@@ -2991,6 +3039,16 @@
       "closureEvidence": "specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md"
     },
     {
+      "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "PO statement 2026-10-07 (chat) during the Alfred revision-5 approval: critic, advisor and readiness reviewer all run in design, which is not the intended flow.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.design-to-implementation-path-has-no-driver",
       "status": "closed",
       "type": "workflow-improvement",
@@ -3027,13 +3085,17 @@
     },
     {
       "id": "pipeline.design-workflow-signing-request-schema-drift",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Source verification during local 0.7 preparation: the canonical presented design-workflow request carries approvalIntent.sha256, whereas sign-intent --request requires top-level intentSha256 before reaching its design-workflow validator. No real key or signing invocation was used to diagnose this mismatch.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "3b05a045e4acfd4e2d3393b6a0c015a799c2bee6",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
@@ -4002,13 +4064,17 @@
     },
     {
       "id": "pipeline.git-apply-bypasses-draft-source-guard",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Live Alfred Design/Draft readback, 2026-09-27: git apply wrote two protected plugin source files without HGO; an equivalent apply_patch action was denied by guard-testpath and guard-devplan.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "1d7c76581504f9e6b1bc797773d501aeab29c970",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.git-commit-multiple-message-trailers-are-misparsed",
@@ -4024,6 +4090,16 @@
       "closureRepository": "self",
       "closureCommit": "0605b19f7e9db2fa84ca19a6f4078c8cedd50df7",
       "closureEvidence": "plugins/pipeline-core/lib/commit-message-policy.test.mjs"
+    },
+    {
+      "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "Claude/Windows session 2026-10-06: preflight pipeline-governance-unverifiable / GS-GIT-UNAVAILABLE; measured by the PO with a direct discoverRepository call and a value matrix.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
@@ -4396,13 +4472,17 @@
     },
     {
       "id": "pipeline.greenfield-handover-claims-absent-supersession-marker",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Codex/WSL greenfield review B9; current consumer docs/state.md claims SUPERSEDED.md, tracked tree has none, and onboarding-continuity.mjs emits the sentence unconditionally.",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.greenfield-machine-output-and-skill-budget",
@@ -5206,13 +5286,17 @@
     },
     {
       "id": "pipeline.historical-plan-cancellation-blocks-current-withdrawal",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Actual canonical cancel-submitted-plan terminal b7dcd4 exited 2 with PLAN-CANCEL-ALREADY-CANCELLED and zero mutation. The current submission differs from a historical cancellation receipt retained from 2026-09-20. Source: lib/plan-spec-state-v2.mjs cancelSubmittedPlan.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "3b05a045e4acfd4e2d3393b6a0c015a799c2bee6",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy",
@@ -7466,6 +7550,16 @@
       "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
     },
     {
+      "id": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-06",
+      "source": "Claude/Windows session 2026-10-06: about 40 guarded tool calls spent before the cause (Git 2.56 NUL regression) was found through a PO-run diagnostic command.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
       "status": "closed",
       "type": "defect",
@@ -8414,13 +8508,17 @@
     },
     {
       "id": "pipeline.reopened-approved-plan-blocks-po-acknowledgement",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Alfred 0.7 plan refresh after reopen-design, 2026-09-27; live project/pipeline-state.json and po-authority-acknowledge-plan readback.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "21b30e597dfd4c25a62d70660853e579f3447d6e",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head",
@@ -8437,13 +8535,17 @@
     },
     {
       "id": "pipeline.repeated-lifecycle-denials-are-not-counted",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Claude/Windows greenfield review F-11, 2026-09-27; reported seven lifecycle refusals but denial-class telemetry contained only the outside-root read class; source says lifecycle denials remain outside that recorder.",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice",
@@ -8485,13 +8587,17 @@
     },
     {
       "id": "pipeline.restart-barrier-can-precede-verbatim-intake-capture",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Codex/WSL greenfield review B5, 2026-09-27: a restart card summarized the original input while the intake checkpoint's materialInput was reported empty.",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
@@ -9254,6 +9360,16 @@
       "closureRepository": "self",
       "closureCommit": "6dc5f897fc89609d69ba2991d94bff9add79ecbe",
       "closureEvidence": "backlog/evidence/2026-08-09-devplan-scratch-exemption-closure.md"
+    },
+    {
+      "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "Critic round 4 (F-B) on the R7 design amendment, 2026-10-07; mechanism: Node child_process spawn with shell false on win32 resolves a bare name via libuv search_path(), which checks the current directory before PATH unless NoDefaultCurrentDirectoryInExePath is set. Not machine-verified in-session (the probe was refused by the guard).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",

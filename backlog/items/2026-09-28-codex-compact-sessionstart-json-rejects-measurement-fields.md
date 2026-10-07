@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-compact-sessionstart-json-rejects-measurement-fields
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-28
 source: "Repeated PO report after Codex Compact; strict wire-contract reproduction and committed bounded recovery in f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6."
 sprint: alfred
@@ -44,6 +48,7 @@ Codex parser replay. The frozen evidence SHA-256 is
 
 ## Triage
 
-- **Decision:** Confirmed, urgent for 0.7; correction partially delivered.
-- **Assignment:** S2 integration and permanent Codex transport regression.
-- **Date:** 2026-09-28.
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at f9ebdd5b6: hooks/codex-session-start-hint.mjs compact output repair (f9ebdd5b6); test: hooks/codex-compact-session-output.test.mjs 'direct hook subprocess emits one supported JSON object for stopped and ready Compact'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

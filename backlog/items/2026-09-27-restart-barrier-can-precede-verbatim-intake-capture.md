@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.restart-barrier-can-precede-verbatim-intake-capture
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Codex/WSL greenfield review B5, 2026-09-27: a restart card summarized the original input while the intake checkpoint's materialInput was reported empty."
 sprint: none
@@ -49,6 +53,11 @@ digest readback; a summary remains orientation only.
   cause and distinguish user/agent action order from storage failure.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: lib/onboarding-continuity.mjs / project-onboarding-v3.mjs first-restart intake gating; test: onboarding-first-restart-intake.test.mjs 'proposed first runtime restart withholds plan and direct apply until explicit original-input capture'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07
 
 ## Canonical boundary reproduction and prepared Codex correction (2026-09-28)
 

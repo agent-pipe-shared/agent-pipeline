@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.git-apply-bypasses-draft-source-guard
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 1d7c76581504f9e6b1bc797773d501aeab29c970
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 sprint: alfred
 done_when: manual
@@ -39,6 +43,7 @@ remains available.
 
 ## Triage
 
-- **Decision:** pending
-- **Assignment:** Alfred 0.7 security blocker
-- **Date:** 2026-09-27
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 1d7c76581: lib/protected-test-paths.mjs (mutating git apply has unbound patch targets); test: protected-test-paths.test.mjs 'mutating git apply cannot masquerade as a scratch-only write'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

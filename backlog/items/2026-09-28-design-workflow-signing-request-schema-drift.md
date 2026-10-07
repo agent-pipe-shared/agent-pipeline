@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.design-workflow-signing-request-schema-drift
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 3b05a045e4acfd4e2d3393b6a0c015a799c2bee6
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-28
 source: "Source verification during local 0.7 preparation: the canonical presented design-workflow request carries approvalIntent.sha256, whereas sign-intent --request requires top-level intentSha256 before reaching its design-workflow validator. No real key or signing invocation was used to diagnose this mismatch."
 sprint: alfred
@@ -40,8 +44,7 @@ missing human consent is inferred from the transport defect.
 
 ## Triage
 
-- **Decision:** Include the confirmed transport defect in the next local candidate.
-- **Assignment:** Narrow signer transport and existing signing tests; preserve the
-  package schema. Coordinate final source integration with the extended design
-  package and installed runtime compatibility work.
-- **Date:** 2026-09-28
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 3b05a045e: scripts/po-human-approval.mjs reads the nested approvalIntent digest (3b05a045e); tests: po-human-approval.test.mjs 'DWP nested digest transport ...' (three cases).
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

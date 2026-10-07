@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.greenfield-handover-claims-absent-supersession-marker
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Codex/WSL greenfield review B9; current consumer docs/state.md claims SUPERSEDED.md, tracked tree has none, and onboarding-continuity.mjs emits the sentence unconditionally."
 sprint: none
@@ -44,6 +48,11 @@ physical readback.
 - Both handovers agree with the machine `activeFeature` and next action.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: lib/onboarding-continuity.mjs handover content no longer names SUPERSEDED.md for direct intake; test: onboarding-continuity.test.mjs assertion 'direct intake has no provisional kickoff package to supersede'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07
 
 ## Preparation evidence (2026-09-28)
 

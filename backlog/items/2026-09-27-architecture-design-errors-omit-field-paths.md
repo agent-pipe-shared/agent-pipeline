@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.architecture-design-errors-omit-field-paths
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Codex/WSL greenfield review B7; source verification of architecture-design.mjs error sites on 2026-09-27."
 sprint: none
@@ -45,3 +49,7 @@ scope and owned-path forms.
 
 ## Triage
 
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: lib/architecture-design.mjs field-bearing errors (e.g. modules[i].ownedPaths[j]); test: architecture-design.test.mjs 'field-local diagnostics identify the single invalid architecture input'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

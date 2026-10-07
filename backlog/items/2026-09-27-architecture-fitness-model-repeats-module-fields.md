@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.architecture-fitness-model-repeats-module-fields
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Claude/Windows greenfield review F-08, 2026-09-27; architecture-design.mjs source inspection confirms module and fitness-model fields are compared for identical values."
 sprint: none
@@ -41,3 +45,7 @@ it unambiguous.
 
 ## Triage
 
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: lib/architecture-design.mjs derives fitnessModel.modules and baseline; test: architecture-design.test.mjs 'compact greenfield package derives redundant fitness rows and zero baseline'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

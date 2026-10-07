@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.advisor-evidence-read-enforces-size-limit-after-allocation
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-28
 source: "Independent read-only source audit of canonical advisory-lifecycle-v2.mjs and Scratch Codex Advisor binding, source 98e752a9. Physical reads are unbounded before declared limits; no large or private operator file was read."
 sprint: none
@@ -59,6 +63,11 @@ Independent audit and bounded reader preparation are being recorded under
 source ordering defect; no integrated correction or closure is claimed.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: lib/advisory-lifecycle-v2.mjs descriptor-bound read (fstat before read); test: advisory-lifecycle-v2.test.mjs 'advisory read bounds: declared sparse oversize rejects before open, content read or allocation'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07
 
 ## Prepared Codex public reader (2026-09-28)
 

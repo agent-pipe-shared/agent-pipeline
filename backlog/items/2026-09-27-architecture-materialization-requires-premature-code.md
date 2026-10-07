@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.architecture-materialization-requires-premature-code
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Claude/Windows greenfield review F-07, 2026-09-27; predicted blocker, not reached live. Source confirms nonempty contract and verification files are required by architecture-design.mjs before materialization."
 sprint: alfred
@@ -44,3 +48,7 @@ empty stubs from falsely satisfying the final contract gate.
 
 ## Triage
 
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: lib/architecture-entry-readiness.mjs pendingPhysicalSurfaces deferral; test: architecture-entry-readiness.test.mjs 'approved greenfield design defers missing physical surfaces without fabricating fitness pass'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07

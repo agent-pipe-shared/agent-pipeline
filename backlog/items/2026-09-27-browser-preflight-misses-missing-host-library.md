@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.browser-preflight-misses-missing-host-library
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 sprint: alfred
 done_when: manual
@@ -36,9 +40,10 @@ degraded substitute. The Agy consumer scenario is read back after repair.
 
 ## Triage
 
-- **Decision:** pending
-- **Assignment:** Alfred candidate verification
-- **Date:** 2026-09-27
+- **Decision:** closed — fixed in source
+- **Rationale:** fixed at 26fef9e7d: scripts/browser-evidence-preflight.mjs line ~50 (missing shared library / missing host dependencies classification); test: browser-evidence-preflight.test.mjs 'missing shared library fails before product test'.
+- **Assignment (if accepted):** n/a
+- **Date:** 2026-10-07
 
 ## Codex preparation (2026-09-28)
 
