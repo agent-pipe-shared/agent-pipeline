@@ -61,7 +61,7 @@ const PORTABLE_AGY_AUTHORSHIP_EXPORT_SCRIPT = fileURLToPath(new URL("./portable-
 const PORTABLE_CRITIC_EXPORT_SCRIPT = fileURLToPath(new URL("./portable-critic-export.mjs", import.meta.url));
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> [--directory <external-dir>] (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> [--directory <external-dir>] (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | set-po-key-directory --directory <absolute-dir> [--replace <current-value>] | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
 // PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
 // PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
@@ -324,17 +324,12 @@ function poKeyDirectoryStillExists(directory, dependencies) {
   } catch { return false; }
 }
 
-// PO-KEYDIR-01(A), 2026-08-11 PO decision (backlog/items/2026-08-10-po-key-directory-
-// default-should-be-repo-scoped-not-machine-wide.md): `setup`'s own auto-persist call
-// (runHumanApproval, below) now targets THIS repo-scoped store instead of the machine
-// plane -- persistExplicitDirectoryIntoMachinePlane above is kept exactly as it was,
-// simply no longer called from that one call site, purely so its own write primitive
-// stays defined and its READ side (parseHumanArgs, below) keeps working as the
-// third-tier fallback; nothing here removes or repurposes either. Same best-effort,
-// additive-only, never-clobber-a-different-value discipline as its sibling above: a
-// write failure here never fails `setup` itself, an already-identical value is a
-// silent no-op, and a different already-valid stored value is never silently
-// overwritten.
+// PO-KEYDIR-01(A), 2026-08-11 PO decision, SUPERSEDED by R7-6-T11 (decision AC, 2026-10-07):
+// `setup`'s auto-persist (persistExplicitDirectoryPointers, below) now writes the MACHINE
+// plane through persistExplicitDirectoryIntoMachinePlane above and no longer calls this
+// repo-scoped writer; the per-repository store is read-only (a legacy fallback in
+// parseHumanArgs). The writer is kept defined, unused by setup, with its original
+// best-effort, additive-only, never-clobber-a-different-value discipline.
 /** The directory is created owner-private (0700, mirroring lib/human-guard-
  * override.mjs's secureDirectory() convention this script cannot import -- see
  * resolveGitCommonDir's own doc comment) and the file itself owner-private
@@ -363,12 +358,88 @@ function persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, de
   } catch { /* best-effort: never fails setup itself */ }
 }
 
-// A repository-private pointer is the authority boundary for this checkout.
-// The machine plane remains an independent fallback for repositories that have
-// no private pointer yet; setup must not make one repository's explicit choice
-// silently govern another repository.
+// R7-6-T11 (decision AC, 2026-10-07): `setup --directory` writes the MACHINE-WIDE default, and only
+// when the plane records no live directory (absent plane, null value, or a recorded directory that no
+// longer exists -- NVA-V1-KEYDIRPTR). The legacy per-repository store is read-only: the repo-scope
+// writer above is no longer called from here. A different LIVE default is left byte-identical, setup
+// still succeeds, and the repair command is reported on stderr.
 function persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies) {
-  persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+  if (args.directorySource !== "flag") return;
+  const readPlane = dependencies.readMachinePlaneFn ?? readMachinePlane;
+  const plane = readPlane(dependencies);
+  if (plane.status === "invalid") return;
+  const recorded = plane.status === "valid" && text(plane.plane.poKeyDirectory) ? plane.plane.poKeyDirectory : null;
+  if (recorded !== null && recorded !== directory && poKeyDirectoryStillExists(recorded, dependencies)) {
+    let sameDirectory = false;
+    try { sameDirectory = realpathSync(recorded) === realpathSync(directory); } catch { /* compare raw values only */ }
+    if (sameDirectory) return;
+    const writeStderr = dependencies.stderrWriteFn ?? ((chunk) => process.stderr.write(chunk));
+    writeStderr(`PO-HUMAN-APPROVAL-NOTE: the machine-wide PO key directory stays ${recorded}; this setup used ${directory} and did not change it. To make it the default run: po-human-approval.mjs set-po-key-directory --directory ${directory} --replace ${recorded}\n`);
+    return;
+  }
+  persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
+}
+
+const SET_PO_KEY_DIRECTORY_COMMAND = "set-po-key-directory";
+function setPoKeyDirectoryParse(argv) {
+  const values = {};
+  const rest = argv.slice(1);
+  if (rest.length % 2 !== 0) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: expected --directory <absolute-dir> [--replace <current-value>]`);
+  for (let index = 0; index < rest.length; index += 2) {
+    const key = rest[index]; const value = rest[index + 1];
+    const name = key === "--directory" ? "directory" : key === "--replace" ? "replace" : null;
+    if (name === null || typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(values, name)) {
+      fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: expected --directory <absolute-dir> [--replace <current-value>]`);
+    }
+    values[name] = value;
+  }
+  if (!Object.hasOwn(values, "directory")) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory <absolute-dir> is required`);
+  return values;
+}
+
+/** Existence/ancestry check only, no git spawn: a `.git` path segment, or an ancestor holding a `.git`
+ * entry (file or directory), puts the path inside a repository. */
+function insideRepository(realDirectory, dependencies) {
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  for (let current = realDirectory; ; current = dirname(current)) {
+    if (basename(current) === ".git" || exists(join(current, ".git"))) return true;
+    if (dirname(current) === current) return false;
+  }
+}
+
+/** R7-6-T11 (decision AC): the writer of the machine-wide default. Touches only poKeyDirectory and
+ * updatedAt of the machine plane; never the key directory, never trust anchors. */
+function runSetPoKeyDirectory(argv, dependencies) {
+  const { directory, replace } = setPoKeyDirectoryParse(argv);
+  if (!isAbsolute(directory)) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory must be an absolute path`);
+  let realDirectory;
+  try {
+    const stat = (dependencies.statSyncFn ?? statSync)(directory);
+    if (!stat.isDirectory()) throw new Error("not a directory");
+    realDirectory = realpathSync(directory);
+  } catch { fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory must name an existing directory`); }
+  if (insideRepository(realDirectory, dependencies)) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory must not be inside a repository or a .git directory`);
+  const readPlane = dependencies.readMachinePlaneFn ?? readMachinePlane;
+  const writePlane = dependencies.writeMachinePlaneFn ?? writeMachinePlane;
+  const plane = readPlane(dependencies);
+  if (plane.status === "invalid") {
+    fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: the machine plane is invalid (${plane.code}); it was not changed -- repair or remove it first`);
+  }
+  const current = plane.status === "valid" ? plane.plane : null;
+  const stored = current !== null && text(current.poKeyDirectory) ? current.poKeyDirectory : null;
+  if (stored === directory) return { ok: true, code: "PO-HUMAN-SET-PO-KEY-DIRECTORY-READY", directory, changed: false };
+  if (stored !== null && replace !== stored) {
+    fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: the machine plane already records ${stored}; to replace it pass --replace ${stored}`);
+  }
+  const updatedAt = new Date().toISOString();
+  const next = current !== null
+    ? { ...current, poKeyDirectory: directory, updatedAt }
+    : {
+      schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: directory, pushApprovalDefault: "signature",
+      routing: null, language: null, session: null, usage: null, updatedAt,
+    };
+  writePlane(next, dependencies);
+  return { ok: true, code: "PO-HUMAN-SET-PO-KEY-DIRECTORY-READY", directory, changed: true, replaced: stored };
 }
 // Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
 // (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
@@ -736,7 +807,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
   // must not see a new own-enumerable field on this object.
   Object.defineProperty(values, "keyReferenceSupplied", { value: supplied.has("keyReference"), enumerable: false, configurable: true });
   if (!new Set(KNOWN_COMMANDS).has(command)) {
-    const suggestion = suggestSubcommand(command, KNOWN_COMMANDS);
+    const suggestion = suggestSubcommand(command, [...KNOWN_COMMANDS, "set-po-key-directory"]);
     return { error: suggestion ? `${USAGE}\nUnknown subcommand "${command}". Did you mean "${suggestion}"?` : USAGE };
   }
   // R7-6-F3 (PO decision AC, Spec 22.6 delta, supersedes the earlier PO-KEYDIR-01(A)/SETUP-2b/AC-11/
@@ -907,11 +978,11 @@ function exitDetail(result) {
 
 const readinessFinding = (findingId, status, cause, repair) => ({ findingId, status, cause, repair });
 const okFinding = (findingId, cause = "ok") => readinessFinding(findingId, "ok", cause, null);
-// The typed setup action takes the value the PO states in chat. No catalogue entry carries it yet
-// (scripts/pipeline-state.mjs is a protected file), so executable and argv stay null rather than
-// naming a command that does not exist; it grants no trust and accepts no signing-executable value.
+// The typed setup action takes the value the PO states in chat. It is agent-runnable through this
+// script's own `set-po-key-directory --directory <dir>` command (R7-6-T11, ruling 10); it grants no
+// trust and accepts no signing-executable value.
 const keyDirectorySetAction = () => ({
-  kind: "set-po-key-directory", executable: null, argv: null, mutation: true, requiresConfirmation: false,
+  kind: "set-po-key-directory", executable: "node", argv: [SCRIPT, "set-po-key-directory", "--directory", "<absolute-key-directory>"], mutation: true, requiresConfirmation: false,
   setting: "poKeyDirectory", takes: "the absolute key directory the PO states in chat", expected: { schema: MACHINE_PLANE_SCHEMA },
 });
 const attendedRepair = (prerequisite, summary) => ({ kind: "attended-prerequisite", prerequisite, summary });
@@ -1613,7 +1684,9 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
 }
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
-  const args = parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
+  // R7-6-T11: not a ceremony command, so it never reaches parseHumanArgs (no --repo-root, no signing).
+  if (argv[0] === SET_PO_KEY_DIRECTORY_COMMAND) return runSetPoKeyDirectory(argv, dependencies);
+  const args =parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
   // Fail closed rather than fall through: the fork-disposition commands need an
   // async fork inspection this synchronous entry point cannot perform, and they
   // were rejected here (as unknown commands) before they existed.
