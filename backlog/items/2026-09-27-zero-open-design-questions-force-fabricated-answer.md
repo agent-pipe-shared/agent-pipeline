@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.zero-open-design-questions-force-fabricated-answer
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 sprint: nightwing
 done_when: manual
@@ -35,6 +39,7 @@ still needs an answer, and three-runner CLI/guard admission stays consistent.
 
 ## Triage
 
-- **Decision:** pending
-- **Assignment:** Nightwing intake experience
-- **Date:** 2026-09-27
+- **Decision:** closed — fixed in source
+- **Rationale:** Fix: `lib/onboarding-continuity.mjs` line 6535. Test: `lib/onboarding-continuity.test.mjs` line 3697.
+- **Assignment:** n/a
+- **Date:** 2026-10-07

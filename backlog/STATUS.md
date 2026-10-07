@@ -142,7 +142,7 @@
 | pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | none | 2026-08-28 | — | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
-| pipeline.claude-bootstrap-action-rejected-by-guard | open | defect | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.claude-bootstrap-action-rejected-by-guard | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook | closed | defect | pipeline | nova-b | 2026-08-29 | — | Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate. |
 | pipeline.claude-design-readiness-cannot-start-on-windows | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | — | 2026-08-05 | 2026-09-05 | — |
@@ -302,7 +302,7 @@
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | closed | defect | pipeline | — | 2026-08-12 | — | — |
 | pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
-| pipeline.fresh-preflight-hides-onboarding-action | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
+| pipeline.fresh-preflight-hides-onboarding-action | closed | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.fresh-repo-onboarding-intake-first-transaction | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.fresh-worktree-indistinguishable-from-abandoned | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable. |
@@ -846,12 +846,12 @@
 | pipeline.worktree-process-start-parser-misreads-spaced-comm | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — a T1 Critic reviewing NVA-B-READCONTAIN-1's symlink-containment fix found that the read-scope lane's new realpath check still admits a `<symlink-inside-root>/../<outside>/<file>` argument, because `path.resolve()` collapses the `..` lexically before any symlink is examined. The write lane's own `isPathWithinRealpathedRoot` — the pattern the read-lane fix was modeled on — opens with the identical `resolve(root, filePath)` call, before its own existence/realpath walk. Whether this is actually exploitable for a WRITE depends on a fact this session could not verify from inside the repository: how the host tool that performs the actual Edit/Write file mutation resolves the same path string. |
-| pipeline.zero-open-design-questions-force-fabricated-answer | open | workflow-improvement | pipeline | nightwing | 2026-09-27 | — | — |
+| pipeline.zero-open-design-questions-force-fabricated-answer | closed | workflow-improvement | pipeline | nightwing | 2026-09-27 | — | — |
 
 ## Counts
 
-- open: 169
+- open: 166
 - in_progress: 0
-- closed: 659
+- closed: 662
 - rejected: 3
 - deferred: 11

@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.fresh-preflight-hides-onboarding-action
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-27
 source: "Claude/Windows greenfield review F-05, 2026-09-27; reported preflight plugin-refresh-required with advisory nextAction in a fresh self-application project."
 sprint: none
 done_when: manual
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 ---
 
 # Fresh-project preflight should surface the executable onboarding action
@@ -41,6 +45,11 @@ advisory unless it truly prevents the onboarding action.
   onboarding inspection.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** Fix: `scripts/pipeline-start-preflight.mjs` line 1594. Test: `scripts/pipeline-start-preflight.test.mjs` lines 566-594.
+- **Assignment:** n/a
+- **Date:** 2026-10-07
 
 ## Prepared Codex boundary verification (2026-09-28)
 

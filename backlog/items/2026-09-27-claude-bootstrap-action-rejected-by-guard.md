@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.claude-bootstrap-action-rejected-by-guard
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-27
 source: "Claude/Windows greenfield review F-01, 2026-09-27; source inspection of project-onboarding-v3 and onboarding-argv-shapes confirmed the emitted/admitted argv mismatch."
 sprint: alfred
 done_when: manual
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 ---
 
 # Claude bootstrap acknowledgement action is rejected by its lifecycle guard
@@ -42,4 +46,9 @@ The guard's recovery must not send the caller back to the same refused action.
 - A repeated refusal yields a distinct, executable recovery rather than a loop.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** Fix: `lib/onboarding-argv-shapes.mjs` lines 87/99/105 admit `--intent`. Test: `hooks/guard-lifecycle-ready.test.mjs` lines 8700-8706.
+- **Assignment:** n/a
+- **Date:** 2026-10-07
 

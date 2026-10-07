@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ab11f89a289c5eb5a83273c5ee34ba04ba15e3d24a21165d66efe22a4b8cfc79"
+    "transitionHead": "fb9dcc91c445bb0c3bc8ebbaad47877f4f7c5d6ba714029d6f5d6a5ca11cfb54"
   },
   "counts": {
-    "open": 169,
+    "open": 166,
     "in_progress": 0,
-    "closed": 659,
+    "closed": 662,
     "rejected": 3,
     "deferred": 11
   },
@@ -1829,13 +1829,17 @@
     },
     {
       "id": "pipeline.claude-bootstrap-action-rejected-by-guard",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Claude/Windows greenfield review F-01, 2026-09-27; source inspection of project-onboarding-v3 and onboarding-argv-shapes confirmed the emitted/admitted argv mismatch.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook",
@@ -3862,13 +3866,17 @@
     },
     {
       "id": "pipeline.fresh-preflight-hides-onboarding-action",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Claude/Windows greenfield review F-05, 2026-09-27; reported preflight plugin-refresh-required with advisory nextAction in a fresh self-application project.",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.fresh-repo-onboarding-intake-first-transaction",
@@ -11027,13 +11035,17 @@
     },
     {
       "id": "pipeline.zero-open-design-questions-force-fabricated-answer",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "PO-supplied Antigravity greenfield review section 2, 2026-09-27; plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeDesignQuestions and validateIntakeCheckpoint.",
       "deferred": false,
-      "sprint": "nightwing"
+      "sprint": "nightwing",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     }
   ]
 }
