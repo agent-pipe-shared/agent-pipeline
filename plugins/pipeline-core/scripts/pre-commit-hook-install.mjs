@@ -998,9 +998,20 @@ if (isDirectInvocation(import.meta.url)) {
   const [verb] = process.argv.slice(2);
   const rootDir = process.cwd();
   if (verb === "--install") {
-    const result = applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
-      console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
-    } });
+    let result;
+    try {
+      result = applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
+        console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
+      } });
+    } catch (error) {
+      // Keep the thrown error's OWN typed refusal code (PB-WINDOWS-ASSURANCE, ...): a typed code is a
+      // hyphenated upper-case identifier, which cannot carry a path or message text. Only an error with
+      // no typed code (a plain Error, or a bare errno such as EACCES) falls back. Mirrors pre-push.
+      const code = typeof error?.code === "string" && error.code.length <= 64 && /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/.test(error.code)
+        ? error.code : "PRECOMMIT-INSTALL-UNAVAILABLE";
+      console.log(JSON.stringify({ status: "refused", code }));
+      process.exit(1);
+    }
     console.log(JSON.stringify(result, null, 2));
     process.exit(result.status === "installed" ? 0 : 1);
   } else if (verb === "--remove") {
