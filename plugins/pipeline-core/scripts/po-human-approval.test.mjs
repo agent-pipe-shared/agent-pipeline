@@ -1762,17 +1762,18 @@ test("sign-intent cancels on an empty confirmation answer the same way as a mism
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-empty-fixture").digest("hex");
-    let spawnCalled = false;
+    const spy = r76Spy("healthy");
     const dependencies = {
       readConfirmation: () => "",
-      spawn: () => { spawnCalled = true; return { status: 0 }; },
+      spawn: spy.spawn,
     };
     assert.throws(
       () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies),
       /approval cancelled: explicit confirmation was not given/,
     );
-    assert.equal(spawnCalled, false);
+    assert.deepEqual(r76KeyPathSpawns(spy), [], "OpenSSL must never be invoked once confirmation is cancelled");
   } finally {
     cleanup(dirs);
   }
@@ -1854,6 +1855,7 @@ test("sign-intent accepts a 3-key trust policy carrying humanName", { skip: REQU
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     writeFileSync(join(dirs.directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Nova the PO" }, null, 2)}\n`);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-humanname-fixture").digest("hex");
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], { readConfirmation: () => "approve" });
@@ -1869,6 +1871,7 @@ test("sign-intent still fails closed on an unrelated extra field (not humanName)
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     writeFileSync(join(dirs.directory, "trust-policy.json"), `${JSON.stringify({ ...authority, unexpectedField: "x" }, null, 2)}\n`);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-badfield-fixture").digest("hex");
     assert.throws(
