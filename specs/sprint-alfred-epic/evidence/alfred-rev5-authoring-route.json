@@ -1,7 +1,8 @@
 {
   "schema": "pipeline.authoring-route-record.v1",
   "featureId": "sprint-alfred-epic",
-  "dispatchId": "ALFRED-REV5-AUTHOR-20261006",
+  "dispatchId": "ALFRED-REV5B-AUTHOR-20261007",
+  "supersedes": "ALFRED-REV5-AUTHOR-20261006 (its Advisor course is terminal for the pre-readiness sources; a child course requires a new authoring dispatch id)",
   "attemptId": "attempt-1",
   "packageId": "greenfield-0.7-remediation",
   "actionId": "complete-and-integrate-approved-slices",
