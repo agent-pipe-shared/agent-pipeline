@@ -35,6 +35,7 @@ import { TextDecoder } from "node:util";
 import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { windowsDriveLetterIdentity, windowsNotationCandidate } from "./repository-path-identity.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import {
   LEGACY_MANIFEST,
   LEGACY_STATE,
@@ -551,7 +552,7 @@ function gitObservation(root, args, spawn = spawnSync) {
       PATH: process.env.PATH,
       SystemRoot: process.env.SystemRoot,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
       GIT_TERMINAL_PROMPT: "0",
     },
   });

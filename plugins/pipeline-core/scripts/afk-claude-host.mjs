@@ -33,6 +33,7 @@ import {
 import { executeAfkEntryHostTransaction } from "../lib/afk-transaction-host.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 
 const MAX_INPUT = 512 * 1024;
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -73,7 +74,7 @@ function git(root, args) {
       PATH: process.env.PATH,
       SystemRoot: process.env.SystemRoot,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
       GIT_TERMINAL_PROMPT: "0",
       GIT_PAGER: "cat",
     },

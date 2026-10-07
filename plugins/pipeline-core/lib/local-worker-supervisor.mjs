@@ -36,6 +36,7 @@ import {
   resolveLocalSupervisorRoot,
   validateLocalSupervisorState,
 } from "./local-supervisor-state.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 export const LOCAL_WORKER_SUPERVISOR_REQUEST_SCHEMA = "pipeline.local-worker-supervisor-request.v1";
 export const LOCAL_WORKER_SUPERVISOR_PLAN_SCHEMA = "pipeline.local-worker-supervisor-plan.v1";
@@ -409,7 +410,7 @@ function gitEnvironment() {
     PATH: process.env.PATH,
     SystemRoot: process.env.SystemRoot,
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+    GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
     GIT_TERMINAL_PROMPT: "0",
     GIT_PAGER: "cat",
     GIT_OPTIONAL_LOCKS: "0",

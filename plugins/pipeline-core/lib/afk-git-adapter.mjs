@@ -13,6 +13,7 @@ import {
 } from "./afk-assumption-mode.mjs";
 import { validateAfkWorkerRequest } from "./afk-capability-worker.mjs";
 import { AFK_LEDGER_ZERO_HASH, validateAfkLedgerRecord } from "./afk-ledger.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 export const AFK_GIT_IDENTITY = Object.freeze({
   name: "Agent Pipeline AFK",
@@ -53,7 +54,7 @@ function hashGitObject(type, bytes, format) {
 }
 
 function trustedEnvironment(extra = {}) {
-  const nullPath = process.platform === "win32" ? "NUL" : "/dev/null";
+  const nullPath = GIT_NULL_DEVICE;
   return {
     PATH: process.env.PATH,
     SystemRoot: process.env.SystemRoot,

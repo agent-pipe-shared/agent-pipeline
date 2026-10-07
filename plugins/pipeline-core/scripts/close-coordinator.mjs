@@ -21,6 +21,7 @@ import {
   ensurePrivateDirectory,
 } from "../lib/private-boundary.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import {
   LEGACY_STATE,
   NEUTRAL_STATE,
@@ -159,7 +160,7 @@ function git(root, args, { accept = [0] } = {}) {
       PATH: dirname(executable),
       LANG: "C",
       LC_ALL: "C",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
       GIT_CONFIG_NOSYSTEM: "1",
     },
   });

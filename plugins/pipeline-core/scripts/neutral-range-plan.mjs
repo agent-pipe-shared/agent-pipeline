@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import {
   lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 } from "node:fs";
@@ -226,7 +227,7 @@ export function validateNeutralRangePlan(plan) {
   return { ok: true, planDigest: plan.planDigest, resultCommit: plan.resultCommit, resultTree: plan.resultTree, resultManifestDigest: plan.resultManifestDigest };
 }
 
-function nullDevice() { return process.platform === "win32" ? "NUL" : "/dev/null"; }
+function nullDevice() { return GIT_NULL_DEVICE; }
 
 function neutralGitEnvironment(extra = {}) {
   const env = {

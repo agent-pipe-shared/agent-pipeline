@@ -19,6 +19,7 @@ import {
   reconcileAfkActivation,
 } from "./afk-git-adapter.mjs";
 import { executeAfkReviewTransaction } from "./afk-review.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 const HEX32 = /^[0-9a-f]{32}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -36,7 +37,7 @@ function git(root, args) {
       PATH: process.env.PATH,
       SystemRoot: process.env.SystemRoot,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
       GIT_TERMINAL_PROMPT: "0",
       GIT_PAGER: "cat",
     },
@@ -301,7 +302,7 @@ export function executeAfkEntryHostTransaction({
 function linkedFeatureCheckouts(root, featureRef) {
   const raw = execFileSync("git", ["-C", root, "worktree", "list", "--porcelain", "-z"], {
     encoding: "utf8",
-    env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null" },
+    env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE },
   });
   return raw.split("\0").filter((line) => line === `branch ${featureRef}`).length;
 }

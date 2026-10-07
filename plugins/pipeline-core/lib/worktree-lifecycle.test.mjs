@@ -20,6 +20,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 import {
   WorktreeLifecycleError,
@@ -70,7 +71,7 @@ function git(cwd, args, { allowNonzero = false } = {}) {
     cwd,
     encoding: "utf8",
     shell: false,
-    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" },
+    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, LC_ALL: "C" },
   });
   if (!isSuccessfulSpawn(result) && !(allowNonzero && typeof result.status === "number" && !result.error)) {
     throw result.error || new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
@@ -1364,10 +1365,15 @@ const R71A_GIT_NULL_KEYS = [
 ];
 const R71A_NUL_LITERAL = /(["'`])NUL\1/i;
 const R71A_NUL_EMBEDDED = /\bcore\.(?:hooksPath|attributesFile|excludesFile|askPass)=NUL\b/i;
+// A win32 ternary: the "win32" literal followed (before any `;`) by a `?`. A NUL literal after it is a platform choice
+// of the NUL spelling, whether the result lands directly in a git value or reaches one through a variable or helper.
+const R71A_WIN32_TERNARY = /["'`]win32["'`][^;]*\?/;
 
-// A line offends when it holds a quoted NUL literal (or an embedded `core.<key>=NUL` -c value) and names one of the git
-// null-device keys on the same line -- or, for a wrapped ternary continuation line (`? "NUL"` / `: "NUL"`), within
-// the two lines above it. Comment lines and text after a `//` are ignored.
+// A line offends when it holds a quoted NUL literal (or an embedded `core.<key>=NUL` -c value) and either names one of
+// the git null-device keys on the same line, or sits in a `process.platform === "win32"` ternary (the indirection shapes:
+// a variable or helper returning NUL that is used as a git value later) -- or, for a wrapped ternary continuation line
+// (`? "NUL"` / `: "NUL"`), the key or the win32 condition is within the two lines above it. Comment lines and text
+// after a `//` are ignored.
 function r71aNulOffences(source) {
   const lines = source.split(/\r?\n/);
   const hits = [];
@@ -1376,8 +1382,10 @@ function r71aNulOffences(source) {
     const match = R71A_NUL_LITERAL.exec(text) ?? R71A_NUL_EMBEDDED.exec(text);
     if (!match || text.slice(0, match.index).includes("//")) return;
     const continuation = /^\s*(?:\?\?|\|\||\?|:)/.test(text);
-    const context = [text, ...(continuation ? lines.slice(Math.max(0, index - 2), index) : [])].join("\n");
-    if (R71A_GIT_NULL_KEYS.some((key) => context.includes(key))) hits.push({ line: index + 1, text });
+    const above = continuation ? lines.slice(Math.max(0, index - 2), index) : [];
+    const context = [text, ...above].join("\n");
+    const inWin32Ternary = R71A_WIN32_TERNARY.test([...above, text.slice(0, match.index)].join("\n"));
+    if (inWin32Ternary || R71A_GIT_NULL_KEYS.some((key) => context.includes(key))) hits.push({ line: index + 1, text });
   });
   return hits;
 }

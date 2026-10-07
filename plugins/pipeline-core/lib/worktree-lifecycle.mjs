@@ -38,6 +38,7 @@ import {
 import { spawnSync } from "node:child_process";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "./successful-spawn.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 export const WORKTREE_RECORD_SCHEMA = "pipeline.worktree-lifecycle.v1";
 export const CLEANUP_MANIFEST_SCHEMA = "pipeline.session-cleanup-manifest.v1";
@@ -115,7 +116,7 @@ function gitEnvironment(env = process.env) {
   const result = {};
   for (const key of allowed) if (typeof env[key] === "string") result[key] = env[key];
   result.GIT_CONFIG_NOSYSTEM = "1";
-  result.GIT_CONFIG_GLOBAL = process.platform === "win32" ? "NUL" : "/dev/null";
+  result.GIT_CONFIG_GLOBAL = GIT_NULL_DEVICE;
   result.GIT_TERMINAL_PROMPT = "0";
   result.GIT_ASKPASS = process.platform === "win32" ? "" : "/bin/false";
   result.GIT_PAGER = "cat";
