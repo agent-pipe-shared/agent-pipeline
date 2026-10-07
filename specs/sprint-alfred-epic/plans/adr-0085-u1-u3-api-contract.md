@@ -239,7 +239,22 @@ DAB-REVIEW-CHAIN `["DCC-REVIEW-RECEIPT-BINDING"]` **[PO-Q2]**. 7 `[]` / three re
 DAB-LEGACY-KIND; kind `other` → DAB-KIND. 16 intent classifier (new, legacy v1, legacy v2, wrong policy). 17 record classifier (new,
 legacy, new + `packageSha256`, new + `advisorException`, other). 18 request + `advisorException` / without `bindingSha256` → DAB-SHAPE.
 
-## 6. PO questions
+## 6. PO answers (2026-10-07)
+
+- **PO-Q1 → option A** (decision Y): sidecar optional; undeclared is a visible skip; `DCC-REGISTER-UNDECLARED` is NOT added (U1 test 12
+  pins option A).
+- **PO-Q2 → option b** (decision Z). Contract changes: in review clause (6), when the latest receipt is a delta (round 2), a source
+  drift produces NO entry; instead `result.review.unreviewedSourceDelta` = `[{ path, reviewedSha256, currentSha256 }]` sorted by path
+  (paths whose digest differs between the latest receipt's sources and the current sources; an absent current file has
+  `currentSha256: null`), and `ok` stays true; when there is no drift the key is `[]`. After an initial receipt, drift stays
+  `DCC-REVIEW-RECEIPT-BINDING`. `result.review` gains that key (always present when `review` is non-null). U2 is unchanged
+  (`nextRound: null` after a delta). U3: `reviewChainInconsistencies` follows the same rule; the binding's `sources` are the CURRENT
+  sources and the binding gains the optional key `unreviewedSourceDelta` (present only when non-empty, same shape, sorted); a binding
+  with that key whose latest receipt is round 1 is invalid (`DAB-SHAPE`). Extra tests: U1 19(f) delta + drift → ok, delta listed;
+  U1 19(g) initial + drift → BINDING (as 19c); U3 6b delta + drift → binding carries `unreviewedSourceDelta`; U3 6c that key with a
+  round-1 latest receipt → DAB-SHAPE.
+
+## 7. Original PO questions (resolved above)
 
 - **[PO-Q1]** Decision W cannot be implemented exactly as worded (the module reads an opt-in sidecar, not the Spec). A (recommended):
   the sidecar's IDs are the register; undeclared is a visible skip. B: the sidecar is mandatory (`DCC-REGISTER-UNDECLARED`).
