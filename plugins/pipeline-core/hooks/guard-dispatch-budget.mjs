@@ -107,9 +107,21 @@
  * stay exactly those of the single-attempt `acquireDispatchBudgetCounterLock`,
  * which is unchanged and never waited for; a holder that exits between another
  * caller's read and its liveness probe surfaces there as the transient
- * `counter-lock-changed`, `counter-lock-recovery-raced` or
- * `counter-lock-recovery-busy`, which the wait retries inside the same bound and
- * backoff, whereas malformed/unsafe/ambiguous lock state still fails closed at once.
+ * `counter-lock-changed` or `counter-lock-recovery-busy`, which the wait retries
+ * inside the same bound and backoff, whereas malformed/unsafe/ambiguous lock state
+ * still fails closed at once.
+ *
+ * R7-11-F3 (after the R7-11d-T3 pins):
+ * - `counter-lock-recovery-raced`, the catch-all for an exception thrown during
+ *   dead-owner recovery, is no longer retried: it fails closed at once, like the
+ *   other recovery outcomes.
+ * - The hook refuses a `counter-lock-timeout` under its own typed code
+ *   `DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT` (path-free, "retry the same call", no
+ *   trusted-host-path repair) because a timeout is contention, not corrupt state.
+ * - Without an injected `dependencies.now` the wait bound runs on a monotonic
+ *   clock (`performance.now()`), so a wall clock stepping backwards mid-wait cannot
+ *   stretch the bound; the holder age still reads wall-clock `Date.now()` minus the
+ *   lock file's wall-clock mtime.
  *
  * ## Storage
  * Per-subagent counters persist as one JSON file each under
@@ -174,6 +186,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { hostname, uptime } from "node:os";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
@@ -200,6 +213,8 @@ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir:
 
 const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
 export { CLOSING_ALLOWANCE, DENIAL_CODE, INVALID_INPUT_CODE, SAFETY_MARGIN };
+/** The hook's own refusal code for a bounded counter-lock wait that timed out (contention, not invalid budget state). */
+export const COUNTER_LOCK_TIMEOUT_CODE = "DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT";
 const DISPATCH_RECORD_PATTERN = /^evidence\/dispatch-record-.*\.json$/u;
 const GIT_CLOSING_VERB_PATTERN = /^git\s+(add|commit)\b/u;
 
@@ -231,9 +246,21 @@ function invalidBudgetInputBlocked({ agentId, agentType, reason }) {
     2,
     "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
       + `${INVALID_INPUT_CODE}: this dispatch (${agentType}, agent ${agentId}) has invalid budget state (${reason}).\n`
-      + (String(reason).startsWith("counter-lock-timeout")
-        ? "This call was not counted and the persisted counter was left unchanged; retry the call (the holder releases the lock when its own call completes).\n"
-        : "The persisted counter was left unchanged; repair or remove it through the trusted host path before continuing.\n"),
+      + "The persisted counter was left unchanged; repair or remove it through the trusted host path before continuing.\n",
+  );
+}
+
+/**
+ * A bounded counter-lock wait that timed out is contention, not corrupt state: its own typed code,
+ * no path, no host-path repair, and the one repair that works -- retry the same call. The holder
+ * age is named only when the wait actually saw one.
+ */
+function counterLockTimeoutBlocked({ agentId, agentType, reason }) {
+  return verdict(
+    2,
+    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
+      + `${COUNTER_LOCK_TIMEOUT_CODE}: this dispatch (${agentType}, agent ${agentId}) could not take its budget counter lock within the bounded wait (${reason}).\n`
+      + "This call was not counted and the persisted counter was left unchanged; retry the same call (the lock is released when the holder's own call completes).\n",
   );
 }
 
@@ -837,13 +864,18 @@ const COUNTER_LOCK_BACKOFF_MAX_MS = 100;
 // Outcomes the wait variant retries: a live owner or the publishing transition
 // (`counter-lock-busy`) and the transient races of dead-owner recovery, produced
 // when the observed holder exits or the lock is replaced under another caller's
-// read. Everything else (malformed, unsafe, ambiguous, recovery-changed) fails closed.
+// read. Everything else (malformed, unsafe, ambiguous, recovery-changed and
+// recovery-raced, the catch-all for an exception during recovery) fails closed.
 const COUNTER_LOCK_TRANSIENT_CODES = new Set([
   "counter-lock-busy",
   "counter-lock-changed",
-  "counter-lock-recovery-raced",
   "counter-lock-recovery-busy",
 ]);
+
+/** Default wait clock: monotonic (immune to wall-clock steps); the injected `dependencies.now` replaces it in tests. */
+function monotonicNowMs() {
+  return performance.now();
+}
 
 function synchronousSleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -862,10 +894,10 @@ function counterLockMtimeMs(path, dependencies) {
  * R7-11): repeats the single attempt (`dependencies.acquireDispatchBudgetCounterLockFn`
  * when supplied, else the real one) while it reports `counter-lock-busy`, i.e.
  * a live owner or the retryable publishing transition, or one of the transient
- * dead-owner-recovery race outcomes `counter-lock-changed`,
- * `counter-lock-recovery-raced` and `counter-lock-recovery-busy`, sleeping with a
- * bounded backoff between attempts. Every other outcome -- acquired (including
- * dead-owner recovery), malformed, unsafe, ambiguous -- is returned at once,
+ * dead-owner-recovery race outcomes `counter-lock-changed` and
+ * `counter-lock-recovery-busy`, sleeping with a bounded backoff between attempts.
+ * Every other outcome -- acquired (including dead-owner recovery), malformed,
+ * unsafe, ambiguous, `counter-lock-recovery-raced` -- is returned at once,
  * exactly as the single attempt produced it, with no sleep. Once
  * `COUNTER_LOCK_WAIT_BOUND_MS` has elapsed it returns `{ status: "rejected", code:
  * "counter-lock-timeout", holderAgeMs }`, where `holderAgeMs` is now minus the
@@ -874,12 +906,16 @@ function counterLockMtimeMs(path, dependencies) {
  * never taken over or deleted.
  *
  * Injectable and SYNCHRONOUS (the hook is synchronous): `dependencies.now()`
- * (epoch ms, default `Date.now`) and `dependencies.sleep(ms)` (default a real
- * `Atomics.wait`). The hook forwards its own options object as `dependencies`.
+ * (ms; default the monotonic `performance.now()`, so the bound cannot be stretched
+ * by a wall-clock step) and `dependencies.sleep(ms)` (default a real
+ * `Atomics.wait`). The holder age compares the lock file's wall-clock mtime with
+ * wall-clock `Date.now()`, or with the injected `now` reading when one is injected.
+ * The hook forwards its own options object as `dependencies`.
  */
 export function acquireDispatchBudgetCounterLockWithWait(path, dependencies = {}) {
   const attempt = dependencies.acquireDispatchBudgetCounterLockFn ?? acquireDispatchBudgetCounterLock;
-  const nowFn = dependencies.now ?? Date.now;
+  const injectedNow = dependencies.now ?? null;
+  const nowFn = injectedNow ?? monotonicNowMs;
   const sleepFn = dependencies.sleep ?? synchronousSleep;
   const startedAt = Number(nowFn());
   let backoffMs = COUNTER_LOCK_BACKOFF_INITIAL_MS;
@@ -894,7 +930,9 @@ export function acquireDispatchBudgetCounterLockWithWait(path, dependencies = {}
     if (!(elapsedMs < COUNTER_LOCK_WAIT_BOUND_MS)) {
       const mtimeMs = counterLockMtimeMs(path, dependencies);
       if (mtimeMs !== null) {
-        return { status: "rejected", code: "counter-lock-timeout", holderAgeMs: Math.max(0, Math.floor(current) - Math.floor(mtimeMs)) };
+        // mtime is wall-clock: age it against wall-clock `Date.now()`, never the monotonic reading (an injected `now` keeps its own reading).
+        const wallNowMs = injectedNow === null ? Number(Date.now()) : current;
+        return { status: "rejected", code: "counter-lock-timeout", holderAgeMs: Math.max(0, Math.floor(wallNowMs) - Math.floor(mtimeMs)) };
       }
       // The lock vanished between the last attempt and the age read: one more
       // attempt, then give up. After a live holder was seen the wait itself is the
@@ -1294,7 +1332,10 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
     // A hook-level stub short-circuits the wait; otherwise parallel tool calls of this one agent wait (bounded) for the lock.
     const acquired = (options.acquireDispatchBudgetCounterLockFn ?? acquireDispatchBudgetCounterLockWithWait)(lockPath, options);
     if (acquired.status !== "acquired") {
-      return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: counterLockRefusalReason(acquired) });
+      const reason = counterLockRefusalReason(acquired);
+      return acquired.code === "counter-lock-timeout"
+        ? counterLockTimeoutBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason })
+        : invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason });
     }
     try {
       options.afterCounterLockAcquiredFn?.();
