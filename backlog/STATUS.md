@@ -829,6 +829,7 @@
 | pipeline.verify-registration-check-fixtures-lack-real-git-topology | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.verify-runtime-concentrated-in-ten-suites | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on. |
 | pipeline.verify-suite-reads-real-machine-state | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite |
+| pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -856,7 +857,7 @@
 
 ## Counts
 
-- open: 171
+- open: 172
 - in_progress: 0
 - closed: 663
 - rejected: 3

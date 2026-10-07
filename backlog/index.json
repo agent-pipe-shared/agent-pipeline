@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bfc3d3e3d0700f50a34ad4d2aab386cc1d8e10b0c459e74285b1ad9d36ec9817"
+    "transitionHead": "1c34ceec480023ac6310e86ccb8a1e5b01d2b8572c6b19974117a55db3f114ad"
   },
   "counts": {
-    "open": 171,
+    "open": 172,
     "in_progress": 0,
     "closed": 663,
     "rejected": 3,
@@ -10806,6 +10806,17 @@
       "closureRepository": "self",
       "closureCommit": "a8c11b5ae31e8cb848d71ee75e834052319dea7d",
       "closureEvidence": "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
+    },
+    {
+      "id": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "Critic Q12 delta 1, finding F-E (specs/sprint-alfred-epic/evidence/critic-2026-10-07/q12-delta1.md)",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.warn-security-gate-hard-blocks-every-push",
