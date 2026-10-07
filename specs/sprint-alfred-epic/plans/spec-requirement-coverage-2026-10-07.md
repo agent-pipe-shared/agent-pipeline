@@ -92,20 +92,20 @@ Classes: `covered` (test or code cited) · `partial` · `none` (searched, nothin
 | Requirement | Gist | Class | Note |
 |---|---|---|---|
 | R7-1a | NUL-rejecting git stub; ratchet scan | covered | `lib/worktree-lifecycle.test.mjs:1304`; `lib/git-null-device.mjs:3` |
-| R7-1b | Discovery failure envelope with cause, diagnose-git | unsearched | |
-| R7-1c | Not-ready preflight admits diagnostics | unsearched | |
-| R7-2a | Ended-session descriptors archived, bytes preserved | unsearched | |
-| R7-2b | Null/absent owner descriptors take attended route | unsearched | |
+| R7-1b | Discovery failure envelope with cause, diagnose-git | none | (3E) `diagnose-git` term has no hit in plugins/harness/schemas/policies |
+| R7-1c | Not-ready preflight admits diagnostics | none | (3E) No titled test or id commit found |
+| R7-2a | Ended-session descriptors archived, bytes preserved | none | (3E) No id commit; no ended-session term hit |
+| R7-2b | Null/absent owner descriptors take attended route | none | (3E) No id commit or test found |
 | R7-2c | Preflight lists orphans; nextAction idempotent | partial | `scripts/toolchain-preflight.mjs:323` mentions R7-2 finding only |
 | R7-3a | present-plan refuses ignored/untracked/modified bound path | partial | `991cb703f` refuses git-ignored bound paths |
 | R7-3b | Producer writes tracked package; fresh-clone digests verify | covered | `scripts/design-course-session.test.mjs:251` |
-| R7-3c | Close check lists bound paths | unsearched | |
-| R7-3d | Ratchet over State fields naming bound paths | unsearched | |
-| R7-4a | Backlog/docs/scratch writes admitted every state | unsearched | |
-| R7-4b | State-only commit admitted via writer receipt | unsearched | |
-| R7-5a | Rebind approval reaches verified, zero signatures | unsearched | |
-| R7-5b | Changed PRD/Spec yields digest-set-changed | unsearched | |
-| R7-5c | Lost artifact yields DWP-REBIND-ARTIFACT-LOST | unsearched | |
+| R7-3c | Close check lists bound paths | none | (3E) No id commit; `991cb703f` is the refuse side only (R7-3a) |
+| R7-3d | Ratchet over State fields naming bound paths | none | (3E) No id commit or ratchet test found |
+| R7-4a | Backlog/docs/scratch writes admitted every state | none | (3E) No id commit or titled test found |
+| R7-4b | State-only commit admitted via writer receipt | none | (3E) No id commit or titled test found |
+| R7-5a | Rebind approval reaches verified, zero signatures | none | (3E) Only unrelated PO-REBIND authority fixtures seen; no design-rebind test |
+| R7-5b | Changed PRD/Spec yields digest-set-changed | none | (3E) `digest-set-changed` has no hit |
+| R7-5c | Lost artifact yields DWP-REBIND-ARTIFACT-LOST | none | (3E) `DWP-REBIND-ARTIFACT-LOST` has no hit |
 | R7-6a | Machine key directory used when repo value unset | covered | `scripts/po-human-approval.test.mjs:4527` |
 | R7-6b | openssl resolution and capability | covered | `scripts/po-human-approval.test.mjs:4558` |
 | R7-6c | Failing openssl stub yields typed result | covered | `scripts/po-human-approval.test.mjs:4596` |
@@ -117,21 +117,21 @@ Classes: `covered` (test or code cited) · `partial` · `none` (searched, nothin
 | R7-7c | Same report at bootstrap and prepare-for-signature | covered | `scripts/toolchain-preflight.test.mjs:571`; `67f0b4cd4` |
 | R7-7d | Report runs from installed copy, no source path | partial | `scripts/toolchain-preflight.test.mjs:391` label only |
 | R7-7e | Missing pre-push hook repairable; foreign attended | covered | `scripts/toolchain-preflight.test.mjs:583` |
-| R7-8a | Both shell lanes give same refusal outcome | unsearched | |
-| R7-8b | continuity-cas same recovery from PowerShell | unsearched | |
-| R7-8c | Unparseable PowerShell carries typed retry action | unsearched | |
-| R7-9a | Device-switch walk, zero PO acts | unsearched | |
-| R7-9b | Static check on signature classes and T-map | unsearched | |
-| R7-9c | T18 replay: preparation scripts admitted in draft | unsearched | |
-| R7-10a | Earlier-revision registration superseded without override | unsearched | |
-| R7-10b | Same-digest unobserved owner superseded | unsearched | |
-| R7-10c | Refusals each name a route, zero mutation | unsearched | |
-| R7-10d | Supersede action idempotent, lane-equal | unsearched | |
+| R7-8a | Both shell lanes give same refusal outcome | none | (3E) No id commit or lane-parity test found |
+| R7-8b | continuity-cas same recovery from PowerShell | partial | (3E) `harness/scripts/pipeline-state.test.mjs:1990` continuity-cas cases exist; PowerShell lane not seen |
+| R7-8c | Unparseable PowerShell carries typed retry action | none | (3E) No id commit or titled test found |
+| R7-9a | Device-switch walk, zero PO acts | none | (3E) `device-switch` has no hit |
+| R7-9b | Static check on signature classes and T-map | none | (3E) No id commit or static check found |
+| R7-9c | T18 replay: preparation scripts admitted in draft | none | (3E) No id commit or replay fixture found |
+| R7-10a | Earlier-revision registration superseded without override | none | (3E) No supersede-registration term hit |
+| R7-10b | Same-digest unobserved owner superseded | none | (3E) Same |
+| R7-10c | Refusals each name a route, zero mutation | none | (3E) Same |
+| R7-10d | Supersede action idempotent, lane-equal | none | (3E) Same |
 | R7-11a | N concurrent calls admitted, counter exact | covered | `hooks/guard-dispatch-budget.test.mjs:968`, `:1225` |
 | R7-11b | Dead-owner lock recovered, malformed fail-closed | covered | `hooks/guard-dispatch-budget.test.mjs:1239` |
 | R7-11c | Per-agent counters isolated | covered | `hooks/guard-dispatch-budget.test.mjs:1274` |
 | R7-11d | Live lock beyond bound yields counter-lock-timeout | covered | `hooks/guard-dispatch-budget.test.mjs:1302`; code `hooks/guard-dispatch-budget.mjs:114` |
-| R7-11e | First Write of subagent admitted via SubagentStart receipt | unsearched | Protected `hooks.json` slice, not confirmed |
+| R7-11e | First Write of subagent admitted via SubagentStart receipt | partial | (3E) `lib/native-goldfish-host-state.mjs:162` binds SubagentStart (Codex); no first-Write admission test seen; Protected `hooks.json` slice not confirmed |
 
 ## RV (AC-33)
 
@@ -159,9 +159,9 @@ Classes: `covered` (test or code cited) · `partial` · `none` (searched, nothin
 | R4 | 12 | 0 | 1 | 3 | 8 |
 | R5 | 8 | 0 | 0 | 1 | 7 |
 | R6 | 5 | 0 | 1 | 2 | 2 |
-| R7 | 41 | 16 | 3 | 0 | 22 |
+| R7 (3E) | 41 | 16 | 5 | 20 | 0 |
 | RV | 11 | 0 | 0 | 11 | 0 |
-| Total | 101 | 18 | 14 | 30 | 39 |
+| Total (3E: R7 delta applied to prior totals) | 101 | 18 | 16 | 50 | 17 |
 
 ## Class `none` by family
 
@@ -171,11 +171,11 @@ Classes: `covered` (test or code cited) · `partial` · `none` (searched, nothin
 - R4: R4-1, R4-2, R4-12 (all inherited from RECON-2A).
 - R5: R5-3 (inherited).
 - R6: R6-2, R6-4 (inherited).
-- R7: none searched as `none`.
+- R7: R7-1b, R7-1c, R7-2a, R7-2b, R7-3c, R7-3d, R7-4a, R7-4b, R7-5a, R7-5b, R7-5c, R7-8a, R7-8c, R7-9a, R7-9b, R7-9c,
+  R7-10a, R7-10b, R7-10c, R7-10d (3E; one commit-message grep plus term greps, may hide tests under other names).
 - RV: RV-1..RV-11 (inherited from RECON-2A, not re-grepped).
 
 ## Not reached (follow-up dispatch needed)
 
-R4-3..R4-10; R5-1, R5-2, R5-4..R5-8; R6-3, R6-5; R7-1b, R7-1c, R7-2a, R7-2b, R7-3c, R7-3d, R7-4a, R7-4b, R7-5a..R7-5c,
-R7-8a..R7-8c, R7-9a..R7-9c, R7-10a..R7-10d, R7-11e. The `none` rows of R3 and R1 rest on one title-pattern grep each and
+R4-3..R4-10; R5-1, R5-2, R5-4..R5-8; R6-3, R6-5 (R7 rows searched in 3E). The `none` rows of R3 and R1 rest on one title-pattern grep each and
 may hide tests under other names.
