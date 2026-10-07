@@ -22,3 +22,14 @@ absence does not make the other runners a bootstrap prerequisite.
 Runner evidence and platform evidence are independent. In particular, the
 synthetic macOS contract suite does not claim native macOS support for any
 runner.
+
+## Claude Desktop app
+
+Local Desktop sessions on a Windows path share settings, user-scope plugins,
+hooks and skills with the CLI. The pipeline's end-to-end behaviour there is not
+yet verified; the open acceptance check is tracked in
+`backlog/items/2026-10-07-desktop-app-support-is-unverified.md`.
+
+- **Desktop WSL sessions load no plugins, so no pipeline guard runs. Do not use them for a governed repository.**
+- Desktop does not load PowerShell profiles; only user/system environment variables or settings `env` apply.
+- PO/human commands (signing, `!`-prefixed commands) run in the integrated or an external terminal.
