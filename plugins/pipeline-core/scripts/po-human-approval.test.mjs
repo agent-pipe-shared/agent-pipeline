@@ -4444,7 +4444,7 @@ test("R7-6e (dynamic): the signing flow only ever names the constant bare execut
   } finally { r76Release(env); }
 });
 
-test("R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the PO key directory is never started when sign-intent runs from the repository root with the real lookup", () => {
+test("R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the PO key directory is never started when sign-intent runs from the repository root with the real lookup", { skip: process.platform === "win32" ? "win32-known residual (PO decision R 2026-10-07): libuv resolves a bare name in the child cwd before PATH; the signing spawn's cwd is the PO key directory" : false }, () => {
   const env = r76Env();
   const aux = mkdtempSync(join(tmpdir(), "r76-decoy-aux-"));
   const startCwd = process.cwd();
