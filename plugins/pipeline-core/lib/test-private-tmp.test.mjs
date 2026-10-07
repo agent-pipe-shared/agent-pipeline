@@ -12,7 +12,9 @@
  * file failing to load.
  */
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -154,3 +156,152 @@ test(
     assert.equal(text.includes("evaluateWindowsPrivateState"), false, "test-private-tmp.mjs must not reference evaluateWindowsPrivateState");
   },
 );
+
+// --- B-S1-T2: exit cleanup and refusal paths ---------------------------------
+//
+// The module offers exactly two seams to a caller: the arguments of
+// `privateMkdtemp(prefix)`, and the environment `os.tmpdir()` reads
+// (TMPDIR / TMP / TEMP). Cases that need a fresh process or a different temp
+// directory therefore run the module in a child Node process whose temp
+// directory is a fixture owned by this test. `PRIVATE_TMP_ROOT_NOT_SECURE` is
+// deliberately not pinned here: `privateTempRoot()` takes no options and calls
+// the Windows adapter without any, so no seam reaches that branch.
+
+const TMP_ENVIRONMENT_KEYS = ["TMPDIR", "TMP", "TEMP"];
+const CHILD_TIMEOUT_MS = 120_000;
+
+function childEnvironment(tmp) {
+  const environment = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!TMP_ENVIRONMENT_KEYS.includes(key.toUpperCase())) environment[key] = value;
+  }
+  for (const key of TMP_ENVIRONMENT_KEYS) environment[key] = tmp;
+  return environment;
+}
+
+/** Run `source` (an ES module body; argv[1] is the module URL) in a child whose temp directory is `tmp`; parse the last stdout line as JSON. */
+function runModuleChild(source, tmp) {
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", source, MODULE_URL.href], {
+    encoding: "utf8",
+    env: childEnvironment(tmp),
+    timeout: CHILD_TIMEOUT_MS,
+    shell: false,
+    windowsHide: true,
+  });
+  assert.equal(result.error, undefined, `the child process must start and finish: ${result.error?.message}`);
+  assert.equal(result.status, 0, `the child process must exit 0 (status=${result.status}, signal=${result.signal}): ${result.stderr}`);
+  const lines = result.stdout.trim().split(/\r?\n/);
+  return JSON.parse(lines[lines.length - 1]);
+}
+
+function samePath(left, right) {
+  return IS_WIN32 ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+/** Run `run`; return the thrown error, or null if it did not throw (a returned directory is queued for cleanup). */
+function refusalOf(run) {
+  try {
+    const value = run();
+    if (typeof value === "string") created.push(value);
+    return null;
+  } catch (error) {
+    return error;
+  }
+}
+
+function assertRefused(run, code, label) {
+  const error = refusalOf(run);
+  assert.notEqual(error, null, `${label}: expected ${code}, but the call succeeded`);
+  assert.equal(error.code, code, `${label}: expected error code ${code}, got ${error.code}: ${error.message}`);
+  assert.equal(String(error.message).includes(code), true, `${label}: the message must name ${code}: ${error.message}`);
+}
+
+test("B-S1-T2: the private temp root and its children are removed when a process that used them exits normally", async () => {
+  const sandbox = await child("b-s1-t2-exit-");
+  const source = [
+    'import { existsSync, writeFileSync } from "node:fs";',
+    'import { join } from "node:path";',
+    "const { privateTempRoot, privateMkdtemp } = await import(process.argv[1]);",
+    "const root = privateTempRoot();",
+    'const dir = privateMkdtemp("x-");',
+    'const file = join(dir, "payload.txt");',
+    'writeFileSync(file, "payload");',
+    'process.stdout.write(JSON.stringify({ root, dir, file, fileExistsBeforeExit: existsSync(file) }) + "\\n");',
+  ].join("\n");
+  const report = runModuleChild(source, sandbox);
+  assert.equal(typeof report.root, "string", "the child must print the root path");
+  assert.equal(isInside(sandbox, report.root), true, `the root ${report.root} must sit inside the temp directory the child was given (${sandbox})`);
+  assert.equal(isInside(report.root, report.dir), true, `the child directory ${report.dir} must sit inside the root ${report.root}`);
+  assert.equal(report.fileExistsBeforeExit, true, "the payload file must exist while the child is still running (otherwise this test proves nothing)");
+  assert.equal(existsSync(report.file), false, `the payload file ${report.file} must be gone after the child exited`);
+  assert.equal(existsSync(report.dir), false, `the child directory ${report.dir} must be gone after the child exited`);
+  assert.equal(existsSync(report.root), false, `the private temp root ${report.root} must be gone after the child exited`);
+  assert.deepEqual(readdirSync(sandbox), [], "nothing the child created may remain in the temp directory it was given");
+});
+
+for (const marker of ["directory", "file"]) {
+  test(`B-S1-T2: PRIVATE_TMP_ROOT_INSIDE_REPOSITORY is refused and leaves no root behind (.git ${marker} in an ancestor of the temp directory)`, async () => {
+    const repository = await child(`b-s1-t2-repo-${marker}-`);
+    if (marker === "directory") mkdirSync(join(repository, ".git"));
+    else writeFileSync(join(repository, ".git"), "gitdir: elsewhere\n");
+    const nested = join(repository, "nested", "tmp");
+    mkdirSync(nested, { recursive: true });
+    const source = [
+      'import { readdirSync } from "node:fs";',
+      'import { tmpdir } from "node:os";',
+      "const { privateTempRoot, privateMkdtemp } = await import(process.argv[1]);",
+      "function attempt(run) {",
+      "  try { run(); return { code: null, message: null }; } catch (error) { return { code: error?.code ?? null, message: String(error?.message) }; }",
+      "}",
+      "const first = attempt(() => privateTempRoot());",
+      'const second = attempt(() => privateMkdtemp("x-"));',
+      'process.stdout.write(JSON.stringify({ tmp: tmpdir(), first, second, entries: readdirSync(tmpdir()).sort() }) + "\\n");',
+    ].join("\n");
+    const report = runModuleChild(source, nested);
+    assert.equal(samePath(report.tmp, nested), true, `the child must have used the fixture as its temp directory: ${report.tmp} vs ${nested}`);
+    for (const [label, outcome] of [["privateTempRoot()", report.first], ["privateMkdtemp() after a refusal", report.second]]) {
+      assert.equal(outcome.code, "PRIVATE_TMP_ROOT_INSIDE_REPOSITORY", `${label} must be refused with PRIVATE_TMP_ROOT_INSIDE_REPOSITORY, got ${outcome.code}: ${outcome.message}`);
+      assert.equal(String(outcome.message).includes("PRIVATE_TMP_ROOT_INSIDE_REPOSITORY"), true, `${label}: the message must name the code: ${outcome.message}`);
+    }
+    assert.deepEqual(report.entries, [], "the rejected root must already be removed when the refusal surfaces, not merely at process exit");
+    assert.deepEqual(readdirSync(nested), [], "no directory may remain in the temp directory after the child exited");
+  });
+}
+
+test("B-S1-T2: PRIVATE_TMP_PREFIX_INVALID refuses an empty or non-string prefix and creates nothing", async () => {
+  const { privateTempRoot, privateMkdtemp } = await api();
+  const root = privateTempRoot();
+  const before = readdirSync(root).sort();
+  const invalid = [
+    ["empty string", ""],
+    ["undefined", undefined],
+    ["null", null],
+    ["number", 42],
+    ["object", {}],
+    ["array", ["x-"]],
+  ];
+  for (const [label, prefix] of invalid) {
+    assertRefused(() => privateMkdtemp(prefix), "PRIVATE_TMP_PREFIX_INVALID", `prefix ${label}`);
+  }
+  assert.deepEqual(readdirSync(root).sort(), before, "a refused prefix must not create any directory in the root");
+});
+
+test("B-S1-T2: PRIVATE_TMP_PREFIX_ESCAPES_ROOT refuses a prefix that resolves outside the root and creates nothing", async () => {
+  const { privateTempRoot, privateMkdtemp } = await api();
+  const root = privateTempRoot();
+  const parent = dirname(root);
+  const grandparent = dirname(parent);
+  const nonce = `b-s1-t2-escape-${randomUUID().slice(0, 8)}-`;
+  const before = readdirSync(root).sort();
+  const leaked = () => [parent, grandparent]
+    .filter((directory, index, all) => all.indexOf(directory) === index)
+    .flatMap((directory) => readdirSync(directory).filter((name) => name.startsWith(nonce)).map((name) => join(directory, name)));
+  try {
+    assertRefused(() => privateMkdtemp(`../${nonce}`), "PRIVATE_TMP_PREFIX_ESCAPES_ROOT", "prefix ../<name>");
+    assertRefused(() => privateMkdtemp(`../../${nonce}`), "PRIVATE_TMP_PREFIX_ESCAPES_ROOT", "prefix ../../<name>");
+    assert.deepEqual(readdirSync(root).sort(), before, "a refused prefix must not create any directory in the root");
+    assert.deepEqual(leaked(), [], "a refused prefix must not create a directory outside the root either");
+  } finally {
+    for (const path of leaked()) rmSync(path, { recursive: true, force: true });
+  }
+});
