@@ -776,7 +776,10 @@ if (isDirectInvocation(import.meta.url)) {
       console.log(JSON.stringify(result, null, 2));
       process.exit(result.status === "installed" ? 0 : 1);
     } catch (error) {
-      const code = typeof error?.code === "string" && /^GHS-[A-Z-]+$/.test(error.code)
+      // Keep the thrown error's OWN typed refusal code (GHS-*, PB-WINDOWS-ASSURANCE, ...): a typed
+      // code is a hyphenated upper-case identifier, which cannot carry a path or message text. Only an
+      // error with no typed code (a plain Error, or a bare errno such as EACCES) falls back.
+      const code = typeof error?.code === "string" && error.code.length <= 64 && /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/.test(error.code)
         ? error.code : "PREPUSH-INSTALL-UNAVAILABLE";
       console.log(JSON.stringify({ status: "refused", code }));
       process.exit(1);
