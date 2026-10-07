@@ -17,6 +17,7 @@ import {
   sha256Raw,
 } from "./afk-assumption-mode.mjs";
 import { createAfkWorkerResult } from "./afk-capability-worker.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import {
   executeAfkActivationHostTransaction,
   executeAfkReviewHostTransaction,
@@ -36,7 +37,7 @@ function git(root, ...args) {
     env: {
       PATH: process.env.PATH,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
     },
   }).trim();
 }

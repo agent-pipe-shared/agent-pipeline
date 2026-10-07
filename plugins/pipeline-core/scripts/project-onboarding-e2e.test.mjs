@@ -53,6 +53,7 @@ import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
 import { registeredRouting, RUNNER_PROFILES_V3_REGISTRY_SHA256, validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import { designReadinessReportSha256, designReadinessRunnerSelectionSha256, validateDesignReadinessModelOutput, verifyDesignReadinessHostExecution } from "../lib/design-readiness-host-evidence.mjs";
 import { createDesignReadinessRunnerHostStore } from "../lib/design-readiness-runner-host-store.mjs";
 import { buildRunnerDesignReadinessPrompt } from "../lib/runner-readiness-request.mjs";
@@ -163,7 +164,7 @@ function cliGit(command, args, options = {}) {
   // directory-shaped imitation. Other Git observations remain doubled below.
   if (gitArgs[0] === "init" && gitArgs[1] === "--initial-branch=main") {
     return spawnSync(command, gitArgs, { ...options, encoding: "utf8", shell: false,
-      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" } });
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, LC_ALL: "C" } });
   }
   if (gitArgs[0] === "config") {
     const local = gitArgs[1] === "--local" ? 1 : 0;

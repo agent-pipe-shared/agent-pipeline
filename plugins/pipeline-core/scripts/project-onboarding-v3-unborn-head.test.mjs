@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 
@@ -39,7 +40,7 @@ function fixture(label) {
     USERPROFILE: home,
     PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home,
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+    GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
     LC_ALL: "C",
   };
   const initialized = run("git", ["init", "--quiet", "--initial-branch=main", root], { cwd: container, env });

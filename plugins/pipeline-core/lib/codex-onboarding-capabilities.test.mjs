@@ -24,6 +24,7 @@ import test from "node:test";
 
 import { diagnoseCodexOnboardingSessionCapability, observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import { hasCodexExistingGitControlMount } from "./codex-host-layout.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 
 const roots = [];
@@ -36,7 +37,7 @@ function git(root, args) {
     env: {
       ...process.env,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
       LC_ALL: "C",
     },
   }).trim();

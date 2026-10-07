@@ -17,6 +17,7 @@ import {
   validateAfkReview,
 } from "./afk-review.mjs";
 import { classifyAfkWorkflowPreflight } from "./workflow-preflight.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 const ACTIVATION = "a".repeat(32);
 const REVIEWED_AT = "2026-07-18T21:00:00.000Z";
@@ -28,7 +29,7 @@ function git(root, ...args) {
     env: {
       PATH: process.env.PATH,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
     },
   }).trim();
 }
