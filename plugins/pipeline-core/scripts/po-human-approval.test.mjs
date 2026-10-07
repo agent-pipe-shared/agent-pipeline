@@ -2899,7 +2899,7 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
   // helper instead, and this one does the same for the same reason).
   const dirsFlag = fixtureDirs();
   const dirsEnv = fixtureDirs();
-  const home = noMachinePlaneHomeFixture();
+  const home = outsideRepoHomeFixture(); // R7-6-T11 (decision AC): the sign-intent probe needs a home outside every repository
   try {
     const { authority: authorityFlag } = keyFixture(dirsFlag.directory);
     anchorFixtureKey(dirsFlag.repoRoot, dirsFlag.directory);
@@ -3048,15 +3048,15 @@ test("AC-14: a plane-sourced directory runs through the identical unsafe-directo
 
 test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machine plane's poKeyDirectory behaves exactly like the same directory passed via --directory", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
-  const home = machinePlaneHomeFixture(dirs.directory);
+  const home = outsideRepoHomeFixture(dirs.directory); // R7-6-T11 (decision AC): plane written in a home outside every repository, as the probe requires
   try {
     const { authority } = keyFixture(dirs.directory);
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("setup-2b-plane-parity-fixture").digest("hex");
-    const result = runHumanApproval(
+    const result = withEnvDirectory(undefined, () => runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--intent-sha256", intentSha256],
       { readConfirmation: () => "approve", homedirFn: () => home },
-    );
+    ));
     assert.equal(result.ok, true);
     assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
     const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
@@ -3175,9 +3175,29 @@ function legacyRepoStoreFixture(gitCommonDir, poKeyDirectory) {
   }, null, 2) + "\n");
 }
 
-test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the REPO-SCOPED store (not the machine plane); a later command in the SAME repo resolves it without repeating --directory; the SAME command in a DIFFERENT repo (different git-common-dir) does NOT inherit it", { skip: REQUIRES_OPENSSL }, () => {
+/** R7-6-T11 (decision AC): a fixture home OUTSIDE every repository -- the sign-intent probe takes its working
+ * directory from the home and refuses one inside a repository, which is where the scratch/ homes above live.
+ * With `poKeyDirectory` the machine plane is written there through the library's own writer. */
+function outsideRepoHomeFixture(poKeyDirectory) {
+  const home = mkdtempSync(join(tmpdir(), "po-human-approval-outside-home-"));
+  if (poKeyDirectory !== undefined) {
+    writeMachinePlane({
+      schema: MACHINE_PLANE_SCHEMA, poKeyDirectory, pushApprovalDefault: "chat",
+      routing: null, language: null, session: null, usage: null, updatedAt: new Date().toISOString(),
+    }, { homedirFn: () => home });
+  }
+  return home;
+}
+
+/** Sorted, forward-slash listing of everything under `root`, for "nothing was written here" pins. */
+function treeListing(root) {
+  return readdirSync(root, { recursive: true }).map((entry) => String(entry).replaceAll("\\", "/")).sort();
+}
+
+// R7-6-T11 (decision AC, r7-6-multi-key-aa.md): setup now writes the MACHINE-WIDE default; the legacy per-repository store is read-only.
+test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the MACHINE PLANE (decision AC), never the legacy REPO-SCOPED store or the repository; a later command resolves it without repeating --directory in the SAME repo and, the plane being machine-wide, in a DIFFERENT repo too", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
-  const home = noMachinePlaneHomeFixture();
+  const home = outsideRepoHomeFixture();
   const otherRepo = mkdtempSync(join(tmpdir(), "po-gapA-other-repo-"));
   const commonA = repoScopeCommonDirFixture();
   const commonOther = repoScopeCommonDirFixture();
@@ -3186,38 +3206,41 @@ test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the R
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const repoRootA = resolve(dirs.repoRoot);
     const gitCommonDirFn = (repository) => (repository === repoRootA ? commonA : commonOther);
-    const setupResult = runHumanApproval(
+    const repoBefore = treeListing(dirs.repoRoot);
+    const setupResult = withEnvDirectory(undefined, () => runHumanApproval(
       ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
       { homedirFn: () => home, gitCommonDirFn },
-    );
+    ));
     assert.equal(setupResult.ok, true);
 
-    // The machine plane must stay untouched: setup's auto-persist no longer targets it.
+    // The machine plane carries it.
     const plane = readMachinePlane({ homedirFn: () => home });
-    assert.equal(plane.status, "absent", "setup with an explicit --directory must no longer auto-persist into the machine plane");
+    assert.equal(plane.status, "valid", "setup with an explicit --directory must write the machine plane (decision AC)");
+    assert.equal(realpathSync(plane.plane.poKeyDirectory), realpathSync(dirs.directory));
 
-    // Repo A's own repo-scoped store now carries it.
-    const stored = JSON.parse(readFileSync(repoScopeStorePath(commonA), "utf8"));
-    assert.equal(stored.poKeyDirectory, realpathSync(dirs.directory), "setup must persist its explicit --directory into THIS repository's repo-scoped store");
+    // Nothing in the repository or the git-common-dir; the legacy store stays untouched.
+    assert.deepEqual(treeListing(dirs.repoRoot), repoBefore, "setup writes nothing into the repository");
+    assert.deepEqual(treeListing(commonA), [], "setup writes nothing into the git-common-dir");
+    assert.equal(existsSync(repoScopeStorePath(commonA)), false, "the legacy per-repository store is not written");
 
-    // A LATER command in the SAME repo, omitting --directory, resolves it.
+    // A LATER command in the SAME repo, omitting --directory, resolves it from the plane.
     const intentSha256Same = createHash("sha256").update("po-keydir-01-a-same-repo-fixture").digest("hex");
-    const resultSame = runHumanApproval(
+    const resultSame = withEnvDirectory(undefined, () => runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--intent-sha256", intentSha256Same],
       { readConfirmation: () => "approve", homedirFn: () => home, gitCommonDirFn },
-    );
+    ));
     assert.equal(resultSame.ok, true);
     assert.equal(resultSame.code, "PO-HUMAN-SIGN-INTENT-READY");
 
-    // The SAME command in a DIFFERENT repo (its own, empty repo-scoped store; no
-    // machine plane; no env) must NOT inherit it -- must fail closed instead.
-    assert.equal(existsSync(repoScopeStorePath(commonOther)), false, "a different repository's repo-scoped store must never be populated by another repository's setup");
-    const otherError = thrown(() => runHumanApproval(
+    // The plane is machine-wide: the SAME resolution in a DIFFERENT repo reaches the same directory.
+    const otherParsed = withEnvDirectory(undefined, () => parseHumanArgs(
       ["sign-intent", "--repo-root", otherRepo, "--intent-sha256", intentSha256Same],
       { homedirFn: () => home, gitCommonDirFn },
     ));
-    assert.ok(otherError, "a different repository must never silently resolve another repository's remembered directory");
-    assert.match(otherError.message, /approval directory is required/u);
+    assert.equal(otherParsed.error, undefined);
+    assert.equal(realpathSync(otherParsed.directory), realpathSync(dirs.directory));
+    assert.equal(otherParsed.directorySource, "machine-plane");
+    assert.equal(existsSync(repoScopeStorePath(commonOther)), false, "another repository's legacy store is never populated either");
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
@@ -3227,37 +3250,42 @@ test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the R
   }
 });
 
-test("PO-KEYDIR-01(A): a subsequent setup --directory <other-dir> never silently overwrites an already-populated, different REPO-SCOPED poKeyDirectory", () => {
+// R7-6-T11 (decision AC): the already-populated, different value is now the MACHINE-WIDE default; the legacy store is never written.
+test("PO-KEYDIR-01(A): a subsequent setup --directory <other-dir> never silently overwrites an already-populated, different MACHINE-WIDE poKeyDirectory, and never writes the legacy REPO-SCOPED store (decision AC)", () => {
   const dirs = fixtureDirs();
   const otherDirs = fixtureDirs();
+  const home = outsideRepoHomeFixture();
   const common = repoScopeCommonDirFixture();
   try {
     keyFixture(dirs.directory);
-    const gitCommonDirFn = () => common;
-    const first = runHumanApproval(
-      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
-      { gitCommonDirFn },
-    );
+    const dependencies = { homedirFn: () => home, gitCommonDirFn: () => common };
+    const first = withEnvDirectory(undefined, () => runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], dependencies));
     assert.equal(first.ok, true);
-    const afterFirst = JSON.parse(readFileSync(repoScopeStorePath(common), "utf8"));
-    assert.equal(afterFirst.poKeyDirectory, realpathSync(dirs.directory));
+    const afterFirst = readMachinePlane({ homedirFn: () => home });
+    assert.equal(afterFirst.status, "valid", "the first setup --directory writes the machine plane (decision AC)");
+    assert.equal(realpathSync(afterFirst.plane.poKeyDirectory), realpathSync(dirs.directory));
 
     keyFixture(otherDirs.directory);
-    const second = runHumanApproval(
-      ["setup", "--repo-root", otherDirs.repoRoot, "--directory", otherDirs.directory],
-      { gitCommonDirFn },
-    );
-    assert.equal(second.ok, true, "setup itself must still succeed even though the repo-scoped store write is skipped");
+    const repositoriesBefore = [treeListing(dirs.repoRoot), treeListing(otherDirs.repoRoot)];
+    const second = withEnvDirectory(undefined, () => runHumanApproval(
+      ["setup", "--repo-root", otherDirs.repoRoot, "--directory", otherDirs.directory], dependencies));
+    assert.equal(second.ok, true, "setup itself must still succeed even though the plane write is skipped");
 
-    const stored = JSON.parse(readFileSync(repoScopeStorePath(common), "utf8"));
-    assert.equal(stored.poKeyDirectory, realpathSync(dirs.directory), "a different, already-valid repo-scoped poKeyDirectory must never be silently overwritten");
+    const stored = readMachinePlane({ homedirFn: () => home });
+    assert.deepEqual(stored, afterFirst, "a different, already-set machine-wide poKeyDirectory must never be silently overwritten");
+    assert.equal(realpathSync(stored.plane.poKeyDirectory), realpathSync(dirs.directory));
+    assert.deepEqual(treeListing(common), [], "the legacy per-repository store is never written");
+    assert.deepEqual([treeListing(dirs.repoRoot), treeListing(otherDirs.repoRoot)], repositoriesBefore, "nothing is written into either repository");
   } finally {
     cleanup(dirs);
     cleanup(otherDirs);
+    rmSync(home, { recursive: true, force: true });
     rmSync(common, { recursive: true, force: true });
   }
 });
 
+// R7-6-T11 (decision AC): a plane-sourced directory leaves the plane alone and still writes neither the legacy store nor the repository.
 test("PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory is never written back into the repo-scoped store either (nothing new to persist)", () => {
   const dirs = fixtureDirs();
   const home = machinePlaneHomeFixture(dirs.directory);
@@ -3266,11 +3294,14 @@ test("PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory 
     keyFixture(dirs.directory);
     const gitCommonDirFn = () => common;
     const before = readMachinePlane({ homedirFn: () => home });
-    const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot], { homedirFn: () => home, gitCommonDirFn });
+    const repoBefore = treeListing(dirs.repoRoot);
+    const result = withEnvDirectory(undefined, () => runHumanApproval(["setup", "--repo-root", dirs.repoRoot], { homedirFn: () => home, gitCommonDirFn }));
     assert.equal(result.ok, true);
     const after = readMachinePlane({ homedirFn: () => home });
     assert.deepEqual(after, before, "a directory resolved FROM the plane must not trigger a redundant write back to it");
     assert.equal(existsSync(repoScopeStorePath(common)), false, "a plane-sourced directory must not be written into the repo-scoped store either");
+    assert.deepEqual(treeListing(common), [], "nothing at all is written into the git-common-dir");
+    assert.deepEqual(treeListing(dirs.repoRoot), repoBefore, "nothing is written into the repository");
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
@@ -3279,15 +3310,12 @@ test("PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory 
 });
 
 /* ------------------------------------------------------------------ *
- * PO-KEYDIR-01(A): precedence order, proved at each boundary --
- * --directory (flag) > repo-scope > machine plane > environment variable.
- * R7-6-T3: Spec 22.6 supersedes the repo-scope/machine-plane boundary: the order is now
- * explicit argument > machine-wide value > legacy per-repository value (read-only fallback,
- * marked legacy) > absent; see the two R7-6-T3 cases below. Boundaries involving the
- * environment variable are untouched.
- * The last boundary (machine plane > environment) is unchanged behaviour
- * already covered above (AC-11: "the machine plane's poKeyDirectory
- * resolves ... and wins over the environment variable").
+ * PO-KEYDIR-01(A): precedence order, proved at each boundary. Decision AC (2026-10-07,
+ * specs/sprint-alfred-epic/plans/r7-6-multi-key-aa.md): --directory >
+ * PIPELINE_PO_APPROVAL_DIRECTORY > machine plane > legacy per-repository value
+ * (read-only, marked legacy) > SIGN-KEY-DIRECTORY-UNSET.
+ * The cases below prove the boundaries involving --directory and the legacy value; the
+ * environment-above-plane boundary is the AC-11 case above, and the whole order is R7-6h.
  * ------------------------------------------------------------------ */
 
 test("PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid repo-scoped value", () => {
