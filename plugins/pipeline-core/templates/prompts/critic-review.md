@@ -354,12 +354,12 @@ staying inside your own subdirectory and never reading a sibling's content as
 evidence, not that the rest of `scratch/dispatch/` does not exist. Never
 `.git/` for this purpose. Before building any evidence (fixtures, repros,
 baselines), create your own fresh subdirectory
-`scratch/dispatch/<codename>-<random-hex>/`, where `<random-hex>` is at least
-8 hex characters from a CSPRNG (e.g. `openssl rand -hex 4`) — the random
-component is what makes two independently dispatched Critics collision-free
-without coordinating; use a bare `mkdir` (not `mkdir -p`) so the filesystem
-enforces atomicity — if it fails because the name already exists, draw a new
-random suffix and retry, never adopt a directory you did not create. Work
+`scratch/dispatch/critic-<task-or-codename>-a1/` with a bare `mkdir` (not
+`mkdir -p`) so the filesystem enforces atomicity — if it already exists, use
+the next suffix (`-a2`, `-a3`, …), never adopt a directory you did not create;
+no random-number command is needed. Notes are written ONLY with the
+Write/Edit tools to `critic-notes.md` inside that directory; there is no Bash
+route for notes. Work
 ONLY inside your own subdirectory; if you find pre-existing scratch state
 from a prior or concurrent dispatch, name it as a disclosure item rather than
 silently building evidence on top of it.
@@ -495,8 +495,8 @@ subdirectory you already create; the moment Phase B produces them, write the
 surviving findings, the deliberately-not-flagged list, the trajectory verdict
 and any requested pass/fail into the same file — that write is your LAST ACT
 before returning the report as text. Name the path in the report. Stated
-honestly: this IS a write inside the repository directory tree via your
-existing Bash grant, not a filesystem-external one — `scratch/` is gitignored,
+honestly: this IS a write inside the repository directory tree with
+the Write/Edit tools, not a filesystem-external one — `scratch/` is gitignored,
 never committed, and never part of any diff, candidate snapshot, or gate that
 binds to tracked state, but it is not invisible to a Critic that reads the
 working tree. No TRACKED repository file is written, no tracked state is
