@@ -257,19 +257,21 @@ function isLink(linkPath) {
  * .json and .txt; the young file is referenced too. Outside the root-level
  * scratch/ directory sit old files that no sweep may ever touch.
  */
-function buildMixed(fx) {
-  fx.write('scratch/notes/a.md', undefined, 30);
-  fx.write('scratch/data/b.json', undefined, 30);
-  fx.write('scratch/c.txt', undefined, 30);
-  fx.write('scratch/fresh-ref.md', undefined, 1);
-  fx.write('scratch/win/w.md', undefined, 30);
-  fx.write('scratch/old-unref.md', undefined, 15);
-  fx.write('scratch/sub/deep/old-unref2.md', undefined, 40);
-  fx.write('scratch/recent-unref.md', undefined, 13);
-  fx.write('scratch/today.md', undefined, 0);
-  fx.write('stray-old.txt', undefined, 100);
-  fx.write('src/scratch/nested-old.md', undefined, 100);
-  fx.write('scratch-notes/old.md', undefined, 100);
+function buildMixed(fx, { realClock = false } = {}) {
+  const put = (rel, content, days) => (realClock ? writeAged(fx, rel, days, content) : fx.write(rel, content, days));
+  const age = realClock ? setRealAge : setAge;
+  put('scratch/notes/a.md', undefined, 30);
+  put('scratch/data/b.json', undefined, 30);
+  put('scratch/c.txt', undefined, 30);
+  put('scratch/fresh-ref.md', undefined, 1);
+  put('scratch/win/w.md', undefined, 30);
+  put('scratch/old-unref.md', undefined, 15);
+  put('scratch/sub/deep/old-unref2.md', undefined, 40);
+  put('scratch/recent-unref.md', undefined, 13);
+  put('scratch/today.md', undefined, 0);
+  put('stray-old.txt', undefined, 100);
+  put('src/scratch/nested-old.md', undefined, 100);
+  put('scratch-notes/old.md', undefined, 100);
   fx.commitFiles({
     'docs/plan.md':
       'Draft in `scratch/notes/a.md`, data in [b](scratch/data/b.json), fresh in scratch/fresh-ref.md.\n'
@@ -277,7 +279,7 @@ function buildMixed(fx) {
     'config/refs.json': '{"artifact": "scratch/c.txt"}\n',
     'docs/old-tracked.md': 'tracked and old\n',
   });
-  setAge(fx.abs('docs/old-tracked.md'), 100);
+  age(fx.abs('docs/old-tracked.md'), 100);
   return {
     referenced: sorted([
       'scratch/notes/a.md',
@@ -458,10 +460,10 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
   describe('--apply', () => {
     test('deletes exactly the files of the plan: no directory, nothing outside scratch/, no referenced or recent file; a second run deletes nothing', () =>
       inFixture({}, (fx) => {
-        const expected = buildMixed(fx);
+        const expected = buildMixed(fx, { realClock: true });
         const treeBefore = snapshotTree(fx.root);
 
-        const result = runCli(fx, [...baseArgs(fx), '--apply']);
+        const result = runCli(fx, [...realClockArgs(fx), '--apply']);
 
         assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
         const report = parseStdout(result);
@@ -475,7 +477,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         const expectedTree = treeBefore.filter((line) => !expected.unreferencedOld.some((rel) => line.startsWith(`${rel}|`)));
         assert.deepEqual(snapshotTree(fx.root), expectedTree, 'only the planned files vanished; their now-empty directories and every other path remain');
 
-        const again = runCli(fx, [...baseArgs(fx), '--apply']);
+        const again = runCli(fx, [...realClockArgs(fx), '--apply']);
         assert.equal(again.status, 0, `a second --apply exits 0 (stderr: ${again.stderr})`);
         assert.deepEqual(parseStdout(again).deleted, [], 'a second --apply has nothing left to delete');
         assert.deepEqual(snapshotTree(fx.root), expectedTree);
@@ -483,19 +485,19 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
 
     test('recomputes the plan at apply time: a file that became referenced or fresh after --sweep survives', () =>
       inFixture({}, (fx) => {
-        fx.write('scratch/stays-old.md', undefined, 30);
-        fx.write('scratch/becomes-referenced.md', undefined, 30);
-        fx.write('scratch/becomes-fresh.md', undefined, 30);
-        const planned = parseStdout(runCli(fx, [...baseArgs(fx), '--sweep'])).plan.delete;
+        writeAged(fx, 'scratch/stays-old.md', 30);
+        writeAged(fx, 'scratch/becomes-referenced.md', 30);
+        writeAged(fx, 'scratch/becomes-fresh.md', 30);
+        const planned = parseStdout(runCli(fx, [...realClockArgs(fx), '--sweep'])).plan.delete;
         assert.deepEqual(sorted(planned), [
           'scratch/becomes-fresh.md',
           'scratch/becomes-referenced.md',
           'scratch/stays-old.md',
         ]);
         fx.commitFiles({ 'docs/late-reference.md': 'now durable: scratch/becomes-referenced.md\n' });
-        setAge(fx.abs('scratch/becomes-fresh.md'), 1);
+        setRealAge(fx.abs('scratch/becomes-fresh.md'), 1);
 
-        const result = runCli(fx, [...baseArgs(fx), '--apply']);
+        const result = runCli(fx, [...realClockArgs(fx), '--apply']);
 
         assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
         assert.deepEqual(parseStdout(result).deleted, ['scratch/stays-old.md']);
@@ -506,12 +508,12 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
 
     test('never deletes anything under scratch/dispatch/, however old and unreferenced, but still sweeps a look-alike sibling directory', () =>
       inFixture({}, (fx) => {
-        fx.write('scratch/dispatch/briefing-live.md', undefined, 40);
-        fx.write('scratch/dispatch/C-S2/notes/run.json', undefined, 60);
-        fx.write('scratch/old-elsewhere.md', undefined, 40);
-        fx.write('scratch/dispatch-notes/old.md', undefined, 40);
+        writeAged(fx, 'scratch/dispatch/briefing-live.md', 40);
+        writeAged(fx, 'scratch/dispatch/C-S2/notes/run.json', 60);
+        writeAged(fx, 'scratch/old-elsewhere.md', 40);
+        writeAged(fx, 'scratch/dispatch-notes/old.md', 40);
 
-        const result = runCli(fx, [...baseArgs(fx), '--apply']);
+        const result = runCli(fx, [...realClockArgs(fx), '--apply']);
 
         assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
         const report = parseStdout(result);
@@ -527,8 +529,8 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         const outsideFile = path.join(outside, 'sub', 'outside-old.md');
         fs.mkdirSync(path.dirname(outsideFile), { recursive: true });
         fs.writeFileSync(outsideFile, 'outside\n');
-        setAge(outsideFile, 40);
-        fx.write('scratch/real-old.md', undefined, 20);
+        setRealAge(outsideFile, 40);
+        writeAged(fx, 'scratch/real-old.md', 20);
         const link = fx.abs('scratch/linked-dir');
         // A junction needs no privilege on win32; elsewhere a plain directory symlink is allowed.
         const failure = tryCreateSymlink(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
@@ -542,7 +544,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         fx.onCleanup(() => removeLink(link));
         const outsideBefore = snapshotTree(outside);
 
-        const result = runCli(fx, [...baseArgs(fx), '--apply']);
+        const result = runCli(fx, [...realClockArgs(fx), '--apply']);
 
         assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
         assert.deepEqual(parseStdout(result).deleted, ['scratch/real-old.md']);
@@ -556,8 +558,8 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         const outside = fx.outsideDir();
         const outsideFile = path.join(outside, 'outside-old.md');
         fs.writeFileSync(outsideFile, 'outside\n');
-        setAge(outsideFile, 40);
-        fx.write('scratch/real-old.md', undefined, 20);
+        setRealAge(outsideFile, 40);
+        writeAged(fx, 'scratch/real-old.md', 20);
         const link = fx.abs('scratch/linked-file.md');
         const failure = tryCreateSymlink(outsideFile, link, 'file');
         if (failure) {
@@ -569,12 +571,12 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         }
         fx.onCleanup(() => removeLink(link));
         try {
-          fs.lutimesSync(link, ageDate(40), ageDate(40));
+          fs.lutimesSync(link, new Date(Date.now() - 40 * DAY_MS), new Date(Date.now() - 40 * DAY_MS));
         } catch {
           // the link's own mtime is real-clock old relative to NOW anyway
         }
 
-        const result = runCli(fx, [...baseArgs(fx), '--apply']);
+        const result = runCli(fx, [...realClockArgs(fx), '--apply']);
 
         assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
         assert.deepEqual(parseStdout(result).deleted, ['scratch/real-old.md']);
@@ -589,7 +591,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
           const file = path.join(outside, ...rel.split('/'));
           fs.mkdirSync(path.dirname(file), { recursive: true });
           fs.writeFileSync(file, 'outside\n');
-          setAge(file, days);
+          setRealAge(file, days);
         }
         const link = fx.abs('scratch');
         const failure = tryCreateSymlink(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
@@ -603,7 +605,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         fx.onCleanup(() => removeLink(link));
         const outsideBefore = snapshotTree(outside);
 
-        const result = runCli(fx, [...baseArgs(fx), '--apply']);
+        const result = runCli(fx, [...realClockArgs(fx), '--apply']);
 
         assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
         assert.deepEqual(parseStdout(result).deleted, []);
@@ -615,13 +617,13 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
   describe('typed refusals', () => {
     test('an unknown flag is refused with SCRATCH-SWEEP-USAGE, exit 1, and nothing is deleted, wherever it sits and even next to --apply', () =>
       inFixture({}, (fx) => {
-        fx.write('scratch/old.md', undefined, 40);
+        writeAged(fx, 'scratch/old.md', 40);
         const treeBefore = snapshotTree(fx.root);
         const variants = [
-          [...baseArgs(fx), '--bogus'],
-          ['--bogus', ...baseArgs(fx)],
-          [...baseArgs(fx), '--apply', '--bogus'],
-          [...baseArgs(fx), '--max-age', '1', '--apply'],
+          [...realClockArgs(fx), '--bogus'],
+          ['--bogus', ...realClockArgs(fx)],
+          [...realClockArgs(fx), '--apply', '--bogus'],
+          [...realClockArgs(fx), '--max-age', '1', '--apply'],
         ];
 
         for (const args of variants) {
@@ -633,7 +635,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
 
     test('two mode flags are refused with SCRATCH-SWEEP-USAGE, exit 1, and nothing is deleted', () =>
       inFixture({}, (fx) => {
-        fx.write('scratch/old.md', undefined, 40);
+        writeAged(fx, 'scratch/old.md', 40);
         const treeBefore = snapshotTree(fx.root);
         const pairs = [
           ['--check', '--sweep'],
@@ -643,7 +645,7 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         ];
 
         for (const pair of pairs) {
-          assertRefused(runCli(fx, [...baseArgs(fx), ...pair]), 'SCRATCH-SWEEP-USAGE', pair.join(' '));
+          assertRefused(runCli(fx, [...realClockArgs(fx), ...pair]), 'SCRATCH-SWEEP-USAGE', pair.join(' '));
           assert.ok(fx.exists('scratch/old.md'), `nothing deleted by: ${pair.join(' ')}`);
         }
         assert.deepEqual(snapshotTree(fx.root), treeBefore);
@@ -651,11 +653,11 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
 
     test('a --root that is not a git work tree is refused with SCRATCH-SWEEP-NOT-A-REPOSITORY in every mode, exit 1, nothing deleted', () =>
       inFixture({ repo: false }, (fx) => {
-        fx.write('scratch/old.md', undefined, 40);
+        writeAged(fx, 'scratch/old.md', 40);
         const treeBefore = snapshotTree(fx.root);
 
         for (const modeArgs of [[], ['--check'], ['--sweep'], ['--apply']]) {
-          assertRefused(runCli(fx, [...baseArgs(fx), ...modeArgs]), 'SCRATCH-SWEEP-NOT-A-REPOSITORY', `mode ${modeArgs.join('') || 'default'}`);
+          assertRefused(runCli(fx, [...realClockArgs(fx), ...modeArgs]), 'SCRATCH-SWEEP-NOT-A-REPOSITORY', `mode ${modeArgs.join('') || 'default'}`);
           assert.ok(fx.exists('scratch/old.md'), `nothing deleted in mode ${modeArgs.join('') || 'default'}`);
         }
         assert.deepEqual(snapshotTree(fx.root), treeBefore);
