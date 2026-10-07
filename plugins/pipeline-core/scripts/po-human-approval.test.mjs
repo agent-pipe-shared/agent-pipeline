@@ -3909,6 +3909,533 @@ test("authorize-critical still requires the literal word approve: anything else 
   }
 });
 
+/* ====================================================================== *
+ * R7-6-T (Spec section 22.6, R7-6, rows T14/T15): the `sign-intent`-level
+ * signing-readiness contract, pinned as executable tests. RED BY DESIGN: these
+ * cases describe behaviour `sign-intent` does not have yet (a pre-prompt probe,
+ * typed results, a hardened spawn); the fix follows in R7-6-F. Only the part of
+ * R7-6d that `sign-intent` itself owns (its own pre-prompt probe, defence in
+ * depth) is covered here; install / bootstrap / prepare-for-signature are not.
+ *
+ * Safety of this block, by construction:
+ *  - Every OpenSSL the flow starts is a stub: either the injectable
+ *    `dependencies.spawn` seam (a spy that answers immediately) or, in exactly
+ *    two cases, a real lookup that can only reach a decoy/empty PATH. No stub
+ *    ever prompts, so no case can block on a passphrase.
+ *  - Every confirmation is the injected `readConfirmation`, which answers at once
+ *    and is counted, so "before any prompt" is measurable and stdin is never read.
+ *  - Keys are throwaway node:crypto fixture keys, unencrypted, in per-test temp
+ *    directories removed by the test (never the PO's key directory, never a real
+ *    key, never a passphrase). Where a case needs a key that must never be
+ *    opened, the file holds a non-key trap string instead.
+ *  - Homes, git-common-dirs and key directories are injected per test, so the real
+ *    machine plane, the real repository store and the real `.git` are never read.
+ *
+ * Result surface: the spec fixes the closed fields (findingId, status, cause,
+ * repair) and the cause classes, not whether `sign-intent` throws or returns the
+ * typed result, so these cases look for the finding on whichever surface
+ * (returned value, thrown error and its properties) carries it.
+ * ====================================================================== */
+import fsNamespace, { chmodSync, copyFileSync, linkSync, readdirSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { isAbsolute, relative } from "node:path";
+import { verify as cryptoVerify } from "node:crypto";
+
+const R76_SELF = fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url));
+const R76_STDERR_FIRST = "stub-openssl: simulated failure R76";
+const R76_TRAP = "R76-TRAP-PRIVATE-KEY-BYTES-MUST-NEVER-BE-OPENED";
+const R76_CLASSES = ["openssl-not-on-path", "openssl-no-ed25519", "key-directory-unset", "key-directory-missing", "key-directory-unreadable", "key-anchor-mismatch"];
+const R76_INTENT = createHash("sha256").update("r7-6-t sign-intent fixture").digest("hex");
+
+function r76Collect(root) {
+  const seen = new Set();
+  const objects = [];
+  const strings = [];
+  const walk = (value, depth) => {
+    if (value === null || value === undefined || depth > 6) return;
+    if (typeof value === "string") { strings.push(value); return; }
+    if (typeof value === "number" || typeof value === "boolean") { strings.push(String(value)); return; }
+    if (typeof value !== "object" || seen.has(value)) return;
+    seen.add(value);
+    objects.push(value);
+    if (value instanceof Error) { strings.push(String(value.message)); walk(value.cause, depth + 1); }
+    for (const key of Object.keys(value)) walk(value[key], depth + 1);
+  };
+  walk(root, 0);
+  return { objects, strings };
+}
+function r76Outcome(fn) {
+  try { return { threw: false, value: fn() }; } catch (error) { return { threw: true, error }; }
+}
+const r76Surface = (outcome) => (outcome.threw ? outcome.error : outcome.value);
+const r76Text = (outcome) => r76Collect(r76Surface(outcome)).strings.join("\n");
+function r76Describe(outcome) {
+  if (outcome.threw) return `threw: ${String(outcome.error?.message).slice(0, 160)}`;
+  let shown;
+  try { shown = JSON.stringify(outcome.value); } catch { shown = String(outcome.value); }
+  return `returned: ${String(shown).slice(0, 160)}`;
+}
+function r76Finding(outcome, cls) {
+  const { objects } = r76Collect(r76Surface(outcome));
+  return objects.find((candidate) => typeof candidate.cause === "string" && candidate.cause.startsWith(cls)) ?? null;
+}
+function r76AnyFinding(outcome) {
+  const { objects } = r76Collect(r76Surface(outcome));
+  return objects.find((candidate) => typeof candidate.cause === "string" && R76_CLASSES.some((cls) => candidate.cause.startsWith(cls))) ?? null;
+}
+function r76AssertTyped(outcome, { cls, findingId, status }) {
+  const finding = r76Finding(outcome, cls);
+  assert.ok(finding, `R7-6: a typed '${cls}' result with the closed fields findingId/status/cause/repair is required; observed ${r76Describe(outcome)}`);
+  assert.equal(finding.findingId, findingId);
+  assert.equal(finding.status, status);
+  assert.ok(finding.repair !== undefined && finding.repair !== null && finding.repair !== "", `a non-ok '${cls}' result must carry a repair (typed repair rule, spec 22.0)`);
+  assert.deepEqual(R76_CLASSES.filter((other) => other !== cls && finding.cause.includes(other)), [], "the cause begins with exactly one class");
+  return finding;
+}
+function r76AssertSetAction(finding) {
+  assert.match(JSON.stringify(finding.repair), /set-po-key-directory/u);
+  assert.equal(finding.repair.mutation, true);
+  assert.equal(finding.repair.requiresConfirmation, false);
+}
+
+/** A stub OpenSSL behind the `dependencies.spawn` seam. It answers at once, never
+ * prompts, and records every call (arguments, spawn options, whether a PO key path
+ * was among the arguments). `healthy` really signs/verifies with node:crypto so a
+ * correct implementation can complete the whole flow against it. */
+function r76Spy(mode = "healthy", events = []) {
+  const calls = [];
+  const spawn = (executable, args = [], options = {}) => {
+    const a = args.map(String);
+    const touchesPoKey = a.some((entry) => /po-private\.pem/u.test(entry));
+    calls.push({ executable, args: a, options, touchesPoKey });
+    events.push({ kind: "spawn", touchesPoKey });
+    const flag = (name) => { const index = a.indexOf(name); return index >= 0 ? a[index + 1] : undefined; };
+    const isSign = a[0] === "pkeyutl" && a.includes("-sign");
+    const isVerify = a[0] === "pkeyutl" && a.includes("-verify");
+    if (mode === "not-on-path") return { status: null, error: Object.assign(new Error("spawn openssl ENOENT"), { code: "ENOENT" }) };
+    if (mode === "fail-all") return { status: 87, stdout: "", stderr: `${R76_STDERR_FIRST}\n${"x".repeat(5000)}` };
+    if (mode === "sign-nonzero" && isSign) return { status: 1, stdout: "", stderr: "pkeyutl: signing failed\n" };
+    if (mode === "no-rawin" && isSign && a.includes("-rawin")) return { status: 1, stdout: "", stderr: "pkeyutl: Unknown option: -rawin\n" };
+    if (mode === "verify-fails" && isVerify) return { status: 1, stdout: "", stderr: "Signature Verification Failure\n" };
+    if (mode === "signing-spawn-fails" && isSign && touchesPoKey) return { status: 53, stdout: "", stderr: "" };
+    try {
+      if (isSign) {
+        writeFileSync(flag("-out"), sign(null, readFileSync(flag("-in")), createPrivateKey(readFileSync(flag("-inkey")))));
+        return { status: 0, stdout: "", stderr: "" };
+      }
+      if (isVerify) {
+        const verified = cryptoVerify(null, readFileSync(flag("-in")), createPublicKey(readFileSync(flag("-inkey"))), readFileSync(flag("-sigfile")));
+        return { status: verified ? 0 : 1, stdout: verified ? "Signature Verified Successfully\n" : "", stderr: "" };
+      }
+      if (a[0] === "genpkey") {
+        const { privateKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
+        writeFileSync(flag("-out"), privateKey);
+        return { status: 0, stdout: "", stderr: "" };
+      }
+      if (a[0] === "pkey" && a.includes("-pubout")) {
+        writeFileSync(flag("-out"), createPublicKey(createPrivateKey(readFileSync(flag("-in"), "utf8"))).export({ type: "spki", format: "pem" }));
+        return { status: 0, stdout: "", stderr: "" };
+      }
+    } catch (error) {
+      return { status: 1, stdout: "", stderr: `stub-openssl: ${error?.code ?? "error"}\n` };
+    }
+    return { status: 0, stdout: "OpenSSL 3.0.0 (r7-6-t stub)\n", stderr: "" };
+  };
+  return { spawn, calls, events };
+}
+
+/** One isolated machine: repo + external key directory (fixtureDirs), a fixture home
+ * carrying the machine-wide plane, and an empty fixture git-common-dir. `plane` is
+ * null (no machine-wide value), "own" (this fixture's key directory) or a path. */
+function r76Env({ plane = null } = {}) {
+  const dirs = fixtureDirs();
+  const home = mkdtempSync(join(tmpdir(), "r76-home-"));
+  writeMachinePlane({
+    schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: plane === "own" ? dirs.directory : plane,
+    pushApprovalDefault: "chat", routing: null, language: null, session: null, usage: null,
+    updatedAt: new Date().toISOString(),
+  }, { homedirFn: () => home });
+  return { dirs, home, common: repoScopeCommonDirFixture(), events: [] };
+}
+function r76Release(env) {
+  cleanup(env.dirs);
+  rmSync(env.home, { recursive: true, force: true });
+  rmSync(env.common, { recursive: true, force: true });
+}
+/** Throwaway fixture keypair in the env's key directory plus a matching committed trust anchor. */
+function r76KeyFixture(env, extraRepoRoots = []) {
+  const { authority } = keyFixture(env.dirs.directory);
+  for (const root of [env.dirs.repoRoot, ...extraRepoRoots]) declareTrustAnchor(root, authority);
+  return authority;
+}
+function r76Sign(env, spy, { useFlag = true, platform, repoRoot } = {}) {
+  const argv = ["sign-intent", "--repo-root", repoRoot ?? env.dirs.repoRoot, ...(useFlag ? ["--directory", env.dirs.directory] : []), "--intent-sha256", R76_INTENT];
+  const dependencies = {
+    readConfirmation: (prompt) => { env.events.push({ kind: "prompt", prompt }); return "approve"; },
+    homedirFn: () => env.home,
+    gitCommonDirFn: () => env.common,
+    ...(spy ? { spawn: spy.spawn } : {}),
+    ...(platform ? { platform } : {}),
+  };
+  return withEnvDirectory(undefined, () => r76Outcome(() => runHumanApproval(argv, dependencies)));
+}
+const r76Prompts = (env) => env.events.filter((event) => event.kind === "prompt").length;
+const r76KeyPathSpawns = (spy) => spy.calls.filter((call) => call.touchesPoKey);
+function r76WithPath(value, fn) {
+  const key = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+  const had = Object.hasOwn(process.env, key);
+  const previous = process.env[key];
+  process.env[key] = value;
+  try { return fn(); } finally { if (had) process.env[key] = previous; else delete process.env[key]; }
+}
+/** Filesystem spy for "a trap private key is never opened": wraps readFileSync/openSync
+ * (what po-human-approval.mjs reads files through) for the duration of `fn`. */
+function r76WithPrivateKeyReadSpy(fn) {
+  const opened = [];
+  const originals = { readFileSync: fsNamespace.readFileSync, openSync: fsNamespace.openSync };
+  const watch = (name) => function watched(path, ...rest) {
+    if (/po-private\.pem/u.test(String(path))) opened.push(name);
+    return originals[name].call(this, path, ...rest);
+  };
+  fsNamespace.readFileSync = watch("readFileSync");
+  fsNamespace.openSync = watch("openSync");
+  syncBuiltinESMExports();
+  try { return { result: fn(), opened }; } finally { Object.assign(fsNamespace, originals); syncBuiltinESMExports(); }
+}
+function r76OutsideEveryRepository(directory, fixtureRepoRoot) {
+  try {
+    let current = realpathSync(directory);
+    const relation = relative(realpathSync(fixtureRepoRoot), current);
+    if (relation === "" || (!relation.startsWith("..") && !isAbsolute(relation))) return false;
+    for (;;) {
+      if (existsSync(join(current, ".git"))) return false;
+      const parent = dirname(current);
+      if (parent === current) return true;
+      current = parent;
+    }
+  } catch { return false; }
+}
+/** Makes `directory` unreadable to the current user, or reports that the host cannot
+ * ("not-run", which the caller turns into a FAILURE, never a skip). */
+function r76MakeUnreadable(directory) {
+  const undo = [];
+  try {
+    if (process.platform === "win32") {
+      const user = process.env.USERNAME;
+      const who = user ? `${process.env.USERDOMAIN ? `${process.env.USERDOMAIN}\\` : ""}${user}` : null;
+      if (who && spawnSync("icacls", [directory, "/deny", `${who}:(OI)(CI)(RD,REA)`], { stdio: "pipe" }).status === 0) {
+        undo.push(() => spawnSync("icacls", [directory, "/remove:d", who, "/T"], { stdio: "pipe" }));
+      }
+    } else {
+      chmodSync(directory, 0o000);
+      undo.push(() => chmodSync(directory, 0o700));
+    }
+  } catch { /* the verification below decides */ }
+  let created = false;
+  try { readdirSync(directory); } catch { created = true; }
+  return { created, restore: () => { for (const step of undo.reverse()) { try { step(); } catch { /* best effort */ } } } };
+}
+
+test("R7-6a(i): with the machine-wide key directory set and no repository value, a second repository on the same machine resolves it with no --directory", () => {
+  const first = r76Env({ plane: "own" });
+  const second = { dirs: fixtureDirs(), home: first.home, common: repoScopeCommonDirFixture(), events: [] };
+  try {
+    r76KeyFixture(first, [second.dirs.repoRoot]);
+    for (const env of [first, second]) {
+      const outcome = r76Sign(env, r76Spy("healthy", env.events), { useFlag: false });
+      assert.equal(outcome.threw, false, `the machine-wide value must resolve the key directory; observed ${r76Describe(outcome)}`);
+      assert.equal(outcome.value.code, "PO-HUMAN-SIGN-INTENT-READY");
+      assert.equal(realpathSync(dirname(outcome.value.paths.proof)), realpathSync(first.dirs.directory));
+    }
+  } finally {
+    cleanup(second.dirs);
+    rmSync(second.common, { recursive: true, force: true });
+    r76Release(first);
+  }
+});
+
+test("R7-6a(ii): with the machine-wide and the repository value both unset the result is the typed SIGN-KEY-DIRECTORY-UNSET with the set-po-key-directory setup action", () => {
+  const env = r76Env({ plane: null });
+  const spy = r76Spy("healthy", env.events);
+  try {
+    const outcome = r76Sign(env, spy, { useFlag: false });
+    assert.match(r76Text(outcome), /SIGN-KEY-DIRECTORY-UNSET/u, `observed ${r76Describe(outcome)}`);
+    const finding = r76AssertTyped(outcome, { cls: "key-directory-unset", findingId: "po-key-directory", status: "repairable" });
+    r76AssertSetAction(finding);
+    assert.equal(spy.calls.length, 0, "no process is started when there is no key directory to check");
+    assert.equal(r76Prompts(env), 0);
+  } finally { r76Release(env); }
+});
+
+test("R7-6b(i): a spawn that cannot find openssl yields the typed openssl-not-on-path result before any prompt and no process receives a key path", () => {
+  const env = r76Env();
+  const spy = r76Spy("not-on-path", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy);
+    const finding = r76AssertTyped(outcome, { cls: "openssl-not-on-path", findingId: "signing-toolchain", status: "attended" });
+    assert.match(JSON.stringify(finding.repair), /PATH/u, "the generic repair names the PATH of the signing terminal");
+    assert.equal(r76Prompts(env), 0, "the typed result ends the command before any prompt");
+    assert.deepEqual(r76KeyPathSpawns(spy), [], "no process may be started with a key path");
+  } finally { r76Release(env); }
+});
+
+test("R7-6b(i), real lookup: with a PATH holding no openssl at all the same typed openssl-not-on-path result ends sign-intent before any prompt", () => {
+  const env = r76Env();
+  const emptyPath = mkdtempSync(join(tmpdir(), "r76-emptypath-"));
+  try {
+    r76KeyFixture(env);
+    const outcome = r76WithPath(emptyPath, () => r76Sign(env, null));
+    r76AssertTyped(outcome, { cls: "openssl-not-on-path", findingId: "signing-toolchain", status: "attended" });
+    assert.equal(r76Prompts(env), 0);
+  } finally { rmSync(emptyPath, { recursive: true, force: true }); r76Release(env); }
+});
+
+test("R7-6b(iii): an openssl that fails the Ed25519 round trip (non-zero exit on sign, a signature that fails verification, no raw-sign support) yields the typed openssl-no-ed25519 result before any prompt", () => {
+  for (const mode of ["sign-nonzero", "verify-fails", "no-rawin"]) {
+    const env = r76Env();
+    const spy = r76Spy(mode, env.events);
+    try {
+      r76KeyFixture(env);
+      const outcome = r76Sign(env, spy);
+      r76AssertTyped(outcome, { cls: "openssl-no-ed25519", findingId: "signing-toolchain", status: "attended" });
+      assert.equal(r76Prompts(env), 0, `${mode}: no prompt`);
+      assert.deepEqual(r76KeyPathSpawns(spy), [], `${mode}: no process may be started with a key path`);
+    } finally { r76Release(env); }
+  }
+});
+
+test("R7-6c: a failing openssl stub yields a typed result carrying the exit code and the stub's first stderr line, bounded and without any host path", () => {
+  const env = r76Env();
+  const spy = r76Spy("fail-all", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy);
+    assert.ok(r76AnyFinding(outcome), `a typed result (one of the closed cause classes) is required; observed ${r76Describe(outcome)}`);
+    const text = r76Text(outcome);
+    assert.match(text, /\b87\b/u, "the exit code is reported");
+    assert.ok(text.includes(R76_STDERR_FIRST), "the first stderr line is reported");
+    assert.equal(text.includes("x".repeat(1000)), false, "the stderr head is bounded");
+    for (const hostPath of [env.dirs.directory, env.dirs.repoRoot, tmpdir()]) assert.equal(text.includes(hostPath), false, "no unredacted host path");
+    assert.equal(r76Prompts(env), 0);
+    assert.deepEqual(r76KeyPathSpawns(spy), []);
+  } finally { r76Release(env); }
+});
+
+test("R7-6c: a failing signing spawn reports its exit code", () => {
+  const env = r76Env();
+  const spy = r76Spy("signing-spawn-fails", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy);
+    assert.equal(outcome.threw || outcome.value?.ok !== true, true, "a failed signing spawn never reports success");
+    assert.match(r76Text(outcome), /\b53\b/u, `the signing spawn's exit code must be reported; observed ${r76Describe(outcome)}`);
+  } finally { r76Release(env); }
+});
+
+test("R7-6d(iii) (sign-intent's own defence-in-depth probe): a probe spawn without any key path runs before the first prompt and before the signing spawn", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy);
+    assert.equal(outcome.threw, false, `a healthy stub must let the whole flow complete; observed ${r76Describe(outcome)}`);
+    const indexOf = (predicate) => env.events.findIndex(predicate);
+    const probe = indexOf((event) => event.kind === "spawn" && !event.touchesPoKey);
+    const prompt = indexOf((event) => event.kind === "prompt");
+    const signing = indexOf((event) => event.kind === "spawn" && event.touchesPoKey);
+    assert.ok(probe >= 0, "sign-intent must run its own probe (steps a to c) before the signing spawn");
+    assert.ok(prompt >= 0 && signing >= 0, "the healthy flow still prompts once and signs once");
+    assert.ok(probe < prompt, "the probe must run before the first prompt");
+    assert.ok(probe < signing, "the probe must run before any process receives the key path");
+  } finally { r76Release(env); }
+});
+
+test("R7-6e (static): no code path in po-human-approval.mjs hands the injectable spawn an executable other than the constant bare name openssl", () => {
+  const source = readFileSync(R76_SELF, "utf8");
+  const code = source.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "");
+  const constants = new Set([...code.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*["']openssl["']\s*;/gu)].map((match) => match[1]));
+  const references = [...code.matchAll(/\bdependencies\.spawn\b/gu)];
+  const violations = [];
+  assert.ok(references.length >= 1, "the signing flow must spawn through the injectable seam");
+  for (const reference of references) {
+    const enclosing = [...code.slice(0, reference.index).matchAll(/function\s+([\w$]+)\s*\(([^)]*)\)/gu)].pop();
+    for (const parameter of (enclosing?.[2] ?? "").split(",").map((entry) => entry.trim().split("=")[0].trim())) {
+      if (/^(executable|exe|exec|file|binary|bin|program|cmd|tool|openssl\w*)$/iu.test(parameter)) {
+        violations.push(`${enclosing[1]}() takes an executable parameter '${parameter}', so a caller can hand the spawn another executable`);
+      }
+    }
+    const immediate = /^\s*\?\?\s*spawnSync\s*\)\s*\(\s*([^,)]+?)\s*,/u.exec(code.slice(reference.index + reference[0].length));
+    if (immediate && !(/^["']openssl["']$/u.test(immediate[1]) || constants.has(immediate[1]))) {
+      violations.push(`a spawn is called with first argument '${immediate[1]}', not the constant bare name openssl`);
+    }
+  }
+  if (/openssl\.(?:exe|com)\b/iu.test(code) || /["'`][^"'`\n]*[\\/]openssl["'`]/iu.test(code)) violations.push("an absolute or extension-qualified openssl path appears in code");
+  if (/PIPELINE_[A-Z_]*(?:OPENSSL|SIGN\w*)_(?:PATH|BIN|EXE\w*)|\b(?:opensslPath|signingExecutable\w*)\b/u.test(code)) violations.push("a setting or variable that carries a signing-executable value appears in code");
+  assert.deepEqual(violations, [], "R7-6e: the Pipeline chooses no signing executable");
+});
+
+test("R7-6e (dynamic): every spawn of sign-intent and its probe runs from an explicit working directory outside every repository, and the signing spawn from the PO key directory", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy);
+    assert.equal(outcome.threw, false, `observed ${r76Describe(outcome)}`);
+    assert.ok(spy.calls.some((call) => !call.touchesPoKey), "the probe must spawn too");
+    for (const call of spy.calls) {
+      const cwd = call.options?.cwd;
+      assert.equal(typeof cwd, "string", `a spawn without an explicit cwd inherits the process's directory: ${call.args.slice(0, 2).join(" ")}`);
+      assert.ok(isAbsolute(cwd), "the working directory is absolute");
+      assert.ok(r76OutsideEveryRepository(cwd, env.dirs.repoRoot), "the working directory lies outside every repository working tree");
+    }
+    for (const call of r76KeyPathSpawns(spy)) assert.equal(realpathSync(call.options.cwd), realpathSync(env.dirs.directory), "the signing spawn runs from the PO key directory");
+  } finally { r76Release(env); }
+});
+
+test("R7-6e (dynamic, win32 dialect): every spawn carries NoDefaultCurrentDirectoryInExePath in its child environment and keeps the PATH of the signing terminal", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy, { platform: "win32" });
+    assert.equal(outcome.threw, false, `observed ${r76Describe(outcome)}`);
+    assert.ok(spy.calls.some((call) => !call.touchesPoKey), "the probe must spawn too");
+    const pathKey = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH");
+    for (const call of spy.calls) {
+      const childEnv = call.options?.env;
+      assert.equal(typeof childEnv, "object", "an explicit child environment is required");
+      assert.ok(childEnv !== null && typeof childEnv.NoDefaultCurrentDirectoryInExePath === "string" && childEnv.NoDefaultCurrentDirectoryInExePath !== "", "NoDefaultCurrentDirectoryInExePath must be set");
+      const childPath = Object.entries(childEnv).find(([name]) => name.toUpperCase() === "PATH")?.[1];
+      assert.equal(childPath, process.env[pathKey], "the PATH of the signing terminal stays the only source of the lookup");
+    }
+  } finally { r76Release(env); }
+});
+
+test("R7-6e (dynamic): the signing flow only ever names the constant bare executable openssl", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy);
+    assert.equal(outcome.threw, false, `observed ${r76Describe(outcome)}`);
+    assert.ok(spy.calls.length > 0);
+    assert.deepEqual([...new Set(spy.calls.map((call) => call.executable))], ["openssl"]);
+  } finally { r76Release(env); }
+});
+
+test("R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the PO key directory is never started when sign-intent runs from the repository root with the real lookup", () => {
+  const env = r76Env();
+  const aux = mkdtempSync(join(tmpdir(), "r76-decoy-aux-"));
+  const startCwd = process.cwd();
+  const previous = { options: process.env.NODE_OPTIONS, marker: process.env.R76_MARKER };
+  try {
+    r76KeyFixture(env);
+    const marker = join(aux, "started.txt");
+    const hook = join(aux, "marker.cjs");
+    // win32 decoys are copies of the node binary (a bare-name lookup only starts a real PE
+    // file); the preload hook records the start and exits at once, so nothing can prompt.
+    writeFileSync(hook, 'require("node:fs").appendFileSync(process.env.R76_MARKER, "decoy-started\\n");\nprocess.exit(0);\n');
+    const plant = (root, source) => {
+      if (process.platform === "win32") {
+        const exe = join(root, "openssl.exe");
+        try { linkSync(source, exe); } catch { copyFileSync(source, exe); }
+        try { linkSync(exe, join(root, "openssl.com")); } catch { copyFileSync(exe, join(root, "openssl.com")); }
+        return exe;
+      }
+      writeFileSync(join(root, "openssl"), `#!/bin/sh\nprintf 'decoy-started\\n' >> "$R76_MARKER"\nexit 0\n`);
+      chmodSync(join(root, "openssl"), 0o755);
+      return source;
+    };
+    const planted = plant(env.dirs.repoRoot, process.execPath);
+    plant(env.dirs.directory, planted);
+    // The PO's signing terminal has the default lookup (current directory first); an ambient
+    // NoDefaultCurrentDirectoryInExePath in THIS process would make the case vacuous, so it is
+    // removed for the real run and restored right after it.
+    previous.nodefault = process.env.NoDefaultCurrentDirectoryInExePath;
+    delete process.env.NoDefaultCurrentDirectoryInExePath;
+    process.env.R76_MARKER = marker;
+    process.env.NODE_OPTIONS = `--require "${hook.replace(/\\/gu, "/")}"`;
+    // Positive control: started by its explicit path, the planted decoy must leave its marker, or
+    // this case could never fail (a vacuous pass is the failure mode of a decoy test).
+    spawnSync(process.platform === "win32" ? planted : join(env.dirs.repoRoot, "openssl"), ["version"], { stdio: "pipe" });
+    assert.equal(existsSync(marker), true, "harness defect: the planted decoy cannot report that it ran");
+    rmSync(marker, { force: true });
+    process.chdir(env.dirs.repoRoot);
+    const outcome = r76Sign(env, null);
+    if (previous.nodefault === undefined) delete process.env.NoDefaultCurrentDirectoryInExePath; else process.env.NoDefaultCurrentDirectoryInExePath = previous.nodefault;
+    process.chdir(startCwd);
+    assert.equal(existsSync(marker), false, `a decoy openssl was started (sign-intent ${r76Describe(outcome)})`);
+  } finally {
+    process.chdir(startCwd);
+    for (const [name, value] of [["NODE_OPTIONS", previous.options], ["R76_MARKER", previous.marker]]) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
+    rmSync(aux, { recursive: true, force: true });
+    r76Release(env);
+  }
+});
+
+test("R7-6f(i): a key directory whose public key matches the committed trust anchor yields ok: the probe passes and signing proceeds", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  try {
+    r76KeyFixture(env);
+    const outcome = r76Sign(env, spy);
+    assert.equal(outcome.threw, false, `observed ${r76Describe(outcome)}`);
+    assert.equal(outcome.value.ok, true);
+    assert.equal(outcome.value.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(r76KeyPathSpawns(spy).length, 1, "exactly one process receives the key path: the signing spawn");
+    assert.equal(r76Prompts(env), 1);
+  } finally { r76Release(env); }
+});
+
+test("R7-6f(i): a stored key directory value that names no directory yields the typed key-directory-missing result with the set-po-key-directory repair", () => {
+  const missing = join(tmpdir(), `r76-missing-${process.pid}-${Date.now()}`);
+  const env = r76Env({ plane: missing });
+  const spy = r76Spy("healthy", env.events);
+  try {
+    const outcome = r76Sign(env, spy, { useFlag: false });
+    const finding = r76AssertTyped(outcome, { cls: "key-directory-missing", findingId: "po-key-directory", status: "repairable" });
+    r76AssertSetAction(finding);
+    assert.equal(r76Prompts(env), 0);
+    assert.deepEqual(r76KeyPathSpawns(spy), []);
+    assert.equal(r76Text(outcome).includes(missing), false, "the stored path is redacted in the result");
+  } finally { r76Release(env); }
+});
+
+test("R7-6f(i)/(ii): a key whose public key digest equals no committed trust anchor yields the typed key-anchor-mismatch result, opens no private key and starts no process with a key path", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  try {
+    const { authority } = keyFixture(env.dirs.directory);
+    writeFileSync(join(env.dirs.directory, "po-private.pem"), R76_TRAP);
+    declareTrustAnchor(env.dirs.repoRoot, { keyReference: authority.keyReference, publicKeySha256: "e".repeat(64) });
+    const spied = r76WithPrivateKeyReadSpy(() => r76Sign(env, spy));
+    const finding = r76AssertTyped(spied.result, { cls: "key-anchor-mismatch", findingId: "trust-anchor-match", status: "attended" });
+    assert.ok(finding.repair, "the repair names where the anchored key lives or the one-time key setup");
+    assert.equal(r76Prompts(env), 0);
+    assert.deepEqual(r76KeyPathSpawns(spy), []);
+    assert.deepEqual(spied.opened, [], "the key-directory check never opens the private key file");
+    const text = r76Text(spied.result);
+    assert.equal(text.includes(R76_TRAP), false, "no key byte in the result");
+    for (const hostPath of [env.dirs.directory, env.dirs.repoRoot]) assert.equal(text.includes(hostPath), false, "no unredacted host path");
+  } finally { r76Release(env); }
+});
+
+test("R7-6f(i): an unreadable key directory yields the typed key-directory-unreadable result; a host that cannot create the condition reports not-run, which FAILS the case", () => {
+  const env = r76Env();
+  const spy = r76Spy("healthy", env.events);
+  let unreadable = null;
+  try {
+    r76KeyFixture(env);
+    unreadable = r76MakeUnreadable(env.dirs.directory);
+    if (!unreadable.created) assert.fail("not-run: this host cannot create an unreadable key directory (R7-6f: not-run fails the matrix and is never a skip)");
+    const outcome = r76Sign(env, spy);
+    r76AssertTyped(outcome, { cls: "key-directory-unreadable", findingId: "po-key-directory", status: "attended" });
+    assert.equal(r76Prompts(env), 0);
+    assert.deepEqual(r76KeyPathSpawns(spy), []);
+  } finally { unreadable?.restore(); r76Release(env); }
+});
+
 test("the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (fixtureDirs variant)", () => {
   const dirs = fixtureDirs();
   try {
