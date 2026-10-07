@@ -498,4 +498,124 @@ describe('scratch-retention (PO decision P)', () => {
         assert.ok(fx.exists('scratch/notes/a.md'));
       }));
   });
+
+  /**
+   * C-S-T3: the library half of the rules settled by the Critic's round-1 record
+   * (specs/sprint-alfred-epic/evidence/critic-2026-10-07/scratch-sweep-round1.md):
+   * F1 (a live plugin root is never planned), F6 (an unreadable tracked reference
+   * document makes nothing deletable) and F7 (tracked files are never candidates).
+   * The CLI-only rules (F2, F3, F4) are pinned in scripts/scratch-sweep.test.mjs.
+   * Written against the library as it stood when the findings were raised, so
+   * these cases are RED until the fix dispatch lands.
+   */
+  describe('C-S-T3: Critic round-1 findings', () => {
+    function withEnv(name, value, fn) {
+      const previous = process.env[name];
+      process.env[name] = value;
+      try {
+        return fn();
+      } finally {
+        if (previous === undefined) delete process.env[name];
+        else process.env[name] = previous;
+      }
+    }
+
+    /**
+     * Make a committed file unreadable for the current user (chmod 000 elsewhere, a deny-read ACE
+     * on win32) and register the restore with the fixture. Returns `{ skip: reason }` when the
+     * platform cannot make the file unreadable reliably (e.g. a privileged user), `{}` when it did.
+     */
+    function makeUnreadable(fx, rel) {
+      const file = fx.abs(rel);
+      let restore;
+      if (process.platform === 'win32') {
+        const account = process.env.USERDOMAIN && process.env.USERNAME
+          ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+          : os.userInfo().username;
+        try {
+          execFileSync('icacls', [file, '/deny', `${account}:(RD)`], { stdio: 'ignore', windowsHide: true });
+        } catch (error) {
+          return { skip: `icacls refused to deny read access (${error.message})` };
+        }
+        restore = () => execFileSync('icacls', [file, '/remove:d', account], { stdio: 'ignore', windowsHide: true });
+      } else {
+        fs.chmodSync(file, 0o000);
+        restore = () => fs.chmodSync(file, 0o644);
+      }
+      fx.onCleanup(restore);
+      try {
+        fs.readFileSync(file);
+      } catch {
+        return {};
+      }
+      return { skip: 'the file is still readable after the permission change (privileged user?)' };
+    }
+
+    test('C-S-T3 F1: planSweep never lists a file under a live plugin root (scratchLivePluginRoots), however old and unreferenced, and still plans its look-alike siblings', () =>
+      inFixture({}, (fx) => {
+        // "Live" is what lib/physical-scratch-boundary.mjs scratchLivePluginRoots() says: this
+        // module's own installation plus $CLAUDE_PLUGIN_ROOT when that directory holds a hooks/
+        // directory and a .claude-plugin/plugin.json file. The fixture builds that shape.
+        const live = 'scratch/installs/live-pipeline-core';
+        const liveFiles = [
+          `${live}/hooks/guard.mjs`,
+          `${live}/.claude-plugin/plugin.json`,
+          `${live}/lib/deep/helper.md`,
+          `${live}/notes.md`,
+        ];
+        const stale = [
+          'scratch/installs/live-pipeline-core-old/stale.md',
+          'scratch/installs/other/stale.md',
+          'scratch/stale-sibling.md',
+        ];
+        for (const rel of [...liveFiles, ...stale]) fx.write(rel, undefined, 40);
+
+        const plan = withEnv('CLAUDE_PLUGIN_ROOT', fx.abs(live), () => planSweep({ root: fx.root, now: NOW }));
+
+        assert.deepEqual(sorted(plan.delete), sorted(stale));
+        for (const rel of liveFiles) assert.ok(fx.exists(rel), `${rel} is untouched`);
+      }));
+
+    test('C-S-T3 F6: with one tracked reference document unreadable the durability result carries a warning and nothing is deletable', (t) =>
+      inFixture({}, (fx) => {
+        fx.commitFiles({ 'docs/keeps.md': 'The notes live in scratch/protected-by-doc.md\n' });
+        fx.write('scratch/protected-by-doc.md', undefined, 40);
+        fx.write('scratch/other-old.md', undefined, 40);
+        const made = makeUnreadable(fx, 'docs/keeps.md');
+        if (made.skip) {
+          t.skip(made.skip);
+          return;
+        }
+        let assessed;
+        let plan;
+
+        assert.doesNotThrow(() => {
+          assessed = assessScratchDurability({ root: fx.root, now: NOW });
+          plan = planSweep({ root: fx.root, now: NOW });
+        });
+
+        assert.ok(assessed.warning, 'the durability result carries a warning');
+        assert.deepEqual(assessed.unreferencedOld, [], 'no file may be declared deletable');
+        assert.deepEqual(plan.delete, [], 'the plan is empty');
+        assert.ok(fx.exists('scratch/protected-by-doc.md') && fx.exists('scratch/other-old.md'));
+      }));
+
+    test('C-S-T3 F7: files tracked by git under a non-ignored scratch/ are never planned; an untracked sibling still is', () =>
+      inFixture({ ignoreScratch: false }, (fx) => {
+        const tracked = [
+          'scratch/tracked-old.md',
+          'scratch/tracked dir/old note.json',
+          'scratch/tracked-sub/deep/old.txt',
+        ];
+        // Content that does not name its own path: a self-reference would count as a durable reference.
+        fx.commitFiles(Object.fromEntries(tracked.map((rel) => [rel, 'tracked scratch note\n'])));
+        for (const rel of tracked) setAge(fx.abs(rel), 40);
+        fx.write('scratch/untracked-old.md', undefined, 40);
+
+        const plan = planSweep({ root: fx.root, now: NOW });
+
+        assert.deepEqual(plan.delete, ['scratch/untracked-old.md']);
+        for (const rel of tracked) assert.ok(fx.exists(rel), `${rel} is untouched`);
+      }));
+  });
 });
