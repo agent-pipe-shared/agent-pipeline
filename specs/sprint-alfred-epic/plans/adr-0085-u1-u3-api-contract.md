@@ -113,7 +113,9 @@ both previous null; delta ⇔ round 2 ⇔ both non-null).
 | 16 | `DCC-REVIEW-ROUND-EXCEEDED` | `reviewReceipts.length > 2` | observed=String(length) |
 | 17 | `DCC-REVIEW-DELTA-CHAIN` | review clauses | path, expected, observed |
 
-Marker regex is line-anchored (`gmu`): a CRLF PRD yields MISSING (parity with po-gate-authority; pinned).
+Marker regex is line-anchored (`gmu`) and used as is (parity with po-gate-authority; pinned). Correction 2026-10-07 (U1-T
+finding): JavaScript treats `\r` as a line terminator in multiline mode, so a CRLF PRD matches exactly once — the earlier
+"CRLF yields MISSING" sentence was wrong; the test pins parity with the real regex, not a CRLF refusal.
 
 **Review clauses** (`reviewChainInconsistencies`, in order): (1) receipts null/`[]` → MISSING, stop. (2) each refusal stub → BINDING
 (path=stub.path, observed=stub.refusal); any stub → stop. (3) summary `featureId` ≠ featureId → BINDING (expected/observed).
