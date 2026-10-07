@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "849ede6cdb95027b9b68a38e1e38db48d9847f52c001e3999bfc14390984fbd2"
+    "transitionHead": "bfc3d3e3d0700f50a34ad4d2aab386cc1d8e10b0c459e74285b1ad9d36ec9817"
   },
   "counts": {
-    "open": 170,
+    "open": 171,
     "in_progress": 0,
     "closed": 663,
     "rejected": 3,
@@ -1849,7 +1849,7 @@
       "sprint": "alfred",
       "closedAt": "2026-10-07",
       "closureRepository": "self",
-      "closureCommit": "26fef9e7d",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
@@ -2979,7 +2979,7 @@
       "sprint": "alfred",
       "closedAt": "2026-10-07",
       "closureRepository": "self",
-      "closureCommit": "3d9ffe770",
+      "closureCommit": "3d9ffe77022b3811b9283dd0656c077ea85548ea",
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
@@ -3126,6 +3126,17 @@
       "closureRepository": "self",
       "closureCommit": "3b05a045e4acfd4e2d3393b6a0c015a799c2bee6",
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
+    },
+    {
+      "id": "pipeline.desktop-app-support-is-unverified",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "PO question 2026-10-07 evening; documentation research (code.claude.com/docs desktop, desktop-wsl, hooks)",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
@@ -3897,7 +3908,7 @@
       "sprint": "none",
       "closedAt": "2026-10-07",
       "closureRepository": "self",
-      "closureCommit": "26fef9e7d",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
@@ -6792,7 +6803,7 @@
       "sprint": "alfred",
       "closedAt": "2026-10-07",
       "closureRepository": "self",
-      "closureCommit": "26fef9e7d",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
@@ -11103,7 +11114,7 @@
       "sprint": "nightwing",
       "closedAt": "2026-10-07",
       "closureRepository": "self",
-      "closureCommit": "26fef9e7d",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     }
   ]

@@ -244,6 +244,7 @@
 | pipeline.design-workflow-package-omits-contract | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.design-workflow-signing-request-schema-drift | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.desktop-app-support-is-unverified | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.disjoint-signed-hgo-actions-invalidate-one-another | open | defect | pipeline | alfred | 2026-09-29 | — | — |
@@ -855,7 +856,7 @@
 
 ## Counts
 
-- open: 170
+- open: 171
 - in_progress: 0
 - closed: 663
 - rejected: 3
