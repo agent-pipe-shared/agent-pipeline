@@ -78,24 +78,30 @@ const RUNNER_SOURCE = [
   "const [, , guardPath, scenarioB64] = process.argv;",
   "const scenario = JSON.parse(Buffer.from(scenarioB64, 'base64').toString('utf8'));",
   "",
-  "const files = new Map(Object.entries(scenario.files || {}));",
-  "const existsSyncFn = (p) => files.has(p);",
+  "// The in-memory fs doubles are keyed by the POSIX literals this suite seeds ('/fake/...'), while the",
+  "// guard builds its keys with the host's node:path join/dirname -- backslash-separated on win32. Every",
+  "// double, the seeding and the inspection ops therefore go through canon(), which maps a key to one",
+  "// separator form so a lookup matches whichever separator built it. On any other platform canon is the",
+  "// identity function, so POSIX behaviour is unchanged by construction.",
+  "const canon = process.platform === 'win32' ? (p) => String(p).replaceAll('\\\\', '/') : (p) => p;",
+  "const files = new Map(Object.entries(scenario.files || {}).map(([k, v]) => [canon(k), v]));",
+  "const existsSyncFn = (p) => files.has(canon(p));",
   "const readFileSyncFn = (p) => {",
-  "  if (!files.has(p)) { const e = new Error('ENOENT ' + p); e.code = 'ENOENT'; throw e; }",
-  "  return files.get(p);",
+  "  if (!files.has(canon(p))) { const e = new Error('ENOENT ' + p); e.code = 'ENOENT'; throw e; }",
+  "  return files.get(canon(p));",
   "};",
   "let writeCount = 0;",
   "let writeMode = 'normal';",
   "const writeFileSyncFn = (p, c) => {",
   "  if (writeMode === 'throw') throw new Error('disk full');",
-  "  if (writeMode === 'partial-throw') { files.set(p, 'partial'); throw new Error('ENOSPC'); }",
+  "  if (writeMode === 'partial-throw') { files.set(canon(p), 'partial'); throw new Error('ENOSPC'); }",
   "  if (writeMode === 'count') writeCount += 1;",
-  "  files.set(p, c);",
+  "  files.set(canon(p), c);",
   "};",
   "const mkdirSyncFn = () => {};",
-  "const appendFileSyncFn = (p, c) => { files.set(p, (files.get(p) || '') + c); };",
-  "const linkSyncFn = (from, to) => { if (files.has(to)) { const e = new Error('EEXIST ' + to); e.code = 'EEXIST'; throw e; } if (!files.has(from)) { const e = new Error('ENOENT ' + from); e.code = 'ENOENT'; throw e; } files.set(to, files.get(from)); };",
-  "const unlinkSyncFn = (p) => { files.delete(p); };",
+  "const appendFileSyncFn = (p, c) => { files.set(canon(p), (files.get(canon(p)) || '') + c); };",
+  "const linkSyncFn = (from, to) => { if (files.has(canon(to))) { const e = new Error('EEXIST ' + to); e.code = 'EEXIST'; throw e; } if (!files.has(canon(from))) { const e = new Error('ENOENT ' + from); e.code = 'ENOENT'; throw e; } files.set(canon(to), files.get(canon(from))); };",
+  "const unlinkSyncFn = (p) => { files.delete(canon(p)); };",
   "",
   "const mod = await import(pathToFileURL(guardPath).href);",
   "",
@@ -135,9 +141,9 @@ const RUNNER_SOURCE = [
   "  } else if (step.op === 'getWriteCount') {",
   "    results.push(writeCount);",
   "  } else if (step.op === 'getFile') {",
-  "    results.push(files.has(step.path) ? files.get(step.path) : null);",
+  "    results.push(files.has(canon(step.path)) ? files.get(canon(step.path)) : null);",
   "  } else if (step.op === 'getFilesByPrefix') {",
-  "    results.push(Array.from(files.entries()).filter(([p]) => p.startsWith(step.prefix)));",
+  "    results.push(Array.from(files.entries()).filter(([p]) => p.startsWith(canon(step.prefix))));",
   "  } else if (step.op === 'listFiles') {",
   "    results.push(Array.from(files.keys()));",
   "  } else if (step.op === 'filesSize') {",
@@ -183,10 +189,16 @@ writeFileSync(PARALLEL_COUNTER_RUNNER_PATH, [
 ].join("\n"));
 process.on("exit", () => { for (const root of [runnerDir, FAKE_ROOT, ENV_ROOT]) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } } });
 
+// Hang-detector bound for ONE runner child (it executes a whole scenario of sequential guard calls). 10 s is
+// ample where a guard call costs milliseconds. On win32 every guard call spends ~170 ms inside
+// observeGovernanceScope (measured 2026-10-07, R7-11-W2: 26 timed calls, 161-245 ms each), so the 50- and
+// 60-call scenarios legitimately need ~9-11 s; the bound is widened there only. Other platforms keep 10 s.
+const RUNNER_TIMEOUT_MS = process.platform === "win32" ? 60000 : 10000;
+
 /** Spawns the runner against the REAL guard module and returns its parsed RESULT payload. Fails loudly (never silently) if the child does not print the success marker -- see the file-top NOTE for why. */
 function run(scenario, spawnOverrides = {}) {
   const b64 = Buffer.from(JSON.stringify(scenario), "utf8").toString("base64");
-  const res = spawnSync(process.execPath, [RUNNER_PATH, GUARD, b64], { input: "", encoding: "utf8", timeout: 10000, ...spawnOverrides });
+  const res = spawnSync(process.execPath, [RUNNER_PATH, GUARD, b64], { input: "", encoding: "utf8", timeout: RUNNER_TIMEOUT_MS, ...spawnOverrides });
   const stdout = res.stdout ?? "";
   const stderr = res.stderr ?? "";
   assert.equal(res.status, 0, `runner child exited ${res.status} (expected 0) -- stderr: ${stderr.trim().slice(0, 500)}`);
