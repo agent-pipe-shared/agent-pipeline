@@ -1207,6 +1207,28 @@ const Q12HD_PUSH_AFTER_HEREDOC_OPENER_TABLE = [
 ];
 recordQ12Table("Q12-HD: PUSH-AFTER-HEREDOC-OPENER", true, Q12HD_PUSH_AFTER_HEREDOC_OPENER_TABLE);
 
+// ---- commandIsGitPush: a git.exe (or other git spelling) push that is not the first command (Q12-T8) ----
+// Test-only pin, written BEFORE any classifier change (QG-04); at the commit that adds it several rows are expected RED, and
+// the per-row state is recorded in the evidence of the dispatch that added it. Contract: PO decision Q12 option B, "fail-closed
+// marker" (specs/sprint-alfred-epic/plans/po-decisions-2026-10-06.md row Q12). The executable word of a git command may be spelled
+// git, git.exe, GIT.EXE, a quoted Windows path ending in git.exe, or a POSIX path ending in git; the same spelling that is already a
+// candidate as the FIRST command of a line (Q12 and GPGL tables above) must also be a candidate when it follows a control operator
+// (`&&`, `;`, `||`, `|`) or a heredoc opener on the same line. The second column of every row states the bash semantics. Every
+// command text below is DATA: it is handed to `commandIsGitPush` and never executed. Every case id in this block starts with
+// Q12-EXE: so one search over a run's output lists all of them.
+const Q12EXE_NON_LEADING_GIT_EXE_PUSH_TABLE = [
+  ["echo ok && git.exe push origin main", "echo succeeds; && then runs git.exe push origin main as its own command"],
+  ["echo ok; git.exe push origin main", "the semicolon ends echo; git.exe push origin main then runs as its own command"],
+  ["true || git.exe push origin main", "true succeeds so || would skip it, but git.exe push origin main is still a command the shell may run"],
+  ["echo ok | git.exe push origin main", "each pipeline stage is its own command; git.exe push origin main runs as the second stage with echo output on its standard input"],
+  ["cat <<EOF && git.exe push origin main\nbody\nEOF", "the heredoc only feeds cat; && then runs git.exe push origin main as its own command"],
+  ["echo ok && GIT.EXE push origin main", "on a case-insensitive file system (Windows) GIT.EXE resolves to git.exe; the second command then pushes"],
+  ['echo ok && "C:/Program Files/Git/cmd/git.exe" push origin main', "the double-quoted word is one path naming git.exe; the second command pushes"],
+  ["echo ok && /usr/bin/git push origin main", "an absolute POSIX path ending in git is the executable of the second command, which pushes"],
+  ["echo ok && git.exe -C . push origin main", "git.exe with a -C option before the subcommand; the second command still runs push origin main"],
+];
+recordQ12Table("Q12-EXE: NON-LEADING-GIT-EXE-PUSH", true, Q12EXE_NON_LEADING_GIT_EXE_PUSH_TABLE);
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
