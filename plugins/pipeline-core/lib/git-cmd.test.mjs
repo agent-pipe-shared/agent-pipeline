@@ -1184,6 +1184,29 @@ const Q12AF_CONTROL_DATA_HEREDOC_TABLE = [
 ];
 recordQ12Table("Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE", false, Q12AF_CONTROL_DATA_HEREDOC_TABLE);
 
+// ---- commandIsGitPush: a push that follows a heredoc opener on the same line (Q12-T7) ----
+// Test-only pin, written BEFORE any classifier change (QG-04); at the commit that adds it several rows are expected RED, and
+// the per-row state is recorded in the evidence of the dispatch that added it. Contract: PO decisions X and AF,
+// specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md rows X and AF. A here-document (`<<`, `<<-`) or here-string (`<<<`)
+// fed to a command that is not a shell, interpreter or command runner is data (row X): the body is read after the line that
+// opened it and belongs to the FIRST command only. A control operator on the opener line (`&&`, `;`, `||`, `&`) then starts a
+// separate command, and a push that follows the opener on the same line, or on the line after the terminator, is a real
+// push. The second column of every row states the bash semantics. Every command text below is DATA: it is handed to
+// `commandIsGitPush` and never executed. Every case id in this block starts with Q12-HD: so one search over a run's output
+// lists all of them. The data side of the same shapes (no push anywhere) is already held by the Q12-X, Q12-C and Q12-AF
+// controls above, so this table is the candidate side only.
+const Q12HD_PUSH_AFTER_HEREDOC_OPENER_TABLE = [
+  ["cat <<EOF && git push origin main\nbody\nEOF", "the heredoc only feeds cat; && then runs git push origin main as its own command"],
+  ["cat <<EOF; git push origin main\nbody\nEOF", "the heredoc only feeds cat; the semicolon then runs git push origin main as its own command"],
+  ["cat <<'EOF' || git push origin main\nbody\nEOF", "the heredoc only feeds cat; || runs git push origin main as its own command when cat fails"],
+  ["git commit -F - <<EOF && git push origin main\nmsg\nEOF", "the heredoc only feeds git commit; && then runs git push origin main as its own command"],
+  ["cat <<-EOF & git push origin main\n\tbody\n\tEOF", "the tab-stripping heredoc only feeds cat; & backgrounds cat and runs git push origin main as its own command"],
+  ['cat <<< "x" && git push origin main', "the here-string only feeds cat; && then runs git push origin main as its own command"],
+  ["git push origin main <<EOF\nbody\nEOF", "the push itself carries the heredoc; git push origin main runs and merely has an unused standard input"],
+  ["cat <<EOF\nbody\nEOF\ngit push origin main", "the heredoc ends at the terminator; the next line runs git push origin main as its own command"],
+];
+recordQ12Table("Q12-HD: PUSH-AFTER-HEREDOC-OPENER", true, Q12HD_PUSH_AFTER_HEREDOC_OPENER_TABLE);
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
