@@ -29,6 +29,11 @@ function test(name, run) {
   cases.push({ id: `DWPB${String(cases.length + 1).padStart(3, "0")}`, name, run });
 }
 
+// R7-3 (Spec 22.3): the package is a digest-bound design artifact, so the builder publishes it under the
+// feature's tracked home `specs/<feature-id>/evidence/` and refuses any output path that is git-ignored.
+const TRACKED_HOME = "specs/advisor-feature/evidence";
+const trackedHomeDirectory = (root) => join(root, "specs", "advisor-feature", "evidence");
+
 async function preparedFixture(t) {
   const f = advisorHostFixture(t);
   const readinessHost = readinessFixture(t);
@@ -46,7 +51,10 @@ async function preparedFixture(t) {
   });
   assert.equal(sources.ok, true, JSON.stringify(sources));
   mkdirSync(join(f.root, "evidence"));
-  // In the fixture only: evidence is ignored exactly as a local package path must be.
+  // The tracked home exists and is NOT ignored; the builder's destination parent must already exist physically.
+  mkdirSync(trackedHomeDirectory(f.root), { recursive: true });
+  // In the fixture only: the root evidence/ stays git-ignored exactly as in a real clone, so the builder's
+  // refusal of an ignored output path can be exercised against it.
   writeFileSync(join(f.root, ".git", "info", "exclude"), "\n/evidence/\n");
   const publish = (name, bytes) => {
     const path = `evidence/${name}`;
@@ -98,11 +106,11 @@ async function preparedFixture(t) {
   return { f, candidate, sources: sources.sources, verifyReadinessExecution };
 }
 
-test("builder publishes one canonical ignored v2 package and refuses overwrite", async (t) => {
+test("builder publishes one canonical v2 package under the tracked specs/<feature-id>/evidence home and refuses overwrite", async (t) => {
   const fixture = await preparedFixture(t);
   const args = {
     repoRoot: fixture.f.root,
-    packagePath: "evidence/design-workflow-package.json",
+    packagePath: `${TRACKED_HOME}/design-workflow-package.json`,
     preparationPath: "evidence/preparation.json",
     readinessPath: "evidence/readiness.json",
     readinessDispatchId: "final-readiness",
@@ -127,7 +135,7 @@ test("builder publishes one canonical ignored v2 package and refuses overwrite",
   assert.equal(buildDesignWorkflowPackageV2(args).code, "DWP2-BUILDER-OUTPUT-EXISTS");
 });
 
-test("builder rejects stale candidate bindings and unsafe destinations without publishing", async (t) => {
+test("builder rejects stale candidate bindings, ignored outputs and unsafe destinations without publishing", async (t) => {
   const fixture = await preparedFixture(t);
   const args = {
     repoRoot: fixture.f.root, packagePath: "evidence/stale.json",
@@ -139,7 +147,8 @@ test("builder rejects stale candidate bindings and unsafe destinations without p
   };
   assert.equal(buildDesignWorkflowPackageV2(args).code, "DWP2-BUILDER-CANDIDATE");
   assert.equal(buildDesignWorkflowPackageV2({ ...args, packagePath: "scratch/not-allowed.json", expectedCandidate: fixture.candidate }).code, "DWP2-BUILDER-INPUT");
-  assert.equal(buildDesignWorkflowPackageV2({ ...args, packagePath: "unignored-package.json", expectedCandidate: fixture.candidate }).code, "DWP2-BUILDER-OUTPUT-NOT-IGNORED");
+  // R7-3: the root evidence/ is git-ignored, so a digest-bound package may not be published into it.
+  assert.equal(buildDesignWorkflowPackageV2({ ...args, packagePath: "evidence/ignored-package.json", expectedCandidate: fixture.candidate }).code, "DWP2-BUILDER-OUTPUT-IGNORED");
 });
 
 test("builder retains a canonical no-child Advisor exception as pending PO approval", async (t) => {
@@ -164,6 +173,8 @@ test("builder retains a canonical no-child Advisor exception as pending PO appro
   });
   assert.equal(sources.ok, true, JSON.stringify(sources));
   mkdirSync(join(f.root, "evidence"));
+  // The tracked home exists and is NOT ignored; the builder's destination parent must already exist physically.
+  mkdirSync(trackedHomeDirectory(f.root), { recursive: true });
   writeFileSync(join(f.root, ".git", "info", "exclude"), "\n/evidence/\n");
   const artifacts = exportCodexDesignAdvisorArtifacts(f.root, "evidence/failure", failure);
   assert.ok(artifacts.initial && artifacts.failure);
@@ -210,7 +221,7 @@ test("builder retains a canonical no-child Advisor exception as pending PO appro
     resolveCodexExecutable: () => process.execPath,
   });
   const built = buildDesignWorkflowPackageV2({
-    repoRoot: f.root, packagePath: "evidence/unavailable-package.json",
+    repoRoot: f.root, packagePath: `${TRACKED_HOME}/unavailable-package.json`,
     preparationPath: "evidence/preparation.json", readinessPath: "evidence/readiness.json",
     readinessDispatchId: "exception-readiness", featureId: "advisor-feature",
     authoringDispatchId: "elephant-author", expectedCandidate: candidate,
