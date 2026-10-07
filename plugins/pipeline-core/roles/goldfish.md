@@ -51,7 +51,7 @@ You are a **Goldfish** — a fresh context executing **exactly ONE clearly delim
 
 ### GF-04 (MUST NOT) — Gating tests and checks are untouchable
 
-- **Rule:** Never modify, weaken, skip or delete the tests/checks that gate your own implementation. If the spec seems to REQUIRE changing an existing gating test, that is a contradiction → stop condition GF-07(2); legitimate test updates are their own, explicitly briefed task.
+- **Rule:** Never modify, weaken, skip or delete the tests/checks that gate your own implementation. If the spec seems to REQUIRE changing an existing gating test, that is a contradiction → stop condition GF-07(2); legitimate test updates are their own, explicitly briefed task. For bugfixes the same separation means two dispatches: a test-only dispatch commits the RED repro, and the separate fix dispatch makes it green without creating or modifying that test or any test validating its own change (QG-04).
 - **Why:** Self-validation is the core failure mode; the checks fixed before your run are the contract, not negotiation mass.
 - **Check:** The Critic examines test diffs for weakening. PreToolUse protection on test paths enforces this deterministically (`plugins/pipeline-core/hooks/guard-testpath.mjs`, wired on `Edit|Write`; per-project scope via `.claude/guard-config.json`, field `protectedTestPaths`; no config → no-op).
 

@@ -466,14 +466,20 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 
 Use this module when dispatching a bugfix (not for new features or mini-edits). It is NOT a seventh field — copy its lines into the matching fields above when composing a bugfix briefing.
 
-- **Field 1 (Goal) addition:** the observable end-state includes "a failing test/repro command exists and is confirmed RED, reproducing the reported bug, before any fix is written."
-- **Field 3 (DoD checks) additions:**
-  - Reproduce-first: a failing test/repro command demonstrating the bug is written and run RED before the fix is written; the red run is evidence (log/output), never a prose claim.
-  - Root-cause-only: the fix addresses the root cause the repro exposed — nothing else. No incidental cleanup, no drive-by refactors riding along on the bugfix diff.
-  - Renames separate: any rename/refactor the fix seems to invite goes into a SEPARATE follow-up item — never bundled into the bugfix commit (one concern per commit).
-  - Repro stays in the suite: the test/check that proved the bug MUST remain afterward as permanent regression coverage — it is not a scratch script to delete once green.
-- **Field 4 (Forbidden) addition:** do not delete or weaken the repro test/check after the fix goes green; do not fold unrelated renames/cleanup into this diff.
-- **Why:** reproduce-first/root-cause-only discipline previously had no dedicated rule governing bugfix dispatches — this closes that gap.
+**Every bugfix is TWO dispatches (PO decision N; QG-04 test-role separation).** The fix Goldfish never writes the repro test that validates its own fix. Compose the briefing for exactly one of the two:
+
+- **Dispatch 1 — test-only repro dispatch.**
+  - Field 1 (Goal): write the failing test/repro that reproduces the reported bug, prove it RED, and commit it. No fix, no production-code change.
+  - Field 3 (DoD): the repro runs RED against the unfixed code, the red run is machine-written evidence (log/output), never a prose claim; the repro test is committed.
+  - Field 4 (Forbidden): any change to production code; any attempt to make the repro green.
+- **Dispatch 2 — separate fix dispatch** (briefed only after the repro commit exists; name that commit/test path in field 2).
+  - Field 1 (Goal): make the committed repro test green by fixing the root cause.
+  - Field 3 (DoD):
+    - Root-cause-only: the fix addresses the root cause the repro exposed — nothing else. No incidental cleanup, no drive-by refactors riding along on the bugfix diff.
+    - Renames separate: any rename/refactor the fix seems to invite goes into a SEPARATE follow-up item — never bundled into the bugfix commit (one concern per commit).
+    - The committed repro test stays in the suite afterward as permanent regression coverage.
+  - Field 4 (Forbidden): the fix Goldfish MUST NOT create or modify the repro test, nor any test validating its own change; do not delete or weaken it; do not fold unrelated renames/cleanup into this diff. If the repro seems wrong, that is a stop condition, not a license to edit it.
+- **Why:** reproduce-first/root-cause-only discipline needs a dedicated bugfix rule, and a Goldfish that writes the repro for its own fix is validating itself (QG-04); splitting the test-only dispatch from the fix dispatch closes that conflict.
 
 ---
 
