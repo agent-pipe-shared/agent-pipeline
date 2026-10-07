@@ -1224,6 +1224,10 @@ test("NVA-W5-TTYSIGN: sign-intent for a passphrase-protected key fails closed wi
   try {
     const passphrase = "sign-intent-fixture-passphrase";
     encryptedKeyFixture(dirs.directory, passphrase);
+    // R7-6-T7 (F5 alignment): with zero committed anchors the readiness check ends in key-anchor-mismatch
+    // before the terminal precondition (case R7-6g(i)); a fixture meant to reach the attended-terminal
+    // refusal therefore commits an anchor for its own key.
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.tty-sign-no-terminal-fixture").digest("hex");
     let spawnCalled = false;
     const dependencies = {
@@ -1285,6 +1289,8 @@ test("NVA-CF-MINORPUSH-RETRY: sign-intent refuses when the controlling terminal 
   try {
     const passphrase = "sign-intent-fixture-passphrase";
     encryptedKeyFixture(dirs.directory, passphrase);
+    // R7-6-T7 (F5 alignment): see the committed-anchor note in the NVA-W5-TTYSIGN case above.
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.tty-sign-no-controlling-tty-fixture").digest("hex");
     let spawnCalled = false;
     const dependencies = {
@@ -1311,6 +1317,8 @@ test("2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native W
   try {
     const passphrase = "sign-intent-fixture-passphrase";
     encryptedKeyFixture(dirs.directory, passphrase);
+    // R7-6-T7 (F5 alignment): see the committed-anchor note in the NVA-W5-TTYSIGN case above.
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.tty-sign-windows-fixture").digest("hex");
     let spawnCalled = false;
     const dependencies = {
@@ -4615,6 +4623,10 @@ function r76gAssertNotAToolchainReplacement(result, label) {
   assert.ok(failing.repair !== undefined && failing.repair !== null && failing.repair !== "", `${label}: a non-ok result carries its own repair (typed repair rule, section 22.0)`);
   assert.notEqual(failing.repair?.prerequisite, "openssl-with-ed25519", `${label}: the repair must not ask the PO to replace or reorder OpenSSL`);
   assert.equal(/ed25519/iu.test(JSON.stringify(failing.repair)), false, `${label}: the repair must not be the replace-OpenSSL repair; observed ${JSON.stringify(failing.repair).slice(0, 160)}`);
+  // R7-6-T7 (decision AE, Spec 22.6 delta): the one new closed class. Both callers (R7-6g(ii)-b and -c) are
+  // the two situations the class names: no admissible working directory outside every repository, and a
+  // local I/O failure while preparing the throwaway material.
+  assert.equal(String(failing.cause).startsWith("probe-environment-unavailable"), true, `${label}: the cause must begin with the closed class 'probe-environment-unavailable' (decision AE); observed '${String(failing.cause).slice(0, 140)}'`);
 }
 
 test("R7-6g(i) (F5): with NO committed trust anchor sign-intent reports key-anchor-mismatch without opening the private key file and without passing its path to any process", () => {
@@ -4716,6 +4728,310 @@ test("R7-6g(iii) (F8): an absolute host path that contains a space is fully reda
       } finally { r76Release(env); }
     }
   }
+});
+
+/* ======================================================================
+ * R7-6-T7 (PO decisions AC, AD and AE of 2026-10-07): several PO keys for one
+ * repository, pinned against the accepted Spec 22.6 delta in
+ * specs/sprint-alfred-epic/plans/r7-6-multi-key-aa.md (the chat decision that
+ * replaces the first T14 bullet; spec.md itself is not edited).
+ *
+ *  R7-6h (AC): one resolution order for the key directory -- --directory, then
+ *        PIPELINE_PO_APPROVAL_DIRECTORY, then the machine-wide poKeyDirectory,
+ *        then the legacy per-repository value (read-only, reported legacy), then
+ *        the typed SIGN-KEY-DIRECTORY-UNSET -- with the resolving tier reported.
+ *        Test-list items 1, 2, 3 and 12 of the plan. Exercised through
+ *        parseHumanArgs and runHumanApproval with the module's own injection
+ *        seams: homedirFn (machine-wide plane), gitCommonDirFn (legacy store),
+ *        and the process environment (withEnvDirectory).
+ *  R7-6i (AD): the committed trust-anchor set is any-of on the PAIR keyReference
+ *        + publicKeySha256 at the probe's step (c) and at sign-intent's
+ *        pre-prompt check. Test-list items 8 and 9 (the protected items 10 and
+ *        11, and the push-prepare / verifier surfaces of item 9, are not here).
+ *  The class `probe-environment-unavailable` (AE) is pinned by changing the two
+ *  existing cases R7-6g(ii)-b and R7-6g(ii)-c, not here.
+ *
+ * Same safety rules as the R7-6 blocks above: every OpenSSL is the r76Spy stub
+ * behind the injectable spawn seam, no prompt can block, keys are throwaway
+ * fixtures in per-test directories, a key whose private half must never be
+ * opened holds the trap string instead. Homes and git-common-dirs are injected,
+ * so the real machine plane, the real repository store and the real `.git` are
+ * never read.
+ * ====================================================================== */
+
+const R76H_TIERS = Object.freeze(["flag", "env", "plane", "legacy"]);
+// The existing directorySource labels (PODIR-1, SETUP-2b, PO-KEYDIR-01(A)); the legacy store also sets legacy === true.
+const R76H_TIER_LABEL = Object.freeze({ flag: "flag", env: "environment", plane: "machine-plane", legacy: "repo-scope" });
+
+/** Declares a SET of committed trust anchors (schema v3), same on-disk shape as declareTrustAnchor. */
+function r76hDeclareAnchors(repoRoot, authorities) {
+  mkdirSync(join(repoRoot, "project"), { recursive: true });
+  writeFileSync(join(repoRoot, "project/critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v3",
+    requiredKinds: ["governance-fork-disposition"],
+    waivedKinds: [],
+    trustAnchors: authorities.map((authority) => ({ keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 })),
+  }));
+}
+
+/** keyFixture with a chosen keyReference, so several keys of one repository stay distinguishable. */
+function r76hKeyFixture(directory, keyReference) {
+  const { authority } = keyFixture(directory);
+  const named = { keyReference, publicKeySha256: authority.publicKeySha256 };
+  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({ ...named, humanName: "Test Operator" }, null, 2)}\n`);
+  return named;
+}
+
+/** One distinct existing directory per resolution tier; parse() builds a fresh injected home and
+ * git-common-dir for each call, with exactly the requested tiers present. present.plane is
+ * true (valid value), "malformed" or "unreadable" (an invalid plane), or falsy (no plane). */
+function r76hResolverFixture() {
+  const made = [];
+  const fresh = (prefix) => { const path = mkdtempSync(join(tmpdir(), prefix)); made.push(path); return path; };
+  const repoRoot = fresh("r76h-repo-");
+  const dirs = Object.fromEntries(R76H_TIERS.map((tier) => [tier, fresh(`r76h-${tier}-`)]));
+  return {
+    repoRoot,
+    dirs,
+    parse(present) {
+      const home = present.plane === true ? machinePlaneHomeFixture(dirs.plane) : noMachinePlaneHomeFixture();
+      made.push(home);
+      if (present.plane === "malformed") {
+        mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+        writeFileSync(join(home, ".agent-pipeline", "machine.json"), "{ not valid json");
+      }
+      if (present.plane === "unreadable") mkdirSync(join(home, ".agent-pipeline", "machine.json"), { recursive: true });
+      const common = fresh("r76h-common-");
+      if (present.legacy) legacyRepoStoreFixture(common, realpathSync(dirs.legacy));
+      const argv = ["setup", "--repo-root", repoRoot, ...(present.flag ? ["--directory", dirs.flag] : []), "--human-name", "Test Operator"];
+      return withEnvDirectory(present.env ? dirs.env : undefined, () => parseHumanArgs(argv, { homedirFn: () => home, gitCommonDirFn: () => common }));
+    },
+    release() { for (const path of made) rmSync(path, { recursive: true, force: true }); },
+  };
+}
+
+function r76hAssertResolved(fixture, parsed, winner, label) {
+  assert.equal(parsed.error, undefined, `${label}: the key directory must resolve; observed '${String(parsed.error).slice(0, 160)}'`);
+  assert.equal(realpathSync(parsed.directory), realpathSync(fixture.dirs[winner]),
+    `${label}: the '${winner}' tier must win; the directory came from another tier (reported source '${parsed.directorySource}')`);
+  assert.equal(parsed.directorySource, R76H_TIER_LABEL[winner], `${label}: the resolving tier must be reported as '${R76H_TIER_LABEL[winner]}'`);
+  assert.equal(parsed.legacy === true, winner === "legacy", `${label}: only the legacy per-repository value is reported as legacy`);
+}
+
+test("R7-6h: the key directory resolves --directory, then PIPELINE_PO_APPROVAL_DIRECTORY, then the machine-wide value, then the legacy per-repository value, reporting the tier, and finally the typed SIGN-KEY-DIRECTORY-UNSET (decision AC, test-list 1)", () => {
+  const fixture = r76hResolverFixture();
+  try {
+    R76H_TIERS.forEach((winner, index) => {
+      const present = Object.fromEntries(R76H_TIERS.map((tier, position) => [tier, position >= index]));
+      r76hAssertResolved(fixture, fixture.parse(present), winner, `tiers present: ${R76H_TIERS.slice(index).join(" + ")}`);
+    });
+    const none = fixture.parse({});
+    assert.equal(none.code, "SIGN-KEY-DIRECTORY-UNSET", `no tier present: the typed result is required; observed '${String(none.error).slice(0, 160)}'`);
+    assert.match(none.error, /SIGN-KEY-DIRECTORY-UNSET/u);
+    assert.equal(none.finding?.findingId, "po-key-directory");
+    assert.equal(none.finding?.status, "repairable");
+    assert.match(String(none.finding?.cause), /^key-directory-unset/u);
+    assert.equal(none.directory, undefined, "nothing resolved");
+  } finally { fixture.release(); }
+});
+
+test("R7-6h: PIPELINE_PO_APPROVAL_DIRECTORY beats the machine-wide value and the legacy per-repository value, and an explicit --directory still beats it (decision AC, test-list 2)", () => {
+  const fixture = r76hResolverFixture();
+  try {
+    const rows = [
+      { label: "environment over the machine-wide value", present: { env: true, plane: true }, winner: "env" },
+      { label: "environment over the legacy per-repository value", present: { env: true, legacy: true }, winner: "env" },
+      { label: "environment over the machine-wide and the legacy value", present: { env: true, plane: true, legacy: true }, winner: "env" },
+      { label: "--directory over the environment", present: { flag: true, env: true }, winner: "flag" },
+      { label: "--directory over every other tier", present: { flag: true, env: true, plane: true, legacy: true }, winner: "flag" },
+    ];
+    for (const row of rows) r76hAssertResolved(fixture, fixture.parse(row.present), row.winner, row.label);
+  } finally { fixture.release(); }
+});
+
+test("R7-6h: an invalid machine-wide store is bypassed by --directory and by PIPELINE_PO_APPROVAL_DIRECTORY and is a reported failure otherwise, never absent and never a fall-through to the legacy value (decision AC, test-list 3)", () => {
+  const fixture = r76hResolverFixture();
+  try {
+    for (const invalid of ["malformed", "unreadable"]) {
+      r76hAssertResolved(fixture, fixture.parse({ plane: invalid, legacy: true, flag: true }), "flag", `${invalid} plane, --directory given`);
+      r76hAssertResolved(fixture, fixture.parse({ plane: invalid, legacy: true, env: true }), "env", `${invalid} plane, environment value given`);
+      for (const present of [{ plane: invalid, legacy: true }, { plane: invalid }]) {
+        const label = `${invalid} plane, no --directory, no environment value${present.legacy ? ", legacy value present" : ""}`;
+        const parsed = fixture.parse(present);
+        assert.match(String(parsed.error), /machine-scoped configuration plane is invalid/u, `${label}: a reported failure naming the plane is required; observed '${String(parsed.error).slice(0, 160)}'`);
+        assert.equal(parsed.directory, undefined, `${label}: nothing resolves, in particular not the legacy value`);
+        assert.notEqual(parsed.code, "SIGN-KEY-DIRECTORY-UNSET", `${label}: an invalid consulted store is never reported as absent`);
+      }
+    }
+  } finally { fixture.release(); }
+});
+
+/** sign-intent against a fixture machine. `flag` is an explicit --directory, `environment` the value of
+ * PIPELINE_PO_APPROVAL_DIRECTORY for this one process; with neither, the machine-wide default resolves. */
+function r76hSign(env, spy, { flag = null, environment = undefined } = {}) {
+  const argv = ["sign-intent", "--repo-root", env.dirs.repoRoot, ...(flag === null ? [] : ["--directory", flag]), "--intent-sha256", R76_INTENT];
+  const dependencies = {
+    readConfirmation: (prompt) => { env.events.push({ kind: "prompt", prompt }); return "approve"; },
+    homedirFn: () => env.home,
+    gitCommonDirFn: () => env.common,
+    spawn: spy.spawn,
+  };
+  return withEnvDirectory(environment, () => r76Outcome(() => runHumanApproval(argv, dependencies)));
+}
+
+/** Person A holds two keys; K1 is the machine-wide default, K2 arrives by `route`. Both anchors are committed. */
+function r76hPersonAChoosesK2(route) {
+  const env = r76Env({ plane: "own" });
+  const directoryK2 = mkdtempSync(join(tmpdir(), "r76h-k2-"));
+  try {
+    const k1 = r76hKeyFixture(env.dirs.directory, "person-a-key-1");
+    const k2 = r76hKeyFixture(directoryK2, "person-a-key-2");
+    r76hDeclareAnchors(env.dirs.repoRoot, [k1, k2]);
+    const planeFile = join(env.home, ".agent-pipeline", "machine.json");
+    const planeBefore = readFileSync(planeFile, "utf8");
+    const spy = r76Spy("healthy", env.events);
+    const outcome = r76hSign(env, spy, route === "flag" ? { flag: directoryK2 } : route === "environment" ? { environment: directoryK2 } : {});
+    const expected = route === "default" ? { authority: k1, directory: env.dirs.directory } : { authority: k2, directory: directoryK2 };
+    assert.equal(outcome.threw, false, `${route}: sign-intent must complete; observed ${r76Describe(outcome)}`);
+    assert.equal(outcome.value.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(outcome.value.signer.keyReference, expected.authority.keyReference,
+      `${route}: the signature must come from ${expected.authority.keyReference}; observed signer ${outcome.value.signer.keyReference}`);
+    assert.equal(realpathSync(dirname(outcome.value.paths.proof)), realpathSync(expected.directory), `${route}: the proof is written next to the key that signed`);
+    const proof = JSON.parse(readFileSync(outcome.value.paths.proof, "utf8"));
+    assert.equal(verifyPoApprovalProof({ intent: { sha256: R76_INTENT }, trustPolicy: expected.authority, proof }).verified, true,
+      `${route}: the proof verifies against the chosen key's own anchor`);
+    assert.equal(readFileSync(planeFile, "utf8"), planeBefore, `${route}: the machine-wide value is byte-identical after the ceremony`);
+    assert.equal(existsSync(repoScopeStorePath(env.common)), false, `${route}: nothing is written into the legacy per-repository store`);
+  } finally {
+    rmSync(directoryK2, { recursive: true, force: true });
+    r76Release(env);
+  }
+}
+
+test("R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as --directory, and the machine-wide value is unchanged (decision AC, test-list 12)", () => {
+  r76hPersonAChoosesK2("default");
+  r76hPersonAChoosesK2("flag");
+});
+
+test("R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as PIPELINE_PO_APPROVAL_DIRECTORY for one process, and the machine-wide value is unchanged (decision AC, test-list 12)", () => {
+  r76hPersonAChoosesK2("default");
+  r76hPersonAChoosesK2("environment");
+});
+
+/** The read-only probe (steps a to c) against one key directory, with the stub OpenSSL and an injected home. */
+function r76iProbe(env, directory) {
+  return probeSigningReadiness({
+    repository: env.dirs.repoRoot,
+    directory,
+    dependencies: { homedirFn: () => env.home, spawn: r76Spy("healthy").spawn },
+  });
+}
+function r76iAssertAnchorRefused(result, label) {
+  assert.equal(result.ok, false, `${label}: the probe must not pass`);
+  const match = result.findings.find((entry) => entry.findingId === "trust-anchor-match");
+  assert.ok(match, `${label}: the trust-anchor-match finding is present`);
+  assert.equal(match.status, "attended", `${label}: observed status '${match.status}'`);
+  assert.equal(String(match.cause).startsWith("key-anchor-mismatch"), true, `${label}: the cause begins with the class key-anchor-mismatch; observed '${String(match.cause).slice(0, 140)}'`);
+}
+
+test("R7-6i: with two committed trust anchors A and B, the key directories of A and of B each pass step (c) of the readiness probe and the key of B signs (decision AD, test-list 8)", () => {
+  const env = r76Env();
+  const directoryB = mkdtempSync(join(tmpdir(), "r76i-b-"));
+  try {
+    const a = r76hKeyFixture(env.dirs.directory, "person-a-key");
+    const b = r76hKeyFixture(directoryB, "person-b-key");
+    r76hDeclareAnchors(env.dirs.repoRoot, [a, b]);
+    for (const [name, directory] of [["A", env.dirs.directory], ["B", directoryB]]) {
+      const result = r76iProbe(env, directory);
+      assert.equal(result.findings.find((entry) => entry.findingId === "trust-anchor-match")?.status, "ok", `key ${name}: step (c) passes; observed ${JSON.stringify(result.findings).slice(0, 200)}`);
+      assert.equal(result.ok, true, `key ${name}: the whole probe passes`);
+    }
+    const spy = r76Spy("healthy", env.events);
+    const outcome = r76hSign(env, spy, { flag: directoryB });
+    assert.equal(outcome.threw, false, `observed ${r76Describe(outcome)}`);
+    assert.equal(outcome.value.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(outcome.value.signer.keyReference, b.keyReference, "the second person's key signed");
+    assert.equal(realpathSync(dirname(outcome.value.paths.proof)), realpathSync(directoryB));
+    assert.equal(r76KeyPathSpawns(spy).length, 1, "exactly one process receives the key path: the signing spawn");
+  } finally { rmSync(directoryB, { recursive: true, force: true }); r76Release(env); }
+});
+
+test("R7-6i: a key C outside the committed anchor set fails key-anchor-mismatch at the probe and at sign-intent before its private key is read (decision AD, test-list 8)", () => {
+  const env = r76Env();
+  const directoryB = mkdtempSync(join(tmpdir(), "r76i-b-"));
+  const directoryC = mkdtempSync(join(tmpdir(), "r76i-c-"));
+  try {
+    const a = r76hKeyFixture(env.dirs.directory, "person-a-key");
+    const b = r76hKeyFixture(directoryB, "person-b-key");
+    r76hKeyFixture(directoryC, "person-c-key");
+    writeFileSync(join(directoryC, "po-private.pem"), R76_TRAP);
+    r76hDeclareAnchors(env.dirs.repoRoot, [a, b]);
+
+    const probed = r76WithPrivateKeyReadSpy(() => r76iProbe(env, directoryC));
+    r76iAssertAnchorRefused(probed.result, "probe of key C");
+    assert.deepEqual(probed.opened, [], "the probe never opens the private key");
+
+    const spy = r76Spy("healthy", env.events);
+    const spied = r76WithPrivateKeyReadSpy(() => r76hSign(env, spy, { flag: directoryC }));
+    r76AssertTyped(spied.result, { cls: "key-anchor-mismatch", findingId: "trust-anchor-match", status: "attended" });
+    assert.deepEqual(spied.opened, [], "sign-intent ends before the private key of C is read or opened");
+    assert.deepEqual(r76KeyPathSpawns(spy), [], "no process receives a key path");
+    assert.equal(r76Prompts(env), 0, "the typed result ends the command before any prompt");
+    assert.equal(r76Text(spied.result).includes(R76_TRAP), false, "no key byte in the result");
+  } finally {
+    rmSync(directoryB, { recursive: true, force: true });
+    rmSync(directoryC, { recursive: true, force: true });
+    r76Release(env);
+  }
+});
+
+/** Anchor sets that all carry the key's own digest and its own keyReference, but never as one pair. */
+function r76iNonPairAnchorSets(key) {
+  return [
+    { name: "the key's digest under another keyReference", anchors: [{ keyReference: "someone-elses-key", publicKeySha256: key.publicKeySha256 }] },
+    { name: "the key's keyReference over another digest", anchors: [{ keyReference: key.keyReference, publicKeySha256: "d".repeat(64) }] },
+    { name: "the key's digest and the key's keyReference in two different anchors", anchors: [
+      { keyReference: "someone-elses-key", publicKeySha256: key.publicKeySha256 },
+      { keyReference: key.keyReference, publicKeySha256: "d".repeat(64) },
+    ] },
+  ];
+}
+
+test("R7-6i: pair matching at the readiness probe: the same public-key digest under a different keyReference is refused, as is a digest and a keyReference taken from two different anchors (decision AD, test-list 9)", () => {
+  const env = r76Env();
+  try {
+    const a = r76hKeyFixture(env.dirs.directory, "person-a-key");
+    r76hDeclareAnchors(env.dirs.repoRoot, [a]);
+    const control = r76iProbe(env, env.dirs.directory);
+    assert.equal(control.ok, true, `control: the matching pair passes step (c); observed ${JSON.stringify(control.findings).slice(0, 200)}`);
+    for (const variant of r76iNonPairAnchorSets(a)) {
+      r76hDeclareAnchors(env.dirs.repoRoot, variant.anchors);
+      r76iAssertAnchorRefused(r76iProbe(env, env.dirs.directory), variant.name);
+    }
+  } finally { r76Release(env); }
+});
+
+test("R7-6i: pair matching at sign-intent's pre-prompt check: the same public-key digest under a different keyReference ends in key-anchor-mismatch before the private key is read, any prompt or any key-path spawn (decision AD, test-list 9)", () => {
+  const env = r76Env();
+  try {
+    const a = r76hKeyFixture(env.dirs.directory, "person-a-key");
+    r76hDeclareAnchors(env.dirs.repoRoot, [a]);
+    const controlSpy = r76Spy("healthy", env.events);
+    const control = r76hSign(env, controlSpy, { flag: env.dirs.directory });
+    assert.equal(control.threw, false, `control: the matching pair signs; observed ${r76Describe(control)}`);
+    assert.equal(control.value.code, "PO-HUMAN-SIGN-INTENT-READY");
+    env.events.length = 0;
+    writeFileSync(join(env.dirs.directory, "po-private.pem"), R76_TRAP);
+    for (const variant of r76iNonPairAnchorSets(a)) {
+      r76hDeclareAnchors(env.dirs.repoRoot, variant.anchors);
+      const spy = r76Spy("healthy", env.events);
+      const spied = r76WithPrivateKeyReadSpy(() => r76hSign(env, spy, { flag: env.dirs.directory }));
+      r76AssertTyped(spied.result, { cls: "key-anchor-mismatch", findingId: "trust-anchor-match", status: "attended" });
+      assert.deepEqual(spied.opened, [], `${variant.name}: the private key is never read or opened`);
+      assert.deepEqual(r76KeyPathSpawns(spy), [], `${variant.name}: no process receives a key path`);
+      assert.equal(r76Prompts(env), 0, `${variant.name}: the typed result ends the command before any prompt`);
+    }
+  } finally { r76Release(env); }
 });
 
 test("the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (fixtureDirs variant)", () => {
