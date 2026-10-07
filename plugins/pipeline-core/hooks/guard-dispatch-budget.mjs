@@ -111,10 +111,13 @@
  * inside the same bound and backoff, whereas malformed/unsafe/ambiguous lock state
  * still fails closed at once.
  *
- * R7-11-F3 (after the R7-11d-T3 pins):
- * - `counter-lock-recovery-raced`, the catch-all for an exception thrown during
- *   dead-owner recovery, is no longer retried: it fails closed at once, like the
- *   other recovery outcomes.
+ * R7-11-F3 (after the R7-11d-T3 pins), bullet 1 amended by R7-11-F4B (R7-11d-T4/T5 pins):
+ * - A benign race exit of dead-owner recovery (the recovery lock vanished after the
+ *   EEXIST link, or ENOENT/EEXIST during the stale-recovery takeover or the main-lock
+ *   republish) returns `counter-lock-recovery-raced`, which the wait retries, so the
+ *   losing parallel call is admitted and counted once. Any other error during
+ *   recovery (EACCES, EPERM, EIO, ...) returns `counter-lock-recovery-failed`, which
+ *   fails closed at once with no counter change and never a raw fs message as the code.
  * - The hook refuses a `counter-lock-timeout` under its own typed code
  *   `DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT` (path-free, "retry the same call", no
  *   trusted-host-path repair) because a timeout is contention, not corrupt state.
@@ -793,6 +796,17 @@ export function releaseDispatchBudgetCounterLock(lock, dependencies = {}) {
   return true;
 }
 
+/**
+ * Classifies an exception thrown during dead-owner recovery (Spec 22.11 R7-11d). ENOENT or EEXIST
+ * means another caller got there first -- a benign race the wait retries as
+ * `counter-lock-recovery-raced`. Anything else (EACCES, EPERM, EIO, ...) is a genuine failure:
+ * `counter-lock-recovery-failed`, never retried, and never the raw fs message as the reason code.
+ */
+function counterLockRecoveryErrorResult(error) {
+  const benign = error?.code === "ENOENT" || error?.code === "EEXIST";
+  return { status: "rejected", code: benign ? "counter-lock-recovery-raced" : "counter-lock-recovery-failed" };
+}
+
 export function acquireDispatchBudgetCounterLock(path, dependencies = {}) {
   const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
   const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
@@ -835,10 +849,11 @@ export function acquireDispatchBudgetCounterLock(path, dependencies = {}) {
         if (!sameCounterLockIdentity(staleRecovery, recoveryObserved.identity, dependencies)) return { status: "rejected", code: "counter-lock-recovery-changed" };
         unlinkSyncFn(staleRecovery);
         recovery = publishCounterLock(recoveryPath, dependencies);
-      } catch { return { status: "rejected", code: "counter-lock-recovery-raced" }; }
-    } else return { status: "rejected", code: error?.message ?? "counter-lock-recovery-publish" };
+      } catch (takeoverError) { return counterLockRecoveryErrorResult(takeoverError); }
+    } else return { status: "rejected", code: "counter-lock-recovery-failed" };
   }
   const quarantine = `${path}.dead.${process.pid}-${randomUUID()}`;
+  let published = null;
   try {
     const current = readStableCounterLock(path, dependencies);
     if (!sameCounterLockIdentity(path, observed.identity, dependencies)
@@ -846,10 +861,14 @@ export function acquireDispatchBudgetCounterLock(path, dependencies = {}) {
       || counterLockOwnerState(current, dependencies) !== "dead") return { status: "rejected", code: "counter-lock-changed" };
     renameSyncFn(path, quarantine);
     if (!sameCounterLockIdentity(quarantine, observed.identity, dependencies)) return { status: "rejected", code: "counter-lock-changed" };
-    const lock = publishCounterLock(path, dependencies);
+    published = publishCounterLock(path, dependencies);
     unlinkSyncFn(quarantine);
-    return { status: "acquired", lock, recovered: true };
-  } catch { return { status: "rejected", code: "counter-lock-recovery-raced" }; }
+    return { status: "acquired", lock: published, recovered: true };
+  } catch (error) {
+    // A lock this attempt published but could not finish recovering must not stay held: the retry of a benign race would otherwise wait on its own live lock.
+    if (published !== null) try { releaseDispatchBudgetCounterLock(published, dependencies); } catch { /* best effort */ }
+    return counterLockRecoveryErrorResult(error);
+  }
   finally { releaseDispatchBudgetCounterLock(recovery, dependencies); }
 }
 
@@ -864,12 +883,15 @@ const COUNTER_LOCK_BACKOFF_MAX_MS = 100;
 // Outcomes the wait variant retries: a live owner or the publishing transition
 // (`counter-lock-busy`) and the transient races of dead-owner recovery, produced
 // when the observed holder exits or the lock is replaced under another caller's
-// read. Everything else (malformed, unsafe, ambiguous, recovery-changed and
-// recovery-raced, the catch-all for an exception during recovery) fails closed.
+// read, including `counter-lock-recovery-raced` (the benign race exits of dead-owner
+// recovery: ENOENT/EEXIST because a winner got there first). Everything else
+// (malformed, unsafe, ambiguous, recovery-changed, and recovery-failed, a genuine
+// EACCES/EPERM/EIO-style failure during recovery) fails closed at once.
 const COUNTER_LOCK_TRANSIENT_CODES = new Set([
   "counter-lock-busy",
   "counter-lock-changed",
   "counter-lock-recovery-busy",
+  "counter-lock-recovery-raced",
 ]);
 
 /** Default wait clock: monotonic (immune to wall-clock steps); the injected `dependencies.now` replaces it in tests. */
@@ -894,10 +916,11 @@ function counterLockMtimeMs(path, dependencies) {
  * R7-11): repeats the single attempt (`dependencies.acquireDispatchBudgetCounterLockFn`
  * when supplied, else the real one) while it reports `counter-lock-busy`, i.e.
  * a live owner or the retryable publishing transition, or one of the transient
- * dead-owner-recovery race outcomes `counter-lock-changed` and
- * `counter-lock-recovery-busy`, sleeping with a bounded backoff between attempts.
- * Every other outcome -- acquired (including dead-owner recovery), malformed,
- * unsafe, ambiguous, `counter-lock-recovery-raced` -- is returned at once,
+ * dead-owner-recovery race outcomes `counter-lock-changed`,
+ * `counter-lock-recovery-busy` and `counter-lock-recovery-raced`, sleeping with a
+ * bounded backoff between attempts. Every other outcome -- acquired (including
+ * dead-owner recovery), malformed, unsafe, ambiguous, and the genuine recovery
+ * failure `counter-lock-recovery-failed` (EACCES/EPERM/EIO) -- is returned at once,
  * exactly as the single attempt produced it, with no sleep. Once
  * `COUNTER_LOCK_WAIT_BOUND_MS` has elapsed it returns `{ status: "rejected", code:
  * "counter-lock-timeout", holderAgeMs }`, where `holderAgeMs` is now minus the
