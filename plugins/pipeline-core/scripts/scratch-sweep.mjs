@@ -22,6 +22,7 @@ import { lstatSync, realpathSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
+import { scratchLivePluginRoots } from '../lib/physical-scratch-boundary.mjs';
 import { assessScratchDurability, planSweep } from '../lib/scratch-retention.mjs';
 
 const SCHEMA = 'pipeline.scratch-sweep.v1';
@@ -78,10 +79,18 @@ function isRepositoryRoot(root) {
   }
 }
 
+function insideRoot(rootPath, target) {
+  const rel = relative(rootPath, target);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
+
 function applyPlan(root, now) {
   const plan = planSweep({ root, now });
   const physicalScratch = realpathSync(join(root, 'scratch'));
   const deleted = [];
+  const liveRoots = scratchLivePluginRoots().flatMap((liveRoot) => {
+    try { return [liveRoot, realpathSync(liveRoot)]; } catch { return [liveRoot]; }
+  });
   for (const rel of plan.delete) {
     // The library plan already excludes scratch/dispatch/; this guard is the second, independent line.
     if (!rel.startsWith('scratch/') || rel.toLowerCase().startsWith('scratch/dispatch/')) continue;
@@ -89,8 +98,13 @@ function applyPlan(root, now) {
     try {
       const stat = lstatSync(full);
       if (stat.isSymbolicLink() || !stat.isFile()) continue;
-      const inner = relative(physicalScratch, realpathSync(full));
-      if (inner === '' || inner.startsWith('..') || inner.startsWith(sep) || isAbsolute(inner) || /^[A-Za-z]:/u.test(inner)) continue;
+      const target = realpathSync(full);
+      const inner = relative(physicalScratch, target);
+      if (inner === '' || inner.startsWith('..') || inner.startsWith(sep) || isAbsolute(inner)) continue;
+      if (process.platform === 'win32' && /^[A-Za-z]:/u.test(inner)) continue;
+      // Re-apply the exclusions to the RESOLVED target: a parent link may land in dispatch/ or a live plugin root.
+      if (/^dispatch(?:[\\/]|$)/iu.test(inner)) continue;
+      if (liveRoots.some((liveRoot) => insideRoot(liveRoot, target))) continue;
       unlinkSync(full);
       deleted.push(rel);
     } catch {
