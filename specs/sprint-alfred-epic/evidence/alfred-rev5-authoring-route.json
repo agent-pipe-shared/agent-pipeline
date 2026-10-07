@@ -1,0 +1,23 @@
+{
+  "schema": "pipeline.authoring-route-record.v1",
+  "featureId": "sprint-alfred-epic",
+  "dispatchId": "ALFRED-REV5-AUTHOR-20261006",
+  "attemptId": "attempt-1",
+  "packageId": "greenfield-0.7-remediation",
+  "actionId": "complete-and-integrate-approved-slices",
+  "revision": "design revision 5 (device switch, R7)",
+  "authoring": {
+    "inputCommits": ["9540f5f47", "bf6c691dd"],
+    "authoringCommits": ["0773a9b43", "27829cc6f"],
+    "correctionCommits": [
+      "6ac16e601", "3901ada88", "56b21d68d", "d3d8799ce", "272bf0029",
+      "1a14abaa8", "cca125b82", "a5b8cc836", "e582502ed", "251e411aa", "ca7a325b7"
+    ],
+    "route": "goldfish dispatches (goldfish-deep, goldfish-mechanic) under the Elephant; stage-0 Elephant commits for the PRD marker and the FIX5 completion (ca7a325b7)"
+  },
+  "review": {
+    "criticRounds": 4,
+    "finalRoundVerdict": "partial (no PASS); open items resolved by PO decisions 2026-10-07 #20-#26",
+    "furtherCritic": "suspended by PO decision 2026-10-07 (time pressure); the decision #20-#26 text (251e411aa, ca7a325b7) is not independently reviewed"
+  }
+}
