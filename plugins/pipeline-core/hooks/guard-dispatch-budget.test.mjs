@@ -1503,13 +1503,24 @@ for (const code of ["counter-lock-recovery-changed", "counter-lock-recovery-malf
   });
 }
 
-test("R7-11d-T3: counter-lock-recovery-raced (the catch-all for a dead-owner recovery exception) fails closed at once: one attempt, no sleep", () => {
+test("R7-11d-T3: counter-lock-recovery-failed (a genuine dead-owner recovery failure) fails closed at once: one attempt, no sleep", () => {
   r711RequireWaitContract();
-  const result = r711t3RunSync({ mode: "scripted-wait", lockPath: r711t3AbsentLockPath("raced"), script: ["counter-lock-recovery-raced"], repeatLast: true });
+  const result = r711t3RunSync({ mode: "scripted-wait", lockPath: r711t3AbsentLockPath("recovery-failed"), script: ["counter-lock-recovery-failed"], repeatLast: true });
   assert.equal(result.status, "rejected", JSON.stringify(result));
-  assert.equal(result.code, "counter-lock-recovery-raced", "refused with the single attempt's own code, not folded into a timeout");
-  assert.equal(result.attempts, 1, `a recovery exception must not be retried -- got ${result.attempts} attempts`);
+  assert.equal(result.code, "counter-lock-recovery-failed", "refused with the single attempt's own code, not folded into a timeout");
+  assert.equal(result.attempts, 1, `a genuine recovery failure must not be retried -- got ${result.attempts} attempts`);
   assert.equal(result.sleeps.length, 0, `no sleep before refusing -- got ${result.sleeps.length} sleeps`);
+});
+
+test("R7-11d-T5: counter-lock-recovery-raced is a retried benign race", () => {
+  const { bound } = r711RequireWaitContract();
+  const result = r711t3RunSync({ mode: "scripted-wait", lockPath: r711t3AbsentLockPath("raced-retry"), script: ["counter-lock-recovery-raced", "acquired"], repeatLast: false });
+  assert.notEqual(result.status, "rejected", `a benign recovery race must not be refused at once -- got ${JSON.stringify(result)}`);
+  assert.equal(result.status, "acquired", JSON.stringify(result));
+  assert.ok(result.attempts > 1, `the raced attempt must be retried -- got ${result.attempts} attempts`);
+  assert.equal(result.attempts, 2, "the raced attempt was retried once and the second was admitted");
+  assert.equal(result.sleeps.length, 1, "one sleep between the two attempts and none after the admission");
+  assert.ok(result.sleeps.reduce((sum, ms) => sum + ms, 0) <= bound, "the retry stayed inside the bound");
 });
 
 for (const code of ["counter-lock-changed", "counter-lock-recovery-busy"]) {
