@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -239,6 +239,139 @@ test("confirmed course reaches one unsigned final package through actual produce
     assert.equal(cliResult.implementationAuthority, false);
     assert.equal(JSON.parse(output.at(-1)).nextAction.kind, 'present-final-design-workflow-package-to-po');
     assert.equal(io.exitCode, 0);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------
+// R7-3b (Spec §22.3, "Classification (T5)"): the design-course producer writes
+// the package and the course and readiness artifacts it digests under the
+// tracked home `specs/<feature-id>/evidence/`, never the git-ignored root
+// `evidence/` (`/evidence/` is anchored in .gitignore). These cases are RED by
+// design until the producer is moved onto the tracked prefix.
+//
+// Not covered here: the fresh-clone half of R7-3b ("after a fresh clone of the
+// committed fixture the approval's digests verify"). This file has no reusable
+// fixture-repository helper (K3C005 builds its repository inline) and the
+// approval-digest path needs a real v2 package, so it is left to the suite that
+// owns the approval verifier.
+// ---------------------------------------------------------------------------
+const R73_FEATURE = "feature-x";
+const R73_TRACKED_HOME = `specs/${R73_FEATURE}/evidence/`;
+const R73_SOURCE_NAMES = ["input", "prd", "spec", "design", "traceability"];
+function r73Fixture() {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), "design-course-r73-")));
+  const current = { commit: "7".repeat(40), tree: "6".repeat(40) };
+  const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  mkdirSync(join(fixture, "docs"));
+  const contents = {}; const refs = {};
+  for (const name of R73_SOURCE_NAMES) {
+    const path = name === "input" ? "docs/design-input.md" : `docs/${name}.md`;
+    const bytes = Buffer.from(`${name} source\n`);
+    contents[path] = bytes; writeFileSync(join(fixture, path), bytes);
+    refs[name] = { path, sha256: sha256(bytes) };
+  }
+  // A path that a tracked home would hold is, by definition, NOT git-ignored:
+  // `git check-ignore --quiet` exits 1 and execFileSync throws.
+  const fakeGit = (_executable, args) => {
+    if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "--show-toplevel") return fixture;
+    if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "HEAD") return current.commit;
+    if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "HEAD^{tree}") return current.tree;
+    if (args[0] === "show") return contents[args[1].slice(current.commit.length + 1)];
+    if (args[0] === "check-ignore") throw Object.assign(new Error("path is not ignored"), { status: 1 });
+    throw new Error(`unexpected Git request: ${args.join(" ")}`);
+  };
+  return { fixture, current, refs, fakeGit, sha256 };
+}
+function r73FlagValue(argv, flag) { return argv[argv.indexOf(flag) + 1]; }
+
+test("R7-3b: the inspection's advisor command names a tracked output prefix under specs/<feature-id>/evidence/", async () => {
+  const { fixture, refs, fakeGit } = r73Fixture();
+  try {
+    const readState = () => ({ status: "ok", state: { activeFeature: { id: R73_FEATURE },
+      planSubmission: { featureId: R73_FEATURE, profile: "feature", planPath: refs.prd.path, planSha256: refs.prd.sha256,
+        specPath: refs.spec.path, specSha256: refs.spec.sha256 },
+      continuity: { queueHead: { dispatch: { dispatchId: "author-x" } } } } });
+    const dependencies = { readState, execFileSync: fakeGit };
+    const trackedPrefix = `specs/${R73_FEATURE}/evidence/design-course/claude`;
+    const inspected = await inspectDesignCourseSubmission({ root: fixture, runner: "claude", pluginRoot }, dependencies);
+    assert.equal(inspected.status, "advisor-ready", JSON.stringify(inspected));
+    assert.equal(inspected.nextAction.stage, "advisor");
+    assert.equal(r73FlagValue(inspected.nextAction.argv, "--output-prefix"), trackedPrefix);
+    const stdout = [];
+    const io = { stdout: { write: (value) => stdout.push(value) }, exitCode: 0 };
+    const cliResult = await main(["--inspect", "--root", fixture, "--runner", "claude"], io, dependencies);
+    assert.equal(cliResult.status, "advisor-ready", JSON.stringify(cliResult));
+    const emitted = JSON.parse(stdout.at(-1)).nextAction;
+    assert.equal(emitted.stage, "advisor");
+    assert.equal(r73FlagValue(emitted.argv, "--output-prefix"), trackedPrefix);
+    for (const argv of [inspected.nextAction.argv, emitted.argv]) {
+      assert.equal(argv.some((value) => value.startsWith("evidence/")), false,
+        "no emitted argument may point into the git-ignored root evidence/");
+    }
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+test("R7-3b: the --run-v2 course accepts and writes every digest-bound artifact under the tracked prefix", async () => {
+  const { fixture, current, refs, fakeGit, sha256 } = r73Fixture();
+  try {
+    const home = `specs/${R73_FEATURE}/evidence`;
+    const course = `${home}/design-course`;
+    mkdirSync(join(fixture, ...course.split("/")), { recursive: true });
+    const write = (path, value) => { const bytes = Buffer.from(value); writeFileSync(join(fixture, ...path.split("/")), bytes); return bytes; };
+    const initialBytes = write(`${course}/initial.json`, JSON.stringify({ featureId: R73_FEATURE, authoringDispatchId: "author-x",
+      initialCandidate: current, sources: refs }));
+    const failure = { schema: "pipeline.design-advisor-failure.v1", code: "native-initial-answer-provenance-unavailable",
+      childStarted: false, inputSubmitted: false, attemptCount: 0 };
+    const failureBytes = write(`${course}/failure.json`, JSON.stringify(failure));
+    const rationale = "The native Advisor route produced verified no-child evidence; request one final package review.";
+    write(`${course}/exception-rationale.txt`, rationale);
+    const advisor = { ok: false, status: "unavailable-pending-final-approval", code: failure.code, runner: "claude",
+      profile: "feature", route: { model: null, effort: null, sourceSha256: "c".repeat(64), candidateCommit: current.commit },
+      courseBinding: { courseId: "course-x" }, hostReceipt: null,
+      artifacts: { initial: { path: `${course}/initial.json`, sha256: sha256(initialBytes) },
+        failure: { path: `${course}/failure.json`, sha256: sha256(failureBytes) } }, implementationAuthority: false };
+    const paths = { outputPrefix: `${course}/claude`, preparation: `${course}/preparation.json`,
+      readiness: `${course}/readiness.json`, package: `${home}/design-workflow-package.json` };
+    const actions = [];
+    const dependencies = {
+      execFileSync: fakeGit, canonicalJson: JSON.stringify,
+      readPreparation: async () => ({ ok: true, advisorObservation: { candidate: current, sources: refs } }),
+      executeProducer: async (action) => {
+        actions.push(action);
+        return action.stage === "advisor" ? { status: "advisor-unavailable-no-child", producerResult: advisor }
+          : { status: "readiness-published", producerResult: { ok: true, code: "DESIGN-READINESS-RECEIPT-PUBLISHED",
+            runner: "claude", candidate: current, path: paths.readiness, dispatchId: "ready-x" } };
+      },
+      buildPackageV2: async (input) => ({ ok: true, code: "DWP2-PACKAGE-BUILT", packagePath: input.packagePath,
+        packageSha256: "e".repeat(64), candidate: current, packageRead: { implementationAuthority: false },
+        advisorStatus: "unavailable", advisorExceptionRequired: true }),
+      approvalModule: { createDesignWorkflowPackageApprovalRequest: () => ({ ok: true,
+        packageRead: { implementationAuthority: false, packageSha256: "e".repeat(64) }, request: { packageSha256: "e".repeat(64),
+          approvalIntent: { sha256: "f".repeat(64), value: { decision: "approve" } } } }) },
+    };
+    const argv = ["--run-v2", "--root", fixture, "--runner", "claude", "--feature-id", R73_FEATURE,
+      "--authoring-dispatch-id", "author-x", "--profile", "feature", "--output-prefix", paths.outputPrefix];
+    for (const name of R73_SOURCE_NAMES) argv.push("--source", name, refs[name].path, refs[name].sha256);
+    argv.push("--readiness-dispatch-id", "ready-x", "--queue-revision", "0", "--receipt", paths.readiness,
+      "--preparation", paths.preparation, "--package", paths.package,
+      "--exception-rationale", `${course}/exception-rationale.txt`, sha256(rationale), "--execute");
+    const io = { stdout: { write: () => {} }, exitCode: 0 };
+    const result = await main(argv, io, dependencies);
+    // A tracked path is not git-ignored; the course must publish into it anyway.
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.status, "final-po-review-ready");
+    assert.deepEqual(actions.map((action) => action.stage), ["advisor", "readiness"]);
+    assert.equal(io.exitCode, 0);
+    const advisorAction = actions[0]; const readinessAction = actions[1];
+    const bound = { advisorOutputPrefix: r73FlagValue(advisorAction.argv, "--output-prefix"),
+      readinessReceipt: r73FlagValue(readinessAction.argv, "--receipt"),
+      readinessPreparation: r73FlagValue(readinessAction.argv, "--advisor-preparation"),
+      publishedPreparation: result.preparation?.packagePath, package: result.packagePath };
+    for (const [label, path] of Object.entries(bound)) {
+      assert.ok(typeof path === "string" && path.startsWith(R73_TRACKED_HOME), `${label} must lie under ${R73_TRACKED_HOME}, got ${path}`);
+    }
+    assert.equal(existsSync(join(fixture, ...paths.preparation.split("/"))), true, "the preparation is published at its tracked path");
+    assert.equal(existsSync(join(fixture, "evidence")), false, "nothing is written under the git-ignored root evidence/");
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
 
