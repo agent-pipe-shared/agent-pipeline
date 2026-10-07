@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { closeSync, mkdtempSync, openSync, readFileSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -137,6 +137,89 @@ if (fixture !== "") {
       { id: "DS02", disposition: "pass" },
     ]);
     assert.deepEqual(observed.at(-1).counts, { pass: 1, fail: 1, skip: 0, todo: 0 });
+  });
+
+  const helperUrl = new URL("./test-case-completion.mjs", import.meta.url).href;
+
+  // Runs a tiny completion-fd suite as a plain single file. The child inherits no descriptor 3,
+  // which is exactly the state `node <file>` / `node --test <file>` leave a suite in outside the
+  // Verify runner. Verify signals itself to a suite child through PIPELINE_VERIFY_CASE_COMPLETION_FD
+  // (set by verify-journal.mjs next to the descriptor it opens); `verifySignal` toggles that variable.
+  function runPlainFixtureSuite({ verifySignal }) {
+    const directory = mkdtempSync(join(tmpdir(), "pipeline-tcc-"));
+    try {
+      const marks = join(directory, "case-marks.txt");
+      const registration = join(directory, "registration-error.txt");
+      const suite = join(directory, "plain-suite.mjs");
+      writeFileSync(suite, [
+        'import { appendFileSync, writeFileSync } from "node:fs";',
+        `import { registerTestCaseCompletion } from ${JSON.stringify(helperUrl)};`,
+        `const mark = (id) => appendFileSync(${JSON.stringify(marks)}, id + "\\n");`,
+        "try {",
+        "  registerTestCaseCompletion({",
+        "    fd: 3,",
+        "    maxBytes: 16_384,",
+        "    cases: [",
+        '      { id: "PR01", name: "first case passes", run: () => { mark("PR01"); } },',
+        '      { id: "PR02", name: "second case is skipped", mode: "skip", run: () => { throw new Error("skip callback must not run"); } },',
+        '      { id: "PR03", name: "last case passes", run: () => { mark("PR03"); } },',
+        "    ],",
+        "  });",
+        "} catch (error) {",
+        `  writeFileSync(${JSON.stringify(registration)}, String(error?.code));`,
+        "  throw error;",
+        "}",
+        "",
+      ].join("\n"));
+      const env = { ...process.env };
+      for (const name of [
+        "NODE_TEST_CONTEXT",
+        "PIPELINE_TCC_FIXTURE",
+        "PIPELINE_VERIFY_CASE_COMPLETION_FD",
+        "PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES",
+      ]) delete env[name];
+      if (verifySignal) {
+        env.PIPELINE_VERIFY_CASE_COMPLETION_FD = "3";
+        env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES = "16384";
+      }
+      const child = spawnSync(process.execPath, [suite], {
+        encoding: "utf8",
+        cwd: directory,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 30_000,
+      });
+      const read = (path) => {
+        try { return readFileSync(path, "utf8"); } catch { return null; }
+      };
+      return {
+        status: child.status,
+        stdout: child.stdout ?? "",
+        stderr: child.stderr ?? "",
+        marks: read(marks),
+        registrationError: read(registration),
+      };
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+
+  test("outside Verify a completion suite runs as a plain single file and reports its cases", () => {
+    const run = runPlainFixtureSuite({ verifySignal: false });
+    assert.equal(run.registrationError, null, `registration must not throw without the Verify signal: ${run.stderr}`);
+    assert.equal(run.status, 0, `a plain single-file run must exit 0: ${run.stderr}`);
+    assert.equal(run.marks, "PR01\nPR03\n", "both runnable cases must execute and the skipped case must not");
+    for (const id of ["PR01", "PR02", "PR03"]) {
+      assert.match(run.stdout, new RegExp(id, "u"), `the per-case result for ${id} must be reported`);
+    }
+  });
+
+  test("inside Verify an unwritable completion descriptor still fails closed with TCC-FD-WRITE", () => {
+    const run = runPlainFixtureSuite({ verifySignal: true });
+    assert.notEqual(run.status, 0, "the suite must die when Verify promised a descriptor that is not writable");
+    assert.equal(run.registrationError, "TCC-FD-WRITE");
+    assert.match(run.stderr, /TCC-FD-WRITE/u);
+    assert.equal(run.marks, null, "no case may run once registration failed closed");
   });
 
   test("preflights the complete bounded stream before declaration and emits within the accepted cap", () => {
