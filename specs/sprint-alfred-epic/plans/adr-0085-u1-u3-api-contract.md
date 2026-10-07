@@ -158,7 +158,8 @@ Source drift: canonical sources differ → `DRR-SOURCE-DRIFT`, `nextRound` 2 aft
 
 Refusal codes, checked in this order: `DRR-SIZE` (0 or > 65536 bytes), `DRR-JSON`, `DRR-NONCANONICAL`, `DRR-SHAPE`, `DRR-PATH`
 (SafePath or report-path collision), `DRR-SOURCES` (companions unsorted/duplicated/> 64/overlapping prd or spec; prd = spec),
-`DRR-FINDING-IDS`, `DRR-VERDICT`, `DRR-KIND-ROUND`, `DRR-ROUND-EXCEEDED` (round > 2 at parse; delta on delta), `DRR-DELTA-CHAIN`,
+`DRR-FINDING-IDS`, `DRR-VERDICT`, `DRR-ROUND-EXCEEDED` (round > 2 at parse — checked before KIND-ROUND, correction 2026-10-07 per
+the U2 tests and the U1/U2 Critic; delta on delta), `DRR-KIND-ROUND`, `DRR-DELTA-CHAIN`,
 `DRR-DELTA-UNCHANGED`, `DRR-SOURCE-DRIFT`.
 
 ## 4. U3 — `design-approval-binding.mjs`

@@ -1,4 +1,8 @@
-# R7-6 / decision AA — several PO keys per repository: analysis and proposed §22.6 delta
+# R7-6 / decision AA — several PO keys per repository: analysis and §22.6 delta
+
+**Status:** delta accepted by PO decisions AC (env tier above the default), AD (second anchor only via the signed GS-2 change)
+and AE (new probe class `probe-environment-unavailable`), 2026-10-07; it is the binding §22.6 delta for the candidate (chat
+decision, recorded like decision I; `spec.md` itself is not edited so the approved Spec digest stays intact).
 
 Read-only design pass, 2026-10-07 (design-tier model). Decision AA in [`po-decisions-2026-10-07.md`](po-decisions-2026-10-07.md).
 Source references are to `plugins/pipeline-core/` at this date; no tests were run.
