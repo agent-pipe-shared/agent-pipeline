@@ -55,10 +55,29 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, outside, parseHumanArgs, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, runForkDispositionApproval, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
 import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+
+/**
+ * R7-6-T9 safety audit (decision AC): `setup --directory` and `set-po-key-directory` WRITE the
+ * machine-wide plane at `<home>/.agent-pipeline/machine.json`, so no case in this file may reach the
+ * real home. Every `runHumanApproval` / `parseHumanArgs` call below that injects no `homedirFn`
+ * (all the `setup --directory` cases that used to run against the host's real home among them)
+ * therefore gets a fixture home OUTSIDE every repository (the sign-intent probe needs one), emptied
+ * before each call so no plane leaks from one case into another. A case that injects its own
+ * `homedirFn` (every multi-step case, to keep its plane between calls) is passed through unchanged.
+ */
+const DEFAULT_FIXTURE_HOME = mkdtempSync(join(tmpdir(), "po-human-approval-default-home-"));
+process.on("exit", () => rmSync(DEFAULT_FIXTURE_HOME, { recursive: true, force: true }));
+function withFixtureHome(dependencies = {}) {
+  if (dependencies.homedirFn !== undefined) return dependencies;
+  rmSync(join(DEFAULT_FIXTURE_HOME, ".agent-pipeline"), { recursive: true, force: true });
+  return { ...dependencies, homedirFn: () => DEFAULT_FIXTURE_HOME };
+}
+const runHumanApproval = (argv, dependencies) => runHumanApprovalUnguarded(argv, withFixtureHome(dependencies));
+const parseHumanArgs = (argv, dependencies) => parseHumanArgsUnguarded(argv, withFixtureHome(dependencies));
 
 function nestedDwpSigningRequest() {
   const packageSha256 = "d".repeat(64);
