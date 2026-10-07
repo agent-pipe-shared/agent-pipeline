@@ -1184,6 +1184,26 @@ const Q12AF_CONTROL_DATA_HEREDOC_TABLE = [
 ];
 recordQ12Table("Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE", false, Q12AF_CONTROL_DATA_HEREDOC_TABLE);
 
+// ---- commandIsGitPush: vim/vi/ex ex-mode and busybox shell applets fed a heredoc (Q12-T11) ----
+// Test-only pin, written BEFORE any classifier change (QG-04); candidate rows are expected RED, controls GREEN. Backlog item:
+// backlog/items/2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.md.
+// Every command text below is DATA: it is handed to `commandIsGitPush` and never executed. Case ids start with Q12-VB.
+const Q12VB_VIM_BUSYBOX_TABLE = [
+  ["vim -es <<EOF\n!git push origin main\nEOF", "vim -es runs in ex mode reading commands from the here-document; the ! command runs git push origin main in a shell"],
+  ["vi -e <<EOF\n!git push origin main\nEOF", "vi -e runs in ex mode reading commands from the here-document; the ! command runs git push origin main in a shell"],
+  ["ex -s <<EOF\n!git push origin main\nEOF", "ex -s reads editor commands from the here-document; the ! command runs git push origin main in a shell"],
+  ["vim -E -s <<EOF\n!git push origin main\nEOF", "vim -E -s runs in ex mode silently reading commands from the here-document; the ! command runs git push origin main"],
+  ["busybox sh <<EOF\ngit push origin main\nEOF", "busybox sh is the shell applet reading the here-document as commands: it runs git push origin main"],
+  ["busybox ash <<'EOF'\ngit push origin main\nEOF", "busybox ash is a shell applet reading the here-document as commands: it runs git push origin main"],
+];
+recordQ12Table("Q12-VB: VIM-BUSYBOX-CANDIDATE", true, Q12VB_VIM_BUSYBOX_TABLE);
+
+const Q12VB_CONTROL_TABLE = [
+  ["vim -es <<EOF\n:wq\nEOF", "vim -es reads ex commands from the here-document; :wq only writes and quits, nothing runs git"],
+  ["busybox ls <<EOF\ngit push origin main\nEOF", "busybox ls is not a shell applet: the here-document is only unused standard input, nothing runs git push"],
+];
+recordQ12Table("Q12-VB: CONTROL-NOT-CANDIDATE", false, Q12VB_CONTROL_TABLE);
+
 // ---- commandIsGitPush: a push that follows a heredoc opener on the same line (Q12-T7) ----
 // Test-only pin, written BEFORE any classifier change (QG-04); at the commit that adds it several rows are expected RED, and
 // the per-row state is recorded in the evidence of the dispatch that added it. Contract: PO decisions X and AF,
