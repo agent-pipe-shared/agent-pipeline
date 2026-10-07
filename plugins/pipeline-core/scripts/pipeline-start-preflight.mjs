@@ -1845,9 +1845,34 @@ export function runBootstrapWorktreeSweep({ rootDir = process.cwd(), deps = {} }
   }
 }
 
-export function main() {
+/**
+ * Spec 22.7 / R7-7c: the environment readiness report is carried beside the typed preflight
+ * envelope as a top-level key of the one compact stdout line, NOT as a field of
+ * `observePipelineStartPreflight`'s result (that key set and its measured payload budget are
+ * pinned). Read-only and never decides the exit code; a failure to produce it is reported as
+ * a typed unavailable marker instead of being swallowed.
+ */
+async function observeEnvironmentReadiness() {
+  try {
+    const { runEnvironmentReadinessReport } = await import("./toolchain-preflight.mjs");
+    const report = await runEnvironmentReadinessReport({ rootDir: process.cwd() });
+    if (report !== null && typeof report === "object" && Array.isArray(report.findings)) return report;
+  } catch {
+    // Reported below as the typed unavailable marker.
+  }
+  return { ok: false, code: "ENVIRONMENT-READINESS-UNAVAILABLE", findings: [] };
+}
+
+/**
+ * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
+ * called with no options, writes the same one compact line. `environmentReadiness` is an
+ * optional seam the async process entry (`runEntry`, below) fills; an exported function must
+ * not become async to carry an observation only the process entry needs.
+ */
+export function main(options = {}) {
+  const environmentReadiness = options?.environmentReadiness;
   const result = observePipelineStartPreflight();
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  process.stdout.write(`${JSON.stringify(environmentReadiness === undefined ? result : { ...result, environmentReadiness })}\n`);
   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
   // Antigravity-only: the structured field above already carries this, but a
   // human watching the terminal reads stderr, not a JSON blob -- so the same
@@ -1881,4 +1906,19 @@ export function main() {
   return pipelineStartPreflightExitCode(result);
 }
 
-if (isDirectInvocation(import.meta.url)) process.exitCode = main();
+/** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */
+async function runEntry() {
+  const environmentReadiness = await observeEnvironmentReadiness();
+  return main({ environmentReadiness });
+}
+
+if (isDirectInvocation(import.meta.url)) {
+  runEntry().then(
+    (code) => { process.exitCode = code; },
+    (error) => {
+      // Fail closed: an entry that could not complete is a non-zero exit, never a silent success.
+      try { process.stderr.write(`PIPELINE-START-PREFLIGHT-FAILED: ${error?.code ?? error?.name ?? "error"}\n`); } catch { /* stderr unavailable */ }
+      process.exitCode = 1;
+    },
+  );
+}

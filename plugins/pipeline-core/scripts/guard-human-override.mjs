@@ -121,6 +121,52 @@ function copySafeActionText(label, action, placeholderValues = [], variableBindi
   }).text;
 }
 
+// Spec 22.7 / R7-7c: the ceremony start blocks only on the readiness findings it needs.
+const READINESS_GATING_FINDING_IDS = Object.freeze(["signing-toolchain", "po-key-directory", "trust-anchor-match"]);
+const READINESS_UNAVAILABLE = Object.freeze({ ok: false, code: "ENVIRONMENT-READINESS-UNAVAILABLE", findings: Object.freeze([]) });
+
+/** One human-readable string for a finding's repair: an attended prerequisite's summary, or the argv of an agent action. */
+function readinessRepairText(repair) {
+  if (typeof repair === "string") return repair.length > 0 ? repair : null;
+  if (repair === null || typeof repair !== "object" || Array.isArray(repair)) return null;
+  if (typeof repair.summary === "string" && repair.summary.length > 0) return repair.summary;
+  if (typeof repair.prerequisite === "string" && repair.prerequisite.length > 0) return repair.prerequisite;
+  if (typeof repair.executable === "string" && repair.executable.length > 0 && Array.isArray(repair.argv)) {
+    return [repair.executable, ...repair.argv.filter((arg) => typeof arg === "string")].join(" ");
+  }
+  return null;
+}
+
+/** Which of the findings this ceremony needs are missing or not ok, and the repairs those findings carry. */
+function ceremonyReadinessBlock(report) {
+  const findings = report !== null && typeof report === "object" && Array.isArray(report.findings) ? report.findings : [];
+  const blockedBy = [];
+  const repairs = [];
+  for (const id of READINESS_GATING_FINDING_IDS) {
+    const matches = findings.filter((finding) => finding !== null && typeof finding === "object" && finding.findingId === id);
+    if (matches.length > 0 && matches.every((finding) => finding.status === "ok")) continue;
+    blockedBy.push(id);
+    for (const finding of matches) {
+      const text = readinessRepairText(finding.repair);
+      if (text !== null) repairs.push(text);
+    }
+  }
+  return { blockedBy, repairs };
+}
+
+/** The process-entry observation of the environment readiness report for one repository; never throws. */
+async function observeEnvironmentReadiness(rest) {
+  try {
+    const parsed = flags(rest);
+    if (!parsed || typeof parsed.repo !== "string") return READINESS_UNAVAILABLE;
+    const { runEnvironmentReadinessReport } = await import("./toolchain-preflight.mjs");
+    const report = await runEnvironmentReadinessReport({ rootDir: parsed.repo });
+    return report !== null && typeof report === "object" && Array.isArray(report.findings) ? report : READINESS_UNAVAILABLE;
+  } catch {
+    return READINESS_UNAVAILABLE;
+  }
+}
+
 /**
  * Backward-compatible `render-copy-safe` entry point. Default hook denials now
  * use the same shared argv-native renderer directly; this read-only command
@@ -399,6 +445,19 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         || typeof parsed.repo !== "string"
         || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
       if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      // Spec 22.7 / R7-7c: the environment readiness report is an optional seam (the process entry
+      // always supplies it). When present, a missing or non-ok finding this ceremony needs blocks
+      // BEFORE the library call, so no ceremony material is built and no window starts.
+      const hasReadiness = Object.hasOwn(options, "environmentReadiness");
+      const readiness = hasReadiness ? (options.environmentReadiness ?? READINESS_UNAVAILABLE) : null;
+      if (hasReadiness) {
+        const { blockedBy, repairs } = ceremonyReadinessBlock(readiness);
+        if (blockedBy.length > 0) {
+          write(`${JSON.stringify({ status: "blocked", blockedBy, repairs, environmentReadiness: readiness })}\n`);
+          writeError(`prepare-for-signature is blocked: ${blockedBy.join(", ")} not ready. Nothing was prepared and no window was started; apply the repairs listed in the output, then run it again.\n`);
+          return 2;
+        }
+      }
       const prepared = prepareHumanGuardOverrideForSignature({
         rootDir: parsed.repo,
         pluginRoot: PLUGIN_ROOT,
@@ -407,7 +466,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         humanApprovalScriptPath: PO_HUMAN_APPROVAL_SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
       });
-      const output = prepared;
+      const output = hasReadiness ? { ...prepared, environmentReadiness: readiness } : prepared;
       const signIntent = copySafeActionText(
         "sign-intent",
         prepared.signIntentCommand,
@@ -417,7 +476,9 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         prepared.authorizeBySignatureCommand,
         ["<external-proof.json>"],
       );
-      write(`${JSON.stringify(output, null, 2)}\n`);
+      // With the report attached the document is one compact line (the shape the readiness
+      // report is carried in at every entry point); without it, the existing pretty form.
+      write(hasReadiness ? `${JSON.stringify(output)}\n` : `${JSON.stringify(output, null, 2)}\n`);
       writeError(`${signIntent}\n\n${authorizeBySignature}\n`);
       return 0;
     }
@@ -519,6 +580,21 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   }
 }
 
+/** Process entry: `prepare-for-signature` carries the environment readiness report; every other command is unchanged. */
+async function runCli(argv = process.argv.slice(2)) {
+  const options = argv[0] === "prepare-for-signature"
+    ? { environmentReadiness: await observeEnvironmentReadiness(argv.slice(1)) }
+    : {};
+  return main(argv, {}, options);
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === SCRIPT) {
-  process.exitCode = main();
+  runCli().then(
+    (code) => { process.exitCode = code; },
+    (error) => {
+      // Fail closed: nothing was prepared if the entry itself could not complete.
+      try { process.stderr.write(`HGO-USAGE: ${error?.message ?? "the command could not complete"}\n`); } catch { /* stderr unavailable */ }
+      process.exitCode = 2;
+    },
+  );
 }
