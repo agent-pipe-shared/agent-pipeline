@@ -1284,6 +1284,146 @@ check("FLAPW an in-flight atomic-write temporary file holding partial bytes is n
   assert.equal(archiveApi.classifyActiveSessionDescriptors(primary, {}).foreign.length, 1);
 });
 
+// R7-1a (Spec section 22.1, ALFRED R7-1A-T): Git for Windows 2.56.0.windows.1 rejects the `NUL` spelling of the
+// null device (upstream git-for-windows/git#6449) and accepts `/dev/null` on every platform. RED BY DESIGN until
+// R7-1A-F lands one shared `/dev/null` constant: the behavioural case fails on win32 today, the ratchet fails everywhere.
+import { chmodSync } from "node:fs";
+import { delimiter, relative, sep } from "node:path";
+
+const R71A_STUB_TOKEN = "git version 2.99.0.r7-1a-stub";
+// The stub mimics the regression: exit 128 with git's own message for any NUL-like null-device value in
+// GIT_CONFIG_GLOBAL / GIT_CONFIG_SYSTEM or in a `-c` null-device config value; otherwise one fixed output line.
+const R71A_STUB_SOURCE = String.raw`const nulLike = (value) => typeof value === "string" && /^(?:[\\/]{2}\.[\\/])?nul$/i.test(value.trim());
+const nullValueKeys = ["core.hookspath", "core.attributesfile", "core.excludesfile", "core.askpass"];
+const offenders = [];
+for (const key of ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"]) if (nulLike(process.env[key])) offenders.push(process.env[key]);
+const args = process.argv.slice(2);
+for (let index = 0; index < args.length - 1; index += 1) {
+  if (args[index] !== "-c") continue;
+  const separator = args[index + 1].indexOf("=");
+  if (separator > 0 && nullValueKeys.includes(args[index + 1].slice(0, separator).toLowerCase()) && nulLike(args[index + 1].slice(separator + 1))) offenders.push(args[index + 1].slice(separator + 1));
+}
+if (offenders.length > 0) {
+  process.stderr.write("fatal: unable to access '" + offenders[0] + "': Invalid argument\n");
+  process.exit(128);
+}
+process.stdout.write(` + JSON.stringify(`${R71A_STUB_TOKEN}\n`) + `);\n`;
+
+function r71aInstallGitStub() {
+  const dir = mkdtempSync(join(tmpdir(), "r7-1a-git-stub-"));
+  fixtureRoots.push(dir);
+  const script = join(dir, "git-stub.mjs");
+  writeFileSync(script, R71A_STUB_SOURCE);
+  writeFileSync(join(dir, "git"), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`);
+  chmodSync(join(dir, "git"), 0o755);
+  writeFileSync(join(dir, "git.cmd"), `@"${process.execPath}" "${script}" %*\r\n`);
+  return { dir, script };
+}
+
+// The stub directory is first on the CHILD's PATH only (the env object handed to runGit); the test process's own PATH is untouched.
+function r71aChildEnv(dir) {
+  const env = {};
+  for (const [key, value] of Object.entries(process.env)) if (key.toLowerCase() !== "path") env[key] = value;
+  env.PATH = [dir, process.env.PATH ?? ""].filter(Boolean).join(delimiter);
+  return env;
+}
+
+// POSIX: runGit's default spawn resolves the `git` shim through the child's PATH. win32: spawnSync(shell:false) only
+// searches `.com`/`.exe` (never `git.cmd`) and Node refuses to run a .cmd without a shell, so the PATH lookup is done
+// here instead -- the shim directory must be the first PATH entry holding a git.cmd -- and the same Node stub script
+// runs. Either way the child receives exactly the environment runGit builds, which is what this case pins.
+function r71aPlatformSpawn(dir, script) {
+  if (process.platform !== "win32") return undefined;
+  return (command, args, options) => {
+    assert.equal(command, "git");
+    const firstShim = String(options.env.PATH).split(delimiter).find((entry) => entry && existsSync(join(entry, "git.cmd")));
+    assert.equal(firstShim, dir, "the stub directory must be first on the child's PATH");
+    return spawnSync(process.execPath, [script, ...args], options);
+  };
+}
+
+check("R7-1a behavioural (RED on win32 today; may PASS on POSIX, which already uses /dev/null): runGit succeeds against a git that rejects NUL-like null devices", () => {
+  const { dir, script } = r71aInstallGitStub();
+  const direct = (value) => spawnSync(process.execPath, [script, "--version"], {
+    encoding: "utf8",
+    shell: false,
+    env: { ...process.env, GIT_CONFIG_GLOBAL: value },
+  });
+  // Fixture self-check first, so a red result below is attributable to the production environment, not to the stub.
+  const rejected = direct("NUL");
+  assert.equal(rejected.status, 128, "fixture self-check: the stub must exit 128 for GIT_CONFIG_GLOBAL=NUL");
+  assert.match(rejected.stderr, /unable to access 'NUL': Invalid argument/);
+  assert.equal(direct("/dev/null").status, 0, "fixture self-check: the stub must accept GIT_CONFIG_GLOBAL=/dev/null");
+  const result = runGit(dir, ["--version"], { env: r71aChildEnv(dir), spawn: r71aPlatformSpawn(dir, script) });
+  assert.equal(result.stdout, `${R71A_STUB_TOKEN}\n`, "the stub, not another git, must have answered");
+});
+
+const R71A_GIT_NULL_KEYS = [
+  "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_ASKPASS", "SSH_ASKPASS",
+  "core.hooksPath", "core.attributesFile", "core.excludesFile", "core.askPass",
+];
+const R71A_NUL_LITERAL = /(["'`])NUL\1/i;
+const R71A_NUL_EMBEDDED = /\bcore\.(?:hooksPath|attributesFile|excludesFile|askPass)=NUL\b/i;
+
+// A line offends when it holds a quoted NUL literal (or an embedded `core.<key>=NUL` -c value) and names one of the git
+// null-device keys on the same line -- or, for a wrapped ternary continuation line (`? "NUL"` / `: "NUL"`), within
+// the two lines above it. Comment lines and text after a `//` are ignored.
+function r71aNulOffences(source) {
+  const lines = source.split(/\r?\n/);
+  const hits = [];
+  lines.forEach((text, index) => {
+    if (/^\s*(?:\/\/|\/\*|\*)/.test(text)) return;
+    const match = R71A_NUL_LITERAL.exec(text) ?? R71A_NUL_EMBEDDED.exec(text);
+    if (!match || text.slice(0, match.index).includes("//")) return;
+    const continuation = /^\s*(?:\?\?|\|\||\?|:)/.test(text);
+    const context = [text, ...(continuation ? lines.slice(Math.max(0, index - 2), index) : [])].join("\n");
+    if (R71A_GIT_NULL_KEYS.some((key) => context.includes(key))) hits.push({ line: index + 1, text });
+  });
+  return hits;
+}
+
+function r71aProductionModules(root) {
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules") continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile() && entry.name.endsWith(".mjs") && !entry.name.endsWith(".test.mjs")) found.push(full);
+    }
+  };
+  walk(root);
+  return found.sort();
+}
+
+check("R7-1a ratchet detector self-check: flags a reintroduced win32 NUL literal for a git value, ignores look-alikes", () => {
+  assert.equal(r71aNulOffences('      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",').length, 1);
+  assert.equal(r71aNulOffences("env.SSH_ASKPASS = 'NUL';").length, 1);
+  assert.equal(r71aNulOffences('const args = ["-c", "core.hooksPath=NUL", "status"];').length, 1);
+  assert.equal(r71aNulOffences(['GIT_ASKPASS:', '  process.platform === "win32"', '    ? "NUL"', '    : "/bin/false",'].join("\n")).length, 1);
+  assert.equal(r71aNulOffences('      GIT_CONFIG_GLOBAL: "/dev/null",').length, 0);
+  assert.equal(r71aNulOffences('const placeholder = "NUL";').length, 0);
+  assert.equal(r71aNulOffences('const kind = "NULL"; // GIT_CONFIG_GLOBAL').length, 0);
+  assert.equal(r71aNulOffences('// GIT_CONFIG_GLOBAL must never be "NUL" on win32').length, 0);
+  assert.equal(r71aNulOffences('GIT_CONFIG_NOSYSTEM: "1",\n"x" ? y : "NUL"').length, 0);
+});
+
+check("R7-1a ratchet (RED today: 9 win32 sites): no production module assigns a \"NUL\" literal to a git environment or -c value", () => {
+  const libDir = dirname(fileURLToPath(import.meta.url));
+  const repoRoot = resolve(libDir, "..", "..", "..");
+  const files = [...r71aProductionModules(libDir), ...r71aProductionModules(resolve(libDir, "..", "scripts"))];
+  assert.ok(files.length > 20, `ratchet scanned only ${files.length} production modules; the scan roots are wrong`);
+  const offences = [];
+  for (const file of files) {
+    for (const hit of r71aNulOffences(readFileSync(file, "utf8"))) {
+      offences.push(`${relative(repoRoot, file).split(sep).join("/")}:${hit.line}: ${hit.text.trim().slice(0, 140)}`);
+    }
+  }
+  if (offences.length > 0) {
+    assert.fail(`${offences.length} git null-device site(s) still spell "NUL" (Git for Windows 2.56.0.windows.1 rejects it; use the shared "/dev/null" constant):\n  ${offences.join("\n  ")}`);
+  }
+});
+
 for (const root of fixtureRoots) rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);
