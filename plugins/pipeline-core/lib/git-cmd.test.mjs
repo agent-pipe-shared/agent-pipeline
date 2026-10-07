@@ -1101,7 +1101,7 @@ const Q12C_CONTROL_DATA_HEREDOC_TABLE = [
 ];
 recordQ12Table("Q12-C: CONTROL-DATA-HEREDOC-NOT-CANDIDATE", false, Q12C_CONTROL_DATA_HEREDOC_TABLE);
 
-// ---- Summary------------------------------------------------------------------------------
+// ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
 if (failures.length > 0) {
