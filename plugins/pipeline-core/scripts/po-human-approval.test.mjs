@@ -2917,19 +2917,25 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
  * PIPELINE_PO_APPROVAL_DIRECTORY, then the "directory is required" error.
  * ------------------------------------------------------------------ */
 
-test("AC-11: the machine plane's poKeyDirectory resolves the directory when --directory is absent, and wins over the environment variable", () => {
+// Realigned to PO decision AC (2026-10-07, specs/sprint-alfred-epic/plans/r7-6-multi-key-aa.md): the environment variable
+// is the per-terminal selection of a non-default key and now wins over the machine plane; the plane resolves without it.
+test("AC-11: PIPELINE_PO_APPROVAL_DIRECTORY wins over the machine plane's poKeyDirectory when --directory is absent; the plane resolves the directory only when the variable is unset", () => {
   const dirs = fixtureDirs();
+  const envDirectory = mkdtempSync(join(tmpdir(), "po-env-wins-"));
   const home = machinePlaneHomeFixture(dirs.directory);
   try {
-    const parsed = withEnvDirectory("/should/never/be/read", () => parseHumanArgs(
-      ["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"],
-      { homedirFn: () => home },
-    ));
-    assert.equal(parsed.error, undefined);
-    assert.equal(parsed.directory, dirs.directory);
-    assert.equal(parsed.directorySource, "machine-plane");
+    const argv = ["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"];
+    const viaEnv = withEnvDirectory(envDirectory, () => parseHumanArgs(argv, { homedirFn: () => home }));
+    assert.equal(viaEnv.error, undefined);
+    assert.equal(viaEnv.directory, envDirectory, "decision AC: the environment variable beats the machine plane");
+    assert.equal(viaEnv.directorySource, "environment");
+    const viaPlane = withEnvDirectory(undefined, () => parseHumanArgs(argv, { homedirFn: () => home }));
+    assert.equal(viaPlane.error, undefined);
+    assert.equal(viaPlane.directory, dirs.directory);
+    assert.equal(viaPlane.directorySource, "machine-plane");
   } finally {
     cleanup(dirs);
+    rmSync(envDirectory, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   }
 });
@@ -2953,18 +2959,26 @@ test("AC-11/AC-13: an explicit --directory still wins over a present, valid mach
   }
 });
 
-test("AC-12: an invalid machine plane fails closed, naming the plane as the cause, and does NOT fall through to the environment variable", () => {
+// Realigned to PO decision AC (2026-10-07): the plane is consulted only when no higher tier resolves, so an invalid plane
+// fails closed there, while PIPELINE_PO_APPROVAL_DIRECTORY or --directory resolves without consulting it.
+test("AC-12: an invalid machine plane fails closed, naming the plane as the cause, when no higher tier resolves; PIPELINE_PO_APPROVAL_DIRECTORY or --directory resolves without consulting it", () => {
   const home = noMachinePlaneHomeFixture();
   try {
     mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
     writeFileSync(join(home, ".agent-pipeline", "machine.json"), "{ not valid json");
-    const parsed = withEnvDirectory("/tmp/po-podir1-env-dir-should-not-be-used", () => parseHumanArgs(
-      ["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"],
-      { homedirFn: () => home },
-    ));
+    const argv = ["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"];
+    const parsed = withEnvDirectory(undefined, () => parseHumanArgs(argv, { homedirFn: () => home }));
     assert.match(parsed.error, /machine-scoped configuration plane is invalid/u);
     assert.match(parsed.error, /MP-MALFORMED/u);
-    assert.equal(parsed.error.includes("/tmp/po-podir1-env-dir-should-not-be-used"), false, "an invalid plane must never silently fall through to the environment variable");
+    assert.equal(parsed.directory, undefined, "nothing resolves from an invalid plane");
+    const viaEnv = withEnvDirectory("/tmp/po-podir1-env-dir", () => parseHumanArgs(argv, { homedirFn: () => home }));
+    assert.equal(viaEnv.error, undefined, "decision AC: the environment variable resolves without consulting the invalid plane");
+    assert.equal(viaEnv.directory, "/tmp/po-podir1-env-dir");
+    assert.equal(viaEnv.directorySource, "environment");
+    const viaFlag = withEnvDirectory(undefined, () => parseHumanArgs([...argv, "--directory", "/tmp/po-podir1-flag-dir"], { homedirFn: () => home }));
+    assert.equal(viaFlag.error, undefined, "an explicit --directory resolves without consulting the invalid plane");
+    assert.equal(viaFlag.directory, "/tmp/po-podir1-flag-dir");
+    assert.equal(viaFlag.directorySource, "flag");
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
