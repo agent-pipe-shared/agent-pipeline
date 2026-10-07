@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync, unlinkSync, symlinkSync, statSync }  from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -146,7 +146,11 @@ function freshRepo(prefix, { commitInitial = true, pipelineEnrollment = true } =
       schema: "pipeline.governance-positive-proof.v1",
       root: dir,
       rootIdentity: {dev: String(rootStat.dev), ino: String(rootStat.ino)},
-      commonPath: commonDir,
+      // The witness contract (governance-scope.mjs readPositiveProof: `commonPath === resolve(commonPath)`)
+      // is the platform-native resolved form. `git rev-parse --path-format=absolute` prints a drive-letter
+      // path with forward slashes on win32, so the raw `commonDir` is not that form there; resolve() is the
+      // identity on POSIX, so the assertion is unchanged on POSIX.
+      commonPath: resolve(commonDir),
       commonIdentity: {dev: String(commonStat.dev), ino: String(commonStat.ino)},
       scopeKey: active.scopeKey,
       by: "disposable-precommit-fixture",
