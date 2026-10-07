@@ -2340,6 +2340,24 @@ Contract:
   PO's key. The signing spawn and the probe below use one spawn helper whose
   executable is the constant `openssl`; it has no executable parameter, so no
   code path can hand it another one (R7-6e).
+- **Neither spawn can start an executable from the working directory or from
+  any repository.** On win32 a bare-name spawn can resolve the name in the
+  current directory before the PATH, so a file named `openssl.exe` or
+  `openssl.com` in the directory the PO signs from would receive the PO's key
+  path and passphrase prompt (defect record:
+  `backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md`).
+  The spawn helper therefore (i) runs both spawns with an explicit working
+  directory outside every repository working tree, never the process's
+  inherited one: the PO key directory for the signing spawn (it already
+  receives the key path there) and the OS user's home directory, a directory the
+  Pipeline does not write, for the probe (which passes no key path to any
+  process); and (ii) on win32 sets `NoDefaultCurrentDirectoryInExePath` in the
+  child environment, so the bare-name lookup skips the current directory.
+  Neither measure selects an executable: the name stays the constant `openssl`
+  and the PATH of the PO's signing terminal stays the only source. The ceremony
+  hand-over text also tells the PO to run `sign-intent` from a neutral
+  directory outside every repository (defence in depth for an install that
+  predates this fix).
 - **Decision #18 is delivered as detection and a PO-applied repair.** PO
   decision 2026-10-06 #18 (`design-input.md`) asks for the signing toolchain to
   be checked before a ceremony and "resolved by the Pipeline itself". R7-6
@@ -2461,7 +2479,17 @@ dialects, in the source checkout and in the consumer-layout fixture):
   directory, none of them on the PATH, are never started in any step, and an
   agent attempt to set a signing executable through `set-po-key-directory` or
   any other catalogued verb is refused with a typed code and leaves state
-  byte-identical.
+  byte-identical. The static scan stays. A further dynamic case (working-directory
+  lookup, defect record
+  `backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md`)
+  places decoy `openssl.exe` and `openssl.com` (win32) and an executable
+  `openssl` (POSIX) in the repository root and in the spawn's working
+  directory, runs `sign-intent` and the probe from the repository root with the
+  real PATH lookup, and asserts that no decoy starts and that on win32 the child
+  environment carried `NoDefaultCurrentDirectoryInExePath`; it also asserts
+  that the working directory of each spawn lies outside every repository working
+  tree and that the hand-over text names a neutral directory outside every
+  repository.
 - R7-6f (key directory checks, no private-key read): (i) Fixtures for a matching
   key, a stored value that names no directory, an unreadable directory and a key
   whose digest equals no committed anchor yield `ok`, `key-directory-missing`,
