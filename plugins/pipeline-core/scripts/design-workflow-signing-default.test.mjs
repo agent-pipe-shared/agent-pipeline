@@ -27,9 +27,10 @@ import {verifyPoApprovalProof} from '../lib/po-approval-proof.mjs';
 import {runHumanApproval} from './po-human-approval.mjs';
 import {parseYaml} from '../lib/yaml-lite.mjs';
 import { devNull } from 'node:os';
+import { fileURLToPath } from 'node:url';
 const sha=b=>createHash('sha256').update(b).digest('hex'),bytes=v=>Buffer.from(canonicalJson(v));
 function yaml(v,indent='') {if(Array.isArray(v))return v.map(x=>x!==null&&typeof x==='object'?`${indent}-\n${yaml(x,indent+'  ')}`:`${indent}- ${JSON.stringify(x)}\n`).join('');return Object.entries(v).map(([k,x])=>x!==null&&typeof x==='object'?`${indent}${k}:\n${yaml(x,indent+'  ')}`:`${indent}${k}: ${JSON.stringify(x)}\n`).join('');}
-const fixtureRoot=process.env.PIPELINE_SIGNING_FIXTURE_ROOT ?? new URL("../../../../scratch/default-signing/",import.meta.url).pathname;
+const fixtureRoot=process.env.PIPELINE_SIGNING_FIXTURE_ROOT ?? fileURLToPath(new URL("../../../scratch/default-signing/",import.meta.url));
 mkdirSync(fixtureRoot,{recursive:true});
 function fixture(t){
  const root=mkdtempSync(join(fixtureRoot,'synthetic-dwp-default-repo-')),keys=mkdtempSync(join(fixtureRoot,'synthetic-dwp-default-keys-'));
@@ -85,6 +86,11 @@ test('canonical DWP equality accepts reordering at every object level without ch
  const checked=validateDesignWorkflowPackageApprovalRequest({...binding,request:reordered});
  assert.equal(original.ok,true);assert.equal(checked.ok,true,JSON.stringify(checked));assert.equal(checked.intentSha256,original.intentSha256);
  assert.deepEqual(checked.packageRead,original.packageRead);
+ const reverseKeys=o=>Array.isArray(o)?o.map(reverseKeys):(o!==null&&typeof o==='object')?Object.fromEntries(Object.keys(o).reverse().map(k=>[k,reverseKeys(o[k])])):o;
+ const reversed=reverseKeys(f.request),reversedChecked=validateDesignWorkflowPackageApprovalRequest({...binding,request:reversed});
+ assert.notEqual(JSON.stringify(reversed),JSON.stringify(f.request));
+ assert.equal(reversedChecked.ok,true,JSON.stringify(reversedChecked));assert.equal(reversedChecked.intentSha256,original.intentSha256);
+ assert.deepEqual(reversedChecked.packageRead,original.packageRead);
 });
 test('canonical comparison retains exact shape, intent, package, source and candidate refusals before signing',t=>{
  const f=fixture(t),binding=approvalBinding(f),reordered=JSON.parse(canonicalJson(f.request));
