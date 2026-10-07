@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-10-07
 closure_repository: self
-closure_commit: 26fef9e7d
+closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
 closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 sprint: nightwing

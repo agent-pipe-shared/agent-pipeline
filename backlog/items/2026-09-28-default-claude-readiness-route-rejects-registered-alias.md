@@ -10,7 +10,7 @@ sprint: alfred
 done_when: manual
 closed_at: 2026-10-07
 closure_repository: self
-closure_commit: 3d9ffe770
+closure_commit: 3d9ffe77022b3811b9283dd0656c077ea85548ea
 closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 ---
 
