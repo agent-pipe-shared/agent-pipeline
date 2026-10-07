@@ -1216,6 +1216,11 @@ recordQ12Table("Q12-HD: PUSH-AFTER-HEREDOC-OPENER", true, Q12HD_PUSH_AFTER_HERED
 // (`&&`, `;`, `||`, `|`) or a heredoc opener on the same line. The second column of every row states the bash semantics. Every
 // command text below is DATA: it is handed to `commandIsGitPush` and never executed. Every case id in this block starts with
 // Q12-EXE: so one search over a run's output lists all of them.
+const Q12EXE_NEGATIVE_ROWS = [
+  ["echo ok && xgit.exe push origin main", "xgit.exe is a different program; no git command runs"],
+  ["echo ok && git.exe.bak push origin main", "git.exe.bak is a different program; no git command runs"],
+  ["echo ok && gitk push origin main", "gitk is a different program; no git command runs"],
+];
 const Q12EXE_NON_LEADING_GIT_EXE_PUSH_TABLE = [
   ["echo ok && git.exe push origin main", "echo succeeds; && then runs git.exe push origin main as its own command"],
   ["echo ok; git.exe push origin main", "the semicolon ends echo; git.exe push origin main then runs as its own command"],
@@ -1228,6 +1233,7 @@ const Q12EXE_NON_LEADING_GIT_EXE_PUSH_TABLE = [
   ["echo ok && git.exe -C . push origin main", "git.exe with a -C option before the subcommand; the second command still runs push origin main"],
 ];
 recordQ12Table("Q12-EXE: NON-LEADING-GIT-EXE-PUSH", true, Q12EXE_NON_LEADING_GIT_EXE_PUSH_TABLE);
+recordQ12Table("Q12-EXE: NON-GIT-LOOKALIKE", false, Q12EXE_NEGATIVE_ROWS);
 
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;

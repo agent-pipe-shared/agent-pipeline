@@ -1060,5 +1060,8 @@ function classifyPush(cmd, reading) {
       (detectionTokens[1] === "-C" && detectionTokens[2] && detectionTokens[3]?.toLowerCase() === "push"));
   const shellWrapperPush = /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd|ssh)(?:\.exe)?$/i.test(executableToken) &&
     detectionTokens.some((token) => /\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/i.test(token));
-  return /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush;
+  // A bare `git.exe` (any letter case) after a separator: same word as `git`, at an executable boundary only
+  // (`xgit.exe`, `git.exe.bak` and `gitk` stay non-git).
+  const nonLeadingGitExePush = /(?:^|[\s;&|(`'"/\\])git\.exe\s+push\b/iu.test(commandRegion);
+  return /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush || nonLeadingGitExePush;
 }
