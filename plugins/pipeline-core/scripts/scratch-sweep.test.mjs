@@ -41,9 +41,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { assessScratchDurability, planSweep } from '../lib/scratch-retention.mjs';
 import { privateMkdtemp } from '../lib/test-private-tmp.mjs';
@@ -289,6 +290,105 @@ function buildMixed(fx) {
     neither: sorted(['scratch/recent-unref.md', 'scratch/today.md']),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Helpers of the C-S-T3 cases (Critic round 1, scratch-sweep-round1.md).
+//
+// --apply refuses --now (F3), so a C-S-T3 case never passes --now to any mode
+// and ages its files against the REAL clock instead: the ages used (30-60 days)
+// sit far from the 14-day threshold, so the real clock cannot flip a verdict.
+// ---------------------------------------------------------------------------
+
+/** mtime = real now minus `days`. */
+function setRealAge(file, days) {
+  const when = new Date(Date.now() - days * DAY_MS);
+  fs.utimesSync(file, when, when);
+}
+
+/** Write a file (content defaults to its own repo-relative path) aged against the real clock. */
+function writeAged(fx, rel, days, content) {
+  const file = fx.write(rel, content);
+  setRealAge(file, days);
+  return file;
+}
+
+/** The only flag every C-S-T3 case passes besides its mode: the fixture as --root. Never --now. */
+const realClockArgs = (fx) => ['--root', fx.root];
+
+/** runCli with extra child environment variables and extra node arguments (e.g. --import). */
+function runCliWith(fx, args, { env = {}, nodeArgs = [] } = {}) {
+  assert.ok(fs.existsSync(CLI), `the CLI under test does not exist yet: ${path.basename(CLI)}`);
+  const result = spawnSync(process.execPath, [...nodeArgs, CLI, ...args], {
+    cwd: fx.cwd,
+    env: { ...process.env, GIT_CEILING_DIRECTORIES: path.dirname(fx.root), ...env },
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 120_000,
+  });
+  assert.equal(result.error, undefined, `the CLI could not be run: ${result.error?.message}`);
+  return result;
+}
+
+/**
+ * Make a committed file unreadable for the current user (chmod 000 elsewhere, a deny-read ACE on
+ * win32) and register the restore with the fixture. Returns `{ skip: reason }` when the platform
+ * cannot make the file unreadable reliably (e.g. a privileged user), `{}` when it did.
+ */
+function makeUnreadable(fx, rel) {
+  const file = fx.abs(rel);
+  let restore;
+  if (process.platform === 'win32') {
+    const account = process.env.USERDOMAIN && process.env.USERNAME
+      ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+      : os.userInfo().username;
+    try {
+      execFileSync('icacls', [file, '/deny', `${account}:(RD)`], { stdio: 'ignore', windowsHide: true });
+    } catch (error) {
+      return { skip: `icacls refused to deny read access (${error.message})` };
+    }
+    restore = () => execFileSync('icacls', [file, '/remove:d', account], { stdio: 'ignore', windowsHide: true });
+  } else {
+    fs.chmodSync(file, 0o000);
+    restore = () => fs.chmodSync(file, 0o644);
+  }
+  fx.onCleanup(restore);
+  try {
+    fs.readFileSync(file);
+  } catch {
+    return {};
+  }
+  return { skip: 'the file is still readable after the permission change (privileged user?)' };
+}
+
+/**
+ * Preload (node --import) that swaps a directory for a link at one exact moment: the first
+ * realpath call on the planned file, which the CLI makes AFTER it has planned the file and
+ * lstat-ed it as a regular file. That is the plan-to-unlink window of a swapped parent, hit
+ * deterministically -- no timing race. A marker file proves the swap happened.
+ */
+const SWAP_HOOK_SOURCE = [
+  "import fs from 'node:fs';",
+  "import { syncBuiltinESMExports } from 'node:module';",
+  "import path from 'node:path';",
+  'const target = path.resolve(process.env.C_S_T3_SWAP_TARGET).toLowerCase();',
+  'let fired = false;',
+  'function swap() {',
+  '  fired = true;',
+  '  fs.rmSync(process.env.C_S_T3_SWAP_DIR, { recursive: true, force: true });',
+  '  fs.symlinkSync(process.env.C_S_T3_SWAP_LINK_TARGET, process.env.C_S_T3_SWAP_DIR, process.env.C_S_T3_SWAP_TYPE);',
+  "  fs.writeFileSync(process.env.C_S_T3_SWAP_MARKER, 'swapped\\n');",
+  '}',
+  'function wrap(original) {',
+  '  return function (p, ...rest) {',
+  "    if (!fired && typeof p === 'string' && path.resolve(p).toLowerCase() === target) swap();",
+  '    return original.call(this, p, ...rest);',
+  '  };',
+  '}',
+  'const wrapped = wrap(fs.realpathSync);',
+  'wrapped.native = wrap(fs.realpathSync.native);',
+  'fs.realpathSync = wrapped;',
+  'syncBuiltinESMExports();',
+].join('\n');
 
 describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
   const savedGitEnv = new Map();
@@ -560,5 +660,254 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
         }
         assert.deepEqual(snapshotTree(fx.root), treeBefore);
       }));
+  });
+
+  /**
+   * C-S-T3: the settled rules from the Critic's round-1 record
+   * (specs/sprint-alfred-epic/evidence/critic-2026-10-07/scratch-sweep-round1.md).
+   * Written against the CLI as it stood when the findings were raised, so cases for
+   * F1, F3, F4, F6 and F7 are RED until the fix dispatch lands; F2 pins behaviour that
+   * already holds and must keep holding.
+   */
+  describe('C-S-T3: Critic round-1 findings', () => {
+    describe('F1: a live plugin root under scratch/ is never planned and never deleted', () => {
+      /**
+       * "Live" is what lib/physical-scratch-boundary.mjs scratchLivePluginRoots() says: the
+       * executing module's own installation plus $CLAUDE_PLUGIN_ROOT when that directory has
+       * a hooks/ directory and a .claude-plugin/plugin.json file. The fixture therefore
+       * builds exactly that shape under scratch/ and hands the CLI the root through the
+       * environment variable the boundary module reads -- no production change needed.
+       */
+      function buildLiveRoot(fx) {
+        const live = 'scratch/installs/live-pipeline-core';
+        const liveFiles = [
+          `${live}/hooks/guard.mjs`,
+          `${live}/.claude-plugin/plugin.json`,
+          `${live}/lib/deep/helper.md`,
+          `${live}/notes.md`,
+        ];
+        for (const rel of liveFiles) writeAged(fx, rel, 40);
+        const stale = [
+          'scratch/installs/live-pipeline-core-old/stale.md',
+          'scratch/installs/other/stale.md',
+          'scratch/stale-sibling.md',
+        ];
+        for (const rel of stale) writeAged(fx, rel, 40);
+        return { liveDir: fx.abs(live), liveFiles, stale: sorted(stale) };
+      }
+
+      test('C-S-T3 F1: --check, --sweep and --apply leave a live plugin root alone, however old and unreferenced, and still sweep its look-alike siblings', () =>
+        inFixture({}, (fx) => {
+          const { liveDir, liveFiles, stale } = buildLiveRoot(fx);
+          const env = { CLAUDE_PLUGIN_ROOT: liveDir };
+
+          for (const mode of ['--check', '--sweep']) {
+            const result = runCliWith(fx, [...realClockArgs(fx), mode], { env });
+            assert.equal(result.status, 0, `${mode}: exit 0 (stderr: ${result.stderr})`);
+            const planned = parseStdout(result).plan.delete;
+            assert.deepEqual(sorted(planned), stale, `${mode}: the plan lists the stale files and nothing under the live root`);
+          }
+
+          const liveBefore = snapshotTree(liveDir);
+          const applied = runCliWith(fx, [...realClockArgs(fx), '--apply'], { env });
+          assert.equal(applied.status, 0, `--apply: exit 0 (stderr: ${applied.stderr})`);
+          assert.deepEqual(sorted(parseStdout(applied).deleted), stale, '--apply deletes the stale files and nothing under the live root');
+          for (const rel of liveFiles) assert.ok(fx.exists(rel), `${rel} is still on disk`);
+          for (const rel of stale) assert.ok(!fx.exists(rel), `${rel} was swept`);
+          assert.deepEqual(snapshotTree(liveDir), liveBefore, 'the live root is untouched');
+        }));
+    });
+
+    describe('F3: --apply always uses the real clock', () => {
+      test('C-S-T3 F3: --apply together with --now is refused with SCRATCH-SWEEP-USAGE, exit 1, and nothing is deleted', () =>
+        inFixture({}, (fx) => {
+          writeAged(fx, 'scratch/old.md', 40);
+          const treeBefore = snapshotTree(fx.root);
+          const farFuture = '2099-01-01T00:00:00.000Z';
+          const variants = [
+            [...realClockArgs(fx), '--apply', '--now', NOW.toISOString()],
+            [...realClockArgs(fx), '--now', NOW.toISOString(), '--apply'],
+            ['--now', farFuture, ...realClockArgs(fx), '--apply'],
+          ];
+
+          for (const args of variants) {
+            assertRefused(runCli(fx, args), 'SCRATCH-SWEEP-USAGE', args.join(' '));
+            assert.ok(fx.exists('scratch/old.md'), `nothing deleted by: ${args.join(' ')}`);
+          }
+          assert.deepEqual(snapshotTree(fx.root), treeBefore);
+
+          const plain = runCli(fx, [...realClockArgs(fx), '--apply']);
+          assert.equal(plain.status, 0, `--apply without --now still works (stderr: ${plain.stderr})`);
+          assert.deepEqual(parseStdout(plain).deleted, ['scratch/old.md'], 'the same tree is swept once --now is gone');
+        }));
+    });
+
+    describe('F4: the previewed plan is the set --apply deletes', () => {
+      test('C-S-T3 F4: --check and --sweep never list a file under scratch/dispatch/, and their plan equals the set --apply deletes on the same tree', () =>
+        inFixture({}, (fx) => {
+          writeAged(fx, 'scratch/dispatch/briefing-live.md', 40);
+          writeAged(fx, 'scratch/dispatch/C-S2/notes/run.json', 60);
+          writeAged(fx, 'scratch/old-elsewhere.md', 40);
+          writeAged(fx, 'scratch/dispatch-notes/old.md', 40);
+          const expected = ['scratch/dispatch-notes/old.md', 'scratch/old-elsewhere.md'];
+
+          const previews = {};
+          for (const mode of ['--check', '--sweep']) {
+            const result = runCli(fx, [...realClockArgs(fx), mode]);
+            assert.equal(result.status, 0, `${mode}: exit 0 (stderr: ${result.stderr})`);
+            previews[mode] = sorted(parseStdout(result).plan.delete);
+            for (const entry of previews[mode]) assert.ok(!entry.startsWith('scratch/dispatch/'), `${mode}: ${entry} is under scratch/dispatch/`);
+            assert.deepEqual(previews[mode], expected, `${mode}: the look-alike sibling stays in the plan`);
+          }
+
+          const applied = runCli(fx, [...realClockArgs(fx), '--apply']);
+          assert.equal(applied.status, 0, `--apply: exit 0 (stderr: ${applied.stderr})`);
+          assert.deepEqual(sorted(parseStdout(applied).deleted), previews['--sweep'], 'the previewed plan equals the applied set');
+          assert.ok(fx.exists('scratch/dispatch/briefing-live.md'), 'a dispatch file survives');
+          assert.ok(fx.exists('scratch/dispatch/C-S2/notes/run.json'), 'a nested dispatch file survives');
+        }));
+    });
+
+    describe('F6: an unreadable tracked reference document makes nothing deletable', () => {
+      test('C-S-T3 F6: with one tracked .md unreadable the plan is empty, durability carries a warning, and --apply deletes nothing', (t) =>
+        inFixture({}, (fx) => {
+          fx.commitFiles({ 'docs/keeps.md': 'The notes live in scratch/protected-by-doc.md\n' });
+          writeAged(fx, 'scratch/protected-by-doc.md', 40);
+          writeAged(fx, 'scratch/other-old.md', 40);
+          const made = makeUnreadable(fx, 'docs/keeps.md');
+          if (made.skip) {
+            t.skip(made.skip);
+            return;
+          }
+          const treeBefore = snapshotTree(fx.root);
+
+          for (const mode of ['--check', '--sweep']) {
+            const result = runCli(fx, [...realClockArgs(fx), mode]);
+            assert.equal(result.status, 0, `${mode}: exit 0 (stderr: ${result.stderr})`);
+            const report = parseStdout(result);
+            assert.deepEqual(report.plan.delete, [], `${mode}: nothing is deletable while a reference document is unreadable`);
+            assert.ok(report.durability.warning, `${mode}: the durability result carries a warning`);
+          }
+
+          const applied = runCli(fx, [...realClockArgs(fx), '--apply']);
+          assert.deepEqual(parseStdout(applied).deleted ?? [], [], '--apply deletes nothing');
+          assert.deepEqual(snapshotTree(fx.root), treeBefore, 'nothing on disk changed');
+        }));
+    });
+
+    describe('F7: files tracked by git are never sweep candidates', () => {
+      test('C-S-T3 F7: tracked files under a non-ignored scratch/ are never planned or deleted; an untracked sibling still is', () =>
+        inFixture({}, (fx) => {
+          // scratch/ is NOT ignored here, so git can track files under it.
+          fx.commitFiles({ '.gitignore': '# nothing is ignored\n' });
+          const tracked = [
+            'scratch/tracked-old.md',
+            'scratch/tracked dir/old note.json',
+            'scratch/tracked-sub/deep/old.txt',
+          ];
+          // Content that does not name its own path: a self-reference would count as a durable reference.
+          fx.commitFiles(Object.fromEntries(tracked.map((rel) => [rel, 'tracked scratch note\n'])));
+          for (const rel of tracked) setRealAge(fx.abs(rel), 40);
+          writeAged(fx, 'scratch/untracked-old.md', 40);
+
+          for (const mode of ['--check', '--sweep']) {
+            const result = runCli(fx, [...realClockArgs(fx), mode]);
+            assert.equal(result.status, 0, `${mode}: exit 0 (stderr: ${result.stderr})`);
+            assert.deepEqual(parseStdout(result).plan.delete, ['scratch/untracked-old.md'], `${mode}: only the untracked file is planned`);
+          }
+
+          const applied = runCli(fx, [...realClockArgs(fx), '--apply']);
+          assert.equal(applied.status, 0, `--apply: exit 0 (stderr: ${applied.stderr})`);
+          assert.deepEqual(parseStdout(applied).deleted, ['scratch/untracked-old.md']);
+          for (const rel of tracked) assert.ok(fx.exists(rel), `${rel} is still on disk`);
+          assert.deepEqual(
+            git(fx.root, ['status', '--porcelain', '--untracked-files=no']).trim(),
+            '',
+            'git sees no deleted tracked file',
+          );
+        }));
+    });
+
+    describe('F2: the pre-unlink containment check holds when a parent directory is swapped for a link', () => {
+      const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+
+      function skipOrThrow(t, failure) {
+        if (process.platform === 'win32') {
+          t.skip(`directory link creation refused on win32 (${failure.code ?? failure.message})`);
+          return true;
+        }
+        throw failure;
+      }
+
+      for (const scenario of ['outside the repository', 'inside the repository but outside scratch/']) {
+        test(`C-S-T3 F2: a planned file whose parent directory became a link to a directory ${scenario} is not deleted (swapped before --apply)`, (t) =>
+          inFixture({}, (fx) => {
+            const outsideRepo = scenario === 'outside the repository';
+            const targetDir = outsideRepo ? fx.outsideDir() : fx.abs('src');
+            const beyondFile = path.join(targetDir, 'old.md');
+            fs.mkdirSync(targetDir, { recursive: true });
+            fs.writeFileSync(beyondFile, 'beyond scratch\n');
+            setRealAge(beyondFile, 40);
+            writeAged(fx, 'scratch/victim/old.md', 40);
+            writeAged(fx, 'scratch/control-old.md', 40);
+            const planned = parseStdout(runCli(fx, [...realClockArgs(fx), '--sweep'])).plan.delete;
+            assert.deepEqual(sorted(planned), ['scratch/control-old.md', 'scratch/victim/old.md'], 'the file is a planned candidate before the swap');
+
+            fs.rmSync(fx.abs('scratch/victim'), { recursive: true, force: true });
+            const link = fx.abs('scratch/victim');
+            const failure = tryCreateSymlink(targetDir, link, linkType);
+            if (failure && skipOrThrow(t, failure)) return;
+            fx.onCleanup(() => removeLink(link));
+            const beyondBefore = snapshotTree(targetDir);
+
+            const result = runCli(fx, [...realClockArgs(fx), '--apply']);
+
+            assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
+            assert.deepEqual(parseStdout(result).deleted, ['scratch/control-old.md']);
+            assert.ok(isLink(link), 'the link itself is still there');
+            assert.ok(fs.existsSync(beyondFile), 'the file behind the link survives');
+            assert.deepEqual(snapshotTree(targetDir), beyondBefore, 'nothing behind the link changed');
+          }));
+      }
+
+      test('C-S-T3 F2: a parent directory swapped for a link between planning and unlinking (in-process, no race) leaves the outside file alone', (t) =>
+        inFixture({}, (fx) => {
+          const outside = fx.outsideDir();
+          const outsideFile = path.join(outside, 'old.md');
+          fs.writeFileSync(outsideFile, 'beyond scratch\n');
+          setRealAge(outsideFile, 40);
+          writeAged(fx, 'scratch/victim/old.md', 40);
+          writeAged(fx, 'scratch/control-old.md', 40);
+          const probe = path.join(fx.cwd, 'link-probe');
+          const failure = tryCreateSymlink(outside, probe, linkType);
+          if (failure && skipOrThrow(t, failure)) return;
+          removeLink(probe);
+
+          const hook = path.join(fx.cwd, 'swap-hook.mjs');
+          const marker = path.join(fx.cwd, 'swap-fired.txt');
+          fs.writeFileSync(hook, `${SWAP_HOOK_SOURCE}\n`);
+          const victimDir = fx.abs('scratch/victim');
+          fx.onCleanup(() => removeLink(victimDir));
+          const outsideBefore = snapshotTree(outside);
+
+          const result = runCliWith(fx, [...realClockArgs(fx), '--apply'], {
+            nodeArgs: ['--import', pathToFileURL(hook).href],
+            env: {
+              C_S_T3_SWAP_TARGET: fx.abs('scratch/victim/old.md'),
+              C_S_T3_SWAP_DIR: victimDir,
+              C_S_T3_SWAP_LINK_TARGET: outside,
+              C_S_T3_SWAP_TYPE: linkType,
+              C_S_T3_SWAP_MARKER: marker,
+            },
+          });
+
+          assert.ok(fs.existsSync(marker), `the swap happened inside the CLI run (stderr: ${result.stderr})`);
+          assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
+          assert.ok(!parseStdout(result).deleted.includes('scratch/victim/old.md'), 'the swapped file is not reported deleted');
+          assert.ok(isLink(victimDir), 'the link itself is still there');
+          assert.ok(fs.existsSync(outsideFile), 'the file behind the link survives');
+          assert.deepEqual(snapshotTree(outside), outsideBefore, 'nothing behind the link changed');
+        }));
+    });
   });
 });
