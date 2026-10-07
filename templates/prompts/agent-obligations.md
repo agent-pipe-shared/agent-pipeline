@@ -23,10 +23,12 @@ spends a tool use from the budget that is also the stop condition.
      plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables
      below ARE measured. -->
 
-`guard-lifecycle-ready` admits exactly **one simple command per tool call**.
-No `&&`, no `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations.
-Bounded `rg`-to-`rg` and `rg`-to-`head` diagnostic pipelines are the only
-admitted composition.
+`guard-lifecycle-ready` admits **one simple command per tool call**.
+No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
+with `&&` is admitted only as up to 6 segments, and only when every segment is
+itself an admitted read-only shape (or the small always-safe-write allowlist:
+`echo`, `mkdir -p` under `scratch/`). Bounded `rg`-to-`rg` and `rg`-to-`head`
+diagnostic pipelines are the only admitted piping.
 
 The two workarounds that cost the most time before they were written down:
 

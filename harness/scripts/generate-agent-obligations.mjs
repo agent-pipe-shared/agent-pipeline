@@ -130,10 +130,12 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("     plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables");
   put("     below ARE measured. -->");
   put();
-  put("`guard-lifecycle-ready` admits exactly **one simple command per tool call**.");
-  put("No `&&`, no `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations.");
-  put("Bounded `rg`-to-`rg` and `rg`-to-`head` diagnostic pipelines are the only");
-  put("admitted composition.");
+  put("`guard-lifecycle-ready` admits **one simple command per tool call**.");
+  put("No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining");
+  put("with `&&` is admitted only as up to 6 segments, and only when every segment is");
+  put("itself an admitted read-only shape (or the small always-safe-write allowlist:");
+  put("`echo`, `mkdir -p` under `scratch/`). Bounded `rg`-to-`rg` and `rg`-to-`head`");
+  put("diagnostic pipelines are the only admitted piping.");
   put();
   put("The two workarounds that cost the most time before they were written down:");
   put();
