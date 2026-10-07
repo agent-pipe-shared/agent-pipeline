@@ -97,12 +97,20 @@ result (`spec-ac-reconciliation-2026-10-07.md` lines 40-45, 63-64). No design or
   explicit conflict."
 - Other mentions: SPEC:2605, 2626 (foreign hook never overwritten); TRC:179.
 
-**Nearest existing seam:** not searched in this slice (budget checkpoint). Earlier reconciliation: code absent from
-plugins/harness, no test, no slice. Candidate area by file name only: `plugins/pipeline-core/lib/project-onboarding-v3.mjs`
-and `project-onboarding-foreign-residue*.test.mjs` (found by the AC-33 search, unverified for this item); a grep of
-`uninstall` in `project-onboarding-v3.mjs` and `onboarding-init.mjs` returned no match.
+**Nearest existing seam**
+- Searches: `PU-FOREIGN-HOOK-CONFLICT`, `pipeline-uninstall`, `install-hooks` (`git grep -n` over plugins harness schemas
+  policies), then a `PU-` code listing. The exact code `PU-FOREIGN-HOOK-CONFLICT` appears nowhere; `hooks.json` hits are
+  only the TP-4 file itself.
+- Uninstall exists: CLI `plugins/pipeline-core/scripts/project-uninstall.mjs:8` (`PU-CLI`, `PU-JOURNAL-MISSING`,
+  `PU-FAILED`); library `plugins/pipeline-core/lib/project-uninstall.mjs` (plan/journal, minified lines): foreign hook is
+  currently classified `PU-FOREIGN-HOOK-PRESERVED` at `:40`, ownership refusal `PU-OWNERSHIP-CONFLICT` at `:64`,
+  journal dir `pipeline-uninstall` at `:41`/`:68`.
+- Hook footprint: `plugins/pipeline-core/lib/git-hook-footprint.mjs:27-46` (`PU-HOOK-NAME`, `PU-HOOK-SHARED`,
+  `PU-HOOK-DRIFT`). Workspace side: `project-uninstall-workspace.mjs`.
+- Tests: `plugins/pipeline-core/lib/project-uninstall.test.mjs:36` (`refuse before mutation: foreign-hook`, fixture at
+  `:52`), `:41,:49,:54,:61` (`PU-OWNERSHIP-CONFLICT`); `project-uninstall-contract.test.mjs`.
 
-**Protected?** Not determined (no seam confirmed).
+**Protected?** No. None of these paths matches TP-1..TP-13 (TP-4 `hooks/hooks.json` is not touched by these files).
 
 **Open questions**
 - Which verb or script the "uninstall" is (no existing entry point found in the two files checked).
@@ -131,11 +139,18 @@ and `project-onboarding-foreign-residue*.test.mjs` (found by the AC-33 search, u
   Claude Critic subagent result accepted only "with the hook-recorded start, per-call read-only enforcement and terminal
   binding". Also SPEC:1796-1800 (R4-12). TRC:78, 82, 83, 161, 184, 244.
 
-**Nearest existing seam:** not searched in this slice. Earlier reconciliation (line 40): no `fallback-self-dispatch` code;
-related `model-family-*.test.mjs`. `plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs` exists (named in
-agent-obligations section 4) but was not checked against R4-1.
+**Nearest existing seam**
+- Searches: `fallback-self-dispatch`, `self-dispatch`, `role-route`, `roleRoute`, `fallback`. `fallback-self-dispatch` and
+  `self-dispatch` match no file; no `role-route` verb exists (hits are only `model-role-route-source` and test names).
+- Closest: `plugins/pipeline-core/lib/model-role-route-source.mjs:34` (`CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE =
+  "duty.advisory.fallback"`; Advisor-only fallback route), `:143` (`functionalTaskRoutesForRunner`), codes
+  `MODEL-ROLE-ROUTE-SOURCE-*` at `:75-132`; consumers `plugins/pipeline-core/scripts/model-role-dispatch-select.mjs:12,15`,
+  `lib/advisory-coordinator.mjs:20`, `scripts/advisory-host-bridge.mjs:42`.
+- Preflight candidate: `plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs` (exists; not read against R4-1).
+- Tests: `model-role-route-source`-driven `lib/model-role-session.test.mjs:602-636`,
+  `scripts/model-role-dispatch-select.test.mjs:4`.
 
-**Protected?** Not determined.
+**Protected?** No. None of these paths matches TP-1..TP-13.
 
 **Open questions**
 - Reason-code vocabulary (SPEC says "a reason code", none listed).
@@ -151,10 +166,18 @@ agent-obligations section 4) but was not checked against R4-1.
 - R5-3 SPEC:1856-1857: "A 30 KB answers file is accepted on Windows, and the language is asked once."
 - TRC:108, 109 (K5-5, K5-6 -> R5-3).
 
-**Nearest existing seam:** not searched in this slice. Earlier reconciliation (line 41): no `--answers-file` code.
-The existing `--answers-json` flag is the named counterpart; its location was not looked up.
+**Nearest existing seam**
+- Searches: `answers-file` (none found anywhere), `answers-json`, `answersJson`, `design-course`. The counterpart flag:
+  - CLI parse: `plugins/pipeline-core/scripts/project-onboarding-v3.mjs:404` (`--answers-json`), usage `:353`, JSON parse
+    `:933`.
+  - Argv shape table: `plugins/pipeline-core/lib/onboarding-argv-shapes.mjs:67,73` (`requiredValue`).
+  - Guard admission: `plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs:388` (`--answers-json` validator).
+  - Published nextAction input (maxBytes 65536): `plugins/pipeline-core/lib/project-onboarding-v3.mjs:2864-2869`.
+  - Docs: `plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md:54`.
+- Tests: `hooks/guard-lifecycle-ready.test.mjs:3744-3764`, `lib/project-onboarding-v3.test.mjs:4953,9224`,
+  `scripts/project-onboarding-v3-argv-closure.test.mjs:160`.
 
-**Protected?** Not determined.
+**Protected?** No. None of these paths matches TP-1..TP-13 (`guard-lifecycle-ready.test.mjs` is not a TP entry).
 
 **Open questions**
 - Digest algorithm and where the digest is recorded.
@@ -172,10 +195,19 @@ The existing `--answers-json` flag is the named counterpart; its location was no
 - R6-2 SPEC:1905: "A continuity digest drift fixture is reported by `inspect`." R6-4 SPEC:1908-1909: "An audit index is
   generated for a fixture change with one deliberately missing gate." TRC:128, 130 (K8-2 -> R6-2, K8-4 -> R6-4).
 
-**Nearest existing seam:** not searched in this slice. Earlier reconciliation (line 42): `runner-transcript-recovery.test.mjs`
-exists; no audit-index or continuity-digest code. The `inspect` verb's module was not located.
+**Nearest existing seam**
+- Searches: `audit-index`, `auditIndex`, `audit index`, `continuity-digest`, `continuityDigest` (none found); `digest`
+  and `prdSha256` (many hits, digest carriers only).
+- `inspect` verb: `plugins/pipeline-core/scripts/pipeline-state.mjs:711` (verb list), `:12306` (`case "inspect"`), note at
+  `:3716`.
+- Continuity PRD/Spec digests carried by `plugins/pipeline-core/lib/continuity-state.mjs:36,195-209,401` (authority
+  digests) and `lib/onboarding-continuity.mjs:787-823`; drift-check analogue at `onboarding-continuity.mjs:5022-5024`
+  (`entry.prdSha256 !== continuity.authority.prd.sha256`). No drift check is surfaced through `inspect`.
+- Tests: `plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs`; `harness/scripts/pipeline-state.test.mjs:322-364`.
 
-**Protected?** Not determined.
+**Protected?** Mixed. Yes for `harness/scripts/pipeline-state.test.mjs` (TP-5, `harness/scripts/pipeline-state.test.mjs`
+pattern); a new test there is not agent-writable. No for `scripts/pipeline-state.mjs`, `lib/continuity-state.mjs`,
+`lib/onboarding-continuity.mjs`, `scripts/runner-transcript-recovery.test.mjs` (no TP match).
 
 **Open questions**
 - Which `inspect` verb is meant (module not located).
