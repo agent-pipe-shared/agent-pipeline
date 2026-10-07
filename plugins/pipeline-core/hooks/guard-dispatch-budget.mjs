@@ -105,7 +105,11 @@
  * with `counter-lock-timeout` (naming the holder age, path-redacted) and is
  * never counted. Dead-owner reclaim and the malformed/unsafe/ambiguous codes
  * stay exactly those of the single-attempt `acquireDispatchBudgetCounterLock`,
- * which is unchanged and never waited for.
+ * which is unchanged and never waited for; a holder that exits between another
+ * caller's read and its liveness probe surfaces there as the transient
+ * `counter-lock-changed`, `counter-lock-recovery-raced` or
+ * `counter-lock-recovery-busy`, which the wait retries inside the same bound and
+ * backoff, whereas malformed/unsafe/ambiguous lock state still fails closed at once.
  *
  * ## Storage
  * Per-subagent counters persist as one JSON file each under
@@ -830,6 +834,16 @@ export function acquireDispatchBudgetCounterLock(path, dependencies = {}) {
 export const COUNTER_LOCK_WAIT_BOUND_MS = 3000;
 const COUNTER_LOCK_BACKOFF_INITIAL_MS = 5;
 const COUNTER_LOCK_BACKOFF_MAX_MS = 100;
+// Outcomes the wait variant retries: a live owner or the publishing transition
+// (`counter-lock-busy`) and the transient races of dead-owner recovery, produced
+// when the observed holder exits or the lock is replaced under another caller's
+// read. Everything else (malformed, unsafe, ambiguous, recovery-changed) fails closed.
+const COUNTER_LOCK_TRANSIENT_CODES = new Set([
+  "counter-lock-busy",
+  "counter-lock-changed",
+  "counter-lock-recovery-raced",
+  "counter-lock-recovery-busy",
+]);
 
 function synchronousSleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -847,13 +861,17 @@ function counterLockMtimeMs(path, dependencies) {
  * Bounded-wait variant of `acquireDispatchBudgetCounterLock` (Spec 22.11
  * R7-11): repeats the single attempt (`dependencies.acquireDispatchBudgetCounterLockFn`
  * when supplied, else the real one) while it reports `counter-lock-busy`, i.e.
- * a live owner or the retryable publishing transition, sleeping with a bounded
- * backoff between attempts. Every other outcome -- acquired (including dead-owner
- * recovery), malformed, unsafe, ambiguous -- is returned at once, exactly as the
- * single attempt produced it, with no sleep. Once `COUNTER_LOCK_WAIT_BOUND_MS`
- * has elapsed it returns `{ status: "rejected", code: "counter-lock-timeout",
- * holderAgeMs }`, where `holderAgeMs` is now minus the lock file's mtime; a live
- * holder's lock is never taken over or deleted.
+ * a live owner or the retryable publishing transition, or one of the transient
+ * dead-owner-recovery race outcomes `counter-lock-changed`,
+ * `counter-lock-recovery-raced` and `counter-lock-recovery-busy`, sleeping with a
+ * bounded backoff between attempts. Every other outcome -- acquired (including
+ * dead-owner recovery), malformed, unsafe, ambiguous -- is returned at once,
+ * exactly as the single attempt produced it, with no sleep. Once
+ * `COUNTER_LOCK_WAIT_BOUND_MS` has elapsed it returns `{ status: "rejected", code:
+ * "counter-lock-timeout", holderAgeMs }`, where `holderAgeMs` is now minus the
+ * lock file's mtime (omitted when no lock file exists and no live holder was seen
+ * during the wait, i.e. only race outcomes occurred); a live holder's lock is
+ * never taken over or deleted.
  *
  * Injectable and SYNCHRONOUS (the hook is synchronous): `dependencies.now()`
  * (epoch ms, default `Date.now`) and `dependencies.sleep(ms)` (default a real
@@ -866,9 +884,11 @@ export function acquireDispatchBudgetCounterLockWithWait(path, dependencies = {}
   const startedAt = Number(nowFn());
   let backoffMs = COUNTER_LOCK_BACKOFF_INITIAL_MS;
   let lastChance = false;
+  let sawBusy = false;
   for (;;) {
     const result = attempt(path, dependencies);
-    if (result?.status !== "rejected" || result.code !== "counter-lock-busy") return result;
+    if (result?.status !== "rejected" || !COUNTER_LOCK_TRANSIENT_CODES.has(result.code)) return result;
+    if (result.code === "counter-lock-busy") sawBusy = true;
     const current = Number(nowFn());
     const elapsedMs = current - startedAt;
     if (!(elapsedMs < COUNTER_LOCK_WAIT_BOUND_MS)) {
@@ -877,8 +897,13 @@ export function acquireDispatchBudgetCounterLockWithWait(path, dependencies = {}
         return { status: "rejected", code: "counter-lock-timeout", holderAgeMs: Math.max(0, Math.floor(current) - Math.floor(mtimeMs)) };
       }
       // The lock vanished between the last attempt and the age read: one more
-      // attempt, then give up with the wait itself as the best available age.
-      if (lastChance) return { status: "rejected", code: "counter-lock-timeout", holderAgeMs: Math.max(0, Math.floor(elapsedMs)) };
+      // attempt, then give up. After a live holder was seen the wait itself is the
+      // best available age; after only race outcomes there is no holder to age.
+      if (lastChance) {
+        return sawBusy
+          ? { status: "rejected", code: "counter-lock-timeout", holderAgeMs: Math.max(0, Math.floor(elapsedMs)) }
+          : { status: "rejected", code: "counter-lock-timeout" };
+      }
       lastChance = true;
       continue;
     }
