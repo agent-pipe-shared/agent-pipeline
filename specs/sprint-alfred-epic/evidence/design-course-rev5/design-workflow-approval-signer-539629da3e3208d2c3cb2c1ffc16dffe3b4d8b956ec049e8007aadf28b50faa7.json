@@ -1,0 +1,7 @@
+{
+  "schema": "pipeline.po-approval-signer.v1",
+  "intentSha256": "73e92e3620488798b9bb2734d6a5875406cbc782ac752839be5ee29d47d597cc",
+  "keyReference": "local-po-key",
+  "publicKeySha256": "2de20a39d0f1c13c15350e428ea0c70be50f8fbca26ec88758a8dcb1a880beee",
+  "humanName": "André"
+}

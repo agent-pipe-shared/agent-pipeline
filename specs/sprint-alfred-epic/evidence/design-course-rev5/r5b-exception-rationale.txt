@@ -1,0 +1,10 @@
+Advisor-unavailable exception, feature sprint-alfred-epic, runner claude, design revision 5.
+
+Receipt-backed facts only:
+- The course producer ran the Advisor stage for runner claude on this candidate.
+- Outcome: unavailable-pending-final-approval, code native-initial-answer-provenance-unavailable.
+- No native Advisor child was started and no input was submitted (terminal no-child outcome).
+- Evidence: the course binding and failure receipt exported by the producer and referenced by this package.
+
+What the PO accepts, once, at the final plan approval: this design is approved without an Advisor
+answer. The exception grants no other authority and does not replace readiness.

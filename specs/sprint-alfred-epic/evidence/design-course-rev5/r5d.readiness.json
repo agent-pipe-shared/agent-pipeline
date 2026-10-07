@@ -1,0 +1,127 @@
+{
+  "candidate": {
+    "commit": "087652e73edc644787185f2a400bd0efadbf2ddf",
+    "tree": "52d5a6ad49a5019eb3a81dad0d82d9f1825b586f"
+  },
+  "dispatchId": "ALFRED-READINESS-R5D-20261007",
+  "findings": [
+    {
+      "code": "ADVISOR-UNAVAILABLE-EXCEPTION-PROPOSED",
+      "severity": "non-blocking",
+      "summary": "The Advisor course ended typed-unavailable (native-initial-answer-provenance-unavailable, phase preparation, no child, no input). No Advisor answer exists for this revision, which adds the large R7 workstream. The proposed one-time exception states only receipt-backed facts, as Spec §21.4 requires, and stays non-authorizing. PRD §11 permits this route. Readiness does not grant the exception. It is for the PO to accept or reject at the final decision."
+    },
+    {
+      "code": "INPUT-SOURCE-IS-DISTILLED-INDEX",
+      "severity": "non-blocking",
+      "summary": "The 'original input' source (design-input.md) says it is an index with distilled PO decisions and not a raw transcript. Only the German recovery sentence is verbatim. This review confirms coverage of that index (decisions #1–#28 each map to an owner and a case in traceability.md). It cannot confirm fidelity to raw PO input bytes. The package discloses this limit itself."
+    },
+    {
+      "code": "STALE-COUNTS-AND-HEADERS",
+      "severity": "non-blocking",
+      "summary": "Some headers and counts lag the content. PRD §14 says the 2026-10-04 decisions are 'fifteen items', but there are 16 (#1–#16), and traceability maps 16 of 16. The PRD §10 traceability row says '#1–#15' and omits the 2026-10-06/07 decisions and R7. The PRD 'Current amendment' header and the design-input scope paragraph do not name the device-switch amendment. The traceability 'Input lineage' and canonical-source tables do not list §22 or the 10-04…10-07 decisions as inputs (a separate map covers them). These are editorial inconsistencies, not substantive gaps."
+    },
+    {
+      "code": "ACCEPTANCE-MD-OUTSIDE-PACKAGE",
+      "severity": "non-blocking",
+      "summary": "AC-26…AC-37 are defined in acceptance.md, which is not one of the five reviewed sources. Every register ID and PO decision maps to an AC-xx there. This review cannot confirm that AC-37 (and the AC-35/AC-36 extensions) exist or say what the Spec cases require. Spec case IDs (R1-1…R7-11e) are present and consistent in the reviewed text."
+    },
+    {
+      "code": "R7-SEQUENCING-DEPENDS-ON-LATER-STEPS",
+      "severity": "non-blocking",
+      "summary": "Spec §22.12 puts R7-2 and R7-11 in step 1 of §21.7. R7-11b needs a provably-dead-owner reclaim on win32, and R7-2's zero-click route needs the §20 native owner observation. Those arrive with R4 K3-9 (step 2) and Recovery (after R4). R7-11 and K3-9 also change the same guard-dispatch-budget lock. The design does not say which minimal owner-identity increment R7-11 may use before R4, or how the two changes avoid conflicting. This is resolvable in implementation planning but is a real ordering tension."
+    },
+    {
+      "code": "HOOK-MEASUREMENT-SCOPE-AND-ANTIGRAVITY-TENSION",
+      "severity": "non-blocking",
+      "summary": "Decision #3 enables Antigravity readiness/Critic/Advisor routes without prior host measurement. Decision #14 and R4-12 make the Critic and plan-verifier 'unavailable' (presentation and close refused) until hook coverage in subagents is measured. The Spec does not say where the per-runner/role measurement record lives for a consumer install, whether it ships candidate-bound or is probed per install, or how A1 staleness on runner or plugin version change affects it. If the record is missing or stale, close is refused in every consumer repository. The PO needs to know this consequence."
+    },
+    {
+      "code": "R7-10-STATE-AND-S20-SCOPE-AMBIGUITY",
+      "severity": "non-blocking",
+      "summary": "R7-10 says State and history are unchanged by the supersede verb. The verb also retires a registration and records a receipt 'in the continuity record', so what is unchanged needs stating precisely. The refusal routes name the §20.2 signed legacy-custody transaction (class 5) for registrations with `unavailable` or `unobserved` owners. §20.2's disposition matrix is written for receipts and descriptors and does not state how it applies to authoring registrations. If it does not apply, decision #15's 'no dead end' would not hold for that case."
+    },
+    {
+      "code": "CURRENT-APPROVAL-BOUND-ARTIFACTS-DEVICE-LOCAL",
+      "severity": "non-blocking",
+      "summary": "This course's own artifacts (initial context, failure receipt) sit under the git-ignored root evidence/design-course/…. R7-3 classifies that location as the defect (device-bound, unverifiable elsewhere). Until R7-3 is implemented, approving this package binds device-local evidence. On another device the route is DWP-REBIND-ARTIFACT-LOST, and decision #25 then requires a fresh course and no reuse of evidence. This follows from the sources but is a consequence the PO should know."
+    },
+    {
+      "code": "UNVERIFIED-EXTERNAL-AND-SOURCE-CLAIMS",
+      "severity": "non-blocking",
+      "summary": "R7-1 and R7-11 rest on claims outside the package: Git for Windows 2.56.0.windows.1 rejecting NUL (upstream #6449, fixed in .windows.2), `/dev/null` being mapped by Git for Windows on MSVCRT and UCRT builds, and the 2026-10-07 source read of guard-dispatch-budget.mjs. The design correctly labels them as defect descriptions and not as design. R7-1a and R7-11a–d contain verification cases. The claims themselves are not independently evidenced here."
+    },
+    {
+      "code": "T18-SCOPE-PROVENANCE",
+      "severity": "non-blocking",
+      "summary": "Decision #18 names T1–T17. T19 and T20 have decisions #26 and #28, but T18 has no PO decision of its own. §22.0 includes T18 'under the same rule' and maps it to R1. This is consistent with existing R1 scope but is an Elephant inclusion and not an explicit PO act."
+    },
+    {
+      "code": "R7-6F-WIN32-UNREADABLE-FIXTURE-FEASIBILITY",
+      "severity": "non-blocking",
+      "summary": "R7-6f requires an unreadable-directory fixture on the win32 dialect and says a host that cannot create it reports `not-run`, which fails the matrix. Creating an unreadable directory on Windows is hard to do reliably. The case may be unsatisfiable without an emulation approach, which the Spec does not state."
+    }
+  ],
+  "hostExecution": {
+    "dutyReceiptSha256": "cf0a11544dd88aeff5efbca168456b988a5adc8cb4125b0a493f9157d4a61e9e",
+    "executionReceiptSha256": "46d876be4d699f130ba450e5ce88afa1debd424b392427f9353dfa1797a43cc4",
+    "repoFingerprint": "3752bc3d65b0cce61a8d7b2ac3a5b4f3f1e4939e5a9f38dde52a8a235ae01eff",
+    "route": {
+      "candidateCommit": "087652e73edc644787185f2a400bd0efadbf2ddf",
+      "effort": "high",
+      "model": "sonnet",
+      "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16"
+    },
+    "runner": "claude",
+    "schema": "pipeline.design-readiness-host-execution.v1",
+    "selectionId": "drh_66b6001f1a1441e9b60c818260e1619c",
+    "selectionSha256": "1a610c34062f43c6f8dea68db0cd175fc9781870ffbaf30c1317aaa8818d30e0"
+  },
+  "outcome": "ready-for-po-review",
+  "runner": "claude",
+  "schema": "pipeline.design-readiness-receipt.v1",
+  "sources": {
+    "design": {
+      "path": "specs/sprint-alfred-epic/design.md",
+      "sha256": "8ac80ba2336e47bd8ec7a9a6cb72970ecb9fc8238ec2a872740856bc75080a8b"
+    },
+    "input": {
+      "path": "specs/sprint-alfred-epic/design-input.md",
+      "sha256": "6d65cbbf323965537b7540b2a7b183d82721e14e434bdeacfe4a6a80fc85b7e7"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/traceability.md",
+      "sha256": "559be0739a6d7de052e4faa29f3ea521ab90e603a04e87697934eb4c9e2eb12d"
+    }
+  },
+  "summary": "I found no blocking finding, so the outcome is ready-for-po-review. Readiness grants neither the Advisor exception nor implementation approval. The PRD technical-spec-sha256 marker equals the supplied spec digest. The five sources agree on 19 work packages, 77 register IDs (R1 13, R2 8, R3 11, R4 20, R5 16, R6 6, deferred 3), 20 T-rows (15 owned by R7, 5 mapped) and 28 PO decisions. Every register ID and decision I checked maps to one owner and one acceptance case. The R7 supersede eligibility (§22.10) matches decisions #22, #23 and #27. The PO's recovery sentence is covered by Spec §20 under decision #15. Non-blocking points remain: stale counts and headers, acceptance.md outside the reviewed set, an R7-vs-R4 sequencing dependency, the unspecified location of the hook-measurement record, ambiguity in how §20.2 applies to registrations, current-course artifacts bound to the ignored evidence/ root, unverified external claims, and the distilled nature of the input index. The Advisor course ended typed-unavailable with no child, so the PO decides on the proposed one-time exception.",
+  "unresolvedChoices": [
+    {
+      "id": "PO-ADVISOR-EXCEPTION",
+      "impact": "Without acceptance the design cannot be approved (PRD §11 requires an Advisor result or an accepted exception). Acceptance means the revision with R7 is approved with no Advisor answer.",
+      "question": "Does the PO accept the one-time advisor-unavailable exception at final approval, or require a retry or a new Advisor course first?"
+    },
+    {
+      "id": "PO-ANTIGRAVITY-HOOK-MEASUREMENT",
+      "impact": "It decides whether presentation and close are refused in consumer repositories until a measurement is recorded, and so whether the happy path AC-32 can pass on Antigravity.",
+      "question": "Should Antigravity (and Claude) Critic and plan-verifier ship as enabled with typed failures (decision #3), or stay unavailable until a measurement record exists (decision #14, R4-12)? Where does that record live for consumer installs?"
+    },
+    {
+      "id": "PO-ELEPHANT-DEFAULTS-AND-ROUTE",
+      "impact": "The sources record these as defaults the PO may overrule. Overruling changes the R1, R3, R4 and R5 contracts and the acceptance cases built on them.",
+      "question": "At final approval, does the PO accept the four Elephant defaults and the R1 shared catalogue / R5 simplified coordinator route, or overrule any?"
+    },
+    {
+      "id": "PO-ORDERING-R7-VS-R4",
+      "impact": "Landing them early risks conflicting changes to the dispatch-budget lock and incomplete not-live semantics. Landing them later delays unblocking bootstrap on a second device.",
+      "question": "May R7-2 and R7-11 land in step 1 with only the owner-identity increment they need, or should they follow R4 K3-9 and the §20 owner observation?"
+    }
+  ]
+}

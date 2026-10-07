@@ -1,0 +1,31 @@
+{
+  "schema": "pipeline.design-workflow-package-approval-request.v1",
+  "packagePath": "evidence/design-course/sprint-alfred-epic/r5d.package.json",
+  "packageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+  "approvalIntent": {
+    "value": {
+      "schema": "pipeline.po-approval-intent.v1",
+      "kind": "design-workflow-package",
+      "featureId": "sprint-alfred-epic",
+      "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+      "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
+      "candidate": {
+        "commit": "087652e73edc644787185f2a400bd0efadbf2ddf",
+        "tree": "52d5a6ad49a5019eb3a81dad0d82d9f1825b586f"
+      },
+      "policyRevision": "design-workflow-package-v2",
+      "subjectSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+      "decision": "approve"
+    },
+    "sha256": "73e92e3620488798b9bb2734d6a5875406cbc782ac752839be5ee29d47d597cc"
+  },
+  "advisorException": {
+    "kind": "advisor-unavailable",
+    "oneTime": true,
+    "packageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+    "courseId": "dac_029719691f9e4c365daa1824e9c271654175bc61",
+    "initialContextSha256": "c6d40554e3e4a8ca7eefd4af0ebf912cd4e1798badcdf5a8fad376689e084955",
+    "failureEvidenceSha256": "85400f4172236afe175790c06bf0689bf11a7cc8420af8a1dd74eae48d16f324",
+    "rationale": "Advisor-unavailable exception, feature sprint-alfred-epic, runner claude, design revision 5.\n\nReceipt-backed facts only:\n- The course producer ran the Advisor stage for runner claude on this candidate.\n- Outcome: unavailable-pending-final-approval, code native-initial-answer-provenance-unavailable.\n- No native Advisor child was started and no input was submitted (terminal no-child outcome).\n- Evidence: the course binding and failure receipt exported by the producer and referenced by this package.\n\nWhat the PO accepts, once, at the final plan approval: this design is approved without an Advisor\nanswer. The exception grants no other authority and does not replace readiness.\n"
+  }
+}

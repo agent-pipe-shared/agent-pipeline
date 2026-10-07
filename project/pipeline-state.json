@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-10-04T14:39:37.949Z",
+  "updatedAt": "2026-10-07T06:43:11.229Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -448,13 +448,29 @@
       {
         "phase": "implementation",
         "at": "2026-10-04T14:39:37.949Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-06T21:21:17.119Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-06T21:21:17.119Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-06T21:21:17.119Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-10-07T06:43:11.228Z"
       }
     ]
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-alfred-epic",
-    "revision": 21,
+    "revision": 31,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -463,11 +479,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-        "sha256": "a93d2241ae191eaa00c7ac62e8ed4746dbaf62a412868c6ff28e42bccde9ce62"
+        "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8"
       },
       "spec": {
         "path": "specs/sprint-alfred-epic/spec.md",
-        "sha256": "291a212fcda05c53e8e172cdc1a1a899ab19c065e9462aecb73277e180277b47"
+        "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
       },
       "result": null
     },
@@ -479,17 +495,17 @@
       "environmentRerouteCount": 0,
       "dispatch": {
         "featureId": "sprint-alfred-epic",
-        "queueRevision": 21,
+        "queueRevision": 31,
         "packageId": "greenfield-0.7-remediation",
         "actionId": "complete-and-integrate-approved-slices",
-        "dispatchId": "ALFRED-REV4-AUTHOR-20261004",
+        "dispatchId": "ALFRED-REV5C-AUTHOR-20261007",
         "attemptId": "attempt-1",
         "authorityDigests": {
-          "prdSha256": "a93d2241ae191eaa00c7ac62e8ed4746dbaf62a412868c6ff28e42bccde9ce62",
-          "specSha256": "291a212fcda05c53e8e172cdc1a1a899ab19c065e9462aecb73277e180277b47",
+          "prdSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+          "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
           "resultSha256": null
         },
-        "routeRequestSha256": "7f679bdeb4c2cc65499282ca8736d55232a92e1301b8021921129bd965109d62",
+        "routeRequestSha256": "24ae419fada9ed6c3dc77f866bac0decf1bb51c87c1b5e63c1bfd75be8e18466",
         "mayDelegate": false
       }
     },
@@ -497,7 +513,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 20,
+      "sourceRevision": 30,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -525,10 +541,10 @@
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-alfred-epic",
-    "invalidatedSubmissionSha256": "e8f749b976b77d1d375ecf91296c13dbe3634e36c3f3100c0c7cbf8ce5dc357a",
+    "invalidatedSubmissionSha256": "71dcfcbe134617ef37cd30a6a016cd8e5af01b8e20261aa6e91605fbc7561b11",
     "invalidatedApprovalSha256": null,
-    "invalidatedBy": "Elephant",
-    "invalidatedAt": "2026-10-03T11:29:06.577Z",
+    "invalidatedBy": "APS",
+    "invalidatedAt": "2026-10-06T21:21:17.119Z",
     "reason": "reopen-design"
   },
   "planMixedStateRecovery": {
@@ -545,13 +561,13 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-alfred-epic",
     "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-    "planSha256": "a93d2241ae191eaa00c7ac62e8ed4746dbaf62a412868c6ff28e42bccde9ce62",
+    "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
     "specPath": "specs/sprint-alfred-epic/spec.md",
-    "specSha256": "291a212fcda05c53e8e172cdc1a1a899ab19c065e9462aecb73277e180277b47",
+    "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
     "profile": "epic",
-    "profileSha256": "c3bb6a9292f554c0099b4ca65a8a49db6ce49e8ba38f07dbf5de15cc5de95f79",
-    "submittedBy": "Elephant",
-    "submittedAt": "2026-10-04T13:44:51.107Z"
+    "profileSha256": "a58df122a632741cdfb0d305e75163fa084c4219811676ecc67e7787a093fd46",
+    "submittedBy": "APS",
+    "submittedAt": "2026-10-07T06:35:14.540Z"
   },
   "selectedProfile": "epic",
   "planApprovalBriefing": {
@@ -559,9 +575,9 @@
     "scope": {
       "featureId": "sprint-alfred-epic",
       "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-      "planSha256": "a93d2241ae191eaa00c7ac62e8ed4746dbaf62a412868c6ff28e42bccde9ce62",
+      "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
       "specPath": "specs/sprint-alfred-epic/spec.md",
-      "specSha256": "291a212fcda05c53e8e172cdc1a1a899ab19c065e9462aecb73277e180277b47",
+      "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
       "profile": "epic"
     },
     "change": {
@@ -580,58 +596,58 @@
   },
   "planPresentation": {
     "schema": "pipeline.plan-presentation.v2",
-    "submissionSha256": "ced70d093ab69dcb25882c0f70ac75998a0834d9067be876b69bba1f1b75496a",
-    "presentedBy": "Elephant",
-    "presentedAt": "2026-10-04T13:55:41.270Z",
-    "designWorkflowPackagePath": "evidence/design-course/sprint-alfred-epic/claude.package.json",
-    "designWorkflowPackageSha256": "826f13740d9762e3c74a75407092a2ab6cd9ecc31ba60aa9216f83d69be52da6",
-    "designWorkflowApprovalRequestPath": "scratch/design-workflow-approval-request-826f13740d9762e3c74a75407092a2ab6cd9ecc31ba60aa9216f83d69be52da6.json"
+    "submissionSha256": "20b6da5169571b727ec67433ad88d3f2988537b8398f7e0a67abc3b7d37207a7",
+    "presentedBy": "APS",
+    "presentedAt": "2026-10-07T06:39:00.362Z",
+    "designWorkflowPackagePath": "evidence/design-course/sprint-alfred-epic/r5d.package.json",
+    "designWorkflowPackageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+    "designWorkflowApprovalRequestPath": "scratch/design-workflow-approval-request-539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7.json"
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v7",
     "approvedBy": "verified:local-po-key",
-    "approvedAt": "2026-10-04T13:59:45.328Z",
-    "submissionSha256": "ced70d093ab69dcb25882c0f70ac75998a0834d9067be876b69bba1f1b75496a",
-    "profileSha256": "c3bb6a9292f554c0099b4ca65a8a49db6ce49e8ba38f07dbf5de15cc5de95f79",
+    "approvedAt": "2026-10-07T06:40:45.087Z",
+    "submissionSha256": "20b6da5169571b727ec67433ad88d3f2988537b8398f7e0a67abc3b7d37207a7",
+    "profileSha256": "a58df122a632741cdfb0d305e75163fa084c4219811676ecc67e7787a093fd46",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
       "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16",
       "runtimeSha256": "4c287d572f49806e587e0c1264e33b1c1b6fcde64bc634b2d7b3bdbf6b93e086",
-      "receiptSha256": "a6ec84b024687be8bff76243feab41ad976c68a3f884e4344de561b7004e22d7",
+      "receiptSha256": "e9a39a2d036437620720707c249494b35cd84d5ecdea0313dbc7a2af24175852",
       "repositoryFingerprint": "3752bc3d65b0cce61a8d7b2ac3a5b4f3f1e4939e5a9f38dde52a8a235ae01eff",
       "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-      "planSha256": "a93d2241ae191eaa00c7ac62e8ed4746dbaf62a412868c6ff28e42bccde9ce62",
+      "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
       "specPath": "specs/sprint-alfred-epic/spec.md",
-      "specSha256": "291a212fcda05c53e8e172cdc1a1a899ab19c065e9462aecb73277e180277b47"
+      "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
     },
-    "priorInvalidationSha256": "73a1060f7972cd7bde0d5de99c3f86fd5b99e67e3c04eaa1efc5bac9aca8dc0e",
+    "priorInvalidationSha256": "4b6202dc221111f744c2b307add8c12fb6c6a2517c248414370b07d133c4571e",
     "designAdvisorAdmissionSha256": null,
-    "designWorkflowPackagePath": "evidence/design-course/sprint-alfred-epic/claude.package.json",
-    "designWorkflowPackageSha256": "826f13740d9762e3c74a75407092a2ab6cd9ecc31ba60aa9216f83d69be52da6",
+    "designWorkflowPackagePath": "evidence/design-course/sprint-alfred-epic/r5d.package.json",
+    "designWorkflowPackageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
     "designWorkflowApproval": {
       "schema": "pipeline.design-workflow-package-approval.v1",
       "mode": "signature",
       "approvedBy": "verified:local-po-key",
-      "approvedAt": "2026-10-04T13:59:45.285Z",
-      "packageSha256": "826f13740d9762e3c74a75407092a2ab6cd9ecc31ba60aa9216f83d69be52da6",
-      "intentSha256": "60276ce3b1b2c913c1bdef2a9c88e8ee4a34601b35521d7ea6b6477165e46154",
-      "proofSha256": "5e4035325b53841f5316aeca31b799260f9b24b38efa972291e41d56ab1ef9c9",
+      "approvedAt": "2026-10-07T06:40:44.895Z",
+      "packageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+      "intentSha256": "73e92e3620488798b9bb2734d6a5875406cbc782ac752839be5ee29d47d597cc",
+      "proofSha256": "e1eae2254fcb63f37eb99e7277cfb0b1e4a11bc21188bf9a328ef00b387830fa",
       "proof": {
         "schema": "pipeline.po-approval-proof.v1",
-        "intentSha256": "60276ce3b1b2c913c1bdef2a9c88e8ee4a34601b35521d7ea6b6477165e46154",
+        "intentSha256": "73e92e3620488798b9bb2734d6a5875406cbc782ac752839be5ee29d47d597cc",
         "keyReference": "local-po-key",
         "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
-        "signatureBase64": "JBlJXUpN8Ynfn1O58k5dhOzQ+S+MAA5nZEKc5p1ton5pqQuyJldWMZdwrEvxorag/7YjnGUeIrRrZPAQXyOhAA=="
+        "signatureBase64": "x3aerOVSZN4/6ChIztzI2BUVlFfTzn3/wE5V+tXusTgPgqwTjDDo6PJ/Jj5RrxiJLweANECsO4AN990F0UoZDA=="
       },
       "advisorException": {
         "kind": "advisor-unavailable",
         "oneTime": true,
-        "packageSha256": "826f13740d9762e3c74a75407092a2ab6cd9ecc31ba60aa9216f83d69be52da6",
-        "courseId": "dac_492cc5adff38ef63eb1913e65f43d9cf1445b659",
-        "initialContextSha256": "07f23deaa01a0f95d4951d53f20e6a72b03c35c2bcaa9b9174ea4add16d4f236",
-        "failureEvidenceSha256": "e69f694595c5f4f35a850e186003a90a5e0a4a3f3f594c1d48401d7d5feb130c",
-        "rationale": "Advisor-unavailable exception, feature sprint-alfred-epic, runner claude (native Windows), design revision 4.\n\nReceipt-backed facts:\n1. The Advisor stage for this candidate was run through the course producer for runner claude. The course\n   recorded a terminal no-child outcome with code native-initial-answer-provenance-unavailable: no Advisor\n   child process was started and no input was submitted (failure evidence: childStarted false,\n   inputSubmitted false, attemptCount 0). The course binding and failure evidence are the exported\n   artifacts referenced by this package.\n2. In this Pipeline version the design course has no wired Advisor route for runner claude: the native\n   initial-Advisor entry records unavailability before any child or export, and the governed consult\n   fallback of Spec section 17 is not wired into the course (the course accepts an answered Advisor only\n   for runner codex; findings register K3-2). Delivering that route is part of the approved scope\n   (Spec section 21.4, role-route preflight); a fallback consult may supply only a labelled,\n   non-authorizing Advisor input and never satisfies readiness, Critic or plan-verifier.\n3. This course is a child of the feature's previous terminal (no-child) course, linked to it as parent.\n   The PO explicitly confirmed a new Advisor course for the revised design (design-input.md, PO decision\n   13 of 2026-10-04); the revision adds new PO input to design-input.md, which the unavailable-path\n   revision chain cannot carry. The child course binds the registered revision authoring dispatch and the\n   revised source digests.\n4. Independent readiness for this candidate is a separate, host-observed claude CLI child with its own\n   receipt in this package; the Advisor exception does not substitute for it.\n\nWhat this exception asks the PO to accept, once, at the final plan approval: that this design is\napproved without an Advisor answer because the course has no wired Advisor route for runner claude in\nthis version. It grants no other authority.\n"
+        "packageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+        "courseId": "dac_029719691f9e4c365daa1824e9c271654175bc61",
+        "initialContextSha256": "c6d40554e3e4a8ca7eefd4af0ebf912cd4e1798badcdf5a8fad376689e084955",
+        "failureEvidenceSha256": "85400f4172236afe175790c06bf0689bf11a7cc8420af8a1dd74eae48d16f324",
+        "rationale": "Advisor-unavailable exception, feature sprint-alfred-epic, runner claude, design revision 5.\n\nReceipt-backed facts only:\n- The course producer ran the Advisor stage for runner claude on this candidate.\n- Outcome: unavailable-pending-final-approval, code native-initial-answer-provenance-unavailable.\n- No native Advisor child was started and no input was submitted (terminal no-child outcome).\n- Evidence: the course binding and failure receipt exported by the producer and referenced by this package.\n\nWhat the PO accepts, once, at the final plan approval: this design is approved without an Advisor\nanswer. The exception grants no other authority and does not replace readiness.\n"
       }
     }
   }
