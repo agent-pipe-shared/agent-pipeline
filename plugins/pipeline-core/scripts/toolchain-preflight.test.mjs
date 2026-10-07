@@ -623,4 +623,99 @@ check("R7-7e: a foreign pre-push hook yields git-hooks attended and is left unch
 afterTests(() => {
 process.stdout.write(`${passed}/${cases.length} checks passed.\n`);
 });
+// ===== R7-6-T10 (Spec 22.6 delta item 4, PO decision AC): the readiness report resolves the PO key directory like the shared resolver =====
+// `locateKeyDirectory` is not exported, so it is observed through the `po-key-directory` finding of
+// runEnvironmentReadinessReport: a readFile spy on the signing dependencies records which directory's
+// po-public.pem the probe opened, and the finding's status/cause carry the legacy and failure tiers. The
+// expected directory/tier comes from resolvePoKeyDirectory() of po-human-approval.mjs (parseHumanArgs when
+// that export is absent), called with the identical fixture inputs. Fixture homes, fixture git-common-dir and
+// fixture key directories only; PIPELINE_PO_APPROVAL_DIRECTORY is saved and restored.
+import * as r76jApproval from "./po-human-approval.mjs";
+import { basename as r76jBasename, resolve as r76jResolve } from "node:path";
+const R76J_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+const R76J_ROWS = Object.freeze([
+  { n: 1, label: "env set + plane set + legacy set -> environment", env: true, plane: "set", legacy: true, expect: "resolved", dir: "environment" },
+  { n: 2, label: "env unset, plane set, legacy set -> machine plane", env: false, plane: "set", legacy: true, expect: "resolved", dir: "machine-plane" },
+  { n: 3, label: "env unset, plane absent, legacy set -> legacy (reported legacy)", env: false, plane: "absent", legacy: true, expect: "resolved", dir: "repo-scope" },
+  { n: 4, label: "env unset, plane absent, legacy absent -> unset", env: false, plane: "absent", legacy: false, expect: "unset", dir: null },
+  { n: 5, label: "env unset, plane invalid (legacy set) -> failure, not absent", env: false, plane: "invalid", legacy: true, expect: "invalid", dir: null },
+  { n: 6, label: "env set, plane invalid (legacy set) -> environment", env: true, plane: "invalid", legacy: true, expect: "resolved", dir: "environment" },
+]);
+function r76jBuild(rowBase, row) {
+  const home = join(rowBase, "home");
+  const common = join(rowBase, "common");
+  const repo = join(rowBase, "repo");
+  const keys = { environment: join(rowBase, "key-env"), "machine-plane": join(rowBase, "key-plane"), "repo-scope": join(rowBase, "key-legacy") };
+  for (const directory of [home, common, repo, ...Object.values(keys)]) mkdirSync(directory, { recursive: true });
+  for (const directory of Object.values(keys)) {
+    writeFileSync(join(directory, "po-public.pem"), "fixture public key\n", "utf8");
+    writeFileSync(join(directory, "trust-policy.json"), JSON.stringify({ keyReference: "r76j-key", publicKeySha256: "d".repeat(64) }), "utf8");
+  }
+  if (row.plane !== "absent") {
+    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+    const valid = { schema: "pipeline.machine-plane.v1", poKeyDirectory: keys["machine-plane"], pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: "2026-10-07T00:00:00.000Z" };
+    writeFileSync(join(home, ".agent-pipeline", "machine.json"), row.plane === "set" ? JSON.stringify(valid) : "{ not json", "utf8");
+  }
+  if (row.legacy) {
+    mkdirSync(join(common, "agent-pipeline"), { recursive: true });
+    writeFileSync(join(common, "agent-pipeline", "po-key-directory.json"), JSON.stringify({ schema: "pipeline.po-key-directory.v1", poKeyDirectory: keys["repo-scope"], updatedAt: "2026-10-07T00:00:00.000Z" }), "utf8");
+  }
+  return { repo, keys, seams: { homedirFn: () => home, gitCommonDirFn: () => common } };
+}
+function r76jOracle(repoRoot, dependencies) {
+  if (typeof r76jApproval.resolvePoKeyDirectory === "function") {
+    const resolution = r76jApproval.resolvePoKeyDirectory({ explicit: undefined, repoRoot, dependencies });
+    return { mode: "resolvePoKeyDirectory", status: resolution.status, directory: resolution.directory ?? null, legacy: resolution.legacy === true };
+  }
+  const parsed = r76jApproval.parseHumanArgs(["verify", "--repo-root", repoRoot], dependencies);
+  if (parsed.error) return { mode: "parseHumanArgs", status: parsed.code === "SIGN-KEY-DIRECTORY-UNSET" ? "unset" : "invalid", directory: null, legacy: false };
+  return { mode: "parseHumanArgs", status: "resolved", directory: parsed.directory, legacy: parsed.legacy === true };
+}
+check("R7-6j: the po-key-directory finding resolves the key directory exactly like the shared resolver (env > machine plane > legacy; an invalid store is a failure, never absent)", async () => {
+  const base = mkdtempSync(join(tmpdir(), "r76j-"));
+  const savedEnv = process.env[R76J_ENV];
+  const verdicts = [];
+  let red = 0;
+  try {
+    for (const row of R76J_ROWS) {
+      const fixture = r76jBuild(join(base, `row-${row.n}`), row);
+      if (row.env) process.env[R76J_ENV] = fixture.keys.environment; else delete process.env[R76J_ENV];
+      const problems = [];
+      const oracle = r76jOracle(fixture.repo, fixture.seams);
+      const expectedDirectory = row.dir === null ? null : r76jResolve(fixture.keys[row.dir]);
+      if (oracle.status !== row.expect || (oracle.directory === null ? null : r76jResolve(oracle.directory)) !== expectedDirectory) {
+        problems.push(`the oracle (${oracle.mode}) answered ${oracle.status} ${oracle.directory === null ? "-" : r76jBasename(oracle.directory)}, not the table's ${row.expect} ${row.dir === null ? "-" : r76jBasename(fixture.keys[row.dir])}`);
+      }
+      const reads = [];
+      const signingDependencies = {
+        ...fixture.seams,
+        spawn: () => ({ status: 0, stdout: "", stderr: "" }),
+        readFile: (path, encoding) => { reads.push(String(path)); return readFileSync(path, encoding); },
+      };
+      const report = await r77Report(fixture.repo, { signingDependencies, [R77_PROBES_DEP]: r77Probes({}, ["signing-toolchain", "po-key-directory", "trust-anchor-match"]) });
+      const finding = report.findings.find((entry) => entry.findingId === "po-key-directory");
+      const cause = String(finding?.cause ?? "");
+      const consulted = reads.find((path) => r76jBasename(path) === "po-public.pem");
+      if (oracle.status === "resolved") {
+        if (consulted === undefined) problems.push(`the report opened no key directory (finding ${finding?.status}: ${cause.slice(0, 80)}), the resolver names ${r76jBasename(oracle.directory)}`);
+        else if (r76jResolve(consulted, "..") !== r76jResolve(oracle.directory)) problems.push(`the report opened ${r76jBasename(r76jResolve(consulted, ".."))}, the resolver names ${r76jBasename(oracle.directory)}`);
+        if (/legacy per-repository/u.test(cause) !== oracle.legacy) problems.push(`legacy tier reported ${/legacy per-repository/u.test(cause)}, the resolver says ${oracle.legacy}`);
+      } else if (oracle.status === "unset") {
+        if (consulted !== undefined) problems.push(`the report opened ${r76jBasename(r76jResolve(consulted, ".."))} although the resolver finds no directory`);
+        if (finding?.status !== "repairable" || !/^key-directory-unset/u.test(cause)) problems.push(`expected the unset finding (repairable, key-directory-unset), got ${finding?.status}: ${cause.slice(0, 80)}`);
+      } else {
+        if (consulted !== undefined) problems.push(`the report opened ${r76jBasename(r76jResolve(consulted, ".."))} although the consulted store is invalid`);
+        if (finding?.status === "ok" || /^key-directory-unset/u.test(cause)) problems.push(`an invalid store must be a failure, not absent or ok; got ${finding?.status}: ${cause.slice(0, 80)}`);
+      }
+      if (problems.length > 0) red += 1;
+      const verdict = `R7-6j row ${row.n} (${row.label}) oracle=${oracle.mode}: ${problems.length === 0 ? "GREEN" : `RED - ${problems.join("; ")}`}`;
+      verdicts.push(verdict);
+      process.stdout.write(`${verdict}\n`);
+    }
+  } finally {
+    if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
+    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
+  assert.equal(red, 0, `${red} of ${R76J_ROWS.length} rows disagree with the shared resolver:\n${verdicts.join("\n")}`);
+});
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
