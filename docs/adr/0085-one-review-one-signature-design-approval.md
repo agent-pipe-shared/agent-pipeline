@@ -2,6 +2,11 @@
 
 ## Status
 
+Accepted, 2026-10-07, by PO chat decision I ([`po-decisions-2026-10-07.md`](../../specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md)):
+the implementation is in scope of the current 0.7.0 candidate without a separate design revision or signature;
+the PO knowingly overrode the approval-scope exclusion for this ADR only. The paragraph below records the original
+proposal state.
+
 Proposed, 2026-10-07. Drafted by the Elephant from PO decisions E and F of
 2026-10-07 ([`specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md`](../../specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md))
 and the measured toil of the revision-5 approval
