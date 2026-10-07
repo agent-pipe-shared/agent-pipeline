@@ -24,7 +24,7 @@ const base = { root, pluginRoot, candidate, sources, featureId: "feature-x", aut
 test("Advisor command selection stays on the canonical producer for all runners", () => {
   for (const runner of ["claude", "codex", "antigravity"]) {
     const action = buildDesignCourseProducerAction({ ...base, runner, stage: "advisor" });
-    assert.match(action.producer, /scripts\/design-advisory-coordinator\.mjs$/u);
+    assert.match(action.producer.replaceAll("\\", "/"), /scripts\/design-advisory-coordinator\.mjs$/u);
     assert.equal(action.shell, false);
     assert.equal(action.requiresConfirmation, true);
     assert.equal(action.implementationAuthority, false);
@@ -155,6 +155,10 @@ test("confirmed course reaches one unsigned final package through actual produce
   const fixture = mkdtempSync(join(tmpdir(), "design-course-full-contract-"));
   try {
     mkdirSync(join(fixture, "docs")); mkdirSync(join(fixture, "evidence"));
+    // R7-3 (Spec 22.3): the preparation, readiness and package are digest-bound, so they live under the tracked
+    // `specs/<feature-id>/evidence/` home, never the git-ignored root `evidence/`.
+    const trackedHome = "specs/feature-x/evidence/design-course/claude";
+    mkdirSync(join(fixture, ...trackedHome.split("/")), { recursive: true });
     const current = { commit: "9".repeat(40), tree: "8".repeat(40) };
     const contents = {};
     const refs = {};
@@ -180,13 +184,14 @@ test("confirmed course reaches one unsigned final package through actual produce
       if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "HEAD") return current.commit;
       if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "HEAD^{tree}") return current.tree;
       if (args[0] === "show") return contents[args[1].slice(current.commit.length + 1)];
-      if (args[0] === "check-ignore") return "";
+      // The tracked home is not git-ignored: `git check-ignore --quiet` exits 1 and execFileSync throws.
+      if (args[0] === "check-ignore") throw Object.assign(new Error("path is not ignored"), { status: 1 });
       throw new Error(`unexpected Git request: ${args.join(" ")}`);
     };
     const input = { root: fixture, pluginRoot, runner: "claude", confirmProducerExecution: true,
       featureId: "feature-x", authoringDispatchId: "author-x", profile: "feature", sources: refs,
-      outputPrefix: "evidence/advisor", preparationPath: "evidence/preparation.json",
-      readinessPath: "evidence/readiness.json", packagePath: "evidence/package.json", readinessDispatchId: "ready-x",
+      outputPrefix: "evidence/advisor", preparationPath: `${trackedHome}/preparation.json`,
+      readinessPath: `${trackedHome}/readiness.json`, packagePath: `${trackedHome}/package.json`, readinessDispatchId: "ready-x",
       proposedExceptionRationale: "The native Advisor route produced verified no-child evidence; request one final package review." };
     const dependencies = {
       execFileSync: fakeGit, canonicalJson: JSON.stringify,
@@ -195,7 +200,7 @@ test("confirmed course reaches one unsigned final package through actual produce
         stages.push(action.stage);
         return action.stage === "advisor" ? { status: "advisor-unavailable-no-child", producerResult: advisor }
           : { status: "readiness-published", producerResult: { ok: true, code: "DESIGN-READINESS-RECEIPT-PUBLISHED",
-            runner: "claude", candidate: current, path: "evidence/readiness.json", dispatchId: "ready-x" } };
+            runner: "claude", candidate: current, path: `${trackedHome}/readiness.json`, dispatchId: "ready-x" } };
       },
       buildPackageV2: async (input) => ({ ok: true, code: "DWP2-PACKAGE-BUILT", packagePath: input.packagePath,
         packageSha256: "e".repeat(64), candidate: current, packageRead: { implementationAuthority: false },
@@ -217,8 +222,8 @@ test("confirmed course reaches one unsigned final package through actual produce
     const argv = ['--run-v2', '--root', fixture, '--runner', 'claude', '--feature-id', input.featureId,
       '--authoring-dispatch-id', input.authoringDispatchId, '--profile', input.profile, '--output-prefix', 'evidence/cli-advisor'];
     for (const name of ['input', 'prd', 'spec', 'design', 'traceability']) argv.push('--source', name, refs[name].path, refs[name].sha256);
-    argv.push('--readiness-dispatch-id', 'ready-cli', '--queue-revision', '0', '--receipt', 'evidence/cli-readiness.json',
-      '--preparation', 'evidence/cli-preparation.json', '--package', 'evidence/cli-package.json',
+    argv.push('--readiness-dispatch-id', 'ready-cli', '--queue-revision', '0', '--receipt', `${trackedHome}/cli-readiness.json`,
+      '--preparation', `${trackedHome}/cli-preparation.json`, '--package', `${trackedHome}/cli-package.json`,
       '--exception-rationale', rationale, digest(input.proposedExceptionRationale), '--execute');
     const cliStages = [];
     const cliDependencies = { ...dependencies, executeProducer: async action => {
@@ -226,7 +231,7 @@ test("confirmed course reaches one unsigned final package through actual produce
       assert.equal(action.implementationAuthority, false);
       return action.stage === 'advisor' ? { status: 'advisor-unavailable-no-child', producerResult: advisor }
         : { status: 'readiness-published', producerResult: { ok: true, code: 'DESIGN-READINESS-RECEIPT-PUBLISHED',
-          runner: 'claude', candidate: current, path: 'evidence/cli-readiness.json', dispatchId: 'ready-cli' } };
+          runner: 'claude', candidate: current, path: `${trackedHome}/cli-readiness.json`, dispatchId: 'ready-cli' } };
     } };
     const output = [];
     const io = { stdout: { write: value => output.push(value) }, exitCode: 0 };
@@ -234,7 +239,7 @@ test("confirmed course reaches one unsigned final package through actual produce
     assert.equal(cliResult.ok, true, JSON.stringify(cliResult));
     assert.deepEqual(cliStages, ['advisor', 'readiness']);
     assert.equal(cliResult.status, 'final-po-review-ready');
-    assert.equal(cliResult.packagePath, 'evidence/cli-package.json');
+    assert.equal(cliResult.packagePath, `${trackedHome}/cli-package.json`);
     assert.equal(cliResult.approvalCountBeforeFinalPackage, 0);
     assert.equal(cliResult.implementationAuthority, false);
     assert.equal(JSON.parse(output.at(-1)).nextAction.kind, 'present-final-design-workflow-package-to-po');
