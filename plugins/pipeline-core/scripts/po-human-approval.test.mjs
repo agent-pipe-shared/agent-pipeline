@@ -3318,6 +3318,205 @@ test("PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory 
  * environment-above-plane boundary is the AC-11 case above, and the whole order is R7-6h.
  * ------------------------------------------------------------------ */
 
+/* ======================================================================
+ * R7-6-T11 (R7-6k; PO decision AC of 2026-10-07, specs/sprint-alfred-epic/plans/r7-6-multi-key-aa.md,
+ * test list 5-7; Elephant ruling 5 in plans/0.7-execution-order.md): the writer of the machine-wide default.
+ *
+ *   po-human-approval.mjs set-po-key-directory --directory <absolute-dir> [--replace <current-value>]
+ *
+ * Writes only poKeyDirectory and updatedAt in the machine plane (creating a valid plane when absent), refuses a
+ * relative path, a non-directory and a path inside a repository or .git, reports an invalid plane without
+ * repairing it, and replaces a DIFFERENT existing value only when --replace names the current value exactly.
+ * `setup --directory` shares the write rule: a fresh home gets the plane, a different existing default is left
+ * alone and reported together with the repair command.
+ *
+ * Every refusal case carries a positive control in the SAME test (the identical command with a valid argument
+ * succeeds), so a refusal that merely is "unknown command" cannot pass. Every home is a fresh directory under
+ * the OS temporary directory, never the real home.
+ * ====================================================================== */
+const R7K_OTHER_FIELDS = { schema: MACHINE_PLANE_SCHEMA, pushApprovalDefault: "signature", routing: { tier: "keep" }, language: "en-test", session: { id: "keep" }, usage: { count: 1 } };
+
+function r7kPlaneBytes(home) {
+  const path = join(home, ".agent-pipeline", "machine.json");
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+function r7kSet(home, directory, extra = []) {
+  return r76Outcome(() => withEnvDirectory(undefined, () => runHumanApproval(
+    ["set-po-key-directory", "--directory", directory, ...extra], { homedirFn: () => home })));
+}
+const r7kRefused = (outcome) => outcome.threw === true || outcome.value?.ok === false;
+function r7kAssertAccepted(outcome, label) {
+  assert.equal(outcome.threw, false, `${label}: observed ${r76Describe(outcome)}`);
+  assert.equal(outcome.value.ok, true, `${label}: observed ${r76Describe(outcome)}`);
+}
+const r7kMentions = (text, path) => text.includes(path) || text.includes(realpathSync(path));
+
+test("R7-6k: set-po-key-directory on a home with no machine plane creates a valid plane that holds the directory, with every other field not configured and nothing else written (decision AC)", () => {
+  const home = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
+  const directory = mkdtempSync(join(tmpdir(), "r7-6k-keys-"));
+  try {
+    assert.equal(r7kPlaneBytes(home), null, "harness: the home starts without a plane");
+    r7kAssertAccepted(r7kSet(home, directory), "set-po-key-directory");
+    const plane = readMachinePlane({ homedirFn: () => home });
+    assert.equal(plane.status, "valid");
+    assert.equal(realpathSync(plane.plane.poKeyDirectory), realpathSync(directory));
+    for (const field of ["routing", "language", "session", "usage"]) assert.equal(plane.plane[field], null, `${field} stays not configured`);
+    assert.deepEqual(treeListing(home).filter((entry) => !entry.startsWith(".agent-pipeline")), [], "nothing outside the plane directory is written into the home");
+    assert.deepEqual(treeListing(directory), [], "the key directory itself is not written: the command creates no key and grants no trust");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("R7-6k: set-po-key-directory replaces a different existing default only when --replace names the current value exactly: none and a wrong value are refused with the plane byte-identical, the exact value succeeds and changes only poKeyDirectory and updatedAt (decision AC, ruling 5)", () => {
+  const home = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
+  const [first, second, third] = ["a", "b", "c"].map((name) => mkdtempSync(join(tmpdir(), `r7-6k-keys-${name}-`)));
+  try {
+    const seeded = { ...R7K_OTHER_FIELDS, poKeyDirectory: first, updatedAt: "2020-01-01T00:00:00.000Z" };
+    writeMachinePlane(seeded, { homedirFn: () => home });
+    const before = r7kPlaneBytes(home);
+    assert.notEqual(before, null, "harness: the seeded plane exists");
+    for (const [label, extra] of [["no --replace", []], ["a wrong --replace value", ["--replace", third]]]) {
+      const refused = r7kSet(home, second, extra);
+      assert.equal(r7kRefused(refused), true, `${label}: observed ${r76Describe(refused)}`);
+      assert.equal(r7kPlaneBytes(home), before, `${label}: the plane is byte-identical`);
+    }
+    r7kAssertAccepted(r7kSet(home, second, ["--replace", first]), "positive control: --replace naming the exact current value");
+    const after = readMachinePlane({ homedirFn: () => home });
+    assert.equal(after.status, "valid");
+    assert.equal(realpathSync(after.plane.poKeyDirectory), realpathSync(second));
+    const { poKeyDirectory: newDirectory, updatedAt: newStamp, ...changedRest } = after.plane;
+    const { poKeyDirectory: oldDirectory, updatedAt: oldStamp, ...seededRest } = seeded;
+    assert.deepEqual(changedRest, seededRest, "every field other than poKeyDirectory and updatedAt is carried over unchanged");
+    assert.ok(Date.parse(newStamp) > Date.parse(oldStamp), "updatedAt moves forward");
+    assert.notEqual(newDirectory, oldDirectory);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    for (const directory of [first, second, third]) rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+function r7kRefusalCase(label, makeBadPath, reason) {
+  test(`R7-6k: set-po-key-directory refuses ${label} and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC)`, () => {
+    const home = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
+    const good = mkdtempSync(join(tmpdir(), "r7-6k-keys-"));
+    const workspace = mkdtempSync(join(tmpdir(), "r7-6k-bad-"));
+    try {
+      const refused = r7kSet(home, makeBadPath(workspace));
+      assert.equal(r7kRefused(refused), true, `${label}: observed ${r76Describe(refused)}`);
+      assert.match(r76Text(refused), reason, `${label}: the refusal names its reason`);
+      assert.equal(r7kPlaneBytes(home), null, `${label}: a refused path writes no plane`);
+      r7kAssertAccepted(r7kSet(home, good), "positive control");
+      assert.equal(readMachinePlane({ homedirFn: () => home }).status, "valid");
+    } finally {
+      for (const directory of [home, good, workspace]) rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+const r7kGitRepository = (workspace) => { const repository = join(workspace, "work"); mkdirSync(repository); execFileSync("git", ["init", "-q", repository]); return repository; };
+r7kRefusalCase("a relative path", () => "relative-po-keys", /absolute/iu);
+r7kRefusalCase("a path that is not a directory", (workspace) => { const file = join(workspace, "a-file"); writeFileSync(file, "not a directory\n"); return file; }, /director/iu);
+r7kRefusalCase("a path inside a repository", (workspace) => { const keys = join(r7kGitRepository(workspace), "keys"); mkdirSync(keys); return keys; }, /repositor|\.git/iu);
+r7kRefusalCase("a path inside .git", (workspace) => { const inside = join(r7kGitRepository(workspace), ".git", "po-keys"); mkdirSync(inside); return inside; }, /repositor|\.git/iu);
+
+test("R7-6k: set-po-key-directory reports an invalid machine plane and leaves it byte-identical, never repairing it; the same command on a valid home succeeds (positive control) (decision AC)", () => {
+  const goodHome = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
+  const badHome = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
+  const directory = mkdtempSync(join(tmpdir(), "r7-6k-keys-"));
+  try {
+    r7kAssertAccepted(r7kSet(goodHome, directory), "positive control");
+    const garbage = "{ not valid json";
+    mkdirSync(join(badHome, ".agent-pipeline"), { recursive: true });
+    writeFileSync(join(badHome, ".agent-pipeline", "machine.json"), garbage);
+    const refused = r7kSet(badHome, directory);
+    assert.equal(r7kRefused(refused), true, `observed ${r76Describe(refused)}`);
+    assert.match(r76Text(refused), /plane/iu, "the report names the machine plane");
+    assert.match(r76Text(refused), /invalid/iu, "the report says the plane is invalid");
+    assert.equal(r7kPlaneBytes(badHome), garbage, "an invalid plane is reported, never repaired or overwritten");
+  } finally {
+    for (const path of [goodHome, badHome, directory]) rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("R7-6k: setup --directory on a home with no machine plane writes a new valid plane (poKeyDirectory and updatedAt set, every other field not configured) and nothing into the repository or the git-common-dir (decision AC, test-list 5)", () => {
+  const dirs = fixtureDirs();
+  const home = outsideRepoHomeFixture();
+  const common = repoScopeCommonDirFixture();
+  try {
+    keyFixture(dirs.directory);
+    const repoBefore = treeListing(dirs.repoRoot);
+    const result = withEnvDirectory(undefined, () => runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
+      { homedirFn: () => home, gitCommonDirFn: () => common },
+    ));
+    assert.equal(result.ok, true);
+    const plane = readMachinePlane({ homedirFn: () => home });
+    assert.equal(plane.status, "valid", "setup --directory creates the machine plane when none exists");
+    assert.equal(realpathSync(plane.plane.poKeyDirectory), realpathSync(dirs.directory));
+    for (const field of ["routing", "language", "session", "usage"]) assert.equal(plane.plane[field], null, `${field} stays not configured`);
+    assert.deepEqual(treeListing(home).filter((entry) => !entry.startsWith(".agent-pipeline")), [], "nothing outside the plane directory is written into the home");
+    assert.deepEqual(treeListing(common), [], "nothing is written into the git-common-dir: the legacy store is read-only");
+    assert.deepEqual(treeListing(dirs.repoRoot), repoBefore, "nothing is written into the repository");
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+    rmSync(common, { recursive: true, force: true });
+  }
+});
+
+test("R7-6k: setup --directory with a different existing default leaves the plane byte-identical and reports the current default plus the set-po-key-directory --replace repair command (decision AC, test-list 6)", () => {
+  const dirs = fixtureDirs();
+  const other = fixtureDirs();
+  const home = outsideRepoHomeFixture();
+  const common = repoScopeCommonDirFixture();
+  const reports = [];
+  const originalWrite = process.stderr.write;
+  try {
+    keyFixture(dirs.directory);
+    keyFixture(other.directory);
+    const dependencies = { homedirFn: () => home, gitCommonDirFn: () => common, stderrWriteFn: (chunk) => reports.push(String(chunk)) };
+    const control = withEnvDirectory(undefined, () => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], dependencies));
+    assert.equal(control.ok, true);
+    const created = readMachinePlane({ homedirFn: () => home });
+    assert.equal(created.status, "valid", "positive control: setup --directory writes the default when none is recorded");
+    assert.equal(realpathSync(created.plane.poKeyDirectory), realpathSync(dirs.directory));
+    const bytes = r7kPlaneBytes(home);
+
+    reports.length = 0;
+    process.stderr.write = (chunk) => { reports.push(String(chunk)); return true; };
+    const second = r76Outcome(() => withEnvDirectory(undefined, () => runHumanApproval(
+      ["setup", "--repo-root", other.repoRoot, "--directory", other.directory], dependencies)));
+    process.stderr.write = originalWrite;
+    assert.equal(second.threw, false, `observed ${r76Describe(second)}`);
+    assert.equal(second.value.ok, true, "setup itself still succeeds when it leaves the default alone");
+    assert.equal(r7kPlaneBytes(home), bytes, "the existing default is left byte-identical");
+    const report = [r76Text(second), ...reports].join("\n");
+    assert.ok(r7kMentions(report, dirs.directory), "the report names the current default");
+    assert.ok(r7kMentions(report, other.directory), "the report names the directory the repair would set");
+    assert.match(report, /set-po-key-directory/u, "the report names the repair command");
+    assert.match(report, /--replace/u, "the repair command carries --replace");
+    assert.deepEqual(treeListing(common), [], "nothing is written into the git-common-dir");
+  } finally {
+    process.stderr.write = originalWrite;
+    cleanup(dirs);
+    cleanup(other);
+    rmSync(home, { recursive: true, force: true });
+    rmSync(common, { recursive: true, force: true });
+  }
+});
+
+test("R7-6k: the catalogue entry for set-po-key-directory is agent-runnable, with a non-null executable and an argv that names the command (decision AC, test-list 7)", () => {
+  const { repair } = keyDirectoryUnsetFinding();
+  assert.equal(repair.kind, "set-po-key-directory");
+  assert.equal(typeof repair.executable, "string", `executable observed as ${JSON.stringify(repair.executable)}`);
+  assert.ok(repair.executable.length > 0);
+  assert.ok(Array.isArray(repair.argv) && repair.argv.length > 0 && repair.argv.every((entry) => typeof entry === "string"), `argv observed as ${JSON.stringify(repair.argv)}`);
+  assert.ok(repair.argv.includes("set-po-key-directory"), "the argv names the subcommand");
+  assert.equal(repair.mutation, true);
+  assert.equal(repair.requiresConfirmation, false);
+});
+
 test("PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid repo-scoped value", () => {
   const dirs = fixtureDirs();
   const otherDirectory = mkdtempSync(join(tmpdir(), "po-repo-scope-unused-"));
