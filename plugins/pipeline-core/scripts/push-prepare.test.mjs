@@ -23,7 +23,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -762,6 +762,7 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.match(humanText, /Step: agent push\nPOSIX:/u);
   assert.match(humanText, /PowerShell:/u);
   assert.doesNotMatch(humanText, /--directory|\/external\/po-dir/u);
+  assert.ok(isAbsolute(PIPELINE_STATE_SCRIPT_PATH));
   assert.match(PIPELINE_STATE_SCRIPT_PATH.replaceAll("\\", "/"), /\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
   const source = readFileSync(fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "utf8");
   assert.match(source, /PIPELINE_STATE_SCRIPT_PATH, "approve-push"/u);

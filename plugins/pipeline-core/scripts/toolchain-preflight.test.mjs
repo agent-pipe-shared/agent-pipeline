@@ -718,4 +718,50 @@ check("R7-6j: the po-key-directory finding resolves the key directory exactly li
   }
   assert.equal(red, 0, `${red} of ${R76J_ROWS.length} rows disagree with the shared resolver:\n${verdicts.join("\n")}`);
 });
+// ===== R7-6-T15 (Critic findings FS-2, FS-3): the relative-environment and invalid-legacy rows, pinned at the report =====
+async function r76tReport(fixture) {
+  const signingDependencies = { ...fixture.seams, spawn: () => ({ status: 0, stdout: "", stderr: "" }), readFile: (path, encoding) => readFileSync(path, encoding) };
+  return r77Report(fixture.repo, { signingDependencies, [R77_PROBES_DEP]: r77Probes({}, ["signing-toolchain", "po-key-directory", "trust-anchor-match"]) });
+}
+check("R7-6m: a relative key directory from the environment is a usage error, never \"unset\"", async () => {
+  const base = mkdtempSync(join(tmpdir(), "r76m-"));
+  const savedEnv = process.env[R76J_ENV];
+  try {
+    const fixture = r76jBuild(join(base, "row"), { plane: "absent", legacy: false });
+    process.env[R76J_ENV] = join("relative", "key-dir");
+    const parsed = r76jApproval.parseHumanArgs(["verify", "--repo-root", fixture.repo], fixture.seams);
+    assert.ok(parsed.error, "the shared parser must refuse a relative environment directory");
+    assert.notEqual(parsed.code, "SIGN-KEY-DIRECTORY-UNSET", "the shared parser must not call a relative value unset");
+    const report = await r76tReport(fixture);
+    const finding = report.findings.find((entry) => entry.findingId === "po-key-directory");
+    const cause = String(finding?.cause ?? "");
+    assert.ok(finding, "the po-key-directory finding must exist");
+    assert.doesNotMatch(cause, /key-directory-unset/u, `a relative value must not be reported as unset: ${cause.slice(0, 120)}`);
+    assert.notEqual(finding.repair?.action ?? finding.repair?.id, "set-po-key-directory", "the unset repair must not be offered for a relative value");
+    assert.notEqual(finding.status, "ok", "a relative directory is never ok");
+    assert.match(`${cause} ${JSON.stringify(finding.repair ?? {})}`, /absolute/iu, "the finding must name the relative-path problem");
+  } finally {
+    if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
+    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
+});
+check("R7-6n: an invalid legacy per-repository store is a failure, never absent", async () => {
+  const base = mkdtempSync(join(tmpdir(), "r76n-"));
+  const savedEnv = process.env[R76J_ENV];
+  try {
+    const fixture = r76jBuild(join(base, "row"), { plane: "absent", legacy: true });
+    writeFileSync(join(base, "row", "common", "agent-pipeline", "po-key-directory.json"), "{ not json", "utf8");
+    delete process.env[R76J_ENV];
+    const report = await r76tReport(fixture);
+    const finding = report.findings.find((entry) => entry.findingId === "po-key-directory");
+    assert.ok(finding, "the po-key-directory finding must exist");
+    assert.match(String(finding.cause), /^repo-scope-invalid/u);
+    assert.equal(finding.repair?.prerequisite, "po-key-directory-store-valid");
+    assert.notEqual(finding.status, "ok");
+    assert.equal(report.ok, false, "the readiness report must not be ok");
+  } finally {
+    if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
+    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
+});
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
