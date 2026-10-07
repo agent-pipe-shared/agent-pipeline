@@ -90,6 +90,10 @@
  * project, and a project with nothing of that kind to scan, which reads identically without
  * this field.
  *
+ * PARTIAL PARSING (SEM-F2): v2 coverage carries semgrep's partially parsed files in
+ * `unsupportedScope` as `partial-parsing:<root-relative forward-slash path>` strings; the v2
+ * verdict still follows the findings, so a degraded run without findings is neither not-met nor blocking.
+ *
  * CLI: `node plugins/pipeline-core/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
@@ -692,11 +696,17 @@ function v2Coverage(entry, snapshotAt) {
   const exclusions = Array.isArray(entry?.coverage?.exclusions)
     ? entry.coverage.exclusions.filter((x) => typeof x === "string")
     : [];
+  // A degraded v1 coverage (semgrep's warn-level PartialParsing, adapter-normalized root-relative
+  // forward-slash files) surfaces as one `partial-parsing:<file>` string per file, de-duplicated and
+  // sorted. Anything else keeps the empty list; the verdict is not changed by this note.
+  const partiallyParsed = entry?.coverage?.status === "degraded" && entry.coverage.reason === "partial-parsing" && Array.isArray(entry.coverage.files)
+    ? [...new Set(entry.coverage.files.filter(isNonEmptyStr).map((file) => `partial-parsing:${file}`))].sort()
+    : [];
   return {
     subject: isNonEmptyStr(entry?.coverage?.subject) ? entry.coverage.subject : "candidate-tree",
     exclusions,
     ignored: [],
-    unsupportedScope: [],
+    unsupportedScope: partiallyParsed,
     truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null },
     dataAge: { ageSeconds: 0, snapshotAt: isNonEmptyStr(snapshotAt) ? snapshotAt : null },
   };
@@ -785,6 +795,9 @@ function buildSecurityEvidenceV2({ rootDir, evidence, exitCode, scanners, findin
       findings: findings.filter((f) => f?.tool === entry.tool),
       raw: rawByTool[entry.tool] ?? null,
       reason: entry.reason ?? null,
+      // Same record the envelope carries below, so candidate and v2 record agree. The evaluator
+      // reads no capability-level coverage, so this note cannot move the verdict.
+      coverage: v2Coverage(entry, snapshotAt),
     })),
   };
   if (candidateUncertain) {

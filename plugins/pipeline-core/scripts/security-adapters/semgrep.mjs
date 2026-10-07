@@ -121,6 +121,13 @@ function scanRootRelativePath(file, rootDir) {
   const hostAbsolute = pathIsAbsolute(file);
   if (!hostAbsolute && (pathPosix.isAbsolute(file) || pathWin32.isAbsolute(file))) return null;
   const relativePath = hostAbsolute ? pathRelative(rootDir, file) : file;
+  // win32 `relative()` hands a path that shares no root with the scan root back verbatim, so a UNC
+  // (`\\server\share\x`) or extended-length/device (`\\?\D:\x`, `\\.\D:\x`) path arrives here still
+  // starting with two separators. Split below would drop those empty leading segments before the
+  // drive-letter test and name the file "server/share/x" or "?/D:/x" -- refuse it first. Tested on
+  // `relativePath`, not on `file`, so a path under a scan root that is itself a UNC share (where
+  // `relative()` yields a plain `src\x`) is still accepted.
+  if (/^[\\/]{2}/.test(relativePath)) return null;
   const segments = relativePath.replaceAll("\\", "/").split("/").filter((segment) => segment !== "" && segment !== ".");
   if (segments.length === 0 || segments.includes("..") || /^[A-Za-z]:/.test(segments[0])) return null;
   return segments.join("/");
@@ -317,7 +324,7 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
   ]),
   exitCodeMapping: Object.freeze({
     completed:
-      "zero child exit AND a JSON body carrying a results[] array AND no error payload -- only this combination is a completed scan (PASS/FINDINGS based on findings.length)",
+      "zero child exit AND a JSON body carrying a results[] array AND no error payload -- only this combination is a completed scan at full coverage (PASS/FINDINGS based on findings.length); the one exception is the all-warn partial-parsing body described under partialParsing, which is also a completed scan but with degraded coverage",
     nonzero: "scanner_error (ERROR) -- any nonzero child exit, fail-closed regardless of stdout content",
     errorPayload:
       "scanner_error (ERROR) -- JSON body carries a non-empty errors[] array (or a non-array errors), even at exit 0 with an otherwise clean-looking results[] array, EXCEPT the all-warn PartialParsing case described under partialParsing",
