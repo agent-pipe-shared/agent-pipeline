@@ -36,7 +36,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { join } from "node:path";
@@ -962,4 +962,410 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): concurrent real-file
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
+});
+
+// =================================================================================================
+// Spec section 22.11, R7-11a..d (task R7-11-T2): parallel dispatch is supported.
+// PO decision 2026-10-07 #26: the dispatch-budget accounting must never refuse a call because another
+// dispatch holds its lock (toil T19). RED BY DESIGN: these cases pin the settled wait interface; the
+// production fix follows in R7-11-F. The interface pinned here (and nothing else):
+//   - acquireDispatchBudgetCounterLock keeps its single-attempt semantics (existing cases unchanged);
+//   - new export acquireDispatchBudgetCounterLockWithWait(path, dependencies): retries the single attempt
+//     with bounded backoff while the holder is live, returns { status: "acquired", ... } as soon as the lock
+//     is free, after the bound returns { status: "rejected", code: "counter-lock-timeout", holderAgeMs },
+//     and recovers a provably dead holder exactly as the single attempt does;
+//   - dependencies.now() -> epoch ms and dependencies.sleep(ms) are injected and SYNCHRONOUS (the hook
+//     is synchronous; production already blocks with Atomics.wait);
+//   - new export COUNTER_LOCK_WAIT_BOUND_MS (read below through a child, never hard-coded here);
+//   - holder age = now - the lock file's mtime; the hook forwards its own `options` object to the lock
+//     function as `dependencies` (it already does), so options.now / options.sleep reach the wait loop;
+//   - the hook refuses a call that outwaits the bound with reason counter-lock-timeout and names the age.
+// Determinism, case by case (no wall-clock races, no retries by the callers):
+//   R7-11a/c: a holder CHILD holds the REAL lock behind a file barrier ("held" -> "release"). Every worker
+//     makes exactly one hook call (no retry loop of its own, unlike the older parallel case above, which
+//     retries on counter-lock-busy and therefore masks this defect). The worker injects a sleep that drops a
+//     "waiting-<label>" marker file; the parent releases the holder only once every expected waiter has
+//     either dropped its marker (proof that THIS call met the held lock) or already terminated (the refusal
+//     path of today's code). The worker's injected now() subtracts the time it spent sleeping, so a
+//     bound measured on now() cannot expire while the parent is still assembling the contention.
+//   R7-11b/d: one child process holds the real lock itself (same-process owner is live on win32 and
+//     Linux) and calls the wait variant / the hook with a VIRTUAL clock: now() reads a counter that
+//     starts at the lock's mtime plus a fixed offset and only sleep(ms) advances it; a sleep stub may
+//     release the lock after K calls. Nothing waits in real time.
+// Like the rest of this file, nothing here imports guard-dispatch-budget.mjs at module scope (file-top NOTE):
+// every call into the guard happens in a child runner.
+// =================================================================================================
+const R711_RUNNER_SOURCE = String.raw`
+import { pathToFileURL } from 'node:url';
+import { existsSync, statSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const [, , guardPath, configB64] = process.argv;
+const cfg = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8'));
+const mod = await import(pathToFileURL(guardPath).href);
+const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const emit = (value) => console.log('R711-RESULT: ' + JSON.stringify(value));
+const hookInput = (agentId) => ({ agent_id: agentId, agent_type: 'pipeline-core:goldfish-implementor', transcript_path: '/unused.jsonl', tool_name: 'Read', tool_input: { file_path: '/x' } });
+const hookOptions = (extra) => Object.assign({ rootDir: cfg.rootDir, resolveGitCommonDirFn: () => cfg.commonDir, resolveMaxTurnsFn: () => 50 }, extra);
+
+if (cfg.mode === 'exports') {
+  emit({
+    waitType: typeof mod.acquireDispatchBudgetCounterLockWithWait,
+    bound: mod.COUNTER_LOCK_WAIT_BOUND_MS === undefined ? null : mod.COUNTER_LOCK_WAIT_BOUND_MS,
+  });
+} else if (cfg.mode === 'holder') {
+  // The controlled holder: owns the REAL lock until the parent drops the release barrier file.
+  const acquired = mod.acquireDispatchBudgetCounterLock(cfg.lockPath);
+  if (acquired.status !== 'acquired') {
+    emit({ acquired: false, code: acquired.code || null });
+  } else {
+    writeFileSync(join(cfg.signalDir, 'held'), '1');
+    const deadline = Date.now() + cfg.maxHoldMs;
+    while (!existsSync(join(cfg.signalDir, 'release')) && Date.now() < deadline) pause(5);
+    emit({ acquired: true, barrierSeen: existsSync(join(cfg.signalDir, 'release')), released: mod.releaseDispatchBudgetCounterLock(acquired.lock) });
+  }
+} else if (cfg.mode === 'worker') {
+  // ONE hook call, no retry loop. sleep() is the probe: its first call proves this call met a held lock.
+  const startedAt = Date.now();
+  let slept = 0;
+  let waited = false;
+  const sleep = (ms) => {
+    if (!waited) { waited = true; writeFileSync(join(cfg.signalDir, 'waiting-' + cfg.label), '1'); }
+    if (Date.now() - startedAt > cfg.safetyMs) throw new Error('worker ' + cfg.label + ' exceeded its safety ceiling of ' + cfg.safetyMs + ' ms while waiting');
+    const before = Date.now();
+    pause(Math.max(1, Number(ms) || 1));
+    slept += Date.now() - before;
+  };
+  const now = () => Date.now() - slept;
+  const r = mod.evaluateDispatchBudgetGuard(hookInput(cfg.agentId), hookOptions({ now, sleep }));
+  emit({ label: cfg.label, agentId: cfg.agentId, exitCode: r.exitCode, stderr: String(r.stderr || ''), waited });
+} else if (cfg.mode === 'virtual') {
+  // Same-process live holder (or none) plus a virtual clock: nothing here waits in real time.
+  let held = null;
+  let mtimeMs = null;
+  if (cfg.holder === 'live') {
+    const acquired = mod.acquireDispatchBudgetCounterLock(cfg.lockPath);
+    if (acquired.status !== 'acquired') throw new Error('fixture holder not acquired: ' + JSON.stringify(acquired));
+    held = acquired.lock;
+    mtimeMs = Math.floor(statSync(cfg.lockPath).mtimeMs);
+  }
+  const startClock = (mtimeMs === null ? Date.now() : mtimeMs) + (cfg.holdOffsetMs || 0);
+  let clock = startClock;
+  let reads = 0;
+  let released = false;
+  let sleepsAfterRelease = 0;
+  const readings = new Set();
+  const sleeps = [];
+  const now = () => {
+    reads += 1;
+    if (reads > 2000000) throw new Error('runaway wait loop: now() read more than 2000000 times');
+    readings.add(clock);
+    return clock;
+  };
+  const sleep = (ms) => {
+    if (released) sleepsAfterRelease += 1;
+    sleeps.push(ms);
+    if (sleeps.length > 200000) throw new Error('runaway wait loop: sleep() called more than 200000 times');
+    clock += ms;
+    if (held !== null && typeof cfg.releaseAfterSleeps === 'number' && sleeps.length >= cfg.releaseAfterSleeps) {
+      mod.releaseDispatchBudgetCounterLock(held);
+      held = null;
+      released = true;
+    }
+  };
+  let outcome;
+  if (cfg.call === 'wait') {
+    const r = mod.acquireDispatchBudgetCounterLockWithWait(cfg.lockPath, { now, sleep });
+    outcome = {
+      status: r.status,
+      code: r.code === undefined ? null : r.code,
+      recovered: r.recovered === true,
+      holderAgeMs: r.holderAgeMs === undefined ? null : r.holderAgeMs,
+    };
+    if (r.status === 'acquired') outcome.acquiredLockReleased = mod.releaseDispatchBudgetCounterLock(r.lock);
+  } else {
+    const r = mod.evaluateDispatchBudgetGuard(hookInput(cfg.agentId), hookOptions({ now, sleep }));
+    outcome = { exitCode: r.exitCode, stderr: String(r.stderr || '') };
+  }
+  const heldStillIntact = held === null ? null : mod.releaseDispatchBudgetCounterLock(held);
+  emit({ outcome, sleeps, sleepsAfterRelease, released, readings: Array.from(readings), startClock, finalClock: clock, mtimeMs, heldStillIntact });
+} else {
+  throw new Error('unknown R7-11 runner mode ' + cfg.mode);
+}
+`;
+let r711RunnerPathCache = null;
+function r711RunnerPath() {
+  if (r711RunnerPathCache === null) {
+    r711RunnerPathCache = join(runnerDir, "r711-runner.mjs");
+    writeFileSync(r711RunnerPathCache, R711_RUNNER_SOURCE);
+  }
+  return r711RunnerPathCache;
+}
+
+function r711ParseResult(stdout, label) {
+  const line = String(stdout ?? "").split(/\r?\n/u).find((candidate) => candidate.startsWith("R711-RESULT: "));
+  assert.ok(line, `R7-11 runner (${label}) did not print a result line -- stdout ${JSON.stringify(String(stdout ?? "").slice(0, 500))}`);
+  return JSON.parse(line.slice("R711-RESULT: ".length));
+}
+
+function r711RunSync(config) {
+  const b64 = Buffer.from(JSON.stringify(config), "utf8").toString("base64");
+  const res = spawnSync(process.execPath, [r711RunnerPath(), GUARD, b64], { input: "", encoding: "utf8", timeout: RUNNER_TIMEOUT_MS });
+  assert.equal(res.status, 0, `R7-11 runner (${config.mode}/${config.call ?? "-"}) exited ${res.status} (expected 0) -- stderr: ${String(res.stderr ?? "").trim().slice(0, 800)}`);
+  return r711ParseResult(res.stdout, config.mode);
+}
+
+/** Spawns a long-lived R7-11 child; `done` resolves with its result line, `isClosed()` tells the parent it has terminated. */
+function r711Spawn(config) {
+  const b64 = Buffer.from(JSON.stringify(config), "utf8").toString("base64");
+  const child = spawn(process.execPath, [r711RunnerPath(), GUARD, b64], { stdio: ["ignore", "pipe", "pipe"] });
+  let stdout = "";
+  let stderr = "";
+  let closed = false;
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const done = new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("close", (code) => {
+      closed = true;
+      try {
+        assert.equal(code, 0, `R7-11 ${config.mode} child (${config.label ?? "-"}) exited ${code} (expected 0) -- stderr: ${stderr.trim().slice(0, 800)}`);
+        resolve(r711ParseResult(stdout, config.mode));
+      } catch (error) { reject(error); }
+    });
+  });
+  done.catch(() => { /* the awaiting test reports it; this only prevents an unhandled-rejection race */ });
+  return { child, done, isClosed: () => closed };
+}
+
+async function r711WaitFor(predicate, timeoutMs = RUNNER_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return predicate();
+}
+
+let r711ExportsCache = null;
+function r711RequireWaitContract() {
+  if (r711ExportsCache === null) r711ExportsCache = r711RunSync({ mode: "exports" });
+  assert.equal(r711ExportsCache.waitType, "function", "guard-dispatch-budget.mjs must export acquireDispatchBudgetCounterLockWithWait(path, dependencies) (Spec 22.11)");
+  assert.ok(Number.isSafeInteger(r711ExportsCache.bound) && r711ExportsCache.bound > 0 && r711ExportsCache.bound <= 10000,
+    `guard-dispatch-budget.mjs must export COUNTER_LOCK_WAIT_BOUND_MS as a positive integer ceiling of at most a few seconds (<= 10000 ms) -- got ${JSON.stringify(r711ExportsCache.bound)}`);
+  return r711ExportsCache;
+}
+
+/** A fixture git common dir with one pre-seeded counter (count 0) per agent; locks live beside the counters, in the fixture only. */
+function r711Fixture(label, agentIds) {
+  const root = mkdtempSync(join(runnerDir, `r711-${label}-`));
+  const commonDir = join(root, "common");
+  const budgetDir = join(commonDir, "agent-pipeline", "dispatch-budget");
+  mkdirSync(budgetDir, { recursive: true, mode: 0o700 });
+  const signalDir = join(root, "signal");
+  mkdirSync(signalDir);
+  const agents = {};
+  for (const agentId of agentIds) {
+    const counterPath = join(budgetDir, `${agentId}.json`);
+    writeFileSync(counterPath, `${JSON.stringify({
+      schema: "pipeline.dispatch-budget-counter.v1",
+      agentId,
+      agentType: "pipeline-core:goldfish-implementor",
+      maxTurns: 50,
+      baseCalls: 35,
+      workingCap: 35,
+      count: 0,
+    }, null, 2)}\n`);
+    agents[agentId] = { counterPath, lockPath: `${counterPath}.binding.lock` };
+  }
+  return { root, commonDir, signalDir, agents };
+}
+const r711Count = (fixture, agentId) => JSON.parse(readFileSync(fixture.agents[agentId].counterPath, "utf8")).count;
+
+/**
+ * Runs `callers` (one hook call each, no retries) against a REAL lock that a holder child keeps until every
+ * caller that is expected to wait has proven it met the held lock (marker file) or has already terminated.
+ * Every child has closed before this returns, whatever happens.
+ */
+async function r711ContendedBatch(fixture, holderAgent, callers) {
+  const barrier = (name) => join(fixture.signalDir, name);
+  const holder = r711Spawn({ mode: "holder", lockPath: fixture.agents[holderAgent].lockPath, signalDir: fixture.signalDir, maxHoldMs: RUNNER_TIMEOUT_MS * 3 });
+  const workers = [];
+  let contentionObserved = false;
+  try {
+    await r711WaitFor(() => existsSync(barrier("held")) || holder.isClosed());
+    assert.ok(existsSync(barrier("held")), "the controlled holder child did not acquire the real lock");
+    for (const caller of callers) {
+      workers.push({
+        ...caller,
+        proc: r711Spawn({
+          mode: "worker", label: caller.label, agentId: caller.agentId, commonDir: fixture.commonDir,
+          rootDir: FAKE_ROOT, signalDir: fixture.signalDir, safetyMs: RUNNER_TIMEOUT_MS * 2,
+        }),
+      });
+    }
+    contentionObserved = await r711WaitFor(() => workers.every((worker) => worker.proc.isClosed()
+      || (worker.expectWait && existsSync(barrier(`waiting-${worker.label}`)))));
+  } finally {
+    writeFileSync(barrier("release"), "1");
+    const procs = [holder, ...workers.map((worker) => worker.proc)];
+    const killer = setTimeout(() => { for (const proc of procs) proc.child.kill(); }, RUNNER_TIMEOUT_MS * 2);
+    try { await Promise.allSettled(procs.map((proc) => proc.done)); } finally { clearTimeout(killer); }
+  }
+  const holderResult = await holder.done;
+  const results = await Promise.all(workers.map((worker) => worker.proc.done));
+  return { holderResult, results, contentionObserved };
+}
+
+const R711_REFUSAL_PATTERN = /counter-lock-busy|DISPATCH-BUDGET-INPUT-INVALID/u;
+function r711Refused(results) {
+  return results.filter((result) => result.exitCode !== 0).map(({ label, exitCode, stderr }) => ({ label, exitCode, stderr: stderr.trim().slice(0, 300) }));
+}
+
+test("R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted and the counter advances by exactly N", async () => {
+  const N = 6;
+  const agentId = "r711-agent-a";
+  const fixture = r711Fixture("a", [agentId]);
+  const batch = await r711ContendedBatch(fixture, agentId, Array.from({ length: N }, (_, index) => ({ label: `w${index}`, agentId, expectWait: true })));
+  const refused = r711Refused(batch.results);
+  assert.equal(refused.length, 0, `${refused.length} of ${N} concurrent calls were refused while a live holder held the lock: ${JSON.stringify(refused)}`);
+  for (const result of batch.results) assert.doesNotMatch(result.stderr, R711_REFUSAL_PATTERN, `${result.label} surfaced a lock refusal to the agent`);
+  assert.equal(r711Count(fixture, agentId), N, "no lost update and no double count: the counter advances by exactly N");
+  assert.equal(batch.contentionObserved, true, "forced contention: every worker must have recorded a wait (injected sleep) before the holder was released");
+  assert.ok(batch.results.every((result) => result.waited), `every worker must have met the held lock -- waited flags: ${JSON.stringify(batch.results.map(({ label, waited }) => [label, waited]))}`);
+  assert.equal(batch.holderResult.released, true, "the holder released its exact lock inode");
+});
+
+test("R7-11b: the wait variant recovers a lock left by a provably dead holder at once, without waiting out the bound", () => {
+  r711RequireWaitContract();
+  const lockDir = mkdtempSync(join(runnerDir, "r711-dead-lock-"));
+  const lockPath = join(lockDir, "agent.json.binding.lock");
+  const first = run({ steps: [{ op: "acquireRealLock", path: lockPath }] });
+  assert.deepEqual(first.results[0], { status: "acquired", code: null, recovered: false });
+  const second = r711RunSync({ mode: "virtual", call: "wait", holder: "none", lockPath });
+  assert.equal(second.outcome.status, "acquired");
+  assert.equal(second.outcome.recovered, true, "a dead holder is recovered exactly as the single attempt recovers it");
+  assert.equal(second.sleeps.length, 0, "a dead owner is recovered without waiting");
+  assert.equal(second.outcome.acquiredLockReleased, true);
+});
+
+test("R7-11b: the wait variant keeps a malformed lock fail-closed under its existing code and never waits for it", () => {
+  r711RequireWaitContract();
+  const lockDir = mkdtempSync(join(runnerDir, "r711-malformed-lock-"));
+  const lockPath = join(lockDir, "agent.json.binding.lock");
+  writeFileSync(lockPath, "not a lock record\n");
+  const result = r711RunSync({ mode: "virtual", call: "wait", holder: "none", lockPath });
+  assert.equal(result.outcome.status, "rejected");
+  assert.equal(result.outcome.code, "counter-lock-malformed");
+  assert.equal(result.sleeps.length, 0, "waiting applies only to a live owner");
+});
+
+test("R7-11b: the hook admits and counts exactly once a call whose lock was left by a provably dead holder", () => {
+  const agentId = "r711-agent-b";
+  const fixture = r711Fixture("b", [agentId]);
+  const dead = run({ steps: [{ op: "acquireRealLock", path: fixture.agents[agentId].lockPath }] });
+  assert.deepEqual(dead.results[0], { status: "acquired", code: null, recovered: false });
+  const hook = r711RunSync({ mode: "virtual", call: "hook", holder: "none", agentId, commonDir: fixture.commonDir, rootDir: FAKE_ROOT });
+  assert.equal(hook.outcome.exitCode, 0, hook.outcome.stderr);
+  assert.equal(r711Count(fixture, agentId), 1, "admitted and counted once");
+  assert.equal(hook.sleeps.length, 0, "a dead owner is not waited for");
+});
+
+test("R7-11c: a lock held for agent A leaves agent B's call admitted with no wait; the counters stay independent", async () => {
+  const [agentA, agentB] = ["r711-agent-ca", "r711-agent-cb"];
+  const fixture = r711Fixture("c-isolation", [agentA, agentB]);
+  const batch = await r711ContendedBatch(fixture, agentA, [{ label: "b0", agentId: agentB, expectWait: false }]);
+  const [call] = batch.results;
+  assert.equal(call.exitCode, 0, call.stderr);
+  assert.equal(call.waited, false, "agent B's call must not wait on agent A's lock");
+  assert.equal(r711Count(fixture, agentB), 1, "agent B counted once");
+  assert.equal(r711Count(fixture, agentA), 0, "agent A's counter is untouched by agent B's call");
+});
+
+test("R7-11c: two agents each making concurrent calls are all admitted and keep separate counters, with agent A's lock held throughout the first contention", async () => {
+  const [agentA, agentB] = ["r711-agent-cc", "r711-agent-cd"];
+  const fixture = r711Fixture("c-mixed", [agentA, agentB]);
+  const batch = await r711ContendedBatch(fixture, agentA, [
+    { label: "a0", agentId: agentA, expectWait: true },
+    { label: "a1", agentId: agentA, expectWait: true },
+    { label: "b0", agentId: agentB, expectWait: false },
+    { label: "b1", agentId: agentB, expectWait: false },
+  ]);
+  const refused = r711Refused(batch.results);
+  assert.equal(refused.length, 0, `${refused.length} of 4 concurrent calls were refused: ${JSON.stringify(refused)}`);
+  for (const result of batch.results) assert.doesNotMatch(result.stderr, R711_REFUSAL_PATTERN, `${result.label} surfaced a lock refusal to the agent`);
+  assert.equal(r711Count(fixture, agentA), 2, "agent A counted exactly its own two calls");
+  assert.equal(r711Count(fixture, agentB), 2, "agent B counted exactly its own two calls");
+  assert.ok(batch.results.filter(({ label }) => label.startsWith("a")).every(({ waited }) => waited), "agent A's calls met the held lock (forced contention)");
+});
+
+test("R7-11d: COUNTER_LOCK_WAIT_BOUND_MS is exported as a positive integer ceiling of a few seconds", () => {
+  const { bound } = r711RequireWaitContract();
+  assert.ok(bound > 0 && bound <= 10000, `bound ${bound}`);
+});
+
+const R711_HOLD_OFFSET_MS = 250;
+
+test("R7-11d: a live holder beyond the bound yields counter-lock-timeout naming the holder age, and the holder is left intact", () => {
+  const { bound } = r711RequireWaitContract();
+  const lockDir = mkdtempSync(join(runnerDir, "r711-timeout-lock-"));
+  const lockPath = join(lockDir, "agent.json.binding.lock");
+  const result = r711RunSync({ mode: "virtual", call: "wait", holder: "live", holdOffsetMs: R711_HOLD_OFFSET_MS, releaseAfterSleeps: null, lockPath });
+  const { outcome, sleeps, readings, mtimeMs } = result;
+  assert.equal(outcome.status, "rejected");
+  assert.equal(outcome.code, "counter-lock-timeout");
+  assert.ok(Number.isFinite(outcome.holderAgeMs) && outcome.holderAgeMs >= bound, `holderAgeMs ${outcome.holderAgeMs} must be a number of at least the bound ${bound}`);
+  assert.ok(readings.some((reading) => Math.abs(outcome.holderAgeMs + mtimeMs - reading) <= 1),
+    `holder age is now minus the lock file's mtime: holderAgeMs ${outcome.holderAgeMs} + mtime ${mtimeMs} matches no now() reading`);
+  const total = sleeps.reduce((sum, ms) => sum + ms, 0);
+  assert.ok(sleeps.length > 0 && total > 0, "the call waited before giving up");
+  assert.ok(total >= bound - R711_HOLD_OFFSET_MS, `waited only ${total} ms of a ${bound} ms bound`);
+  assert.ok(total - sleeps[sleeps.length - 1] <= bound && total <= 2 * bound, `waited ${total} ms, beyond the ${bound} ms bound`);
+  assert.equal(result.heldStillIntact, true, "a live holder's lock is never taken over or deleted");
+});
+
+test("R7-11d: a holder that releases within the bound lets the call through as soon as the lock is free", () => {
+  const { bound } = r711RequireWaitContract();
+  const lockDir = mkdtempSync(join(runnerDir, "r711-release-lock-"));
+  const lockPath = join(lockDir, "agent.json.binding.lock");
+  const result = r711RunSync({ mode: "virtual", call: "wait", holder: "live", holdOffsetMs: R711_HOLD_OFFSET_MS, releaseAfterSleeps: 2, lockPath });
+  assert.equal(result.outcome.status, "acquired");
+  assert.equal(result.outcome.recovered, false);
+  assert.equal(result.released, true, "the holder released during the wait");
+  assert.equal(result.sleepsAfterRelease, 0, "no sleep once the lock is free");
+  assert.ok(result.sleeps.length >= 2 && result.sleeps.reduce((sum, ms) => sum + ms, 0) <= bound, "waited, but within the bound");
+  assert.equal(result.outcome.acquiredLockReleased, true);
+});
+
+const R711_HOLDER_AGE_TEXT = /holder[^\n]{0,80}?\d|\bage\b[^\n]{0,40}?\d|held for[^\n]{0,20}?\d/iu;
+
+test("R7-11d: at hook level a live holder beyond the bound refuses with counter-lock-timeout, names the holder age and counts nothing", () => {
+  const agentId = "r711-agent-dt";
+  const fixture = r711Fixture("d-hook-timeout", [agentId]);
+  const before = readFileSync(fixture.agents[agentId].counterPath, "utf8");
+  const result = r711RunSync({
+    mode: "virtual", call: "hook", holder: "live", holdOffsetMs: R711_HOLD_OFFSET_MS, releaseAfterSleeps: null,
+    lockPath: fixture.agents[agentId].lockPath, agentId, commonDir: fixture.commonDir, rootDir: FAKE_ROOT,
+  });
+  const { exitCode, stderr } = result.outcome;
+  assert.equal(exitCode, 2, stderr);
+  assert.match(stderr, /counter-lock-timeout/u);
+  assert.doesNotMatch(stderr, /counter-lock-busy/u, "counter-lock-busy never reaches the agent");
+  assert.match(stderr, R711_HOLDER_AGE_TEXT, `the refusal text names the holder age: ${JSON.stringify(stderr)}`);
+  assert.ok(!stderr.includes(fixture.commonDir) && !stderr.includes("binding.lock"), "the refusal text is path-redacted");
+  assert.equal(readFileSync(fixture.agents[agentId].counterPath, "utf8"), before, "a timed-out call is never counted and changes no counter");
+  assert.equal(result.heldStillIntact, true, "the live holder's lock was not taken over");
+});
+
+test("R7-11d: at hook level a holder that releases within the bound lets the call through, counted exactly once", () => {
+  const agentId = "r711-agent-dr";
+  const fixture = r711Fixture("d-hook-release", [agentId]);
+  const result = r711RunSync({
+    mode: "virtual", call: "hook", holder: "live", holdOffsetMs: R711_HOLD_OFFSET_MS, releaseAfterSleeps: 2,
+    lockPath: fixture.agents[agentId].lockPath, agentId, commonDir: fixture.commonDir, rootDir: FAKE_ROOT,
+  });
+  assert.equal(result.outcome.exitCode, 0, result.outcome.stderr);
+  assert.equal(result.released, true, "the holder released during the wait");
+  assert.equal(result.sleepsAfterRelease, 0, "no sleep once the lock is free");
+  assert.equal(r711Count(fixture, agentId), 1, "admitted after waiting and counted exactly once");
 });
