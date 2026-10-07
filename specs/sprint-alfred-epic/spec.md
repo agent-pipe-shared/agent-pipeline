@@ -1975,7 +1975,7 @@ an owned ID is a reproduction step for that sub-aspect, not a second owner.
 
 ## 22. 2026-10-06 device switch: agent-recoverable operation and device portability (R7)
 
-Source of findings: PO decisions 17–19 of 2026-10-06 and 20–26 of 2026-10-07
+Source of findings: PO decisions 17–19 of 2026-10-06 and 20–27 of 2026-10-07
 (`design-input.md`) and the toil rows T1–T20 recorded while the approved
 candidate was brought up on a second device (T1–T17 on 2026-10-06, T18–T20 on
 2026-10-07). The toil log was a working note in the ignored `scratch/`
@@ -2749,11 +2749,13 @@ Contract:
   - and exactly one of three branches applies. (A) Earlier revision: its
     recorded submission lineage equals the current submission's, its recorded
     revision is earlier than the current revision and its recorded authority
-    digest set differs from the current submission's. That positive fact alone
-    makes it eligible, on any device and whatever the state of its owner,
-    because its owner's work is bound to superseded sources and the
-    non-destructive rule below makes any later integration fail closed; it
-    assumes nothing about the owner. (B) A registration of the same lineage at
+    digest set differs from the current submission's: only when its owner is
+    positively `not-live` or `ended`. An earlier revision does not by itself
+    make a registration eligible: a `live` owner is never superseded, and an
+    `unavailable` or `unobserved` owner of an earlier revision with different
+    digests is not eligible (PO decision 2026-10-07, the readiness finding on
+    branch (A): supersede without a signature stays within decisions #22 and
+    #23). (B) A registration of the same lineage at
     the current or an earlier revision that (A) does not cover: when its owner
     is positively `not-live` or `ended`; and, where its recorded authority
     digest set equals the current submission's (the same digests), also when
@@ -2792,15 +2794,15 @@ Contract:
   prerequisite (RV-11), which names its concrete route and never only a code:
   - owner `live`: wait for the owner's terminal record (its session end or its
     integration result as the Pipeline records it); no signature;
-  - owner `unavailable`, for any registration that branch (A) does not cover:
-    the §20.2 signed legacy-custody transaction (signature class 5), the only
+  - owner `unavailable`, for any registration: the §20.2 signed legacy-custody transaction (signature class 5), the only
     attended route that does not infer death. It is unnecessary if the owner's
     terminal record arrives first, because the owner is then `ended` or
     `not-live` and branch (B) or (C) applies;
   - owner `unobserved` (including an owner that ran on another device and has no
-    descriptor here) for a registration that neither branch (A) nor the
-    same-digest clause of branch (B) covers (another lineage, a later revision,
-    or the current revision with different digests): the same §20.2 transaction
+    descriptor here) for a registration that the same-digest clause of branch
+    (B) does not cover (an earlier revision with different digests, another
+    lineage, a later revision, or the current revision with different
+    digests): the same §20.2 transaction
     (signature class 5), unnecessary if the owner's terminal record arrives
     first;
   - a registration of another lineage, or of a later revision than the current
@@ -2829,17 +2831,21 @@ consumer-layout fixture):
 - R7-10a (branch A, earlier revision): a registered authoring dispatch whose
   recorded lineage is the current one, whose recorded revision is earlier and
   whose authority digests differ from the current submission blocks
-  `submit-plan`. In each of (i) the owner `ended` on this device, (ii) the
-  registration made on another device (fresh clone of an approved, committed
-  fixture, fresh private state, owner `unobserved`, result artifacts absent) and
-  (iii) the owner `live`, the typed action supersedes it, `submit-plan` then
-  succeeds, and the counts of overrides, signatures and PO terminal commands are
-  all zero; the archived bytes equal the original, a receipt exists and the
-  result-path namespace is preserved. (iv) The superseded owner, from a second
-  checkout, then attempts to integrate: the result is the typed `superseded`
-  naming the receipt, and the registration, the namespace and every result byte
-  it produced are byte-identical before and after, with the State digest
-  unchanged by the attempt.
+  `submit-plan`. In each of (i) the owner recorded `ended` on this device and
+  (ii) the owner reporting `not-live`, the typed action supersedes it,
+  `submit-plan` then succeeds, and the counts of overrides, signatures and PO
+  terminal commands are all zero; the archived bytes equal the original, a
+  receipt exists and the result-path namespace is preserved. (iii) With the
+  owner `live` it is not superseded, zero mutation occurs and the typed
+  prerequisite names waiting for the owner's terminal record. (iv) With the
+  owner `unavailable`, or `unobserved` (registration made on another device:
+  fresh clone of an approved, committed fixture, fresh private state, result
+  artifacts absent), it is not superseded, zero mutation occurs and the typed
+  prerequisite names the §20.2 class 5 transaction. (v) The owner superseded in
+  (i), from a second checkout, then attempts to integrate: the result is the
+  typed `superseded` naming the receipt, and the registration, the namespace
+  and every result byte it produced are byte-identical before and after, with
+  the State digest unchanged by the attempt.
 - R7-10b (branch B, same digests; PO decision #22): (i) a registration with the
   same digests whose owner ran on another device and is `unobserved` here (fresh
   clone of an approved, committed fixture, fresh private state, result artifacts

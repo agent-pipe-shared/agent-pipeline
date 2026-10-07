@@ -224,6 +224,13 @@ not being on the signing terminal's PATH).
     because another dispatch holds its lock (toil T19), and this is fixed in
     0.7.0.
 
+27. (Answer to the independent readiness review of 2026-10-07.) Supersede of
+    an authoring registration without a signature stays within decisions #22
+    and #23: a registration of an earlier revision with different digests is
+    eligible only when its owner is positively `not-live` or `ended`; a `live`
+    owner is never superseded, and an `unavailable` or `unobserved` owner of
+    such a registration takes the §20.2 route.
+
 Each decision has an owner and an acceptance case in the "PO decisions → owner
 and case" section of `traceability.md`.
 

@@ -196,7 +196,7 @@ and AC-37 is additional to AC-32):
 | #19 environment prerequisites checked at install and bootstrap, with a concrete repair action, never first discovered at a signature | R7 | §22.0 prerequisites; R7-7 (report), R7-6 (signing prerequisites; the readiness check handed over before the signing command, R7-6d(ii), R7-6d(iii)) | AC-37 |
 
 2026-10-07 decisions (device switch, morning chat; `design-input.md` decisions
-20–26, Spec §22; this subsection extends the section's scope to the 2026-10-07
+20–27, Spec §22; this subsection extends the section's scope to the 2026-10-07
 decisions, and AC-37 is additional to AC-32):
 
 | Decision | Owner | Spec § / cases | Acceptance |
@@ -208,8 +208,9 @@ decisions, and AC-37 is additional to AC-32):
 | #24 the shipped attended orphan-archive route stays for owners `unavailable` or `unobserved`; the zero-click route only for positively ended sessions | R7 (R7-2) | §22.2 "Never inferred; two routes by owner state"; §22.0 signature rule; R7-2b, R7-2c | AC-37 |
 | #25 a re-approval after a lost bound artifact does not reuse earlier course or readiness evidence (fail closed) | R7 (R7-5) | §22.5 `DWP-REBIND-ARTIFACT-LOST`; R7-5c | AC-37 |
 | #26 parallel subagent dispatch is a required, supported mode on every runner and platform; the dispatch-budget accounting never refuses a call because another call holds its lock (T19; T20 via the SubagentStart receipt) | R7 (R7-11) | §22.11 R7-11; R7-11a…R7-11e | AC-37 |
+| #27 signature-free supersede stays within #22/#23: an earlier-revision registration with different digests is eligible only with a positively `not-live` or `ended` owner; a `live` owner is never superseded | R7 (R7-10) | §22.10 eligibility branch (A); R7-10a(i)…R7-10a(v) | AC-37 |
 
-Mapped decisions: 2026-10-07 #20–#26 (7 of 7); 2026-10-06 #17–#19 (3 of 3);
+Mapped decisions: 2026-10-07 #20–#27 (8 of 8); 2026-10-06 #17–#19 (3 of 3);
 2026-10-04 #1–#16 (16 of 16); 2026-10-03 decisions #1–#4 and the route and
 hotfix decisions (6 rows).
 

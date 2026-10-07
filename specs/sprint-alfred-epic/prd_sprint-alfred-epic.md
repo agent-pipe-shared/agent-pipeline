@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 3e5f94106f363ffe6f523dc1378a4c9096ec843522c3e1f0a2f64c9d8a40d48f -->
+<!-- technical-spec-sha256: 436372e5e5423052dda4cad93a1ec05d42858391a05ea1e94e334cb944fb9982 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -954,7 +954,7 @@ owners and cases in `traceability.md`):
   a concrete repair action, and never discovered for the first time at a
   signature.
 
-**PO decisions (2026-10-07).** Recorded in `design-input.md` (decisions 20–26;
+**PO decisions (2026-10-07).** Recorded in `design-input.md` (decisions 20–27;
 owners and cases in `traceability.md`):
 
 - The signing toolchain is checked by a read-only readiness probe with a typed
@@ -965,7 +965,8 @@ owners and cases in `traceability.md`):
 - A registered authoring dispatch may be superseded without a signature when
   its digests are the same and its owner is `unobserved` (#22), or when it is
   of another lineage or a later revision and its owner is `not-live` or
-  `ended` (#23).
+  `ended` (#23). Nothing beyond these two cases is superseded without a
+  signature; a `live` owner never is (#27).
 - The shipped attended orphan-archive route stays for `unavailable` and
   `unobserved` owners; the zero-click route covers only positively ended
   sessions (#24).

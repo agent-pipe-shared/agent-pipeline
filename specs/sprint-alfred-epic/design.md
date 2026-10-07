@@ -150,17 +150,21 @@ This interleaves with the existing waves rather than replacing them. The
 amendment's acceptance is AC-32: the three-runner end-to-end scenario on the
 host matrix of Spec §21.7, on the stamped candidate.
 
-## 2026-10-06 device-switch amendment
+## 2026-10-06/07 device-switch amendment
 
-Bringing the approved candidate up on a second device surfaced seventeen
-hurdles (T1–T17) that no agent could clear alone. Spec §22 adds the workstream
-R7, agent-recoverable operation and device portability: twelve rows are owned
-by eight contracts that give each block a typed agent-executable repair
-(null-device handling with a diagnosable preflight, orphan archival, tracked
-bound artifacts, writes in every state, approval rebind, signing prerequisites,
-one readiness report, shell-lane parity), and five rows are mapped to the R1,
-R3, R4 and R5 contracts that already cover them. `traceability.md` carries the 17-row map; AC-37 is
-additional to AC-32.
+Bringing the approved candidate up on a second device surfaced twenty hurdles
+(T1–T17 on 2026-10-06, T18–T20 on 2026-10-07) that no agent could clear alone.
+Spec §22 adds the workstream R7, agent-recoverable operation and device
+portability: fifteen rows are owned by ten contracts (R7-1…R7-8, R7-10,
+R7-11) that give each block a typed agent-executable repair (null-device
+handling with a diagnosable preflight, orphan archival, tracked bound
+artifacts, writes in every state, approval rebind, a read-only signing-readiness
+probe, one readiness report, shell-lane parity, supersede of a stale authoring
+registration, parallel dispatch on the budget lock), and five rows (T4, T9,
+T10, T13, T18) are mapped to the R1, R3, R4 and R5 contracts that already cover
+them. R7-9 replays the mapped rows. PO decisions 17–27 (`design-input.md`)
+bind the amendment; Spec §22.12 sequences it. `traceability.md` carries the
+20-row map; AC-37 is additional to AC-32.
 
 ## Sequence, evidence and gates
 
