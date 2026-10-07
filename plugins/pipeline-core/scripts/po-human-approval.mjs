@@ -1085,12 +1085,15 @@ export function probeSigningReadiness({ repository, directory, legacy = false, d
 }
 
 /** `sign-intent`'s own defence-in-depth run, before the first prompt and before any process receives a key
- * path. A declared anchor that the key does not match ends it at once, without reading anything private; an
- * absent anchor set is reported after the terminal precondition and the toolchain, which read the private
- * key's armor and start the probe spawns. */
+ * path. A declared anchor that the key does not match ends it at once, without reading anything private. With
+ * no committed anchor at all (R7-6g(i), F5) step (c) cannot pass either, so the toolchain probe's findings
+ * and step (c)'s are reported together, still before the terminal precondition: the private key is never
+ * read -- not even its armor -- without a committed anchor to hold it against. */
 function assertSigningReadyBeforePrompt({ repository, inspection, legacy, keys, dependencies }) {
   const keyDirectory = probeKeyDirectory({ repository, inspection, legacy, dependencies });
-  if (keyDirectory.anchorCount > 0 && keyDirectory.findings.some((entry) => entry.status !== "ok")) throw readinessFailure(keyDirectory.findings);
+  const keyDirectoryReady = keyDirectory.findings.every((entry) => entry.status === "ok");
+  if (!keyDirectoryReady && keyDirectory.anchorCount > 0) throw readinessFailure(keyDirectory.findings);
+  if (!keyDirectoryReady) throw readinessFailure([...probeSigningToolchain(dependencies), ...keyDirectory.findings]);
   assertAttendedTerminalWhenPassphraseKey(keys, dependencies);
   const findings = [...probeSigningToolchain(dependencies), ...keyDirectory.findings];
   if (findings.some((entry) => entry.status !== "ok")) throw readinessFailure(findings);
