@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
-/** Preview-only, exact-path Git commands for legacy non-host Goldfish returns. */
+/** Preview-only, exact-path Git commands for legacy non-host Goldfish returns.
+ *
+ * Single-line rule (toil T29): every step's copyCommand is ONE line. The Bash guard refuses newlines in
+ * commands, so a multi-line `CMD=...`/`eval` copy script is never admitted. posix is the step's own argv-exact
+ * `command`; powershell is `& git` plus single-quoted argv words. maxColumns stays informational only. */
 import { boundedCopySafeCommand } from "./copy-safe-command.mjs";
 import { commitTypeFindings, finishedCommitMessageFindings } from "./commit-message-policy.mjs";
 import { isSafeTaskId, normalizeDispatchRecordPath } from "./dispatch-record.mjs";
@@ -12,6 +16,12 @@ const fail = (code) => ({ ok: false, code, steps: [] });
 function oneLine(value, maxBytes) {
   return typeof value === "string" && value.trim() === value && value.length > 0
     && Buffer.byteLength(value, "utf8") <= maxBytes && !/[\0\r\n]/u.test(value);
+}
+
+const psQuote = (word) => `'${word.replaceAll("'", "''")}'`;
+function singleLine(step, argv) {
+  return { ...step, copyCommand: { ...step.copyCommand, posix: step.command,
+    powershell: `& git ${argv.map(psQuote).join(" ")}` } };
 }
 
 /** No Git invocation and no authority grant. The caller executes each step separately. */
@@ -33,11 +43,13 @@ export function createGoldfishCommitCommandFlow({ taskId, type, scope, summary,
     || finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.length > 0) {
     return fail("GF-COMMAND-MESSAGE");
   }
-  const stage = boundedCopySafeCommand({ executable: "git", argv: ["add", "--", ...normalized], forceCopyCommand: true });
-  const commit = boundedCopySafeCommand({ executable: "git", argv: ["commit", "-m", subject,
+  const stageArgv = ["add", "--", ...normalized];
+  const commitArgv = ["commit", "-m", subject,
     ...bodyParagraphs.flatMap((part) => ["-m", part]),
     "--trailer", `Dispatch: ${taskId} (goldfish)`, "--trailer", "AI-Assisted: true",
-    "--", ...normalized], forceCopyCommand: true });
+    "--", ...normalized];
+  const stage = singleLine(boundedCopySafeCommand({ executable: "git", argv: stageArgv, forceCopyCommand: true }), stageArgv);
+  const commit = singleLine(boundedCopySafeCommand({ executable: "git", argv: commitArgv, forceCopyCommand: true }), commitArgv);
   return { ok: true, schema: GOLDFISH_COMMIT_COMMAND_FLOW_SCHEMA,
     code: "GF-COMMAND-PREVIEW-ONLY", taskId, paths: normalized,
     steps: [{ kind: "stage-exact-paths", ...stage }, { kind: "commit-exact-paths", ...commit }],
