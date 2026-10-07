@@ -1252,11 +1252,12 @@ const Q12CQ_COMMENTS_AND_QUOTE_CHARS_TABLE = [
   ["true # don't\ng\"i\"t $(echo push) origin main", "the comment starts at the word-initial # so its apostrophe opens no quote; line two runs git push origin main"],
   ["# x\"\ng\"i\"t $(echo push) origin main", "the double quote sits inside a comment and opens no quote; line two runs git push origin main"],
   ["echo \"it's\" # it's\ng''it push origin main", "the apostrophe in the double quotes and in the comment open no quote; g''it is git on line two and pushes"],
+  // unterminated single quote: bash refuses the line; fail-closed → candidate (decisions B/S)
+  ["echo '# don't' && git status", "the quote is unterminated so bash refuses the line and the classifier fails closed"],
 ];
 recordQ12Table("Q12-CQ: COMMENTS-AND-QUOTE-CHARS", true, Q12CQ_COMMENTS_AND_QUOTE_CHARS_TABLE);
 const Q12CQ_CONTROL_TABLE = [
   ["# git push origin main", "a comment only; no command runs"],
-  ["echo '# don't' && git status", "the # sits inside single quotes so it is data, and git status is read-only"],
 ];
 recordQ12Table("Q12-CQ: CONTROL-NOT-CANDIDATE", false, Q12CQ_CONTROL_TABLE);
 
