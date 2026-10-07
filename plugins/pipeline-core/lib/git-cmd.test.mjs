@@ -968,6 +968,84 @@ const Q12_ACCEPTED_FALSE_POSITIVE_TABLE = [
 ];
 recordQ12Table("Q12-ACCEPTED-FP", true, Q12_ACCEPTED_FALSE_POSITIVE_TABLE);
 
+// ---- commandIsGitPush: the heredoc narrowing, both sides (PO decision X, Q12-T3) ----
+// Test-only pin. Contract: PO decision X (2026-10-07), recorded in specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md
+// row X. It narrows decisions B and S for here-documents only: `<<` (a here-document, `<<-`, or the here-string `<<<`) is a
+// fail-closed marker ONLY when the command that receives it is a shell or interpreter (sh, bash, zsh, ksh, dash, ash, fish,
+// csh, tcsh, node, python, perl, ruby, pwsh, powershell, cmd, eval, ssh, or any nested-shell form the classifier already
+// recognises). A here-document fed to any other command (`git commit -F - <<EOF`, `cat <<EOF > notes.txt`) is data and does
+// not by itself make the command a push candidate. Every other marker of decisions B, J and S applies unchanged, so a `$`, a
+// backtick or any other marker on the command line (or in the body, which a shell expands when the delimiter is unquoted)
+// still decides. The first table is the NOT-candidate side (it fails on a classifier that treats every `<<` as a marker);
+// the receiver tables are the candidate side (they fail on a classifier that treats no `<<` as a marker, for instance one that
+// removes every here-document body from the detection text); the last two tables hold the markers and the real pushes that the
+// narrowing must keep deciding. Together they pin the decided contract from both directions. The consumer pin is PG-HD1 of
+// plugins/pipeline-core/hooks/guard-push.test.mjs (allow); the first case below carries its command text byte for byte so the
+// unit pin and the consumer pin cannot drift apart. A body line only mentions the push word; it is data, never run.
+// Every case id in this block starts with Q12-X: so one search over a run's output lists the state of all of them.
+
+// Data here-documents: the receiving command is not a shell or interpreter, so these are NOT candidates.
+const Q12X_DATA_HEREDOC_TABLE = [
+  ["git commit -q -F - <<EOF\nfix: a raw git push cannot consume it\nEOF", "the exact text of PG-HD1: a commit message here-document whose body mentions the push phrase"],
+  ["git commit -q -F - <<EOF\nfix: explain why a push is refused\nEOF", "an unquoted delimiter, the body line mentions push"],
+  ["git commit -q -F - <<'EOF'\nfix: explain why a push is refused\nEOF", "a single-quoted delimiter (no expansion in the body), the body line mentions push"],
+  ["git commit -q -F - <<-EOF\n\tfix: explain why a push is refused\n\tEOF", "the tab-stripping <<- form with a tab-indented body and terminator"],
+  ["cat <<EOF > notes.txt\ngit push origin main\nEOF", "cat is not a shell: the body, even a full push phrase, is written to a file and never run"],
+  ['git commit -q -F - <<<"fix: push docs"', "a here-string feeding git commit: data, not a command"],
+];
+recordQ12Table("Q12-X: DATA-HEREDOC-NOT-CANDIDATE", false, Q12X_DATA_HEREDOC_TABLE);
+
+// Shell and interpreter receivers: `<<` stays a fail-closed marker, because the body or string is a program the receiver
+// runs. The body carries a git word and the push words and no other marker, so only the `<<` rule can make these candidates.
+const Q12X_SHELL_RECEIVER_TABLE = [
+  ["bash <<EOF\ngit push origin main\nEOF", "bash runs the here-document body"],
+  ["sh <<'EOF'\ngit push origin main\nEOF", "sh with a single-quoted delimiter: the shell still runs the body"],
+  ["node <<EOF\n// git push origin main\nEOF", "node runs the here-document body as a program"],
+  ["pwsh <<EOF\ngit push origin main\nEOF", "pwsh runs the here-document body"],
+  ['bash <<<"git push"', "a here-string fed to bash: the string is the command line it runs"],
+  ["ssh host <<EOF\ngit push\nEOF", "ssh sends the here-document body to a remote shell"],
+  ["cat <<EOF | sh\ngit push\nEOF", "cat only forwards the body; the shell after the pipe runs it"],
+  ["python3 - <<EOF\n# git push origin main\nEOF", "python3 reads its program from the here-document"],
+];
+recordQ12Table("Q12-X: SHELL-RECEIVER-CANDIDATE", true, Q12X_SHELL_RECEIVER_TABLE);
+
+// The remaining shells and interpreters named by decision X, each as the receiver of a here-document. Same shape as above: a
+// git word and the push words in the body, no other marker.
+const Q12X_NAMED_RECEIVER_TABLE = [
+  ["zsh <<EOF\ngit push origin main\nEOF", "zsh"],
+  ["ksh <<EOF\ngit push origin main\nEOF", "ksh"],
+  ["dash <<EOF\ngit push origin main\nEOF", "dash"],
+  ["ash <<EOF\ngit push origin main\nEOF", "ash"],
+  ["fish <<EOF\ngit push origin main\nEOF", "fish"],
+  ["csh <<EOF\ngit push origin main\nEOF", "csh"],
+  ["tcsh <<EOF\ngit push origin main\nEOF", "tcsh"],
+  ["powershell <<EOF\ngit push origin main\nEOF", "powershell"],
+  ["cmd <<EOF\ngit push origin main\nEOF", "cmd"],
+  ["eval <<EOF\ngit push origin main\nEOF", "eval"],
+  ["perl <<EOF\n# git push origin main\nEOF", "perl"],
+  ["ruby <<EOF\n# git push origin main\nEOF", "ruby"],
+  ["python <<EOF\n# git push origin main\nEOF", "python (python3 is pinned above)"],
+];
+recordQ12Table("Q12-X: NAMED-RECEIVER-CANDIDATE", true, Q12X_NAMED_RECEIVER_TABLE);
+
+// Other markers still decide: the receiving command is data, but the command line (or the text after the terminator) carries
+// a marker of decisions B, J or S, so the command stays a push candidate.
+const Q12X_OTHER_MARKER_TABLE = [
+  ["git -C \"$(git rev-parse --show-toplevel)\" commit -q -F - <<EOF\nfix: docs\nEOF", "a data here-document whose command line carries a $( ) command substitution outside the body"],
+  ["git -C `git rev-parse --show-toplevel` commit -q -F - <<EOF\nfix: docs\nEOF", "a data here-document whose command line carries a backtick substitution outside the body"],
+  ["git commit -q -F - <<EOF\nfix: docs\nEOF\necho \"$(git rev-parse HEAD)\"", "a data here-document followed, after its terminator, by a command with a $( ) substitution"],
+];
+recordQ12Table("Q12-X: OTHER-MARKER-STAYS-CANDIDATE", true, Q12X_OTHER_MARKER_TABLE);
+
+// The narrowing must not open the gate: a real push next to a data here-document is still a push candidate, because the
+// body is removed from the detection text and what remains is read as before (the unit-level mirror of PG-HD5, PG-HD6 and PG-HD11).
+const Q12X_PUSH_NEXT_TO_HEREDOC_TABLE = [
+  ["git commit -q -F - <<EOF\nmsg\nEOF\ngit push origin main", "a real push on the line after the terminator"],
+  ["git commit -q -F - <<EOF\nmsg\nEOF\n && git push origin main", "a real push chained after the terminator"],
+  ["git push origin main <<EOF\nnote\nEOF", "the push itself carries a data here-document"],
+];
+recordQ12Table("Q12-X: PUSH-NEXT-TO-HEREDOC-CANDIDATE", true, Q12X_PUSH_NEXT_TO_HEREDOC_TABLE);
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
