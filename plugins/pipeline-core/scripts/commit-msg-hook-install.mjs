@@ -505,10 +505,22 @@ export function applyRemoval({ rootDir } = {}) {
 if (isDirectInvocation(import.meta.url)) {
   const [verb] = process.argv.slice(2);
   const rootDir = process.cwd();
+  // Keep the thrown error's OWN typed refusal code (PB-WINDOWS-ASSURANCE, ...): a typed code is a
+  // hyphenated upper-case identifier, which cannot carry a path or message text. Only an error with
+  // no typed code (a plain Error, or a bare errno such as EACCES) falls back. Mirrors pre-push.
+  const installOrRefusal = () => {
+    try {
+      return applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
+        console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
+      } });
+    } catch (error) {
+      const code = typeof error?.code === "string" && error.code.length <= 64 && /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/.test(error.code)
+        ? error.code : "COMMITMSG-INSTALL-UNAVAILABLE";
+      return { status: "refused", code };
+    }
+  };
   const result = verb === "--install"
-    ? applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
-      console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
-    } })
+    ? installOrRefusal()
     : verb === "--remove"
       ? applyRemoval({ rootDir })
       : verb === "--plan-install"
