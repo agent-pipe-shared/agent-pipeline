@@ -678,6 +678,46 @@ const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
+/**
+ * R7-6-F3 (PO decision AC): the ONE key-directory resolver for every entry point (this module's
+ * parseHumanArgs, toolchain-preflight.mjs, push-prepare.mjs). Tiers, in this exact order:
+ *   1. `explicit`            -> source "flag"           (the --directory argument)
+ *   2. PIPELINE_PO_APPROVAL_DIRECTORY -> source "environment" (per-terminal choice of a non-default key)
+ *   3. machine-wide poKeyDirectory    -> source "machine-plane" (one default per OS user)
+ *   4. legacy per-repository value    -> source "repo-scope", `legacy: true` (read-only)
+ *   5. nothing               -> status "unset" (callers report SIGN-KEY-DIRECTORY-UNSET)
+ * The result names the resolving tier. A store that is CONSULTED and invalid (the machine plane in
+ * tier 3, the legacy store in tier 4) is `status: "invalid"`, never "unset" and never a fall-through
+ * to a lower tier; but a higher tier that resolves is not blocked by an invalid lower store, because
+ * the lower stores are not consulted at all once a higher tier has resolved. Resolving a directory
+ * grants no trust: the committed anchor set decides whether the key found there may sign.
+ */
+export function resolvePoKeyDirectory({ explicit, repoRoot, dependencies = {} } = {}) {
+  if (text(explicit)) return { status: "resolved", directory: explicit, source: "flag", legacy: false };
+  const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
+  if (text(fromEnv)) return { status: "resolved", directory: fromEnv, source: "environment", legacy: false };
+  const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
+  if (plane.status === "invalid") {
+    return { status: "invalid", store: "machine-plane", code: plane.code, error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
+  }
+  if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
+    return { status: "resolved", directory: plane.plane.poKeyDirectory, source: "machine-plane", legacy: false };
+  }
+  // The legacy tier needs a git-common-dir computed from repoRoot; the authoritative repoRoot
+  // validation stays with the caller -- this check only SKIPS the tier when repoRoot is not yet a
+  // usable absolute path.
+  const repoScope = (text(repoRoot) && isAbsolute(repoRoot))
+    ? resolveRepoScopedDirectory(repoRoot, dependencies)
+    : { status: "absent", directory: null };
+  if (repoScope.status === "invalid") {
+    return { status: "invalid", store: "repo-scope", code: repoScope.code, error: `this repository's own remembered PO key-directory store is invalid (${repoScope.code}): fix or remove it, or pass --directory explicitly.` };
+  }
+  if (repoScope.status === "valid" && text(repoScope.directory)) {
+    return { status: "resolved", directory: repoScope.directory, source: "repo-scope", legacy: true };
+  }
+  return { status: "unset", directory: null, source: null, legacy: false };
+}
+
 export function parseHumanArgs(argv, dependencies = {}) {
   const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();
   for (let index = 0; index < tokens.length; index += 1) {
@@ -699,59 +739,32 @@ export function parseHumanArgs(argv, dependencies = {}) {
     const suggestion = suggestSubcommand(command, KNOWN_COMMANDS);
     return { error: suggestion ? `${USAGE}\nUnknown subcommand "${command}". Did you mean "${suggestion}"?` : USAGE };
   }
-  // PO-KEYDIR-01(A)/SETUP-2b/AC-11: precedence, in this exact order. An explicit
-  // --directory always wins and is used exactly as before, never even consulting
-  // any of the tiers below. Absent that, this repository's OWN remembered directory
-  // (the repo-scoped store, below) -- absent that, the machine-scoped configuration
-  // plane's own poKeyDirectory (SS2/SS6a of nova-setup-bootstrap.md); absent that in
-  // turn, the PIPELINE_PO_APPROVAL_DIRECTORY environment variable, exactly as before
-  // this task. Whichever route resolves a value, that value then runs through the
-  // identical isAbsolute check below and, downstream, the identical
-  // externalDirectory() safety checks (AC-14) -- there is no separate, weaker path
-  // for a repo-scope-, plane- or environment-sourced value.
-  // R7-6-F (Spec 22.6, T14): the order is now explicit argument, then the machine-wide value
-  // (one per OS user, outside every repository and `.git`), then the legacy per-repository
-  // private-state value (read-only fallback, reported as `legacy: true`), then the
-  // environment variable as before, then absent.
+  // R7-6-F3 (PO decision AC, Spec 22.6 delta, supersedes the earlier PO-KEYDIR-01(A)/SETUP-2b/AC-11/
+  // R7-6-F orders): ONE resolver, resolvePoKeyDirectory() above, shared with toolchain-preflight.mjs
+  // and push-prepare.mjs. The order is: an explicit --directory (used exactly as given, never
+  // consulting any tier below); the PIPELINE_PO_APPROVAL_DIRECTORY environment variable (the
+  // per-terminal selection of a non-default key); the machine-wide poKeyDirectory (one per OS
+  // user, outside every repository and `.git`); the legacy per-repository private-state value
+  // (read-only fallback, reported as `legacy: true`); else absent (SIGN-KEY-DIRECTORY-UNSET). The
+  // result names the resolving tier (directorySource). Whichever tier resolves a value, that value
+  // then runs through the identical isAbsolute check below and, downstream, the identical
+  // externalDirectory() safety checks (AC-14) -- there is no separate, weaker path for any tier.
+  // Choosing a key by directory never grants trust: the committed anchor set decides (probe step (c)).
   if (supplied.has("directory")) {
     setDirectorySource(values, "flag");
   } else {
-    const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
-    // AC-12: an invalid or unreadable plane is a reported failure, never silently
-    // treated as absent -- it must NOT fall through to the legacy store or the environment
-    // variable as though nothing were there. An ABSENT plane (a machine that has not
-    // been set up yet) falls through normally and silently.
-    if (plane.status === "invalid") {
-      return { error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
-    }
-    if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
-      values.directory = plane.plane.poKeyDirectory;
-      setDirectorySource(values, "machine-plane");
-    } else {
-      // The legacy tier needs values.repoRoot to compute a git-common-dir; the authoritative
-      // repoRoot validation stays below, unchanged -- this inline check only SKIPS the tier
-      // when repoRoot is not yet a usable absolute path.
-      const repoScope = (text(values.repoRoot) && isAbsolute(values.repoRoot))
-        ? resolveRepoScopedDirectory(values.repoRoot, dependencies)
-        : { status: "absent", directory: null };
-      // Mirrors AC-12's discipline: an invalid legacy store is a reported failure, never
-      // silently treated as absent.
-      if (repoScope.status === "invalid") {
-        return { error: `this repository's own remembered PO key-directory store is invalid (${repoScope.code}): fix or remove it, or pass --directory explicitly.` };
-      }
-      if (repoScope.status === "valid" && text(repoScope.directory)) {
-        values.directory = repoScope.directory;
-        setDirectorySource(values, "repo-scope");
-        // Non-enumerable, like directorySource: exact-shape assertions elsewhere must not see it.
-        Object.defineProperty(values, "legacy", { value: true, enumerable: false, configurable: true });
-      } else {
-        const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
-        if (text(fromEnv)) { values.directory = fromEnv; setDirectorySource(values, "environment"); }
-      }
+    const resolution = resolvePoKeyDirectory({ repoRoot: values.repoRoot, dependencies });
+    // AC-12: an invalid consulted store is a reported failure, never silently treated as absent.
+    if (resolution.status === "invalid") return { error: resolution.error };
+    if (resolution.status === "resolved") {
+      values.directory = resolution.directory;
+      setDirectorySource(values, resolution.source);
+      // Non-enumerable, like directorySource: exact-shape assertions elsewhere must not see it.
+      if (resolution.legacy) Object.defineProperty(values, "legacy", { value: true, enumerable: false, configurable: true });
     }
   }
   if (!text(values.directory) || !isAbsolute(values.directory)) {
-    const required = `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, configure poKeyDirectory in the machine-scoped configuration plane (one value per OS user), let this repository's legacy remembered value stand (persisted by an earlier 'setup --directory'), or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides the machine-scoped plane, which overrides the repository's legacy remembered value, which overrides the environment variable).`;
+    const required = `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, configure poKeyDirectory in the machine-scoped configuration plane (one value per OS user), let this repository's legacy remembered value stand (persisted by an earlier 'setup --directory'), or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path to choose a non-default key for one terminal (an explicit --directory always overrides the environment variable, which overrides the machine-scoped plane, which overrides the repository's legacy remembered value).`;
     // Absent, as opposed to present but relative: the typed SIGN-KEY-DIRECTORY-UNSET result with its setup action.
     if (!text(values.directory)) {
       return { error: `${required}\nSIGN-KEY-DIRECTORY-UNSET: key-directory-unset; repair: set-po-key-directory (agent-executable, no signature) with the absolute key directory the PO states.`, code: "SIGN-KEY-DIRECTORY-UNSET", finding: keyDirectoryUnsetFinding() };
@@ -955,11 +968,17 @@ function outsideEveryRepository(path) {
 function probeSigningToolchain(dependencies) {
   const noEd25519 = (detail) => readinessFinding("signing-toolchain", "attended", `openssl-no-ed25519: ${detail}`,
     toolchainRepair("openssl-with-ed25519", "put an OpenSSL build with Ed25519 support earlier on the PATH of the terminal that signs, in that terminal's own shell, and re-run the readiness check there.", dependencies));
+  // R7-6-F3 (PO decision AE): the closed class for a probe that cannot run its round trip because of its
+  // OWN working environment -- no admissible working directory outside every repository, or a local I/O
+  // failure while preparing the throwaway material. The OpenSSL on the PATH is not at fault in either
+  // case, so it is never reported as openssl-no-ed25519 and never carries the replace-OpenSSL repair.
+  const environmentUnavailable = (detail) => readinessFinding("signing-toolchain", "attended", `probe-environment-unavailable: ${detail}`,
+    attendedRepair("probe-environment", "check that your home directory exists, is a directory outside every Git repository and can be read by your own OS user, and that the system temporary directory exists and is writable by you, then re-run the readiness check in that terminal. The working environment of the check itself is the problem, not your OpenSSL."));
+  // The probe child runs from the OS user's home directory and never falls back to the temporary
+  // directory (a world-writable location a planted file could occupy).
   let cwd = null;
-  for (const candidate of [dependencies.homedirFn ?? homedir, dependencies.tmpdirFn ?? tmpdir]) {
-    try { const value = realpathSync(candidate()); if (statSync(value).isDirectory() && outsideEveryRepository(value)) { cwd = value; break; } } catch { /* try the next */ }
-  }
-  if (cwd === null) return [noEd25519("no working directory outside every repository was available for the probe")];
+  try { const value = realpathSync((dependencies.homedirFn ?? homedir)()); if (statSync(value).isDirectory() && outsideEveryRepository(value)) cwd = value; } catch { /* no admissible working directory */ }
+  if (cwd === null) return [environmentUnavailable("no working directory outside every repository was available for the probe")];
   const options = { cwd, stdio: "pipe", encoding: "utf8", timeout: PROBE_TIMEOUT_MS, maxBuffer: 65_536 };
   const resolved = spawnOpenssl(["version"], options, dependencies);
   if (!resolved || (resolved.error && NOT_STARTED_CODES.has(resolved.error.code))) {
@@ -970,14 +989,23 @@ function probeSigningToolchain(dependencies) {
   const findings = [okFinding("signing-toolchain")];
   let directory = null;
   try {
-    const base = (dependencies.tmpdirFn ?? tmpdir)();
-    if (!outsideEveryRepository(base)) return [noEd25519("no throwaway directory outside every repository was available for the round trip")];
-    directory = mkdtempSync(join(base, "pipeline-sign-probe-"));
-    const { privateKey, publicKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
-    const files = { privateKey: join(directory, "probe-private.pem"), publicKey: join(directory, "probe-public.pem"), payload: join(directory, "probe-payload.txt"), signature: join(directory, "probe-signature.bin") };
-    writeFileSync(files.privateKey, privateKey, { mode: 0o600 });
-    writeFileSync(files.publicKey, publicKey);
-    writeFileSync(files.payload, PROBE_PAYLOAD);
+    let files;
+    // R7-6-F3 (PO decision AE): a LOCAL I/O failure while preparing the throwaway material (the directory
+    // for it, the key generation, the file writes) is the probe's own environment failing, not the
+    // OpenSSL on the PATH. Only this inner block maps to probe-environment-unavailable; every spawn
+    // below stays outside it, so a spawn that fails or throws is still the ed25519 class.
+    try {
+      const base = (dependencies.tmpdirFn ?? tmpdir)();
+      if (!outsideEveryRepository(base)) return [environmentUnavailable("no throwaway directory outside every repository was available for the round trip")];
+      directory = mkdtempSync(join(base, "pipeline-sign-probe-"));
+      const { privateKey, publicKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
+      files = { privateKey: join(directory, "probe-private.pem"), publicKey: join(directory, "probe-public.pem"), payload: join(directory, "probe-payload.txt"), signature: join(directory, "probe-signature.bin") };
+      writeFileSync(files.privateKey, privateKey, { mode: 0o600 });
+      writeFileSync(files.publicKey, publicKey);
+      writeFileSync(files.payload, PROBE_PAYLOAD);
+    } catch (error) {
+      return [environmentUnavailable(`the throwaway material for the round trip could not be prepared (${error?.code ?? "error"})`)];
+    }
     const signed = spawnOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", files.privateKey, "-in", files.payload, "-out", files.signature], options, dependencies);
     if (signed?.error || signed?.status !== 0) return [noEd25519(`the Ed25519 round trip failed at the sign step: ${exitDetail(signed)}`)];
     const verified = spawnOpenssl(["pkeyutl", "-verify", "-rawin", "-pubin", "-inkey", files.publicKey, "-in", files.payload, "-sigfile", files.signature], options, dependencies);
@@ -997,12 +1025,29 @@ function inspectKeyDirectory(directory, dependencies) {
   try { info = statSync(directory); } catch (error) { return { state: state(error, "missing"), publicKey: null }; }
   if (!info.isDirectory()) return { state: "missing", publicKey: null };
   try { readdirSync(directory); } catch (error) { return { state: state(error, "missing"), publicKey: null }; }
-  try { return { state: "readable", publicKey: String((dependencies.readFile ?? readFileSync)(join(directory, "po-public.pem"), "utf8")) }; }
-  catch (error) { return { state: state(error, "readable"), publicKey: null }; }
+  let publicKey;
+  try { publicKey = String((dependencies.readFile ?? readFileSync)(join(directory, "po-public.pem"), "utf8")); }
+  catch (error) { return { state: state(error, "readable"), publicKey: null, keyReference: null }; }
+  return { state: "readable", publicKey, keyReference: declaredKeyReference(directory, publicKey, dependencies) };
 }
 
-/** Step (c): the directory resolves to an existing readable directory, and the digest of the public key found
- * there equals one committed trust anchor. Reads the public key and the anchor only. */
+/** R7-6-F3 (PO decision AD): the key reference the directory's own public trust-policy.json declares for the
+ * public key found there. It counts only if that record names THIS key: a publicKeySha256, when the record
+ * carries one, must equal the digest of po-public.pem, so a record describing another key can never lend its
+ * reference to this one. Public data only; null when the record is missing, unreadable or does not apply. */
+function declaredKeyReference(directory, publicKey, dependencies) {
+  try {
+    const record = JSON.parse(String((dependencies.readFile ?? readFileSync)(join(directory, "trust-policy.json"), "utf8")));
+    if (record === null || typeof record !== "object" || !text(record.keyReference)) return null;
+    if (record.publicKeySha256 !== undefined && record.publicKeySha256 !== createHash("sha256").update(publicKey).digest("hex")) return null;
+    return record.keyReference;
+  } catch { return null; }
+}
+
+/** Step (c): the directory resolves to an existing readable directory, and the key found there -- its key
+ * reference AND the digest of its public key, as ONE pair -- equals one committed trust anchor (decision AD:
+ * any-of on the pair, never a digest matched here and a reference matched there). Reads the public key, the
+ * directory's public trust-policy.json and the anchor set only; the private key is never opened. */
 function probeKeyDirectory({ repository, inspection, legacy, dependencies }) {
   if (inspection.state === "missing") {
     return { anchorCount: 0, findings: [readinessFinding("po-key-directory", "repairable", "key-directory-missing: the stored PO key directory value names no directory", keyDirectorySetAction())] };
@@ -1018,12 +1063,14 @@ function probeKeyDirectory({ repository, inspection, legacy, dependencies }) {
   } catch { anchors = []; }
   const findings = [okFinding("po-key-directory", legacy ? "ok (resolved from the legacy per-repository value)" : "ok")];
   const digest = inspection.publicKey === null ? null : createHash("sha256").update(inspection.publicKey).digest("hex");
-  if (digest !== null && anchors.some((anchor) => anchor?.publicKeySha256 === digest)) {
+  const keyReference = inspection.keyReference ?? null;
+  if (digest !== null && keyReference !== null && anchors.some((anchor) => anchor?.keyReference === keyReference && anchor?.publicKeySha256 === digest)) {
     findings.push(okFinding("trust-anchor-match"));
   } else {
     const detail = digest === null ? "no public key was found in the PO key directory"
       : anchors.length === 0 ? "no trust anchor is committed for this repository"
-        : `the public key found there matches none of the ${anchors.length} committed trust anchors`;
+        : keyReference === null ? "the PO key directory declares no key reference for the public key found there, so it cannot match a committed trust anchor as a pair"
+          : `the key reference and public key found there match none of the ${anchors.length} committed trust anchors as one pair`;
     findings.push(readinessFinding("trust-anchor-match", "attended", `key-anchor-mismatch: ${detail}`,
       attendedRepair("po-key-anchored", "point poKeyDirectory at the directory that holds the anchored key, or perform the one-time key setup (setup) in your own terminal.")));
   }
