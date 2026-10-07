@@ -35,6 +35,9 @@ function safePackagePath(value) {
     && value.split("/").every((part) => part && !part.startsWith(".") && part !== "scratch" && part !== "node_modules");
 }
 
+/** The tracked home of a feature's digest-bound evidence (Spec 22.3 R7-3). */
+function trackedEvidencePrefix(featureId) { return `specs/${featureId}/evidence/`; }
+
 function fail(code, message = code) { throw Object.assign(new Error(message), { code }); }
 function sha(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function exact(value, keys) {
@@ -263,13 +266,16 @@ export async function inspectDesignCourseSubmission({ root, runner, pluginRoot }
         implementationAuthority: false };
     }
     const sources = verifySources(root, plannedSources, candidate, runGit);
+    // Every artifact the approval digests is durable evidence: it lives under
+    // the feature's tracked evidence prefix, never the git-ignored root evidence/
+    // (Spec 22.3 R7-3, Classification T5).
+    const outputPrefix = `${trackedEvidencePrefix(featureId)}design-course/${runner}`;
     const producerAction = buildDesignCourseProducerAction({ root, pluginRoot: selectedPluginRoot, runner, stage: "advisor",
-      featureId, authoringDispatchId, profile: submission.profile, candidate, sources,
-      outputPrefix: `evidence/design-course/${featureId}/${runner}` });
+      featureId, authoringDispatchId, profile: submission.profile, candidate, sources, outputPrefix });
     const scriptPath = fileURLToPath(import.meta.url);
     const argv = [scriptPath, "--root", root, "--runner", runner, "--stage", "advisor",
       "--feature-id", featureId, "--authoring-dispatch-id", authoringDispatchId,
-      "--profile", submission.profile, "--output-prefix", `evidence/design-course/${featureId}/${runner}`];
+      "--profile", submission.profile, "--output-prefix", outputPrefix];
     for (const name of SOURCES) argv.push("--source", name, sources[name].path, sources[name].sha256);
     argv.push("--execute");
     const nextAction = { kind: "command", executable: process.execPath,
