@@ -229,7 +229,7 @@
 | pipeline.dead-key-directory-pointer-is-permanent-and-silent | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless. |
 | pipeline.declared-system-skill-read-requires-human-override | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-16 | — |
-| pipeline.default-claude-readiness-route-rejects-registered-alias | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.default-claude-readiness-route-rejects-registered-alias | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | batman | 2026-08-28 | — | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
@@ -521,7 +521,7 @@
 | pipeline.onboarding-produces-drift-it-then-has-to-repair | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
-| pipeline.onboarding-spec-marker-has-no-preapproval-reconcile | open | defect | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.onboarding-spec-marker-has-no-preapproval-reconcile | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.onboarding-test-runner-reports-async-pass-before-settlement | open | defect | pipeline | alfred | 2026-09-29 | — | 0.7 test integrity and bounded runtime; Source repair delivered, final candidate verification pending. |
 | pipeline.operating-model-not-shipped-with-the-plugin | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading. |
@@ -700,6 +700,7 @@
 | pipeline.selected-critic-lane-contracts-unpinned | open | defect | pipeline | none | 2026-09-06 | — | Future native-Windows Codex sandbox package -- the selected-Codex-Critic lane (codex-critic-app-server.mjs) resolves roles/critic.md, templates/prompts/critic-review.md and the verdict schema against the live checkout with only an lstat, hands their paths into the child's prompt, and binds no digest of the briefed bytes into either receipt it constructs. The sibling native lane in codex-critic-host.mjs enforces pipelineRoot !== repoRoot, refuses a dirty ruleset checkout, and binds roleContractSha256/promptContractSha256/verdictSchemaSha256 into the prepared packet and the receipt. Under SEC-10's threat model an agent can edit roles/critic.md in the working tree, dispatch its own reviewer through the selected lane, and the tamper-evident execution receipt cannot show it. |
 | pipeline.self-application-integrity-check-absent | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
+| pipeline.semgrep-console-coverage-note-has-no-test | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.semgrep-offline-default-version-check | open | defect | pipeline | none | 2026-09-29 | — | — |
 | pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.semgrep-timeout-oversized-pipeline-state-test | closed | defect | pipeline | — | 2026-08-11 | — | — |
@@ -849,8 +850,8 @@
 
 ## Counts
 
-- open: 170
+- open: 169
 - in_progress: 0
-- closed: 657
+- closed: 659
 - rejected: 3
 - deferred: 11

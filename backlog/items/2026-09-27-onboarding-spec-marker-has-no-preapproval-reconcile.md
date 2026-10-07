@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-spec-marker-has-no-preapproval-reconcile
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 26fef9e7d
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 created: 2026-09-27
 source: "Claude/Windows greenfield review F-04, 2026-09-27; consumer reports blocked ad-hoc hashing, source confirms marker requirement and a separate post-approval rebind helper."
 sprint: alfred
@@ -40,6 +44,13 @@ Keep the substantive PRD/Spec review separate from this mechanical repair.
 - A fresh Claude/Windows run reaches PO review with matching marker and Spec.
 
 ## Triage
+
+- **Decision:** closed — fixed in source
+- **Rationale:** Fix site `plugins/pipeline-core/lib/project-onboarding-v3.mjs:3564`
+  (`intake-spec-marker-apply`); regression test
+  `project-onboarding-v3.test.mjs:9287`.
+- **Assignment:** n/a
+- **Date:** 2026-10-07
 
 ## Prepared repair core (2026-09-28)
 

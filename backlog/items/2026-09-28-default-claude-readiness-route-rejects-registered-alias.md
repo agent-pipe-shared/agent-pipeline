@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.default-claude-readiness-route-rejects-registered-alias
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-28
 source: "Default-validator integration during 0.7 preparation: a valid frozen V3 Claude readiness alias is rejected by the shared resolver used by the supported non-Codex readiness producer and verifier. Model-free disposable Git reproduction 797359; no provider or real key invoked."
 sprint: alfred
 done_when: manual
+closed_at: 2026-10-07
+closure_repository: self
+closure_commit: 3d9ffe770
+closure_evidence: specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md
 ---
 
 # Registered Claude readiness alias is rejected by its shared default resolver
@@ -39,10 +43,10 @@ transport. No resolver override or relabelled selector is an accepted repair.
 
 ## Triage
 
-- **Decision:** Confirmed integration defect; include in the existing 0.7
-  three-runner readiness and chat/signature consistency correction scope.
-- **Assignment:** Shared duty resolver and meaningful producer/verifier/signing
-  regression, coordinated with the source qualification integrator.
-- **Date:** 2026-09-28
+- **Decision:** closed — fixed in source
+- **Rationale:** Fix site `plugins/pipeline-core/lib/critic-route-v3.mjs:49`
+  (commit 3d9ffe770); regression test `critic-route-v3.test.mjs:35`.
+- **Assignment:** n/a
+- **Date:** 2026-10-07
 - **State:** Open. Source proposal, ledger registration and acceptance follow;
   this intake does not change the five bound design sources or grant approval.

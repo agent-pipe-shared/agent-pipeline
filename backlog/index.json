@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4674e477311ff4ced5b6b5c6f4846093edb0a43e65ec3be56eb3b81a14a66acd"
+    "transitionHead": "ab11f89a289c5eb5a83273c5ee34ba04ba15e3d24a21165d66efe22a4b8cfc79"
   },
   "counts": {
-    "open": 170,
+    "open": 169,
     "in_progress": 0,
-    "closed": 657,
+    "closed": 659,
     "rejected": 3,
     "deferred": 11
   },
@@ -2955,13 +2955,17 @@
     },
     {
       "id": "pipeline.default-claude-readiness-route-rejects-registered-alias",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Default-validator integration during 0.7 preparation: a valid frozen V3 Claude readiness alias is rejected by the shared resolver used by the supported non-Codex readiness producer and verifier. Model-free disposable Git reproduction 797359; no provider or real key invoked.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "3d9ffe770",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.delivery-is-not-always-a-git-push",
@@ -6734,13 +6738,17 @@
     },
     {
       "id": "pipeline.onboarding-spec-marker-has-no-preapproval-reconcile",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Claude/Windows greenfield review F-04, 2026-09-27; consumer reports blocked ad-hoc hashing, source confirms marker requirement and a separate post-approval rebind helper.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d",
+      "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
     },
     {
       "id": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
@@ -9089,6 +9097,17 @@
       "closureRepository": "self",
       "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
       "closureEvidence": "backlog/items/2026-08-18-self-healing-local-cleanup-recovery.md"
+    },
+    {
+      "id": "pipeline.semgrep-console-coverage-note-has-no-test",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "Critic finding F-1 (minor, QG-06), SEM delta review 2026-10-07, specs/sprint-alfred-epic/evidence/critic-2026-10-07/sem-delta.md",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.semgrep-offline-default-version-check",
