@@ -23,8 +23,8 @@ Existing approvals keep the frozen legacy branches; the new branch is selected o
 ## Mechanical consistency check (`pipeline.design-consistency-check.v1`)
 Inputs: plan submission digests, PRD `technical-spec-sha256` marker, Spec requirement register vs traceability IDs/counts, bound companions, review receipts. Codes: `DCC-PRD-MARKER-MISSING|DUPLICATE|STALE`, `DCC-PRD-DIGEST-DRIFT`, `DCC-SPEC-DIGEST-DRIFT`, `DCC-COUNT-MISMATCH`, `DCC-ID-DUPLICATE`, `DCC-PATH-UNTRACKED|MODIFIED|IGNORED|UNSAFE`, `DCC-REVIEW-RECEIPT-MISSING|BINDING`, `DCC-REVIEW-ROUND-EXCEEDED`, `DCC-REVIEW-DELTA-CHAIN`. No content-finding slot. Runs in present-plan before the request/sign command, again in approve-plan; inspect read-only.
 
-## Open PO questions
-1. Rev-5 legacy re-read: (a) keep the course-store reader byte-frozen, or (b) approved re-read mode `DWP2-LEGACY-APPROVED-REREAD` (checks package bytes, digests, exception binding, signature; works on a fresh clone).
-2. Review receipt gate: must the verdict be PASS, or may the PO sign over open findings?
-3. Register definition: Spec requirement IDs via `requirement-traceability.mjs`?
-4. In-flight v2 presentations at upgrade: finish via legacy approve, or re-present?
+## PO answers (decisions T–W, `po-decisions-2026-10-07.md`)
+1. Rev-5 legacy re-read → (b) `DWP2-LEGACY-APPROVED-REREAD` (T).
+2. Review receipt gate → the PO may sign over open findings; their IDs are listed in the signed binding (U).
+3. Register → Spec requirement IDs via `requirement-traceability.mjs` (W).
+4. In-flight v2 presentations → refused with a typed code, re-present via the new route (V).
