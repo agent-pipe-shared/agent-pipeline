@@ -38,7 +38,7 @@ the function under test and never executed. Owner: pipeline; due before the 0.7.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted; scope widened from agent sessions to every session the lifecycle guard sees (main session and subagents), no override route.
+- **Rationale:** the main session's transcript is as exposed as a subagent's; a secret printed once cannot be unprinted, so there is no legitimate agent need that outweighs a typed refusal.
+- **Assignment (if accepted):** ENVDUMP-T (test-only pins in `guard-lifecycle-ready.test.mjs`), then the guard fix with code `GUARD-ENV-DUMP` and the template sentence; 0.7.0 candidate.
+- **Date:** 2026-10-07

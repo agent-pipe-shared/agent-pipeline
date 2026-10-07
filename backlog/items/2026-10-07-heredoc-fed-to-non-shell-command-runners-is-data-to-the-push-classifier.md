@@ -36,7 +36,7 @@ Ask the PO whether decision X's receiver list extends to command runners (`xargs
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted (PO decision AF, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md`).
+- **Rationale:** a command runner fed a heredoc executes it; treating it as data leaves a push path unrouted to guard-push.
+- **Assignment (if accepted):** Q12-T5 (test-only pins), then the classifier fix; 0.7.0 candidate.
+- **Date:** 2026-10-07
