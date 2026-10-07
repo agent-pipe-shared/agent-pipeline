@@ -1235,6 +1235,31 @@ const Q12EXE_NON_LEADING_GIT_EXE_PUSH_TABLE = [
 recordQ12Table("Q12-EXE: NON-LEADING-GIT-EXE-PUSH", true, Q12EXE_NON_LEADING_GIT_EXE_PUSH_TABLE);
 recordQ12Table("Q12-EXE: NON-GIT-LOOKALIKE", false, Q12EXE_NEGATIVE_ROWS);
 
+// ---- commandIsGitPush: comments and quote characters that carry a push bypass (Q12-T9) ----
+// Test-only pin, written BEFORE any classifier change (QG-04); several candidate rows are expected RED at the commit that adds it,
+// and the per-row state is recorded in the evidence of the dispatch that added it. Contract: PO decision Q12 option B,
+// "fail-closed marker". A comment (# at a word start) or a quote character inside a comment or heredoc body must not hide a later
+// line that runs a push, and an unbalanced quote inside a comment must not swallow the lines after it. Every command text below is
+// DATA: it is handed to `commandIsGitPush` and never executed. Every case id starts with Q12-CQ so one search lists all of them.
+const Q12CQ_COMMENTS_AND_QUOTE_CHARS_TABLE = [
+  ["cat <<EOF | # c\ngit push origin main\nEOF\nsh", "the heredoc body feeds cat, whose output pipes into sh after the terminator; sh runs git push origin main"],
+  ["cat <<EOF |\ngit push origin main\nEOF\n# c\nsh", "the pipe continues past the heredoc and the comment line; sh receives the body and runs git push origin main"],
+  ["cat <<EOF |   # trailing comment\n\ngit push origin main\nEOF\nbash", "a trailing comment after the pipe and a blank line; bash receives the body and runs git push origin main"],
+  ["xargs git <<EOF | # c\npush origin main\nEOF", "the heredoc body becomes xargs arguments for git, so git push origin main runs; the comment does not change that"],
+  ["cat <<EOF\ndon't\nEOF\ng\"i\"t $(echo push) origin main", "the apostrophe is heredoc data; after the terminator g\"i\"t is git and the substitution yields push"],
+  ["cat <<EOF\ndon't\nEOF\n{g\"i\"t,push} origin main", "the apostrophe is heredoc data; after the terminator brace expansion yields git push origin main"],
+  ["# don't\ng\"i\"t $(echo push) origin main", "the first line is a comment, so its apostrophe opens no quote; line two runs git push origin main"],
+  ["true # don't\ng\"i\"t $(echo push) origin main", "the comment starts at the word-initial # so its apostrophe opens no quote; line two runs git push origin main"],
+  ["# x\"\ng\"i\"t $(echo push) origin main", "the double quote sits inside a comment and opens no quote; line two runs git push origin main"],
+  ["echo \"it's\" # it's\ng''it push origin main", "the apostrophe in the double quotes and in the comment open no quote; g''it is git on line two and pushes"],
+];
+recordQ12Table("Q12-CQ: COMMENTS-AND-QUOTE-CHARS", true, Q12CQ_COMMENTS_AND_QUOTE_CHARS_TABLE);
+const Q12CQ_CONTROL_TABLE = [
+  ["# git push origin main", "a comment only; no command runs"],
+  ["echo '# don't' && git status", "the # sits inside single quotes so it is data, and git status is read-only"],
+];
+recordQ12Table("Q12-CQ: CONTROL-NOT-CANDIDATE", false, Q12CQ_CONTROL_TABLE);
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
