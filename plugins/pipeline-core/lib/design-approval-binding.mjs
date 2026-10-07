@@ -178,7 +178,8 @@ function unreviewedSourceDelta(reviewedSources, currentSources) {
 const copySources = (sources) => ({
   prd: { path: sources.prd.path, sha256: sources.prd.sha256 },
   spec: { path: sources.spec.path, sha256: sources.spec.sha256 },
-  companions: sources.companions.map(({ path, sha256 }) => ({ path, sha256 })),
+  // A companion deleted since review (current sha256 null) is not bound; its delta entry still records the removal.
+  companions: sources.companions.filter(({ sha256 }) => sha256 !== null).map(({ path, sha256 }) => ({ path, sha256 })),
 });
 
 /**
