@@ -392,6 +392,92 @@ const SWAP_HOOK_SOURCE = [
   'syncBuiltinESMExports();',
 ].join('\n');
 
+// ---------------------------------------------------------------------------
+// Helpers of the C-S-T5 cases (Critic delta findings on the scratch sweep).
+//
+// The F2 swap pin above (SWAP_HOOK_SOURCE) fires on the FIRST realpath call on the planned file,
+// and the physical-scratch-boundary walk of the planning phase already makes that call -- so it
+// swaps during planning and the plan simply never lists the file. Nothing in that case reaches the
+// containment branch of applyPlan (the realpath-and-relative check just before unlinkSync). The
+// hook below swaps in the APPLY phase only: on the first realpath call on the target made after
+// the first unlink of the run. Planning never unlinks, so that call is applyPlan's own, made after
+// lstat saw a regular file and before unlinkSync. The fixtures keep a control file that sorts
+// before the victim, so its deletion opens the apply phase before the victim is looked at.
+// ---------------------------------------------------------------------------
+
+const APPLY_SWAP_HOOK_SOURCE = [
+  "import fs from 'node:fs';",
+  "import { syncBuiltinESMExports } from 'node:module';",
+  "import path from 'node:path';",
+  'const target = path.resolve(process.env.C_S_T5_SWAP_TARGET).toLowerCase();',
+  'let unlinks = 0;',
+  'let targetCalls = 0;',
+  'let fired = false;',
+  'function swap() {',
+  '  fired = true;',
+  '  fs.rmSync(process.env.C_S_T5_SWAP_DIR, { recursive: true, force: true });',
+  '  fs.symlinkSync(process.env.C_S_T5_SWAP_LINK_TARGET, process.env.C_S_T5_SWAP_DIR, process.env.C_S_T5_SWAP_TYPE);',
+  "  fs.writeFileSync(process.env.C_S_T5_SWAP_MARKER, JSON.stringify({ unlinksBefore: unlinks, targetRealpathCallsBefore: targetCalls }) + '\\n');",
+  '}',
+  'function wrapRealpath(original) {',
+  '  return function (p, ...rest) {',
+  "    if (!fired && typeof p === 'string' && path.resolve(p).toLowerCase() === target) {",
+  '      if (unlinks > 0) swap();',
+  '      else targetCalls += 1;',
+  '    }',
+  '    return original.call(this, p, ...rest);',
+  '  };',
+  '}',
+  'const originalUnlink = fs.unlinkSync;',
+  'fs.unlinkSync = function (p, ...rest) {',
+  '  const result = originalUnlink.call(this, p, ...rest);',
+  '  if (!fired) unlinks += 1;',
+  '  return result;',
+  '};',
+  'const wrapped = wrapRealpath(fs.realpathSync);',
+  'wrapped.native = wrapRealpath(fs.realpathSync.native);',
+  'fs.realpathSync = wrapped;',
+  'syncBuiltinESMExports();',
+].join('\n');
+
+const T5_REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/** The upper-case drive letter of an absolute win32 path, or null. */
+const driveLetter = (p) => /^([A-Za-z]):/u.exec(path.resolve(p))?.[1].toUpperCase() ?? null;
+
+/**
+ * A fresh directory on a volume other than the fixture's, win32 only (elsewhere path.relative never
+ * returns an absolute path, so there is no cross-volume case to pin). Prefers a fresh directory under
+ * this repository's own scratch/ when the repository lives on another volume than the fixture, then
+ * falls back to the first writable root of any other existing drive letter D: to Z:. Returns
+ * `{ dir }` (removed with the fixture) or `{ skip: reason }`.
+ */
+function createCrossVolumeDirectory(fx) {
+  if (process.platform !== 'win32') {
+    return { skip: 'a cross-volume path.relative() result (an absolute path) exists only on win32; this platform has one root' };
+  }
+  const fixtureDrive = driveLetter(fx.root);
+  const bases = [];
+  if (driveLetter(T5_REPO_ROOT) !== fixtureDrive && fs.existsSync(path.join(T5_REPO_ROOT, '.git'))) {
+    bases.push(path.join(T5_REPO_ROOT, 'scratch'));
+  }
+  for (let code = 'D'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code += 1) {
+    const letter = String.fromCharCode(code);
+    if (letter !== fixtureDrive && fs.existsSync(`${letter}:\\`)) bases.push(`${letter}:\\`);
+  }
+  for (const base of bases) {
+    try {
+      fs.mkdirSync(base, { recursive: true });
+      const dir = fs.realpathSync(fs.mkdtempSync(path.join(base, 'c-s-t5-outside-')));
+      fx.onCleanup(() => fs.rmSync(dir, { recursive: true, force: true }));
+      return { dir };
+    } catch {
+      // this volume is not writable for us: try the next one
+    }
+  }
+  return { skip: `no second writable volume besides ${fixtureDrive ?? 'the fixture volume'}: (candidates tried: ${bases.join(', ') || 'none exist'})` };
+}
+
 describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
   const savedGitEnv = new Map();
 
@@ -911,5 +997,94 @@ describe('scratch-sweep CLI (PO decision P, slice C-S2)', () => {
           assert.deepEqual(snapshotTree(outside), outsideBefore, 'nothing behind the link changed');
         }));
     });
+  });
+
+  /**
+   * C-S-T5: the containment check of applyPlan itself (realpath of the planned file, then
+   * relative() against the physical scratch/), reached AFTER planning. The C-S-T3 F2 hook can no
+   * longer reach it (the planning walk calls realpath first), so these cases swap the parent
+   * directory for a link only in the apply phase (APPLY_SWAP_HOOK_SOURCE) and prove it three
+   * ways: the hook's marker, the apply report's own `plan` still listing the victim (so the swap
+   * came after planning), and the victim missing from `deleted` while the outside file survives.
+   */
+  describe('C-S-T5: the apply-time containment check', () => {
+    const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+
+    /**
+     * Shared body. `outside` is `{ dir }` or `{ skip }`; `acceptRelative(rel)` states the precondition
+     * that makes the case what it claims to be (the relative() result of the swap target against the
+     * physical scratch/): `..`-prefixed for the same-volume control, an absolute path across volumes.
+     */
+    function swapAfterPlanning(t, fx, outside, acceptRelative, relativeLabel) {
+      if (outside.skip) {
+        t.skip(outside.skip);
+        return;
+      }
+      const outsideFile = path.join(outside.dir, 'old.md');
+      fs.writeFileSync(outsideFile, 'beyond scratch\n');
+      setRealAge(outsideFile, 40);
+      // The control sorts before the victim, so its deletion opens the apply phase first.
+      writeAged(fx, 'scratch/a-control-old.md', 40);
+      writeAged(fx, 'scratch/victim/old.md', 40);
+      const probe = path.join(fx.cwd, 'link-probe');
+      const failure = tryCreateSymlink(outside.dir, probe, linkType);
+      if (failure) {
+        if (process.platform === 'win32') {
+          t.skip(`directory link creation refused on win32 (${failure.code ?? failure.message})`);
+          return;
+        }
+        throw failure;
+      }
+      removeLink(probe);
+
+      const relativeToScratch = path.relative(fs.realpathSync(fx.abs('scratch')), outsideFile);
+      assert.ok(acceptRelative(relativeToScratch), `precondition: relative(physical scratch/, swap target file) ${relativeLabel}: ${relativeToScratch}`);
+      const planned = parseStdout(runCli(fx, [...realClockArgs(fx), '--sweep'])).plan.delete;
+      assert.deepEqual(planned, ['scratch/a-control-old.md', 'scratch/victim/old.md'], 'both files are planned candidates before the swap');
+
+      const hook = path.join(fx.cwd, 'apply-swap-hook.mjs');
+      const marker = path.join(fx.cwd, 'apply-swap-fired.json');
+      fs.writeFileSync(hook, `${APPLY_SWAP_HOOK_SOURCE}\n`);
+      const victimDir = fx.abs('scratch/victim');
+      fx.onCleanup(() => removeLink(victimDir));
+      const outsideBefore = snapshotTree(outside.dir);
+
+      const result = runCliWith(fx, [...realClockArgs(fx), '--apply'], {
+        nodeArgs: ['--import', pathToFileURL(hook).href],
+        env: {
+          C_S_T5_SWAP_TARGET: fx.abs('scratch/victim/old.md'),
+          C_S_T5_SWAP_DIR: victimDir,
+          C_S_T5_SWAP_LINK_TARGET: outside.dir,
+          C_S_T5_SWAP_TYPE: linkType,
+          C_S_T5_SWAP_MARKER: marker,
+        },
+      });
+
+      // 1. The swap happened, inside the CLI run, in the apply phase (a prior unlink) after planning looked at the file.
+      assert.ok(fs.existsSync(marker), `the swap happened inside the CLI run (stderr: ${result.stderr})`);
+      const swapped = JSON.parse(fs.readFileSync(marker, 'utf8'));
+      assert.ok(swapped.unlinksBefore >= 1, `the swap came after the first deletion, i.e. in the apply phase (${JSON.stringify(swapped)})`);
+      assert.ok(swapped.targetRealpathCallsBefore >= 1, `planning had already resolved the file before the swap (${JSON.stringify(swapped)})`);
+      assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
+      const report = parseStdout(result);
+      // 2. The plan inside the very same apply report still lists the victim: the swap came after planning.
+      assert.ok(report.plan.delete.includes('scratch/victim/old.md'), `the apply report's own plan lists the victim (so the swap did not precede planning): ${JSON.stringify(report.plan.delete)}`);
+      // 3. The swapped file is neither deleted nor reported, and nothing behind the link was touched.
+      assert.ok(isLink(victimDir), 'the link itself is still there');
+      assert.ok(fs.existsSync(outsideFile), 'the file behind the link survives the apply-time containment check');
+      assert.deepEqual(snapshotTree(outside.dir), outsideBefore, 'nothing behind the link changed');
+      assert.ok(!report.deleted.includes('scratch/victim/old.md'), `the swapped file is not reported deleted: ${JSON.stringify(report.deleted)}`);
+      assert.deepEqual(report.deleted, ['scratch/a-control-old.md'], 'the control file is still swept');
+    }
+
+    test('C-S-T5: same-volume control: a parent directory swapped for a link to a directory outside scratch/ AFTER planning is refused at apply time and the outside file survives', (t) =>
+      inFixture({}, (fx) => {
+        swapAfterPlanning(t, fx, { dir: fx.outsideDir() }, (rel) => rel.startsWith('..'), 'climbs out of scratch/ with ..');
+      }));
+
+    test('C-S-T5: cross-volume: a parent directory swapped for a junction to a directory on ANOTHER volume AFTER planning is refused at apply time and the outside file survives', (t) =>
+      inFixture({}, (fx) => {
+        swapAfterPlanning(t, fx, createCrossVolumeDirectory(fx), (rel) => path.isAbsolute(rel), 'is an absolute path (different volume)');
+      }));
   });
 });
