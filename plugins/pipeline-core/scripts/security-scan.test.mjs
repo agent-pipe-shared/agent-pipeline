@@ -1750,6 +1750,116 @@ gates:
   );
 }
 
+// ===============================================================================================
+// SEM-T3 -- a partially parsed semgrep run: v2 coverage note + v1 coverage merge
+// (PO decision 2026-10-06 "Semgrep": the gate decides on findings plus a visible coverage note;
+// partially parsed files must not disappear silently).
+//   S1  (RED by design today): the v2 capability record's coverage.unsupportedScope names every
+//       partially parsed file as `partial-parsing:<root-relative forward-slash path>`;
+//       security-scan.mjs v2Coverage() still hardcodes `unsupportedScope: []`.
+//   S3a (green regression pin): the v1 scanner entry carries coverage { status: "degraded",
+//       reason: "partial-parsing", files } merged onto its {subject, exclusions} coverage.
+//   S3b (the console line): WAIVED -- no production seam exists to observe it; deliberately not
+//       tested here and no seam is added by this task.
+// No real semgrep: a fake emitting warn-level PartialParsing errors (one file twice, to pin
+// "exactly one string per partially parsed file"), no network.
+// ===============================================================================================
+
+{
+  const semgrepPartialParsing = writeFixtureBinary(
+    "semgrep-partial-parsing",
+    `const partial = (path) => ({ code: 3, level: "warn", type: ["PartialParsing", []], path, message: "<redacted>" });
+process.stdout.write(JSON.stringify({ results: [], errors: [partial("src/alpha.js"), partial("src/beta.js"), partial("src/alpha.js")] }));
+process.exit(0);
+`,
+  );
+  const runSemgrepOnly = async (label, binary) => {
+    const rootDir = makeRootDir(label);
+    writeManifest(
+      rootDir,
+      `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+    license-check:
+      enabled: false
+`,
+    );
+    mkdirSync(join(rootDir, "src"), { recursive: true });
+    writeFileSync(join(rootDir, "src", "alpha.js"), "export const alpha = 1;\n");
+    writeFileSync(join(rootDir, "src", "beta.js"), "export const beta = 2;\n");
+    commitFixture(rootDir);
+    return runSecurityScan({
+      rootDir, env: { PIPELINE_SEMGREP_PATH: binary }, spawnFn: fixtureSpawnFn,
+      timeoutMs: 30000, assessTrustedExecutablePath: mockAssessFixtureBinary,
+    });
+  };
+  const sastRecord = (evidenceV2) => evidenceV2?.capabilities?.find((c) => c.capabilityId === "cap.sast");
+
+  {
+    const { evidence, exitCode, evidenceV2, verdictV2 } = await runSemgrepOnly("semgrep-partial-parsing-root", semgrepPartialParsing);
+    const entry = evidence.scanners.find((s) => s.tool === "semgrep");
+    const cov = entry?.coverage;
+
+    // S3a -- v1 entry: the completed scan keeps its status and gains the degraded-coverage note.
+    assertEqual(
+      "SEM-T3 S3a: v1 semgrep entry keeps PASS/success despite warn-level PartialParsing errors",
+      { status: entry?.status, classification: entry?.classification, findings: entry?.findingCount },
+      { status: "PASS", classification: "success", findings: 0 },
+    );
+    assertEqual(
+      "SEM-T3 S3a: v1 semgrep entry coverage is merged onto {subject, exclusions} and lists each partially parsed file once",
+      { subject: cov?.subject, exclusions: cov?.exclusions, status: cov?.status, reason: cov?.reason, files: cov?.files },
+      { subject: "candidate-tree", exclusions: [], status: "degraded", reason: "partial-parsing", files: ["src/alpha.js", "src/beta.js"] },
+    );
+    assertEqual("SEM-T3: partial parsing alone does not block the v1 gate (exit 0)", exitCode, 0);
+
+    // S1 -- v2 capability record: every partially parsed file is named in unsupportedScope.
+    assertTrue("SEM-T3 S1: v2 envelope carries a cap.sast capability record", Boolean(sastRecord(evidenceV2)), "no cap.sast record in evidenceV2");
+    const unsupportedScope = sastRecord(evidenceV2)?.coverage?.unsupportedScope;
+    assertEqual(
+      "SEM-T3 S1: v2 cap.sast coverage.unsupportedScope holds exactly one partial-parsing:<path> string per partially parsed file",
+      Array.isArray(unsupportedScope) ? [...unsupportedScope].sort() : unsupportedScope,
+      ["partial-parsing:src/alpha.js", "partial-parsing:src/beta.js"],
+    );
+    assertTrue(
+      "SEM-T3 S1: unsupportedScope strings are root-relative forward-slash (no absolute path, no drive letter, no backslash)",
+      Array.isArray(unsupportedScope) && unsupportedScope.length > 0 && unsupportedScope.every((s) => /^partial-parsing:(?!\/)[^\\:]+$/.test(s)),
+      `unsupportedScope=${JSON.stringify(unsupportedScope)}`,
+    );
+
+    // The v2 verdict still follows findings: no findings -> pass, never not-met, never blocking.
+    assertTrue(
+      "SEM-T3: v2 cap.sast outcome is not not-met with no findings",
+      verdictV2?.capabilityOutcomes?.["cap.sast"] !== "not-met",
+      `outcome=${JSON.stringify(verdictV2?.capabilityOutcomes?.["cap.sast"])}`,
+    );
+    assertEqual("SEM-T3: v2 cap.sast outcome follows findings (pass) despite degraded coverage", verdictV2?.capabilityOutcomes?.["cap.sast"], "pass");
+    assertEqual("SEM-T3: v2 verdict is non-blocking with no findings", verdictV2?.verdict?.blocking, false);
+  }
+
+  {
+    // A clean (fully parsed) run keeps an empty unsupportedScope and no degraded-coverage note.
+    const { evidence, evidenceV2 } = await runSemgrepOnly("semgrep-full-coverage-root", semgrepClean);
+    assertEqual(
+      "SEM-T3: a clean run keeps cap.sast coverage.unsupportedScope equal to []",
+      sastRecord(evidenceV2)?.coverage?.unsupportedScope,
+      [],
+    );
+    assertEqual(
+      "SEM-T3: a clean run's v1 semgrep entry carries no degraded-coverage status",
+      evidence.scanners.find((s) => s.tool === "semgrep")?.coverage?.status,
+      undefined,
+    );
+  }
+}
+
 {
   // reportStatus, three more of the five named states in one run: passed / findings / error,
   // plus license-check's own not-configured shown again for cross-check.
