@@ -134,7 +134,15 @@ function readDoubleQuoted(cmd, open) {
  *     a part that holds structural characters, which is blanked to `''` exactly like `stripQuotedSegments`
  *     blanks quoted prose, so `echo "git push"` is not a push;
  *   unterminated: an unclosed quote or a trailing lone backslash -- the text cannot be parsed with certainty;
- *   escapedQuoteOutsideQuotes: a backslash-escaped quote outside every quote, the shape that used to fake a span.
+ *   escapedQuoteOutsideQuotes: a backslash-escaped quote outside every quote, the shape that used to fake a span;
+ *   regions: the comments and here-document bodies found, as `{ kind, start, end }` raw index ranges of the text.
+ * Comments and here-document bodies (Q12-F7): a `#` that starts a word (start of the text, after whitespace or after an
+ * unquoted `;` `&` `|` `(` `)`) opens a comment that runs to the end of its line; it adds nothing to `words` or `view`, so a
+ * quote character in it opens no quote and the git word it may spell is no command. The lines after a `<<` / `<<-` opener up
+ * to a line that is exactly its delimiter (`<<-`: after leading tabs) are the body: they are scanned as a text of their own,
+ * so a quote that never closes inside the body (`don't`) ends with it and hides nothing after the terminator; a body is kept in
+ * `words` and `view` as before, quoting balanced inside it still being read. An opener with no terminator line opens no body
+ * (the arithmetic shift `1 << 2` is not a here-document). Not modelled: `<#` `#>` PowerShell block comments.
  * `reading` picks how a backslash is read (three readings, GPGL-7):
  *   READING_POSIX (default): an unquoted backslash escapes the next character; inside double quotes it escapes
  *     only `"`, `\`, `$`, a backtick and a newline.
@@ -173,15 +181,69 @@ function readPowerShellQuoted(cmd, open, closers) {
 // shell (`"/c/Program Files/git/bin/bash"`) stays ONE word whose basename can be read. The default view is unchanged.
 const RECEIVER_SPAN_BLANK_RE = /[\s;&|()<>`$"']/gu;
 
+/**
+ * The delimiter word of a here-document opener, quotes and escapes removed (`<<'EOF'`, `<<E"O"F` and `<<\EOF` all name
+ * `EOF`); `from` is the index just after `<<` or `<<-`. Null when no usable word follows.
+ */
+function readHeredocDelimiter(cmd, from) {
+  let i = from;
+  while (cmd[i] === " " || cmd[i] === "\t") i += 1;
+  let delimiter = "";
+  while (i < cmd.length && !/[\s;&|<>()]/u.test(cmd[i])) {
+    const ch = cmd[i];
+    if (ch === "\\") {
+      if (i + 1 >= cmd.length) return null;
+      if (cmd[i + 1] !== "\n") delimiter += cmd[i + 1];
+      i += 2;
+      continue;
+    }
+    const open = ch === "$" && cmd[i + 1] === "'" ? i + 1 : i;
+    if (cmd[open] === "'" || cmd[open] === '"') {
+      const end = cmd.indexOf(cmd[open], open + 1);
+      if (end === -1) return null;
+      delimiter += cmd.slice(open + 1, end);
+      i = end + 1;
+      continue;
+    }
+    delimiter += ch;
+    i += 1;
+  }
+  return delimiter === "" ? null : delimiter;
+}
+
+/**
+ * The index where the here-document body that starts at `from` ends: the end of its terminator line, the newline after it
+ * excluded. The terminator is a line that is exactly the delimiter (`<<-` strips leading tabs first). -1 when no terminator
+ * line exists: the text is then not a here-document (the arithmetic shift `1 << 2` is no opener), see `classifyPush`.
+ */
+function findHeredocBodyEnd(cmd, from, heredoc) {
+  let lineStart = from;
+  while (lineStart <= cmd.length) {
+    const newline = cmd.indexOf("\n", lineStart);
+    const lineEnd = newline === -1 ? cmd.length : newline;
+    const line = cmd.slice(lineStart, lineEnd);
+    if ((heredoc.strip ? line.replace(/^\t+/u, "") : line) === heredoc.delimiter) return lineEnd;
+    if (newline === -1) return -1;
+    lineStart = newline + 1;
+  }
+  return -1;
+}
+
 function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
   const pathBackslash = reading === READING_WINDOWS_PATH;
   const powershell = reading === READING_POWERSHELL;
   const words = [];
+  const regions = [];
+  const pendingHeredocs = [];
   let view = "";
   let word = "";
   let sawAny = false;
   let unterminated = false;
   let escapedQuoteOutsideQuotes = false;
+  // True while the next character would START a word: at the start of the text, after whitespace and after an unquoted
+  // `;` `&` `|` `(` `)`. A `#` there opens a comment; anywhere else (`a#b`, `$#`, `${#x}`, a quoted or escaped `#`) it is
+  // an ordinary character.
+  let atWordStart = true;
 
   const endWord = () => {
     if (!sawAny) return;
@@ -199,6 +261,31 @@ function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
       endWord();
       view += ch;
       i += 1;
+      atWordStart = true;
+      if (ch === "\n" && pendingHeredocs.length > 0) {
+        // The body of the next here-document opened on the line that just ended. Its quote characters have no quoting
+        // function for the text around it, so it is scanned as a text of its own: a quote that never closes inside the
+        // body ends with the body instead of swallowing the lines after the terminator.
+        const bodyEnd = findHeredocBodyEnd(cmd, i, pendingHeredocs.shift());
+        if (bodyEnd === -1) pendingHeredocs.length = 0;
+        else {
+          regions.push({ kind: "heredoc-body", start: i, end: bodyEnd });
+          const body = scanShell(cmd.slice(i, bodyEnd), reading, keepQuotedPaths);
+          for (const bodyWord of body.words) words.push(bodyWord);
+          view += body.view;
+          if (body.escapedQuoteOutsideQuotes) escapedQuoteOutsideQuotes = true;
+          i = bodyEnd;
+        }
+      }
+      continue;
+    }
+    if (ch === "#" && atWordStart) {
+      // A comment runs to the end of its line and is neither a word nor part of the view: the quote characters in it
+      // open no quote, and what it says is not a command. The newline that ends it is read as usual.
+      let end = cmd.indexOf("\n", i);
+      if (end === -1) end = cmd.length;
+      regions.push({ kind: "comment", start: i, end });
+      i = end;
       continue;
     }
     if (ch === "\\" && powershell) {
@@ -207,6 +294,7 @@ function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
       word += ch;
       view += "/";
       sawAny = true;
+      atWordStart = false;
       i += 1;
       continue;
     }
@@ -217,6 +305,7 @@ function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
         word += ch;
         view += ch;
         sawAny = true;
+        atWordStart = false;
         unterminated = true;
         i += 1;
         continue;
@@ -225,6 +314,7 @@ function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
       if (next === "\n") continue; // line continuation: the shell drops both characters and the word goes on
       if (next === "'" || next === '"') escapedQuoteOutsideQuotes = true;
       sawAny = true;
+      atWordStart = false;
       if (SHELL_STRUCTURAL_RE.test(next)) {
         word += next;
         view += `\\${next}`;
@@ -245,6 +335,7 @@ function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
     else if (ch === '"') span = readDoubleQuoted(cmd, i);
     if (span !== null) {
       sawAny = true;
+      atWordStart = false;
       word += span.content;
       if (span.end === -1) {
         unterminated = true;
@@ -257,13 +348,31 @@ function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
       }
       continue;
     }
+    if (ch === "<" && cmd[i + 1] === "<") {
+      // `<<` opens a here-document (`<<<` is a here-string and opens none). Its delimiter is read here only to find the body
+      // at the next newline; the delimiter word itself is scanned as usual below.
+      const hereString = cmd[i + 2] === "<";
+      if (!hereString) {
+        const strip = cmd[i + 2] === "-";
+        const delimiter = readHeredocDelimiter(cmd, i + (strip ? 3 : 2));
+        if (delimiter !== null) pendingHeredocs.push({ delimiter, strip });
+      }
+      const operator = hereString ? "<<<" : "<<";
+      word += operator;
+      view += operator;
+      sawAny = true;
+      atWordStart = false;
+      i += operator.length;
+      continue;
+    }
     word += ch;
     view += ch;
     sawAny = true;
+    atWordStart = ch === ";" || ch === "&" || ch === "|" || ch === "(" || ch === ")";
     i += 1;
   }
   endWord();
-  return { words, view, unterminated, escapedQuoteOutsideQuotes };
+  return { words, view, unterminated, escapedQuoteOutsideQuotes, regions };
 }
 
 // ---- global git option recognition ----------------------------------------------------
@@ -629,14 +738,26 @@ function spellsGitWord(text) {
  * The words of `cmd` split at unquoted whitespace and `;` `&` `|` `(` `)` `<` `>`, each kept as WRITTEN (quotes and
  * backslashes included): bash performs brace expansion before it removes quotes, so the alternatives of a brace group
  * have to be read from the raw word. A quoted part is skipped as a whole, so `{g"i"t," -c x",push}` stays one word; an
- * unterminated quote runs to the end of the text.
+ * unterminated quote runs to the end of the text. A comment is no word and holds no quote, and the body of a here-document is a
+ * text of its own (its words are split apart from the text around it), the regions `scanShell` reports.
  */
 function splitRawWords(cmd) {
+  const { regions } = scanShell(cmd);
   const words = [];
   let word = "";
   let i = 0;
+  let nextRegion = 0;
   while (i < cmd.length) {
     const ch = cmd[i];
+    while (nextRegion < regions.length && regions[nextRegion].end <= i) nextRegion += 1;
+    const region = regions[nextRegion];
+    if (region !== undefined && region.start === i) {
+      if (word !== "") words.push(word);
+      word = "";
+      if (region.kind === "heredoc-body") for (const bodyWord of splitRawWords(cmd.slice(region.start, region.end))) words.push(bodyWord);
+      i = region.end;
+      continue;
+    }
     if (/[\s;&|()<>]/u.test(ch)) {
       if (word !== "") words.push(word);
       word = "";
