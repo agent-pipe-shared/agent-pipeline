@@ -898,3 +898,126 @@ test("U1-20: further caller errors from the contract's DCC-INPUT list are thrown
     assert.throws(() => checkDesignConsistency(mutated), isInputError, label);
   }
 });
+
+// ---------------------------------------------------------------------------
+// U1-21: the two findings of Critic round 1 (specs/sprint-alfred-epic/evidence/critic-2026-10-07/u1-u2-round1.md).
+// F1: a bound receipt-side path without a pathStates entry is a caller error (contract section 2,
+//     "pathStates not exactly one entry per bound path" -> DCC-INPUT), never a plain TypeError.
+// F2: a traceability table row yields an ID only when a second `|` closes its first cell
+//     (contract section 1, "between the first and second `|`").
+// ---------------------------------------------------------------------------
+
+const REPORT_2 = `${DIR}/review/design-review-2.md`;
+
+/** A consistent two-receipt chain: an initial PASS on the old design.md, then a delta on the current sources. */
+function deltaChain(current) {
+  const initial = makeSummary({ n: 1, sources: withDigest(current, DESIGN_PATH, OLD_DESIGN) });
+  return [initial, makeSummary({ n: 2, kind: "delta", sources: current, previous: initial, verdict: "open-findings", openFindingIds: ["F-3"] })];
+}
+
+/** Drops exactly one pathStates entry; the fixture must have held it, so the omission is the only mutation. */
+function withoutPathState(input, path) {
+  const before = input.pathStates.length;
+  input.pathStates = input.pathStates.filter((state) => state.path !== path);
+  assert.equal(input.pathStates.length, before - 1, `the fixture must hold exactly one pathStates entry for ${path}`);
+  return input;
+}
+
+/** Requires exactly a DesignConsistencyCheckError carrying DCC-INPUT; a plain TypeError is the defect being pinned. */
+function assertDccInput(call, label) {
+  let thrown;
+  try {
+    call();
+  } catch (error) {
+    thrown = error;
+  }
+  assert.notEqual(thrown, undefined, `${label}: expected a thrown DCC-INPUT, nothing was thrown`);
+  assert.ok(
+    thrown instanceof DesignConsistencyCheckError,
+    `${label}: expected a DesignConsistencyCheckError, got ${thrown?.constructor?.name}: ${thrown?.message}`,
+  );
+  assert.equal(thrown.code, "DCC-INPUT", label);
+}
+
+/**
+ * One test per case so each is red or green on its own: the unmutated input must be accepted
+ * (and, when `consistent`, be ok), then the single omission must be a DCC-INPUT.
+ */
+function pinPathStateHole(group, description, cases, consistent) {
+  for (const [label, options, hole] of cases) {
+    test(`U1-21: ${group} ${description} [${label}]`, () => {
+      assert.doesNotThrow(() => checkDesignConsistency(build(options)), `${label}: the unmutated input must be accepted`);
+      if (consistent) assert.equal(checkDesignConsistency(build(options)).ok, true, `${label}: the unmutated input must be consistent`);
+      assertDccInput(() => checkDesignConsistency(withoutPathState(build(options), hole)), label);
+    });
+  }
+}
+
+pinPathStateHole("(a)", "no pathStates entry for a review receipt path is a DCC-INPUT caller error, not a TypeError", [
+  ["a single initial summary", {}, RECEIPT_1],
+  ["the first receipt of a delta chain", { receipts: deltaChain }, RECEIPT_1],
+  ["the second receipt of a delta chain", { receipts: deltaChain }, RECEIPT_2],
+], true);
+
+pinPathStateHole("(b)", "no pathStates entry for a valid summary's report.path is a DCC-INPUT caller error, not a TypeError", [
+  ["the report of a single initial summary", {}, REPORT_1],
+  ["the report of the first receipt of a delta chain", { receipts: deltaChain }, REPORT_1],
+  ["the report of the second receipt of a delta chain", { receipts: deltaChain }, REPORT_2],
+], true);
+
+pinPathStateHole("(c)", "no pathStates entry for a refusal stub's path is a DCC-INPUT caller error, not a TypeError", [
+  ["a single refusal stub", { receipts: [{ path: RECEIPT_1, refusal: "DRR-NONCANONICAL" }] }, RECEIPT_1],
+  [
+    "a refusal stub after a valid summary",
+    { receipts: (current) => [makeSummary({ n: 1, sources: current }), { path: RECEIPT_2, refusal: "DRR-SHAPE" }] },
+    RECEIPT_2,
+  ],
+], false);
+
+test("U1-21: (d) parseTraceabilityIds returns [] for a line with a single | (no cell between a first and a second |)", () => {
+  assert.deepEqual(parseTraceabilityIds("| AC-ONE"), []);
+  assert.deepEqual(parseTraceabilityIds("|AC-ONE"), []);
+  assert.deepEqual(parseTraceabilityIds("   | AC-ONE   "), []);
+  assert.deepEqual(parseTraceabilityIds("| `AC-ONE`"), []);
+  assert.deepEqual(parseTraceabilityIds("|"), []);
+});
+
+test("U1-21: (d) parseTraceabilityIds skips single-| rows and keeps the neighbouring closed rows, whatever the line terminator", () => {
+  const lines = ["| AC-ONE", "| AC-TWO |", "| AC-THREE"];
+  assert.deepEqual(parseTraceabilityIds(lines.join("\n")), ["AC-TWO"]);
+  assert.deepEqual(parseTraceabilityIds(lines.join("\r\n")), ["AC-TWO"]);
+});
+
+const traceRows = (lines) => ["# Traceability", "", "| ID | Requirement | Evidence |", "| --- | --- | --- |", ...lines, ""].join("\n");
+const closedRow = (id) => `| ${id} | requirement ${id} | evidence ${id} |`;
+const countsOf = (traceabilityCount) => ({ mode: "declared", mapPath: MAP_PATH, registerCount: 3, traceabilityCount });
+
+test("U1-21: (d) a traceability row of a registered ID whose first cell is never closed leaves that ID missing from the reconciliation", () => {
+  const result = checkDesignConsistency(build({ traceText: traceRows([closedRow("AC-ONE"), "| AC-TWO", closedRow("AC-THREE")]) }));
+  assertInconsistent(result, [entry("DCC-COUNT-MISMATCH", { path: TRACE_PATH, ids: ["AC-TWO"] })]);
+  assert.deepEqual(result.register, countsOf(2));
+});
+
+test("U1-21: (d) an unclosed traceability row of an unregistered ID adds neither an ID nor a mismatch", () => {
+  const result = checkDesignConsistency(build({ traceText: traceRows([...TRACE_ORDER.map(closedRow), "| AC-FOUR"]) }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.inconsistencies, []);
+  assert.deepEqual(result.register, countsOf(3));
+});
+
+test("U1-21: (d) an unclosed traceability row repeating a listed ID is not a duplicate", () => {
+  const result = checkDesignConsistency(build({ traceText: traceRows([...TRACE_ORDER.map(closedRow), "| AC-ONE"]) }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.inconsistencies, []);
+  assert.deepEqual(result.register, countsOf(3));
+});
+
+test("U1-21: (d) boundary: a first cell closed by a second | counts even when the row has no trailing |", () => {
+  assert.deepEqual(parseTraceabilityIds("| AC-ONE | requirement"), ["AC-ONE"]);
+  assert.deepEqual(parseTraceabilityIds("| `AC-TWO` | requirement | evidence"), ["AC-TWO"]);
+  const unterminated = ["# Traceability", "", "| ID | Requirement | Evidence |", "| --- | --- | --- |", ...TRACE_ORDER.map((id) => `| ${id} | requirement ${id} | evidence ${id}`), ""].join("\n");
+  const result = checkDesignConsistency(build({ traceText: unterminated }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.inconsistencies, []);
+  assert.deepEqual(result.register, { mode: "declared", mapPath: MAP_PATH, registerCount: 3, traceabilityCount: 3 });
+});
