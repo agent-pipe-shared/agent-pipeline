@@ -24,6 +24,7 @@
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | closed | defect | pipeline | nightwing | 2026-08-27 | — | — |
+| pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.a-registered-but-abandoned-worktree-is-never-retired | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
@@ -241,6 +242,7 @@
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
 | pipeline.design-trailer-verifier-lost-after-closure | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.design-workflow-package-omits-contract | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.design-workflow-signing-request-schema-drift | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
@@ -343,7 +345,7 @@
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
-| pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.governance-scope-rejects-readonly-host-git-control | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.greenfield-approval-policy-applies-after-intake-transition | open | defect | pipeline | alfred | 2026-09-27 | — | — |
@@ -402,6 +404,7 @@
 | pipeline.hardening-round-cannot-register-its-own-suites | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
+| pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.heredoc-refusal-teaches-no-substitute | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit. |
@@ -591,6 +594,7 @@
 | pipeline.pretooluse-guards-do-not-fire-in-dispatched-subagents | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive | deferred | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
+| pipeline.private-temp-root-not-secure-branch-has-no-test-seam | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.product-capability-inventory-missing-two-new-guard-hooks | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.product-capability-inventory-two-guard-hooks-uncategorized | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.project-audit-evidence-overview-for-external-review | closed | requirement | pipeline | nova-b | 2026-08-30 | — | Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge. |
@@ -729,6 +733,7 @@
 | pipeline.signed-quality-package-route-is-not-agent-operable-on-windows | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | closed | defect | pipeline | — | 2026-08-08 | 2026-09-05 | — |
 | pipeline.signing-ceremony-tty-check-has-no-windows-fallback | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
+| pipeline.signing-default-test-fixture-root-escapes-the-repository | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.signing-prompt-prints-the-whole-review-package | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
@@ -850,8 +855,8 @@
 
 ## Counts
 
-- open: 166
+- open: 170
 - in_progress: 0
-- closed: 662
+- closed: 663
 - rejected: 3
 - deferred: 11

@@ -7,7 +7,7 @@ status: closed
 closed_at: 2026-10-07
 closure_repository: self
 closure_commit: 26fef9e7d26be3d59b7e609c1dad9dd04c747b4d
-closure_evidence: evidence/close-a-governance-scope-stale-worktree.txt
+closure_evidence: backlog/evidence/2026-10-07-close-out-governance-scope-stale-worktree.md
 created: 2026-09-28
 source: "Pre-integration verification of the S1 Governance Scope proposal in a network-off disposable Git fixture. An enrolled repository becomes inactive solely after deleting an unrelated registered worktree directory. Terminal 58232a, exit 0."
 sprint: alfred

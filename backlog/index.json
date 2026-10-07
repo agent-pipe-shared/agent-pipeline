@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fb9dcc91c445bb0c3bc8ebbaad47877f4f7c5d6ba714029d6f5d6a5ca11cfb54"
+    "transitionHead": "849ede6cdb95027b9b68a38e1e38db48d9847f52c001e3999bfc14390984fbd2"
   },
   "counts": {
-    "open": 166,
+    "open": 170,
     "in_progress": 0,
-    "closed": 662,
+    "closed": 663,
     "rejected": 3,
     "deferred": 11
   },
@@ -281,6 +281,17 @@
       "closureRepository": "self",
       "closureCommit": "e52e5373d81afde912ff35df043aade44ee7c073",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+    },
+    {
+      "id": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "Q12 Critic round 1 disclosure, specs/sprint-alfred-epic/evidence/critic-2026-10-07/q12-round1.md; toil T46",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",
@@ -3092,6 +3103,17 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "CLOSEOUT-T2 dispatch stop report, evidence/dispatch-record-CLOSEOUT-T2.json",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.design-workflow-signing-request-schema-drift",
       "status": "closed",
       "type": "defect",
@@ -4402,13 +4424,17 @@
     },
     {
       "id": "pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Pre-integration verification of the S1 Governance Scope proposal in a network-off disposable Git fixture. An enrolled repository becomes inactive solely after deleting an unrelated registered worktree directory. Terminal 58232a, exit 0.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-07",
+      "closureRepository": "self",
+      "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+      "closureEvidence": "backlog/evidence/2026-10-07-close-out-governance-scope-stale-worktree.md"
     },
     {
       "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
@@ -5168,6 +5194,17 @@
       "closureRepository": "self",
       "closureCommit": "c8dee9d47692fd5f87a6a3f4cc15a666cc7fb247",
       "closureEvidence": "backlog/items/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md"
+    },
+    {
+      "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "Critic finding F5 (minor, QG-06), Q12 round 1, specs/sprint-alfred-epic/evidence/critic-2026-10-07/q12-round1.md",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.heredoc-refusal-teaches-no-substitute",
@@ -7659,6 +7696,17 @@
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
+      "id": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "B-S1-T2 dispatch report, evidence/dispatch-record-B-S1-T2.json",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.product-capability-inventory-missing-two-new-guard-hooks",
       "status": "closed",
       "type": "defect",
@@ -9473,6 +9521,17 @@
       "closureRepository": "self",
       "closureCommit": "c2cb4b3332a077719ae9efa643189e5235e746db",
       "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    },
+    {
+      "id": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-07",
+      "source": "CLOSEOUT-T2 dispatch stop report, evidence/dispatch-record-CLOSEOUT-T2.json",
+      "deferred": false,
+      "due": "2026-10-20",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase",
