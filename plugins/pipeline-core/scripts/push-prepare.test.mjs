@@ -22,7 +22,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -45,6 +46,7 @@ import {
   resolveVerifyRemedyPlan,
 } from "./push-prepare.mjs";
 import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
+import { resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
@@ -397,6 +399,144 @@ function noMachineKeyFixture() {
   after(() => rmSync(home, { recursive: true, force: true }));
   return { homedirFn: () => home };
 }
+
+// ---------------------------------------------------------------------------
+// R7-6j (Spec 22.6 delta item 4, PO decision AC; Elephant rulings (3) and (8) of
+// specs/sprint-alfred-epic/plans/0.7-execution-order.md): checkCriticalHumanProofPolicy resolves
+// the approval key directory exactly like the shared resolver (resolvePoKeyDirectory() of
+// po-human-approval.mjs: explicit > PIPELINE_PO_APPROVAL_DIRECTORY > machine-wide plane > legacy
+// per-repository value; a consulted-but-invalid store is a failure, never absent), and its
+// trust-on-first-use branch accepts ONLY a key the resolver proved through the machine-wide
+// default (source "machine-plane") -- the one tier the real gate (localOperatorAnchorFor) proves.
+// The expected directory/tier always comes from resolvePoKeyDirectory() called with the identical
+// fixture inputs. Three policy shapes x six rows; each of the three key directories carries a
+// DIFFERENT trust-policy.json, so membership of the pinned anchor also proves the tier. Fixture
+// homes, fixture git-common-dir and fixture key directories only; the environment variable is
+// saved and restored.
+// ---------------------------------------------------------------------------
+const R76J_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+const R76J_DIGEST = Object.freeze({ environment: "e".repeat(64), "machine-plane": "b".repeat(64), "repo-scope": "c".repeat(64) });
+const R76J_STRANGER = Object.freeze({ keyReference: "r76j-stranger", publicKeySha256: "9".repeat(64) });
+const R76J_ROWS = Object.freeze([
+  { n: 1, label: "env set, plane set, legacy set", env: true, plane: "set", legacy: true, expect: "resolved", source: "environment" },
+  { n: 2, label: "env unset, plane set, legacy set", env: false, plane: "set", legacy: true, expect: "resolved", source: "machine-plane" },
+  { n: 3, label: "env unset, plane absent, legacy set", env: false, plane: "absent", legacy: true, expect: "resolved", source: "repo-scope" },
+  { n: 4, label: "env unset, plane absent, legacy absent", env: false, plane: "absent", legacy: false, expect: "unset", source: null },
+  { n: 5, label: "env unset, plane invalid, legacy set", env: false, plane: "invalid", legacy: true, expect: "invalid", source: null },
+  { n: 6, label: "env set, plane invalid, legacy set", env: true, plane: "invalid", legacy: true, expect: "resolved", source: "environment" },
+]);
+const R76J_SHAPES = Object.freeze([
+  { id: "pinned", label: "pinned set" },
+  { id: "empty", label: "trustAnchors []" },
+  { id: "tofu", label: "TOFU (no trustAnchor, no trustAnchors)" },
+]);
+function r76jBuild(rowBase, row) {
+  const home = join(rowBase, "home");
+  const common = join(rowBase, "common");
+  const repo = join(rowBase, "repo");
+  const keys = { environment: join(rowBase, "key-env"), "machine-plane": join(rowBase, "key-plane"), "repo-scope": join(rowBase, "key-legacy") };
+  for (const directory of [home, common, repo, ...Object.values(keys)]) mkdirSync(directory, { recursive: true });
+  for (const [tier, directory] of Object.entries(keys)) {
+    writeFileSync(join(directory, "po-public.pem"), "fixture public key\n", "utf8");
+    writeFileSync(join(directory, "trust-policy.json"), JSON.stringify({ keyReference: `r76j-key-${tier}`, publicKeySha256: R76J_DIGEST[tier] }), "utf8");
+  }
+  if (row.plane !== "absent") {
+    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+    const valid = { schema: "pipeline.machine-plane.v1", poKeyDirectory: keys["machine-plane"], pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: "2026-10-07T00:00:00.000Z" };
+    writeFileSync(join(home, ".agent-pipeline", "machine.json"), row.plane === "set" ? JSON.stringify(valid) : "{ not json", "utf8");
+  }
+  if (row.legacy) {
+    mkdirSync(join(common, "agent-pipeline"), { recursive: true });
+    writeFileSync(join(common, "agent-pipeline", "po-key-directory.json"), JSON.stringify({ schema: "pipeline.po-key-directory.v1", poKeyDirectory: keys["repo-scope"], updatedAt: "2026-10-07T00:00:00.000Z" }), "utf8");
+  }
+  return { repo, keys, seams: { homedirFn: () => home, gitCommonDirFn: () => common } };
+}
+function r76jAnchorIn(directory) {
+  const { keyReference, publicKeySha256 } = JSON.parse(readFileSync(join(directory, "trust-policy.json"), "utf8"));
+  return { keyReference, publicKeySha256 };
+}
+function r76jPolicyFor(shapeId, oracle, keys) {
+  if (shapeId === "tofu") return { ok: true, trustAnchor: null, trustAnchors: null };
+  if (shapeId === "empty") return { ok: true, trustAnchor: null, trustAnchors: [] };
+  // Resolved rows: only the anchor read from the ORACLE's directory is a member, so a result that
+  // names any other tier fails the membership check. Unset/invalid rows: a decoy set holding every
+  // fixture key, so a silent fall-through to a lower tier would read as a member.
+  const anchors = oracle.status === "resolved"
+    ? [R76J_STRANGER, r76jAnchorIn(oracle.directory)]
+    : [R76J_STRANGER, ...Object.values(keys).map(r76jAnchorIn)];
+  return { ok: true, trustAnchor: null, trustAnchors: anchors };
+}
+function r76jJudge(shapeId, oracle, result, row4Message) {
+  const problems = [];
+  const message = String(result?.message ?? "");
+  const excerpt = message.slice(0, 90);
+  const got = typeof result?.directory === "string" ? basename(result.directory) : "none";
+  // Ruling (8): TOFU accepts only source "machine-plane"; every other resolved tier is refused.
+  const refusedTier = shapeId === "tofu" && oracle.status === "resolved" && oracle.source !== "machine-plane";
+  if (oracle.status === "resolved" && !refusedTier) {
+    if (result?.ok !== true) problems.push(`ok is ${result?.ok}, expected true (${excerpt})`);
+    if (typeof result?.directory !== "string" || resolve(result.directory) !== resolve(oracle.directory)) {
+      problems.push(`directory ${got}, the resolver names ${basename(oracle.directory)} (${oracle.source})`);
+    }
+    return problems;
+  }
+  if (result?.directory !== undefined) problems.push(`a directory (${got}) was carried although no key was proved`);
+  if (refusedTier) {
+    if (result?.ok !== false) problems.push(`ok is ${result?.ok}, expected a refusal of the ${oracle.source} tier`);
+    for (const pattern of [/TRUST-ANCHOR-MISSING/, /machine-wide default/i, /only/i, /first[- ]use/i]) {
+      if (!pattern.test(message)) problems.push(`refusal message lacks ${pattern} (${excerpt})`);
+    }
+  } else if (oracle.status === "unset") {
+    if (shapeId !== "empty" && result?.ok !== false) problems.push(`ok is ${result?.ok}, expected false with no key directory`);
+    if (shapeId === "tofu" && !/TRUST-ANCHOR-MISSING/.test(message)) problems.push(`absent-key message lacks TRUST-ANCHOR-MISSING (${excerpt})`);
+  } else {
+    if (result?.ok !== false) problems.push(`ok is ${result?.ok}, an invalid store must fail (${excerpt})`);
+    if (message === row4Message) problems.push("message is identical to the absent-store row's");
+    if (!/invalid/i.test(message)) problems.push(`message does not say the store is invalid (${excerpt})`);
+  }
+  return problems;
+}
+test("R7-6j: push-prepare resolves the key directory like the shared resolver and pins first-use keys only from the machine-wide default", () => {
+  const base = mkdtempSync(join(tmpdir(), "r76j-pp-"));
+  const savedEnv = process.env[R76J_ENV];
+  const verdicts = [];
+  const row4Messages = {};
+  let red = 0;
+  try {
+    for (const row of R76J_ROWS) {
+      const fixture = r76jBuild(join(base, `row-${row.n}`), row);
+      if (row.env) process.env[R76J_ENV] = fixture.keys.environment; else delete process.env[R76J_ENV];
+      const resolution = resolvePoKeyDirectory({ explicit: undefined, repoRoot: fixture.repo, dependencies: fixture.seams });
+      const oracle = { status: resolution.status, directory: resolution.directory ?? null, source: resolution.source ?? null };
+      const expectedDirectory = row.source === null ? null : resolve(fixture.keys[row.source]);
+      const oracleProblem = oracle.status !== row.expect || oracle.source !== row.source || (oracle.directory === null ? null : resolve(oracle.directory)) !== expectedDirectory
+        ? `the oracle answered ${oracle.status}/${oracle.source}, not the table's ${row.expect}/${row.source}`
+        : null;
+      for (const shape of R76J_SHAPES) {
+        let result;
+        try {
+          result = checkCriticalHumanProofPolicy(fixture.repo, {
+            readCriticalHumanProofPolicy: () => r76jPolicyFor(shape.id, oracle, fixture.keys),
+            ...fixture.seams,
+            humanArgsDeps: { ...fixture.seams },
+          });
+        } catch (error) {
+          result = { ok: undefined, message: `threw: ${error?.message}` };
+        }
+        if (row.n === 4) row4Messages[shape.id] = String(result.message ?? "");
+        const problems = [...(oracleProblem === null ? [] : [oracleProblem]), ...r76jJudge(shape.id, oracle, result, row4Messages[shape.id])];
+        if (problems.length > 0) red += 1;
+        const verdict = `R7-6j [${shape.label}] row ${row.n} (${row.label}) oracle=${oracle.status}${oracle.source === null ? "" : `/${oracle.source}`}: ${problems.length === 0 ? "GREEN" : `RED - ${problems.join("; ")}`}`;
+        verdicts.push(verdict);
+        console.log(verdict);
+      }
+    }
+  } finally {
+    if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
+    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
+  assert.equal(red, 0, `${red} of ${R76J_ROWS.length * R76J_SHAPES.length} (shape,row) cases disagree with the shared resolver:\n${verdicts.join("\n")}`);
+});
 
 test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor, machine HAS a resolvable operator key -> ok:true, unrestricted-once (trust-on-first-use, NVA-TOFU-1/NVA-CF-TOFUAGREE)", () => {
   const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
