@@ -5,6 +5,7 @@ import {constants,closeSync,fstatSync,lstatSync,openSync,readSync,fsyncSync,real
 import {execFileSync} from 'node:child_process';
 import {dirname,join,parse,resolve,sep} from 'node:path';
 import {discoverRepository} from './worktree-lifecycle.mjs';
+import {fsyncDirectoryDurable} from './fs-durability.mjs';
 export const GIT_HOOK_NAMES=Object.freeze(['pre-commit','commit-msg','pre-push']);
 export const footprintSha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 export function footprintFail(code){throw Object.assign(new Error(code),{code});}
@@ -34,7 +35,7 @@ export function removeManagedGitHook({rootDir,name,deps={},expectedEntry}={}){
   const rows=[[expectedEntry.hookPath,"hook"],[expectedEntry.implPath,"impl"],[expectedEntry.markerPath,"marker"]];
   // Durable caller binding authorizes only the original physical objects.
   for(const [path,key] of rows){const row=readPhysicalFootprint(path),bound=expectedEntry[key];if(row&&(!bound||row.sha256!==bound.sha256||JSON.stringify(row.identity)!==JSON.stringify(bound.identity)||(key==="hook"&&row.mode!==bound.mode)))footprintFail("PU-HOOK-DRIFT");}
-  for(const [path,key] of rows){const row=readPhysicalFootprint(path),bound=expectedEntry[key];if(row){if(!bound||row.sha256!==bound.sha256||JSON.stringify(row.identity)!==JSON.stringify(bound.identity))footprintFail("PU-HOOK-DRIFT");unlinkSync(path);const fd=openSync(dirname(path),"r");try{fsyncSync(fd);}finally{closeSync(fd);}}if(key==="hook")deps.afterShim?.();}
+  for(const [path,key] of rows){const row=readPhysicalFootprint(path),bound=expectedEntry[key];if(row){if(!bound||row.sha256!==bound.sha256||JSON.stringify(row.identity)!==JSON.stringify(bound.identity))footprintFail("PU-HOOK-DRIFT");unlinkSync(path);fsyncDirectoryDurable(dirname(path));}if(key==="hook")deps.afterShim?.();}
   return {status:"removed",hookPath:expectedEntry.hookPath};
  }
  const plan=planManagedGitHookRemoval({rootDir,name});if(plan.status!=='ready')return plan;

@@ -60,6 +60,7 @@ import {
   closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeSync,
 } from "node:fs";
 import { dirname, join, parse, resolve, sep } from "node:path";
+import { fsyncDirectoryDurable } from "./fs-durability.mjs";
 
 export const CONSENT_MARKER_SCHEMA = "pipeline.onboarding-consent-marker.v1";
 export const CONSENT_MARKER_STATUS = "consent-given-onboarding-incomplete";
@@ -85,7 +86,7 @@ function atomicWriteFileSync(targetPath, bytes) {
   } finally {
     closeSync(fd);
   }
-  renameSync(tempPath, targetPath);const parent=openSync(dirname(targetPath),"r");try{fsyncSync(parent);}finally{closeSync(parent);}
+  renameSync(tempPath, targetPath);fsyncDirectoryDurable(dirname(targetPath));
 }
 
 function appendAuditEntry(rootDir, entry) {
@@ -220,7 +221,7 @@ function withEnrollmentConsentLock(rootDir,operation){
  }
  const lockStat=lstatSync(lock),bytes=Buffer.from(JSON.stringify(descriptor)+'\n');
  try{let n=0;while(n<bytes.length){const wrote=writeSync(fd,bytes,n,bytes.length-n,n);if(wrote<=0)throw Error('ER-CONSENT-LOCK-WRITE');n+=wrote;}fsyncSync(fd);return operation();}
- finally{closeSync(fd);const actual=lstatSync(lock);if(actual.dev!==lockStat.dev||actual.ino!==lockStat.ino)throw Error('ER-CONSENT-LOCK-CAS');unlinkSync(lock);const parent=openSync(directory,'r');try{fsyncSync(parent);}finally{closeSync(parent);}}
+ finally{closeSync(fd);const actual=lstatSync(lock);if(actual.dev!==lockStat.dev||actual.ino!==lockStat.ino)throw Error('ER-CONSENT-LOCK-CAS');unlinkSync(lock);fsyncDirectoryDurable(directory);}
 
 }
 /** Removal-only CAS. A different fresh marker is never consumed by a replay. */
@@ -231,7 +232,7 @@ export function retireEnrollmentConsent({rootDir,expectedSha256}={}) {
   if(current.sha256!==expectedSha256)throw Error('ER-CONSENT-FRESH-DRIFT');
   unlinkSync(current.path);
   appendAuditEntry(rootDir,{schema:CONSENT_AUDIT_SCHEMA,clearedAt:new Date().toISOString(),reason:'enrollment-retirement'});
-  const fd=openSync(dirname(current.path),'r');try{fsyncSync(fd);}finally{closeSync(fd);}
+  fsyncDirectoryDurable(dirname(current.path));
   return {sha256:null,replayed:false};
  });
 }
