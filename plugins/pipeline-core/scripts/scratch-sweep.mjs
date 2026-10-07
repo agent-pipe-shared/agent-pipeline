@@ -9,7 +9,11 @@
 //   --check  durability assessment plus sweep plan (default, read-only)
 //   --sweep  the same report with mode "sweep" (a plan only, read-only)
 //   --apply  recompute the plan now and delete exactly its files; never anything
-//            under scratch/dispatch/, never a link, never a directory
+//            under scratch/dispatch/, a file git tracks, a live plugin root, a
+//            link or a directory. The clock is always the real one: --now is
+//            refused together with --apply.
+// The plan (library planSweep) already excludes all of that, so a --check/--sweep
+// preview is the set --apply deletes.
 // Output: one JSON object on stdout; paths are repo-relative. Refusals print
 // { status: "refused", code } and exit 1 (SCRATCH-SWEEP-USAGE,
 // SCRATCH-SWEEP-NOT-A-REPOSITORY).
@@ -47,6 +51,8 @@ function parseArgs(argv) {
     }
   }
   if (modes.length > 1) return { error: 'at most one mode flag is allowed' };
+  // --now would let a caller age every file past the 14-day floor; a deletion uses the real clock.
+  if (modes[0] === 'apply' && now !== null) return { error: '--now cannot be combined with --apply: a deletion always uses the real clock' };
   let nowDate = new Date();
   if (now !== null) {
     nowDate = new Date(now);
@@ -77,7 +83,8 @@ function applyPlan(root, now) {
   const physicalScratch = realpathSync(join(root, 'scratch'));
   const deleted = [];
   for (const rel of plan.delete) {
-    if (!rel.startsWith('scratch/') || rel.startsWith('scratch/dispatch/')) continue;
+    // The library plan already excludes scratch/dispatch/; this guard is the second, independent line.
+    if (!rel.startsWith('scratch/') || rel.toLowerCase().startsWith('scratch/dispatch/')) continue;
     const full = join(root, ...rel.split('/'));
     try {
       const stat = lstatSync(full);
