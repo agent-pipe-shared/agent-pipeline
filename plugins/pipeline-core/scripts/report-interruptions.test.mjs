@@ -143,6 +143,22 @@ test("CLI invocation with --help prints usage and exits 0 with empty stderr", ()
   assert.equal(shortResult.stderr, "");
 });
 
+test("AC6: --write-baseline writes an aggregate-only telemetry/interruption-baseline.json", () => {
+  const fx = fixture();
+  try {
+    const create = run(observedScript, ["create", "--root", fx.root, "--spec", "specs/sprint-alfred-epic/spec.md"]);
+    assert.equal(create.status, 0, `${create.stdout}${create.stderr}`);
+    const written = run(reportScript, ["--root", fx.root, "--write-baseline"]);
+    assert.equal(written.status, 0, `${written.stdout}${written.stderr}`);
+    const baseline = JSON.parse(readFileSync(join(fx.root, "telemetry/interruption-baseline.json"), "utf8"));
+    for (const key of ["window", "coverage", "registrySha256", "limitations", "generatedAt"]) assert.ok(key in baseline, `baseline lacks ${key}`);
+    assert.ok(Array.isArray(baseline.limitations));
+    for (const key of ["receipts", "snapshot", "sourceEntries", "episodes"]) assert.ok(!(key in baseline), `baseline must carry no receipt content: ${key}`);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
 test("CLI rejects invalid arguments with exit 2 and C1S-SHAPE error JSON on stderr", () => {
   const cases = [
     [],

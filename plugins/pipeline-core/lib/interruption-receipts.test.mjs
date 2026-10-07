@@ -19,6 +19,55 @@ import { createInterruptionStore, productionPorts } from "./interruption-receipt
 const registry = JSON.parse(readFileSync(new URL("../../../policies/interruption-registry.v1.json", import.meta.url), "utf8"));
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64);
 const clone = (value) => structuredClone(value);
+
+// AC-6 promotion contract (ruling 15). The baseline is passed as the exact bytes of the
+// tracked file (string); its digest is sha256 of those bytes (hex); approval is { baselineSha256 }.
+const ac6Mod = await import("./interruption-receipts.mjs");
+const ac6Eval = (input) => {
+  assert.equal(typeof ac6Mod.evaluatePromotionEvidence, "function", "AC6: evaluatePromotionEvidence is not exported by interruption-receipts.mjs");
+  return ac6Mod.evaluatePromotionEvidence(input);
+};
+const ac6Sha = (text) => createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex");
+const ac6Window = (start, end) => ({ start: { value: start, status: "measured" }, end: { value: end, status: "measured" } });
+const ac6Bytes = (over = {}) => `${JSON.stringify({ window: ac6Window("2026-08-01T00:00:00.000Z", "2026-08-02T00:00:00.000Z"), coverage: { receipts: "measured", followup: "measured" }, registrySha256: "a".repeat(64), limitations: [], generatedAt: "2026-08-02T00:00:00.000Z", ...over }, null, 2)}\n`;
+const ac6Status = (result) => (typeof result === "string" ? result : result?.status);
+
+test("AC6: no baseline is unavailable", () => {
+  for (const baseline of [null, undefined]) assert.equal(ac6Status(ac6Eval({ baseline, poApproval: { baselineSha256: "0".repeat(64) } })), "unavailable");
+});
+
+test("AC6: unparseable baseline or one missing window or coverage is unavailable", () => {
+  const noWindow = JSON.parse(ac6Bytes()); delete noWindow.window;
+  const noCoverage = JSON.parse(ac6Bytes()); delete noCoverage.coverage;
+  for (const baseline of ["{not json", noWindow, noCoverage].map((v) => (typeof v === "string" ? v : `${JSON.stringify(v)}\n`))) {
+    assert.equal(ac6Status(ac6Eval({ baseline, poApproval: { baselineSha256: ac6Sha(baseline) } })), "unavailable");
+  }
+});
+
+test("AC6: valid baseline without approval is report-only", () => {
+  assert.equal(ac6Status(ac6Eval({ baseline: ac6Bytes(), poApproval: null })), "report-only");
+});
+
+test("AC6: valid baseline with approval of its own digest is calibrated-pass", () => {
+  const baseline = ac6Bytes();
+  assert.equal(ac6Status(ac6Eval({ baseline, poApproval: { baselineSha256: ac6Sha(baseline) } })), "calibrated-pass");
+});
+
+test("AC6: approval naming a different digest is report-only", () => {
+  assert.equal(ac6Status(ac6Eval({ baseline: ac6Bytes(), poApproval: { baselineSha256: ac6Sha("other") } })), "report-only");
+});
+
+test("AC6: coverage unknown with matching approval is not calibrated-pass", () => {
+  const baseline = ac6Bytes({ coverage: { receipts: "unknown", followup: "unknown" } });
+  assert.notEqual(ac6Status(ac6Eval({ baseline, poApproval: { baselineSha256: ac6Sha(baseline) } })), "calibrated-pass");
+});
+
+test("AC6: elapsed time is not an input", () => {
+  const long = ac6Bytes({ window: ac6Window("2026-06-01T00:00:00.000Z", "2026-07-31T00:00:00.000Z"), coverage: { receipts: "unknown", followup: "unknown" } });
+  assert.notEqual(ac6Status(ac6Eval({ baseline: long, poApproval: { baselineSha256: ac6Sha(long) } })), "calibrated-pass");
+  const short = ac6Bytes({ window: ac6Window("2026-08-01T00:00:00.000Z", "2026-08-02T00:00:00.000Z") });
+  assert.equal(ac6Status(ac6Eval({ baseline: short, poApproval: { baselineSha256: ac6Sha(short) } })), "calibrated-pass");
+});
 const time = (seconds, status = "measured") => ({ value: `2026-08-01T00:00:${String(seconds).padStart(2, "0")}.000Z`, status });
 const absent = (status = "unknown") => ({ value: null, status });
 function input() {
