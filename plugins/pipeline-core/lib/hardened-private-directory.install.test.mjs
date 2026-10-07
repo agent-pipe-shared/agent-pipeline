@@ -5,22 +5,50 @@
  * Windows "secure" is decided by the real assessment primitive, never by a stub; elsewhere
  * the directories the installer's own helper creates must carry mode 0o700.
  *
+ * The complete case corpus (HPDI001-HPDI003, one per installer) is declared through
+ * `registerTestCaseCompletion` before any fixture setup, so a run that stops short of a
+ * disposition for every declared case is distinguishable from one that ran them all.
+ *
  * Run: node --test plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, openSync as openCompletionDescriptor, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
 
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 // pre-push first: project onboarding imports this installer in-process.
 import { applyInstall as applyPrePushInstall } from "../scripts/pre-push-hook-install.mjs";
 import { applyInstall as applyPreCommitInstall } from "../scripts/pre-commit-hook-install.mjs";
 import { applyInstall as applyCommitMsgInstall } from "../scripts/commit-msg-hook-install.mjs";
 
+const completionCases = [];
+function test(name, run) {
+  if (typeof name !== "string" || typeof run !== "function") throw new TypeError("invalid callback registration");
+  completionCases.push({ id: "HPDI" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+}
+
 const onWindows = process.platform === "win32";
+
+/**
+ * The per-case bound the suite carried as `{ timeout: 180_000 }` on `node:test`. The case-completion
+ * protocol registers each case without per-case options, so the bound lives inside the callback: the
+ * install body races a rejection, and a hang therefore surfaces as an ordinary `fail` disposition.
+ */
+const CASE_TIMEOUT_MS = 180_000;
+async function withCaseBound(label, body) {
+  let timer;
+  const bound = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} exceeded ${CASE_TIMEOUT_MS} ms`)), CASE_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([(async () => body())(), bound]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function withTemp(prefix, run) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -41,7 +69,7 @@ for (const [name, install, stateName] of [
   ["pre-commit", applyPreCommitInstall, "pre-commit-hook"],
   ["commit-msg", applyCommitMsgInstall, "commit-msg-hook"],
 ]) {
-  test(`${name} applyInstall in a fresh repository leaves every private directory it created ${onWindows ? "secure" : "mode 0o700"}`, { timeout: 180_000 }, () => {
+  test(`${name} applyInstall in a fresh repository leaves every private directory it created ${onWindows ? "secure" : "mode 0o700"}`, () => withCaseBound(name, () => {
     withTemp(`hpd-install-${name}-`, (dir) => {
       const init = spawnSync("git", ["init", "-q", "-b", "main"], { cwd: dir, encoding: "utf8", timeout: 20_000 });
       assert.equal(init.status, 0, init.stderr);
@@ -71,5 +99,11 @@ for (const [name, install, stateName] of [
         for (const path of [parent, stateDir]) assert.equal(statSync(path).mode & 0o777, 0o700, path.slice(dir.length + 1));
       }
     });
-  });
+  }));
 }
+
+if (completionCases.length !== 3) throw new Error("case completion count drift: expected 3, got " + completionCases.length);
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(devNull, "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: 65536 });
