@@ -1160,7 +1160,8 @@ test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-diges
       dependencies,
     ));
     assert.ok(error, "a key that no longer matches the recorded digest must still refuse to sign");
-    assert.match(error.message, /does not match the local public key/u, "a genuine key-digest mismatch must keep the mismatch message");
+    r76AssertTyped({ threw: true, error }, { cls: "key-anchor-mismatch", findingId: "trust-anchor-match", status: "attended" });
+    assert.match(error.message, /digest|public key found there/iu, "a genuine key-digest mismatch must keep the mismatch message");
     assert.doesNotMatch(error.message, /predates --human-name/u, "a genuine key mismatch must never be reported as a missing --human-name");
   } finally {
     cleanup(dirs);
@@ -3524,8 +3525,7 @@ test("PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid 
   try {
     const gitCommonDirFn = () => common;
     keyFixture(otherDirectory);
-    const setupResult = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", otherDirectory], { gitCommonDirFn });
-    assert.equal(setupResult.ok, true);
+    legacyRepoStoreFixture(common, realpathSync(otherDirectory));
 
     const parsed = parseHumanArgs(
       ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"],
