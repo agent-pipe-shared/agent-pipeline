@@ -120,6 +120,7 @@ test("AC-19 sign-intent presents the exact inherited registry before signing", {
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
     mkdirSync(join(dirs.repoRoot, "project"), { recursive: true });
     const subject = { schema: "pipeline.organization-architecture-config.v1", expectedPriorSha256: null,
@@ -262,9 +263,24 @@ function encryptedKeyFixture(directory, passphrase) {
  * during `setup`, not exercised by `sign-intent`) stays real, unmodified
  * `openssl`.
  */
+/**
+ * R7-6-T3 (D3, Spec 22.6): sign-intent's own pre-prompt probe (R7-6-F) spawns the bare name
+ * openssl for a harmless version call and an Ed25519 sign/verify round trip with a throwaway key,
+ * before the signing spawn. The spies below answer those probe calls with the healthy node:crypto
+ * stub the R7-6 block already defines (r76Spy, exit 0, plausible stdout), so no existing case
+ * depends on a real openssl on PATH and none of them changes what it asserts about the signing
+ * spawn itself.
+ */
+function answerOpensslProbe(executable, args) {
+  return r76Spy("healthy").spawn(executable, args);
+}
+
 function fakeSignSpawn(privateKeyPem, passphrase) {
   return (executable, args) => {
-    if (executable === "openssl" && args[0] === "pkeyutl") {
+    // R7-6-T3 (D3): only the signing spawn (the one carrying the PO key path) is signed here with the
+    // fixture key; every other openssl call -- the pre-prompt probe (version, throwaway Ed25519
+    // sign/verify round trip) -- is answered by the healthy stub below, never by a real openssl.
+    if (executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private\.pem/u.test(String(entry)))) {
       const inIndex = args.indexOf("-in");
       const outIndex = args.indexOf("-out");
       const rawInput = readFileSync(args[inIndex + 1]);
@@ -273,6 +289,7 @@ function fakeSignSpawn(privateKeyPem, passphrase) {
       writeFileSync(args[outIndex + 1], signature);
       return { status: 0 };
     }
+    if (executable === "openssl") return answerOpensslProbe(executable, args);
     const result = spawnSync(executable, args, { stdio: "pipe" });
     return { status: result.status };
   };
@@ -398,6 +415,7 @@ function fakeSetupSpawn(executable, args) {
     writeFileSync(outPath, publicKey);
     return { status: 0 };
   }
+  if (executable === "openssl") return answerOpensslProbe(executable, args);
   const result = spawnSync(executable, args, { stdio: "pipe" });
   return { status: result.status };
 }
@@ -598,6 +616,7 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
   const dirs = fixtureDirs();
   try {
     const { publicKeyPem, authority } = keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-fixture").digest("hex");
     const confirmationPrompts = [];
     const dependencies = { readConfirmation: (prompt) => { confirmationPrompts.push(prompt); return "approve"; } };
@@ -664,6 +683,7 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.gmw-reconcile-request-fixture").digest("hex");
     const scratchDir = join(dirs.repoRoot, "scratch");
     mkdirSync(scratchDir, { recursive: true });
@@ -723,6 +743,7 @@ test("sign-intent discloses the exact redacted Agy authorship export and its non
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const request = portableAgySigningFixture();
     const path = "scratch/agy-authorship-export-request-fixture.json";
     mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
@@ -793,6 +814,7 @@ test("sign-intent discloses a bound portable Critic export and no release author
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const request = portableCriticSigningFixture();
     const path = "scratch/portable-critic-export-request-fixture.json";
     mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
@@ -838,6 +860,7 @@ test("sign-intent discloses the exact reviewed PRD, specification, and checkpoin
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const action = {
       kind: "bootstrap-plan-acknowledgement",
       decision: "content-sound-and-spec-consistent",
@@ -1086,6 +1109,7 @@ test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name sp
   const dirs = fixtureDirs();
   try {
     legacyKeyFixture(dirs.directory); // writes {keyReference, publicKeySha256} only, no humanName -- the SAME key sign-intent will use
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.sigdisclose-f3-legacy-fixture").digest("hex");
     const dependencies = { readConfirmation: () => "approve" };
     const error = thrown(() => runHumanApproval(
@@ -1109,6 +1133,7 @@ test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-diges
     // ...but the private key on disk is now regenerated, so it no longer matches the
     // publicKeySha256 the trust-policy.json record was written against.
     writeEd25519KeyPair(otherPrivateKey, join(dirs.directory, "po-public.pem"));
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.sigdisclose-f3-mismatch-fixture").digest("hex");
     const dependencies = { readConfirmation: () => "approve" };
     const error = thrown(() => runHumanApproval(
@@ -1127,17 +1152,18 @@ test("sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-cancel-fixture").digest("hex");
-    let spawnCalled = false;
+    const spy = r76Spy("healthy");
     const dependencies = {
       readConfirmation: () => "nope",
-      spawn: () => { spawnCalled = true; return { status: 0 }; },
+      spawn: spy.spawn,
     };
     assert.throws(
       () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies),
       /approval cancelled: explicit confirmation was not given/,
     );
-    assert.equal(spawnCalled, false, "OpenSSL must never be invoked once confirmation is cancelled");
+    assert.deepEqual(r76KeyPathSpawns(spy), [], "OpenSSL must never be invoked once confirmation is cancelled");
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
     assert.equal(existsSync(join(dirs.directory, "signature-manual.bin")), false);
     assert.equal(existsSync(join(dirs.directory, `intent-${intentSha256}.txt`)), false);
@@ -1155,6 +1181,7 @@ test("NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-
   try {
     const passphrase = "sign-intent-fixture-passphrase";
     const { privateKeyPem, authority } = encryptedKeyFixture(dirs.directory, passphrase);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-passphrase-fixture").digest("hex");
     const dependencies = {
       spawn: fakeSignSpawn(privateKeyPem, passphrase),
@@ -1229,6 +1256,7 @@ test("NVA-CF-MINORPUSH-RETRY: sign-intent accepts a REAL controlling terminal ev
   try {
     const passphrase = "sign-intent-fixture-passphrase";
     const { privateKeyPem, authority } = encryptedKeyFixture(dirs.directory, passphrase);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.tty-sign-redirected-stdin-fixture").digest("hex");
     const dependencies = {
       spawn: fakeSignSpawn(privateKeyPem, passphrase),
@@ -1315,6 +1343,7 @@ test("2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native W
   try {
     const passphrase = "sign-intent-fixture-passphrase";
     const { privateKeyPem } = encryptedKeyFixture(dirs.directory, passphrase);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.tty-sign-windows-attended-fixture").digest("hex");
     const dependencies = {
       platform: "win32",
@@ -1337,6 +1366,7 @@ test("NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a miss
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.tty-sign-unprotected-key-fixture").digest("hex");
     const dependencies = { isTTY: false, readConfirmation: () => "approve" };
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
@@ -1354,17 +1384,18 @@ test("NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel o
     // isPrivateKeyPassphraseProtected() correctly resolves an unencrypted key to
     // `false` and still funnels sign-intent through the confirmation-required path.
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-signonce-unencrypted-fixture").digest("hex");
-    let spawnCalled = false;
+    const spy = r76Spy("healthy");
     const dependencies = {
       readConfirmation: () => "definitely not approve",
-      spawn: () => { spawnCalled = true; return { status: 0 }; },
+      spawn: spy.spawn,
     };
     assert.throws(
       () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies),
       /approval cancelled: explicit confirmation was not given/,
     );
-    assert.equal(spawnCalled, false, "OpenSSL must never be invoked once confirmation is cancelled for a key with no passphrase");
+    assert.deepEqual(r76KeyPathSpawns(spy), [], "OpenSSL must never be invoked once confirmation is cancelled for a key with no passphrase");
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
   } finally {
     cleanup(dirs);
@@ -1482,6 +1513,22 @@ function declareTrustAnchor(repoRoot, authority) {
     waivedKinds: [],
     trustAnchors: [{ keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 }],
   }));
+}
+
+/**
+ * R7-6-T3 (D2, Spec 22.6): with no committed trust anchor no public key can match one, so
+ * sign-intent's step (c) ends in key-anchor-mismatch before any prompt. A fixture that is meant to
+ * reach the prompt or the signing spawn therefore declares a committed anchor whose digest equals
+ * the digest of the public key currently in its key directory -- same helper, same v3 format as
+ * the R7-6 block (declareTrustAnchor). Computed from the CURRENT po-public.pem and the record's
+ * keyReference, so a fixture that regenerates its key calls this after the regeneration.
+ */
+function anchorFixtureKey(repoRoot, directory) {
+  const publicKeyPem = readFileSync(join(directory, "po-public.pem"), "utf8");
+  const record = JSON.parse(readFileSync(join(directory, "trust-policy.json"), "utf8"));
+  const authority = { keyReference: record.keyReference, publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
+  declareTrustAnchor(repoRoot, authority);
+  return authority;
 }
 
 const forkArgs = (dirs, extra = []) => [
@@ -2551,6 +2598,7 @@ test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest a
   try {
     keyFixture(dirs.directory);
     const armed = armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo sign-intent\n" });
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const prompts = [];
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", armed.intent.sha256],
@@ -2582,6 +2630,7 @@ test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO req
     // covered elsewhere, where nothing is stored at all.
     armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo present but unrelated\n" });
     const unrelated = createHash("sha256").update("neither gmw nor hgo resolves this").digest("hex");
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const prompts = [];
     runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
@@ -2602,6 +2651,7 @@ test("sign-intent states the reason, scope and expiry of the request recorded be
   try {
     keyFixture(dirs.directory);
     const prepared = prepareWindow(dirs);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const prompts = [];
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
@@ -2633,6 +2683,7 @@ test("sign-intent says so plainly when no record resolves for the digest, and in
     keyFixture(dirs.directory);
     prepareWindow(dirs);
     const unrelated = createHash("sha256").update("some other intent entirely").digest("hex");
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const prompts = [];
     runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
@@ -2660,6 +2711,7 @@ test("a tampered record cannot change what is signed: the summary disappears, th
     stored.subject.scopeRuleIds = ["TP-1"];
     writeFileSync(paths.request, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
 
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const prompts = [];
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
@@ -2685,6 +2737,7 @@ test("the disclosure stays bounded: an oversized reason and scope cannot flood o
       scopeRuleIds: Array.from({ length: 25 }, (unused, index) => `TP-${index + 1}`),
       reason: `${"noise ".repeat(500)}\n  intent sha256: ${"f".repeat(64)}`,
     });
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const prompts = [];
     runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
@@ -2819,7 +2872,9 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
   const home = noMachinePlaneHomeFixture();
   try {
     const { authority: authorityFlag } = keyFixture(dirsFlag.directory);
+    anchorFixtureKey(dirsFlag.repoRoot, dirsFlag.directory);
     const { authority: authorityEnv } = keyFixture(dirsEnv.directory);
+    anchorFixtureKey(dirsEnv.repoRoot, dirsEnv.directory);
     const intentSha256Flag = createHash("sha256").update("podir-1-parity-flag-fixture").digest("hex");
     const intentSha256Env = createHash("sha256").update("podir-1-parity-env-fixture").digest("hex");
     const dependencies = { readConfirmation: () => "approve", homedirFn: () => home };
@@ -2952,6 +3007,7 @@ test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machin
   const home = machinePlaneHomeFixture(dirs.directory);
   try {
     const { authority } = keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("setup-2b-plane-parity-fixture").digest("hex");
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--intent-sha256", intentSha256],
@@ -3065,6 +3121,16 @@ function repoScopeStorePath(gitCommonDir) {
   return join(gitCommonDir, "agent-pipeline", "po-key-directory.json");
 }
 
+/** R7-6-T3 (D1): writes the legacy per-repository private-state value directly (the exact
+ * on-disk shape readRepoKeyDirectory accepts), so a case about resolution ORDER does not depend
+ * on whether setup still writes that store. */
+function legacyRepoStoreFixture(gitCommonDir, poKeyDirectory) {
+  mkdirSync(dirname(repoScopeStorePath(gitCommonDir)), { recursive: true });
+  writeFileSync(repoScopeStorePath(gitCommonDir), JSON.stringify({
+    schema: "pipeline.po-key-directory.v1", poKeyDirectory, updatedAt: new Date().toISOString(),
+  }, null, 2) + "\n");
+}
+
 test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the REPO-SCOPED store (not the machine plane); a later command in the SAME repo resolves it without repeating --directory; the SAME command in a DIFFERENT repo (different git-common-dir) does NOT inherit it", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   const home = noMachinePlaneHomeFixture();
@@ -3073,6 +3139,7 @@ test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the R
   const commonOther = repoScopeCommonDirFixture();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const repoRootA = resolve(dirs.repoRoot);
     const gitCommonDirFn = (repository) => (repository === repoRootA ? commonA : commonOther);
     const setupResult = runHumanApproval(
@@ -3170,6 +3237,10 @@ test("PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory 
 /* ------------------------------------------------------------------ *
  * PO-KEYDIR-01(A): precedence order, proved at each boundary --
  * --directory (flag) > repo-scope > machine plane > environment variable.
+ * R7-6-T3: Spec 22.6 supersedes the repo-scope/machine-plane boundary: the order is now
+ * explicit argument > machine-wide value > legacy per-repository value (read-only fallback,
+ * marked legacy) > absent; see the two R7-6-T3 cases below. Boundaries involving the
+ * environment variable are untouched.
  * The last boundary (machine plane > environment) is unchanged behaviour
  * already covered above (AC-11: "the machine plane's poKeyDirectory
  * resolves ... and wins over the environment variable").
@@ -3199,26 +3270,68 @@ test("PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid 
   }
 });
 
-test("PO-KEYDIR-01(A): a repo-scoped value resolves the directory when --directory is absent, and wins over a present, valid machine plane", () => {
+test("PO-KEYDIR-01(A) / Spec 22.6 (R7-6-T3, D1): the machine-wide value resolves the directory when --directory is absent and wins over a present legacy repo-scoped value", () => {
   const dirs = fixtureDirs();
-  const home = machinePlaneHomeFixture("/should/never/be/read/machine-plane-directory");
+  const machineDirectory = mkdtempSync(join(tmpdir(), "po-machine-wins-"));
+  const home = machinePlaneHomeFixture(machineDirectory);
   const common = repoScopeCommonDirFixture();
   try {
-    const gitCommonDirFn = () => common;
-    keyFixture(dirs.directory);
-    const setupResult = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { homedirFn: () => home, gitCommonDirFn });
-    assert.equal(setupResult.ok, true);
-
-    const parsed = parseHumanArgs(
+    legacyRepoStoreFixture(common, realpathSync(dirs.directory));
+    const parsed = withEnvDirectory(undefined, () => parseHumanArgs(
       ["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"],
-      { homedirFn: () => home, gitCommonDirFn },
-    );
+      { homedirFn: () => home, gitCommonDirFn: () => common },
+    ));
     assert.equal(parsed.error, undefined);
-    assert.equal(parsed.directory, realpathSync(dirs.directory));
-    assert.equal(parsed.directorySource, "repo-scope");
+    assert.equal(realpathSync(parsed.directory), realpathSync(machineDirectory), "Spec 22.6: the machine-wide value precedes the legacy per-repository value");
+    assert.equal(parsed.directorySource, "machine-plane");
   } finally {
     cleanup(dirs);
+    rmSync(machineDirectory, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
+    rmSync(common, { recursive: true, force: true });
+  }
+});
+
+test("R7-6-T3 (Spec 22.6, D1): poKeyDirectory resolves explicit argument, then machine-wide value, then the legacy per-repository value, and the legacy result is marked legacy", () => {
+  // CONTRACT FOR R7-6-F (legacy marker): the object returned by parseHumanArgs for a directory that
+  // came from the legacy per-repository private-state value carries the boolean  legacy: true .
+  // Every other source (flag, machine-plane, environment) leaves  legacy  absent or false.
+  // directorySource keeps its existing values and is not pinned for the legacy case here.
+  const dirs = fixtureDirs();
+  const explicitDirectory = mkdtempSync(join(tmpdir(), "po-order-explicit-"));
+  const machineDirectory = mkdtempSync(join(tmpdir(), "po-order-machine-"));
+  const machineHome = machinePlaneHomeFixture(machineDirectory);
+  const emptyHome = noMachinePlaneHomeFixture();
+  const common = repoScopeCommonDirFixture();
+  try {
+    legacyRepoStoreFixture(common, realpathSync(dirs.directory));
+    const parseWith = (extraArgv, home) => withEnvDirectory(undefined, () => parseHumanArgs(
+      ["setup", "--repo-root", dirs.repoRoot, ...extraArgv, "--human-name", "Test Operator"],
+      { homedirFn: () => home, gitCommonDirFn: () => common },
+    ));
+
+    const explicit = parseWith(["--directory", explicitDirectory], machineHome);
+    assert.equal(explicit.error, undefined);
+    assert.equal(explicit.directory, explicitDirectory, "explicit argument beats the machine-wide and the legacy value");
+    assert.equal(explicit.directorySource, "flag");
+    assert.notEqual(explicit.legacy, true);
+
+    const machine = parseWith([], machineHome);
+    assert.equal(machine.error, undefined);
+    assert.equal(realpathSync(machine.directory), realpathSync(machineDirectory), "the machine-wide value beats the legacy per-repository value");
+    assert.equal(machine.directorySource, "machine-plane");
+    assert.notEqual(machine.legacy, true);
+
+    const legacy = parseWith([], emptyHome);
+    assert.equal(legacy.error, undefined);
+    assert.equal(realpathSync(legacy.directory), realpathSync(dirs.directory), "the legacy per-repository value alone still resolves (read-only fallback)");
+    assert.equal(legacy.legacy, true, "the legacy result must be reported as legacy (contract: legacy === true on the parsed result)");
+  } finally {
+    cleanup(dirs);
+    rmSync(explicitDirectory, { recursive: true, force: true });
+    rmSync(machineDirectory, { recursive: true, force: true });
+    rmSync(machineHome, { recursive: true, force: true });
+    rmSync(emptyHome, { recursive: true, force: true });
     rmSync(common, { recursive: true, force: true });
   }
 });
@@ -3565,6 +3678,7 @@ test("NVA-BL-74: a repository configured for `de` gets the German prompt frame, 
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     stateFixture(dirs.repoRoot, { language: "de" });
     const intentSha256 = createHash("sha256").update("nva-bl-74-de-fixture").digest("hex");
     const prompts = [];
@@ -3597,18 +3711,19 @@ test("NVA-BL-74: cancellation semantics are unchanged under the German prompt --
     const dirs = fixtureDirs();
     try {
       keyFixture(dirs.directory);
+      anchorFixtureKey(dirs.repoRoot, dirs.directory);
       stateFixture(dirs.repoRoot, { language: "de" });
       const intentSha256 = createHash("sha256").update(`nva-bl-74-cancel-${answer}`).digest("hex");
-      let spawnCalled = false;
+      const spy = r76Spy("healthy");
       assert.throws(
         () => runHumanApproval(
           ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
-          { readConfirmation: () => answer, spawn: () => { spawnCalled = true; return { status: 0 }; } },
+          { readConfirmation: () => answer, spawn: spy.spawn },
         ),
         /approval cancelled: explicit confirmation was not given/u,
         `${JSON.stringify(answer)} must cancel under the German prompt`,
       );
-      assert.equal(spawnCalled, false, `${JSON.stringify(answer)}: OpenSSL must never be invoked once confirmation is cancelled`);
+      assert.deepEqual(r76KeyPathSpawns(spy), [], `${JSON.stringify(answer)}: OpenSSL must never be invoked once confirmation is cancelled`);
       for (const artifact of [`proof-${intentSha256}.json`, `signature-${intentSha256}.bin`, `intent-${intentSha256}.txt`]) {
         assert.equal(existsSync(join(dirs.directory, artifact)), false, `${JSON.stringify(answer)}: no ${artifact} may exist after a cancelled confirmation`);
       }
@@ -3635,6 +3750,7 @@ test("NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malfor
     const dirs = fixtureDirs();
     try {
       keyFixture(dirs.directory);
+      anchorFixtureKey(dirs.repoRoot, dirs.directory);
       scenario.prepare(dirs.repoRoot);
       const intentSha256 = createHash("sha256").update(`nva-bl-74-fallback-${scenario.label}`).digest("hex");
       const prompts = [];
@@ -3659,6 +3775,7 @@ test("NVA-BL-74: the language selects only the frame -- the `de` and `en` prompt
     const dirs = fixtureDirs();
     try {
       keyFixture(dirs.directory);
+      anchorFixtureKey(dirs.repoRoot, dirs.directory);
       stateFixture(dirs.repoRoot, { language });
       const prompts = [];
       runHumanApproval(
