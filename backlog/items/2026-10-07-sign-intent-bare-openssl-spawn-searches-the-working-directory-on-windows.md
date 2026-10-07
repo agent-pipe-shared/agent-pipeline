@@ -45,3 +45,7 @@ test with a decoy `openssl` in the working directory that must never start.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Residual risk (PO decision R, 2026-10-07)
+
+On win32 the signing spawn keeps the PO key directory as its cwd, so a planted `openssl.exe` or `openssl.com` in that directory would be started instead of the real binary. This remains because libuv searches the child cwd before PATH when resolving a bare executable name, and `NoDefaultCurrentDirectoryInExePath` is not honoured by that lookup. The operating rule is that the PO keeps the key directory free of executables.
