@@ -11834,3 +11834,81 @@ test("RECCOL-6 claimDispatchRecordOwnership claims on the first opening write on
     }).status, "not-a-dispatch-record");
   } finally { fx.cleanup(); }
 });
+
+// ENVDUMP-T2: pins for backlog item 2026-10-07-a-read-only-probe-can-dump-the-process-environment-into-a-transcript
+// (appended after the RECCOL tests). A command whose effect is to print the process environment writes every secret in that
+// environment into a transcript that cannot be un-printed. Triage widened the scope from agent sessions to every session the
+// lifecycle guard sees, with no override route, so each command is pinned for BOTH session shapes: "agent" (the payload carries
+// agent_id/agent_type) and "main" (the same payload without them). The refusal carries a typed code containing ENV-DUMP
+// (planned: GUARD-ENV-DUMP).
+// SAFETY: every command string below is DATA passed in-process to evaluateLifecycleReadyGuard. None is ever spawned or executed
+// by this test; the guard only inspects the string. The fixture is READY, so an exit 0 is a real admission and a refusal that
+// is not the env-dump one (a different guard standing in) fails the stderr match instead of passing by accident.
+// Controls pin the other direction: ordinary read-only and test-running commands stay admitted in both shapes.
+const ENVDUMP_AGENT_ID = "envdump-agent-1";
+const ENVDUMP_REFUSAL = /ENV-DUMP/u;
+const ENVDUMP_SHAPES = ["agent", "main"];
+const ENVDUMP_DUMP_CASES = [
+  ["Bash", "env"],
+  ["Bash", "/usr/bin/env"],
+  ["Bash", "\"/usr/bin/env\" <<EOF\nx\nEOF"],
+  ["Bash", "printenv"],
+  ["Bash", "printenv PATH"],
+  ["Bash", "set"],
+  ["Bash", "export -p"],
+  ["Bash", "declare -x"],
+  ["Bash", "cat /proc/self/environ"],
+  ["Bash", "env | sort"],
+  ["Bash", "node -e \"console.log(process.env)\""],
+  ["Bash", "node -p process.env"],
+  ["PowerShell", "Get-ChildItem env:"],
+  ["PowerShell", "gci env:"],
+  ["PowerShell", "dir env:"],
+  ["PowerShell", "[Environment]::GetEnvironmentVariables()"],
+];
+const ENVDUMP_CONTROL_CASES = [
+  ["Bash", "git status"],
+  ["Bash", "node --test plugins/pipeline-core/lib/git-cmd.test.mjs"],
+];
+
+function envdumpFixture() {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  mkdirSync(join(commonDir, "agent-pipeline", "bootstrap-receipt"), { recursive: true });
+  writeFileSync(bootstrapReceiptPathFixture(commonDir, ENVDUMP_AGENT_ID), JSON.stringify({
+    schema: "pipeline.bootstrap-receipt.v1", agentId: ENVDUMP_AGENT_ID, agentType: "pipeline-core:goldfish-deep", observedAt: "1970-01-01T00:00:00.000Z",
+  }));
+  const deps = {
+    projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(),
+    nowFn: () => "1970-01-01T00:00:00.000Z",
+  };
+  return {
+    run: (shape, tool, command) => evaluateLifecycleReadyGuard({
+      tool_name: tool, tool_input: { command }, transcript_path: "/parent/session.jsonl",
+      ...(shape === "agent" ? { agent_id: ENVDUMP_AGENT_ID, agent_type: "pipeline-core:goldfish-deep" } : {}),
+    }, deps),
+    cleanup: () => { rmSync(path, { recursive: true, force: true }); rmSync(commonDir, { recursive: true, force: true }); },
+  };
+}
+
+for (const shape of ENVDUMP_SHAPES) {
+  for (const [tool, command] of ENVDUMP_DUMP_CASES) {
+    test(`ENVDUMP: ${shape} ${tool} ${JSON.stringify(command)}`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 2, `an environment-dump command must be refused in the ${shape} session (got exit ${result.exitCode}); stderr: ${result.stderr}`);
+        assert.match(result.stderr, ENVDUMP_REFUSAL);
+      } finally { fx.cleanup(); }
+    });
+  }
+  for (const [tool, command] of ENVDUMP_CONTROL_CASES) {
+    test(`ENVDUMP: control ${shape} ${tool} ${JSON.stringify(command)}`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 0, `an ordinary command must stay admitted in the ${shape} session; stderr: ${result.stderr}`);
+      } finally { fx.cleanup(); }
+    });
+  }
+}
