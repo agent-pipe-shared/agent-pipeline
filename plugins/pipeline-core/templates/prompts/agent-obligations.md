@@ -23,10 +23,12 @@ spends a tool use from the budget that is also the stop condition.
      plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables
      below ARE measured. -->
 
-`guard-lifecycle-ready` admits exactly **one simple command per tool call**.
-No `&&`, no `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations.
-Bounded `rg`-to-`rg` and `rg`-to-`head` diagnostic pipelines are the only
-admitted composition.
+`guard-lifecycle-ready` admits **one simple command per tool call**.
+No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
+with `&&` is admitted only as up to 6 segments, and only when every segment is
+itself an admitted read-only shape (or the small always-safe-write allowlist:
+`echo`, `mkdir -p` under `scratch/`). Bounded `rg`-to-`rg` and `rg`-to-`head`
+diagnostic pipelines are the only admitted piping.
 
 The two workarounds that cost the most time before they were written down:
 
@@ -161,7 +163,7 @@ deliberately carries no static copy of that; a second copy is the drift.
 - Commit messages carry **no** provider or model co-author trailers, **no**
   session URLs, **no** correlation identifiers (GIT-03; there is no override).
   Only `AI-Assisted: true`, plus exactly one `Dispatch:` trailer saying who did
-  the work. There are three legitimate forms, and they are not interchangeable:
+  the work. There are two legitimate forms, and they are not interchangeable:
   - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a
     claim about a *specific* dispatch, so it has to survive being checked against
     one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must
@@ -172,11 +174,9 @@ deliberately carries no static copy of that; a second copy is the drift.
     the stage-0 fast path (operating-model §3.3): small, disclosed,
     judgment-light work with no dispatch behind it and therefore no record to
     bind. Stage-0 work is legitimate; the trailer exists so it stops being
-    indistinguishable from unattributed work.
-  - `Dispatch: design (elephant)` — the orchestrator committing design-phase
-    documents (docs/, specs/, plans/, backlog/, evidence/, .claude/, scratch/)
-    directly with no dispatch record required.
-  A commit with none of these forms is unbound to any evidence, and the
+    indistinguishable from unattributed work. It is the only form an Elephant
+    committing directly uses; there is no separate design-phase form.
+  A commit with neither of these forms is unbound to any evidence, and the
   `dispatch-authorship-verify` tool shipped with this plugin
   (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the
   bootstrap prints — it is NOT a path relative to a consumer project root)
