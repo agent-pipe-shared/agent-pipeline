@@ -1369,3 +1369,196 @@ test("R7-11d: at hook level a holder that releases within the bound lets the cal
   assert.equal(result.sleepsAfterRelease, 0, "no sleep once the lock is free");
   assert.equal(r711Count(fixture, agentId), 1, "admitted after waiting and counted exactly once");
 });
+
+// =================================================================================================
+// Task R7-11-T3: pin the bounded-wait boundary (test-only). The settled behaviour, one case per clause:
+//   1. COUNTER_LOCK_WAIT_BOUND_MS is exactly 3000 (green today);
+//   2. retry set: counter-lock-busy / -changed / -recovery-busy are retried inside the bound; the dead-owner
+//      recovery outcomes -recovery-raced / -recovery-changed / -recovery-malformed and any malformed-lock
+//      outcome refuse at once, one attempt, no sleep (RED today for -recovery-raced only: the catch-all for a
+//      dead-owner recovery exception must fail closed, but it sits in COUNTER_LOCK_TRANSIENT_CODES);
+//   3. when only -changed / -recovery-busy occurred until the bound, the timeout carries NO holderAgeMs and
+//      the refusal text never says "live holder" (green today);
+//   4. the hook refuses a timeout under its own typed code DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT, path-free,
+//      with a repair telling the agent to retry the same call (RED today: it reuses ...-INPUT-INVALID);
+//   5. with no dependencies.now the wait runs on a monotonic source: a Date.now that jumps back 60000 ms
+//      mid-wait must not stretch the wait beyond the bound (RED today: it reads Date.now).
+// Seams, deliberately asymmetric (do not conflate): at FUNCTION level acquireDispatchBudgetCounterLockFn
+// replaces the single attempt and the real wait loop runs around it (clauses 2, 3, 5); at HOOK level the same
+// option short-circuits the whole wait (evaluateDispatchBudgetGuard calls it instead of the wait), so clauses
+// 3-text and 4 are driven with a stub that returns the timeout outcome directly. Everything stubbed lives in a
+// fresh child process (R711T3_RUNNER_SOURCE); nothing leaks into any other case.
+// =================================================================================================
+const R711T3_RUNNER_SOURCE = String.raw`
+import { pathToFileURL } from 'node:url';
+
+const [, , guardPath, configB64] = process.argv;
+const cfg = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8'));
+const mod = await import(pathToFileURL(guardPath).href);
+const emit = (value) => console.log('R711-RESULT: ' + JSON.stringify(value));
+const hookInput = (agentId) => ({ agent_id: agentId, agent_type: 'pipeline-core:goldfish-implementor', transcript_path: '/unused.jsonl', tool_name: 'Read', tool_input: { file_path: '/x' } });
+const hookOptions = (extra) => Object.assign({ rootDir: cfg.rootDir, resolveGitCommonDirFn: () => cfg.commonDir, resolveMaxTurnsFn: () => 50 }, extra);
+const outcomeOf = (entry) => (entry === 'acquired' ? { status: 'acquired', lock: null } : { status: 'rejected', code: entry });
+
+if (cfg.mode === 'scripted-wait') {
+  // Function level: the scripted function REPLACES THE SINGLE ATTEMPT; the real wait loop runs around it on a virtual clock.
+  let clock = 1000000;
+  let attempts = 0;
+  const sleeps = [];
+  const script = cfg.script.slice();
+  const attempt = () => {
+    attempts += 1;
+    if (attempts > 100000) throw new Error('runaway wait loop: more than 100000 attempts');
+    const entry = script.length > 1 || !cfg.repeatLast ? script.shift() : script[0];
+    return outcomeOf(entry === undefined ? 'acquired' : entry);
+  };
+  const sleep = (ms) => {
+    sleeps.push(ms);
+    if (sleeps.length > 100000) throw new Error('runaway wait loop: more than 100000 sleeps');
+    clock += ms;
+  };
+  const r = mod.acquireDispatchBudgetCounterLockWithWait(cfg.lockPath, { acquireDispatchBudgetCounterLockFn: attempt, now: () => clock, sleep });
+  emit({ status: r.status, code: r.code === undefined ? null : r.code, hasHolderAgeMs: Object.prototype.hasOwnProperty.call(r, 'holderAgeMs'), attempts, sleeps });
+} else if (cfg.mode === 'hook-stub') {
+  // Hook level: the option SHORT-CIRCUITS the wait, so the stub returns the timeout outcome itself.
+  let calls = 0;
+  const stub = () => {
+    calls += 1;
+    return Object.assign({ status: 'rejected', code: 'counter-lock-timeout' }, cfg.holderAgeMs === null ? {} : { holderAgeMs: cfg.holderAgeMs });
+  };
+  const r = mod.evaluateDispatchBudgetGuard(hookInput(cfg.agentId), hookOptions({ acquireDispatchBudgetCounterLockFn: stub }));
+  emit({ exitCode: r.exitCode, stderr: String(r.stderr || ''), calls });
+} else if (cfg.mode === 'monotonic') {
+  // No dependencies.now and no dependencies.sleep: the wait runs on its own clock and really sleeps. A live holder is
+  // scripted at the single-attempt level. performance.now() is the real-time reference (unaffected by the Date.now stub).
+  const realDateNow = Date.now.bind(Date);
+  const t0 = performance.now();
+  const bound = mod.COUNTER_LOCK_WAIT_BOUND_MS;
+  let offset = 0;
+  let attempts = 0;
+  globalThis.Date.now = () => {
+    if (performance.now() - t0 > bound + cfg.ceilingSlackMs) {
+      throw new Error('a wall-clock based wait outran the ' + bound + ' ms bound by more than ' + cfg.ceilingSlackMs + ' ms after Date.now jumped back ' + cfg.jumpBackMs + ' ms');
+    }
+    return realDateNow() - offset;
+  };
+  const attempt = () => {
+    attempts += 1;
+    if (offset === 0 && performance.now() - t0 >= cfg.jumpAfterMs) offset = cfg.jumpBackMs;
+    return { status: 'rejected', code: 'counter-lock-busy' };
+  };
+  let result = null;
+  let error = null;
+  try {
+    result = mod.acquireDispatchBudgetCounterLockWithWait(cfg.lockPath, { acquireDispatchBudgetCounterLockFn: attempt });
+  } catch (caught) {
+    error = String((caught && caught.message) || caught);
+  }
+  const realElapsedMs = performance.now() - t0;
+  emit({ error, jumped: offset !== 0, attempts, realElapsedMs, status: result === null ? null : result.status, code: result === null || result.code === undefined ? null : result.code });
+} else {
+  throw new Error('unknown R7-11-T3 runner mode ' + cfg.mode);
+}
+`;
+let r711t3RunnerPathCache = null;
+function r711t3RunSync(config) {
+  if (r711t3RunnerPathCache === null) {
+    r711t3RunnerPathCache = join(runnerDir, "r711-t3-runner.mjs");
+    writeFileSync(r711t3RunnerPathCache, R711T3_RUNNER_SOURCE);
+  }
+  const b64 = Buffer.from(JSON.stringify(config), "utf8").toString("base64");
+  const res = spawnSync(process.execPath, [r711t3RunnerPathCache, GUARD, b64], { input: "", encoding: "utf8", timeout: RUNNER_TIMEOUT_MS });
+  assert.equal(res.status, 0, `R7-11-T3 runner (${config.mode}) exited ${res.status} (expected 0) -- stderr: ${String(res.stderr ?? "").trim().slice(0, 800)}`);
+  return r711ParseResult(res.stdout, config.mode);
+}
+
+/** A lock path inside a fresh directory where no lock file exists: the wait has no mtime to age, so no holder is ever "seen" by the filesystem. */
+function r711t3AbsentLockPath(label) {
+  return join(mkdtempSync(join(runnerDir, `r711-t3-${label}-`)), "agent.json.binding.lock");
+}
+
+test("R7-11d-T3: COUNTER_LOCK_WAIT_BOUND_MS is exactly 3000 ms", () => {
+  assert.equal(r711RequireWaitContract().bound, 3000);
+});
+
+for (const code of ["counter-lock-busy", "counter-lock-changed", "counter-lock-recovery-busy"]) {
+  test(`R7-11d-T3: ${code} is retried inside the bound and the call is admitted as soon as the lock is free`, () => {
+    const { bound } = r711RequireWaitContract();
+    const result = r711t3RunSync({ mode: "scripted-wait", lockPath: r711t3AbsentLockPath("retry"), script: [code, code, "acquired"], repeatLast: false });
+    assert.equal(result.status, "acquired", JSON.stringify(result));
+    assert.equal(result.attempts, 3, "two refused attempts were retried, the third was admitted");
+    assert.equal(result.sleeps.length, 2, "one sleep between each pair of attempts and none after the admission");
+    assert.ok(result.sleeps.reduce((sum, ms) => sum + ms, 0) <= bound, "the retries stayed inside the bound");
+  });
+}
+
+for (const code of ["counter-lock-recovery-changed", "counter-lock-recovery-malformed", "counter-lock-malformed"]) {
+  test(`R7-11d-T3: ${code} is never retried: one attempt, no sleep, refused with its own code`, () => {
+    r711RequireWaitContract();
+    const result = r711t3RunSync({ mode: "scripted-wait", lockPath: r711t3AbsentLockPath("noretry"), script: [code], repeatLast: true });
+    assert.equal(result.status, "rejected", JSON.stringify(result));
+    assert.equal(result.code, code, "the single attempt's refusal is returned as it came");
+    assert.equal(result.attempts, 1, "a single attempt and no retry");
+    assert.equal(result.sleeps.length, 0, "no sleep before refusing");
+  });
+}
+
+test("R7-11d-T3: counter-lock-recovery-raced (the catch-all for a dead-owner recovery exception) fails closed at once: one attempt, no sleep", () => {
+  r711RequireWaitContract();
+  const result = r711t3RunSync({ mode: "scripted-wait", lockPath: r711t3AbsentLockPath("raced"), script: ["counter-lock-recovery-raced"], repeatLast: true });
+  assert.equal(result.status, "rejected", JSON.stringify(result));
+  assert.equal(result.code, "counter-lock-recovery-raced", "refused with the single attempt's own code, not folded into a timeout");
+  assert.equal(result.attempts, 1, `a recovery exception must not be retried -- got ${result.attempts} attempts`);
+  assert.equal(result.sleeps.length, 0, `no sleep before refusing -- got ${result.sleeps.length} sleeps`);
+});
+
+for (const code of ["counter-lock-changed", "counter-lock-recovery-busy"]) {
+  test(`R7-11d-T3: only ${code} until the bound times out with counter-lock-timeout and no holderAgeMs`, () => {
+    const { bound } = r711RequireWaitContract();
+    const result = r711t3RunSync({ mode: "scripted-wait", lockPath: r711t3AbsentLockPath("timeout"), script: [code], repeatLast: true });
+    assert.equal(result.status, "rejected", JSON.stringify(result));
+    assert.equal(result.code, "counter-lock-timeout");
+    assert.equal(result.hasHolderAgeMs, false, "no live holder was seen, so no holder age is reported");
+    assert.ok(result.attempts > 1 && result.sleeps.reduce((sum, ms) => sum + ms, 0) >= bound, "the call waited out the full bound before giving up");
+  });
+}
+
+function r711t3HookTimeout(label, holderAgeMs) {
+  const agentId = `r711-agent-t3-${label}`;
+  const fixture = r711Fixture(`t3-${label}`, [agentId]);
+  const before = readFileSync(fixture.agents[agentId].counterPath, "utf8");
+  const result = r711t3RunSync({ mode: "hook-stub", agentId, commonDir: fixture.commonDir, rootDir: FAKE_ROOT, holderAgeMs });
+  assert.equal(result.calls, 1, "the hook-level option was consulted exactly once");
+  assert.equal(result.exitCode, 2, result.stderr);
+  assert.ok(!result.stderr.includes(fixture.commonDir) && !result.stderr.includes("binding.lock"), "the refusal text is path-redacted");
+  assert.equal(readFileSync(fixture.agents[agentId].counterPath, "utf8"), before, "a timed-out call is never counted and changes no counter");
+  return result.stderr;
+}
+
+test("R7-11d-T3: a timeout without a holder age never says 'live holder' in the refusal text", () => {
+  const stderr = r711t3HookTimeout("noage-text", null);
+  assert.doesNotMatch(stderr, /live holder/iu, `no live holder was seen: ${JSON.stringify(stderr)}`);
+});
+
+for (const { label, holderAgeMs } of [{ label: "with-age", holderAgeMs: 3100 }, { label: "no-age", holderAgeMs: null }]) {
+  test(`R7-11d-T3: the hook refuses a timeout (${label}) under its own typed code DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT with a retry-the-same-call repair`, () => {
+    const stderr = r711t3HookTimeout(`typed-${label}`, holderAgeMs);
+    assert.match(stderr, /DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT/u, `a lock timeout has its own typed code: ${JSON.stringify(stderr)}`);
+    assert.doesNotMatch(stderr, /DISPATCH-BUDGET-INPUT-INVALID/u, "a lock timeout is not an invalid-budget-state refusal");
+    assert.match(stderr, /\bretry\b[^\n]{0,20}\bsame\b[^\n]{0,20}\bcall\b/iu, `the repair tells the agent to retry the same call: ${JSON.stringify(stderr)}`);
+    assert.doesNotMatch(stderr, /trusted host path/iu, "a transient timeout is not a corrupt counter: no host-path repair is offered");
+  });
+}
+
+test("R7-11d-T3: with no injected clock the wait is monotonic: Date.now jumping back 60000 ms mid-wait ends the call within the bound plus 500 ms of real time", () => {
+  const { bound } = r711RequireWaitContract();
+  const result = r711t3RunSync({
+    mode: "monotonic", lockPath: r711t3AbsentLockPath("mono"), jumpAfterMs: 800, jumpBackMs: 60000, ceilingSlackMs: 500,
+  });
+  assert.equal(result.error, null, `the wait must not follow a wall clock that moved backwards: ${result.error}`);
+  assert.equal(result.jumped, true, "the backwards jump happened mid-wait");
+  assert.equal(result.status, "rejected");
+  assert.equal(result.code, "counter-lock-timeout");
+  assert.ok(result.realElapsedMs >= bound - 50, `the call gave up after only ${Math.round(result.realElapsedMs)} ms of a ${bound} ms bound`);
+  assert.ok(result.realElapsedMs <= bound + 500, `the call took ${Math.round(result.realElapsedMs)} ms of real time, beyond the ${bound} ms bound plus 500 ms`);
+});
