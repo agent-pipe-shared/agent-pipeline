@@ -895,6 +895,73 @@ for (const [cmd, why] of GPGL9T3_BRACE_WRAPPER_TABLE) {
   record(`GPGL9T3-BRACE-WRAPPER ${JSON.stringify(cmd)}  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} expected=true out=${out}`);
 }
 
+// ---- commandIsGitPush: the decided push-classifier contract, both sides (Q12 option B + decision J, Q12-T) ----
+// Test-only pin. Contract: PO decision Q12 option B, "fail-closed marker" (2026-10-06), narrowed by decision J
+// (2026-10-07); both are recorded under specs/sprint-alfred-epic/plans/ (po-decisions-2026-10-06.md row Q12,
+// po-decisions-2026-10-07.md row J). `commandIsGitPush` is an allowlist of plain commands: a command text with a git
+// word at an executable boundary that also carries a dollar sign, a backtick, a backslash, a brace, a here-document or
+// here-string marker, a parenthesis, a non-ASCII quote character or a nested shell invocation anywhere is a push
+// CANDIDATE (true), routed to the push gate, which refuses every non-exact push. Decision J narrows exactly one
+// marker: a backslash is NOT a marker when it occurs only inside a path token (a drive path such as X:\...
+// or a relative path such as plugins\pipeline-core\x.mjs) where it has no quoting or escape function; every other
+// backslash stays a marker. The positive side of Q12 (every traced push bypass is a candidate) is already pinned by
+// the GPGL-9, GPGL-9t2 and GPGL-9t3 tables above; the tables below add the negative side that the PO decision
+// unblocked, the decision-J narrowing and its escape-trick negatives, and the accepted cost of option B.
+// Every string is an ordinary JS string. Where a shape needs a backslash, the source holds a doubled backslash so the
+// RUNTIME string carries exactly one (the case names print it JSON-escaped, as two); a backslash-newline pair is the
+// source spelling "\\\n". The drive letters and directories are synthetic fixtures, not real paths. Every case id in
+// this block starts with Q12 so one search over a run's output lists the state of all of them.
+// Each table is run through one helper; `expected` is the classification the decided contract demands.
+function recordQ12Table(prefix, expected, table) {
+  for (const [cmd, why] of table) {
+    const out = commandIsGitPush(cmd);
+    record(`${prefix} ${JSON.stringify(cmd)}  ${why}`, out === expected, `cmd=${JSON.stringify(cmd)} expected=${expected} out=${out}`);
+  }
+}
+
+// Decision J positives: a backslash that only separates path segments is not a marker, so these are NOT candidates.
+const Q12J_PATH_NOT_MARKER_TABLE = [
+  ["git grep -n status -- D:\\Dev\\repo\\backlog\\items", "a drive path after a pathspec separator; the backslashes only separate segments"],
+  ["git -C D:\\Dev\\repo status", "a drive path as the -C directory, read-only subcommand after it"],
+  ["git log --oneline -- plugins\\pipeline-core\\lib\\git-cmd.mjs", "a relative path with backslash separators after a pathspec separator"],
+  ["git show HEAD:plugins/x.mjs", "no backslash at all: a plain revision:path argument stays out of the gate"],
+  ['git diff --stat -- "D:\\Dev\\repo\\a b\\c.mjs"', "a double-quoted drive path holding a space; the backslashes only separate segments"],
+];
+recordQ12Table("Q12J-PATH-NOT-MARKER", false, Q12J_PATH_NOT_MARKER_TABLE);
+
+// Decision J negatives: every other backslash stays a marker (an escape that can spell or hide the push word), so these
+// ARE candidates and go to the push gate.
+const Q12J_BACKSLASH_MARKER_TABLE = [
+  ["git pu\\sh origin main", "a backslash escaping a letter inside the push word spells push in a POSIX shell"],
+  ["git push\\ origin", "a backslash-escaped space right after the push word"],
+  ['git "pu"\\sh', "a quoted fragment followed by a backslash-escaped letter splices the push word"],
+  ["git \\push", "a backslash escaping the first letter of the push word"],
+  ['git \\"push\\" origin', "backslash-escaped quote characters around the push word"],
+  ["git \\\npush", "a line continuation joins the push word to the git word"],
+  ["git -C D:\\Dev\\repo pu\\sh", "a drive path is present, but a backslash elsewhere escapes a letter of the push word"],
+];
+recordQ12Table("Q12J-BACKSLASH-MARKER", true, Q12J_BACKSLASH_MARKER_TABLE);
+
+// Plain allowlist positives: no marker anywhere, so these are NOT candidates.
+const Q12_PLAIN_TABLE = [
+  ["git status", "a plain read-only command"],
+  ["git commit -m 'fix: x' -- a.mjs", "a plain commit with a single-quoted message and a pathspec"],
+  ["git add -- a.mjs b.mjs", "a plain add with a pathspec separator and two paths"],
+  ["git log --oneline -5", "a plain log with flags"],
+];
+recordQ12Table("Q12-PLAIN", false, Q12_PLAIN_TABLE);
+
+// Option-B accepted false positives, pinned as candidates ON PURPOSE. Neither command is a push. Under the decided
+// fail-closed marker rule a dollar sign in any position after a git word makes the command a push candidate, so both
+// are routed to the push gate for nothing. This is the accepted Codex-route cost of Q12 option B (the alternative,
+// classifying what an expansion produces, is the deny-list that never converged). A later change that "fixes" these
+// by exempting expansions reopens the bypass class and must be a new PO decision, not a test edit.
+const Q12_ACCEPTED_FALSE_POSITIVE_TABLE = [
+  ['git commit -m "$(date)"', "ACCEPTED false positive: command substitution inside a double-quoted commit message"],
+  ["git diff $(git merge-base HEAD main)", "ACCEPTED false positive: command substitution as a revision argument"],
+];
+recordQ12Table("Q12-ACCEPTED-FP", true, Q12_ACCEPTED_FALSE_POSITIVE_TABLE);
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
