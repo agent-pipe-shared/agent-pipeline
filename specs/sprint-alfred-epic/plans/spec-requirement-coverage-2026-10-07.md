@@ -51,31 +51,31 @@ Classes: `covered` (test or code cited) · `partial` · `none` (searched, nothin
 
 | Requirement | Gist | Class | Note |
 |---|---|---|---|
-| R4-1 | Role-route preflight fixtures per runner | none (inh) | RECON-2A: no `fallback-self-dispatch` code |
-| R4-2 | Fallback Advisor labelled; Critic subagent evidence rules | none (inh) | Same RECON-2A finding |
-| R4-3 | Antigravity readiness and Critic via observed children | unsearched | |
-| R4-4 | Native-Windows budget-counted Goldfish; built-in types | unsearched | |
-| R4-5 | Codex unmarked dispatch typed pre-dispatch finding | unsearched | |
-| R4-6 | Claude SessionStart names no other runner | unsearched | |
-| R4-7 | Advisor failure stderr; export re-run byte-identical | unsearched | |
-| R4-8 | Windows sweep test fails on unguarded POSIX checks | unsearched | |
-| R4-9 | Windows Claude CLI under `.local/bin` resolved | unsearched | |
-| R4-10 | CLI schema carries no `$schema`/`$id` | unsearched | |
+| R4-1 | Role-route preflight fixtures per runner | none | (3D) `git grep fallback-self-dispatch` over plugins/harness/schemas/policies: 0 hits (also RECON-2A) |
+| R4-2 | Fallback Advisor labelled; Critic subagent evidence rules | none | (3D) same grep: no fallback-label or Critic-subagent evidence code |
+| R4-3 | Antigravity readiness and Critic via observed children | partial | (3D) Antigravity readiness bootstrap and host code exist (`scripts/runner-design-readiness-bootstrap.test.mjs`, `scripts/goldfish-antigravity-host.mjs`); no 30-minute resume or Read/Write fixture found |
+| R4-4 | Native-Windows budget-counted Goldfish; built-in types | partial | (3D) budget-line parsing tests (`hooks/guard-dispatch-budget.mjs`, `lib/dispatch-budget-*.test.mjs`); maxTurns in agents/consult-advisor.md and plan-verifier.md; no native-Windows or Explore case confirmed |
+| R4-5 | Codex unmarked dispatch typed pre-dispatch finding | none | (3D) grep for unmarked / not-requested host-commit finding: only unrelated codex onboarding hits |
+| R4-6 | Claude SessionStart names no other runner | none | (3D) only `hooks/codex-session-start-hint.test.mjs` found; no Claude SessionStart runner-name test |
+| R4-7 | Advisor failure stderr; export re-run byte-identical | none | (3D) greps for advisor stderr / producer failure / byte-identical in scripts and lib: no advisor-failure or export re-run test (byte-identical hits are unrelated copy-safe-command, continuity-state and similar) |
+| R4-8 | Windows sweep test fails on unguarded POSIX checks | partial | (3D) `lib/windows-private-state.test.mjs` only; no sweep test for mode-bit/uid/fsync//proc found |
+| R4-9 | Windows Claude CLI under `.local/bin` resolved | none | (3D) no `.local/bin` resolution code or test in the readiness bootstrap/host store |
+| R4-10 | CLI schema carries no `$schema`/`$id` | none | (3D) no `$schema`/`$id` stripping code or test in the readiness bootstrap/host store |
 | R4-11 | Model-family fixtures per runner | partial (inh) | `model-family-*.test.mjs` per RECON-2A, not re-checked |
-| R4-12 | Hook-measured Critic/plan-verifier start per runner | none (inh) | RECON-2A: hook measurement missing |
+| R4-12 | Hook-measured Critic/plan-verifier start per runner | none | (3D) SubagentStart records exist only for Goldfish (`lib/native-goldfish-host-state.mjs`); no Critic/plan-verifier per-runner measurement found |
 
 ## R5 (AC-30)
 
 | Requirement | Gist | Class | Note |
 |---|---|---|---|
-| R5-1 | Doc/emitter consistency; small-project course | unsearched | |
-| R5-2 | Printed commit examples pass commit guard | unsearched | |
-| R5-3 | 30 KB answers file accepted on Windows | none (inh) | RECON-2A: no `--answers-file` code |
-| R5-4 | Presentation refused without Verify contract | unsearched | |
-| R5-5 | Short form carries EL-16 qualifiers | unsearched | |
-| R5-6 | Design revision needs zero PO interactions | unsearched | |
-| R5-7 | Private first name refused; role path preflight | unsearched | |
-| R5-8 | Course-run fixtures (run-v2, runner argv, resume) | unsearched | |
+| R5-1 | Doc/emitter consistency; small-project course | none | (3D) greps for documented sequence / emitted steps / small-local in plugins and harness: 0 hits |
+| R5-2 | Printed commit examples pass commit guard | none | (3D) greps for installed commit guard / printed commit example(s) in plugins and harness: 0 hits |
+| R5-3 | 30 KB answers file accepted on Windows | none | (3D) `git grep answers-file`: 0 hits (also RECON-2A) |
+| R5-4 | Presentation refused without Verify contract | partial | (3D) unconfigured-verify marker handled in `lib/project-onboarding-v3.mjs:1025`, `scripts/pipeline-state.mjs:3414`, `scripts/push-gate-satisfiability.mjs:81`; no presentation-refusal test found |
+| R5-5 | Short form carries EL-16 qualifiers | none | (3D) EL-16 hits are role-prohibition text only; no short-form qualifier test found |
+| R5-6 | Design revision needs zero PO interactions | none | (3D) greps for zero PO interactions / design revision / R5-6 in scripts, lib, hooks: only an unrelated `lib/codex-advisor-execution.test.mjs:38` hit |
+| R5-7 | Private first name refused; role path preflight | partial | (3D) `scripts/check-private-identifiers.mjs` and its test exist; role-path preflight (K9-1) and obligations grammar (K9-4) not confirmed |
+| R5-8 | Course-run fixtures (run-v2, runner argv, resume) | partial | (3D) `--run-v2` fixtures in `scripts/design-course-session.test.mjs` (lines 222, 357); K5-10 runner argv and K5-11 resume not confirmed |
 
 ## R6 (AC-31)
 
@@ -83,9 +83,9 @@ Classes: `covered` (test or code cited) · `partial` · `none` (searched, nothin
 |---|---|---|---|
 | R6-1 | Multi-segment transcripts readable per runner | partial (inh) | `runner-transcript-recovery.test.mjs` per RECON-2A |
 | R6-2 | Continuity digest drift reported by inspect | none (inh) | RECON-2A: no continuity-digest code |
-| R6-3 | Unclassified docs commit refused | unsearched | |
+| R6-3 | Unclassified docs commit refused | none | (3D) greps for unclassified / docs-classification in hooks and lib/guard: only `HGO-UNCLASSIFIED` override codes and an unrelated admission-test comment |
 | R6-4 | Audit index with missing gate | none (inh) | RECON-2A: no audit-index code |
-| R6-5 | Host user path refused at pre-commit | unsearched | |
+| R6-5 | Host user path refused at pre-commit | partial | (3D) `scripts/check-private-identifiers.mjs` and test exist; host-path pre-commit refusal and Alfred sanitization not confirmed |
 
 ## R7 (AC-37)
 
@@ -156,26 +156,26 @@ Classes: `covered` (test or code cited) · `partial` · `none` (searched, nothin
 | R1 | 9 | 1 | 4 | 4 | 0 |
 | R2 | 5 | 1 | 1 | 3 | 0 |
 | R3 | 10 | 0 | 4 | 6 | 0 |
-| R4 | 12 | 0 | 1 | 3 | 8 |
-| R5 | 8 | 0 | 0 | 1 | 7 |
-| R6 | 5 | 0 | 1 | 2 | 2 |
+| R4 | 12 | 0 | 4 | 8 | 0 |
+| R5 | 8 | 0 | 3 | 5 | 0 |
+| R6 | 5 | 0 | 2 | 3 | 0 |
 | R7 (3E) | 41 | 16 | 5 | 20 | 0 |
 | RV | 11 | 0 | 0 | 11 | 0 |
-| Total (3E: R7 delta applied to prior totals) | 101 | 18 | 16 | 50 | 17 |
+| Total (3E: R7 delta applied to prior totals) | 101 | 18 | 23 | 60 | 0 |
 
 ## Class `none` by family
 
 - R1: R1-2, R1-4, R1-6, R1-9.
 - R2: R2-3, R2-4, R2-5.
 - R3: R3-1, R3-3, R3-4, R3-5, R3-6, R3-8.
-- R4: R4-1, R4-2, R4-12 (all inherited from RECON-2A).
-- R5: R5-3 (inherited).
-- R6: R6-2, R6-4 (inherited).
+- R4: R4-1, R4-2, R4-5, R4-6, R4-7, R4-9, R4-10, R4-12 (RECON-3D; R4-1/R4-2 also RECON-2A).
+- R5: R5-1, R5-2, R5-3, R5-5, R5-6 (RECON-3D; R5-3 also RECON-2A).
+- R6: R6-2, R6-3, R6-4 (R6-2/R6-4 inherited; R6-3 RECON-3D).
 - R7: R7-1b, R7-1c, R7-2a, R7-2b, R7-3c, R7-3d, R7-4a, R7-4b, R7-5a, R7-5b, R7-5c, R7-8a, R7-8c, R7-9a, R7-9b, R7-9c,
   R7-10a, R7-10b, R7-10c, R7-10d (3E; one commit-message grep plus term greps, may hide tests under other names).
 - RV: RV-1..RV-11 (inherited from RECON-2A, not re-grepped).
 
 ## Not reached (follow-up dispatch needed)
 
-R4-3..R4-10; R5-1, R5-2, R5-4..R5-8; R6-3, R6-5 (R7 rows searched in 3E). The `none` rows of R3 and R1 rest on one title-pattern grep each and
+No R4/R5/R6 row remains unsearched (RECON-3D; R7 rows searched in 3E). The `none` rows of R3 and R1 rest on one title-pattern grep each and
 may hide tests under other names.
