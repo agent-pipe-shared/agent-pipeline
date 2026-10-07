@@ -198,6 +198,32 @@ not being on the signing terminal's PATH).
     with a concrete repair action, and never discovered for the first time at
     a signature.
 
+### PO decisions of 2026-10-07 (chat, morning; each followed the presented recommendation)
+
+20. Decision #18's "signing toolchain resolved by the Pipeline itself" is
+    delivered as a read-only signing-readiness probe with a typed repair the PO
+    applies in their own shell; the Pipeline never chooses the executable that
+    receives the PO's key.
+21. A readiness check runs in the PO's signing terminal BEFORE the signing
+    command is handed over, so a signature attempt never discovers a missing
+    or unusable `openssl` first (decision #19).
+22. A registered authoring dispatch with the same digests whose owner is
+    `unobserved` may be superseded without a signature, because supersede is
+    non-destructive (bytes and result namespace archived, the owner's later
+    integration fails closed).
+23. The same applies to a registration of another lineage or a later revision
+    whose owner is positively `not-live` or `ended`.
+24. The shipped attended orphan-archive route (one PO confirmation with
+    attribution, no signature) stays for owners that are `unavailable` or
+    `unobserved`; the zero-click route is added only for positively ended
+    sessions.
+25. A re-approval after a lost bound artifact does not reuse earlier course or
+    readiness evidence (fail closed).
+26. Parallel subagent dispatch is a required, supported mode on every runner
+    and platform: the dispatch-budget accounting must never refuse a call
+    because another dispatch holds its lock (toil T19), and this is fixed in
+    0.7.0.
+
 Each decision has an owner and an acceptance case in the "PO decisions → owner
 and case" section of `traceability.md`.
 
