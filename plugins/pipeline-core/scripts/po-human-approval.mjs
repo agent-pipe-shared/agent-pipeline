@@ -19,9 +19,10 @@
  * file, or pipeline state. `verify` is public readback and is agent work
  * again.
  */
-import { createHash, createPublicKey } from "node:crypto";
+import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix as posixPath, resolve, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isatty as nodeIsatty } from "node:tty";
@@ -708,38 +709,41 @@ export function parseHumanArgs(argv, dependencies = {}) {
   // identical isAbsolute check below and, downstream, the identical
   // externalDirectory() safety checks (AC-14) -- there is no separate, weaker path
   // for a repo-scope-, plane- or environment-sourced value.
+  // R7-6-F (Spec 22.6, T14): the order is now explicit argument, then the machine-wide value
+  // (one per OS user, outside every repository and `.git`), then the legacy per-repository
+  // private-state value (read-only fallback, reported as `legacy: true`), then the
+  // environment variable as before, then absent.
   if (supplied.has("directory")) {
     setDirectorySource(values, "flag");
   } else {
-    // The repo-scoped tier needs values.repoRoot to compute a git-common-dir, but the
-    // authoritative repoRoot validation stays exactly where it always was (below,
-    // unchanged) -- this inline check only ever SKIPS the tier when repoRoot is not
-    // yet a usable absolute path; it never duplicates or preempts that check's own
-    // error text or shape.
-    const repoScope = (text(values.repoRoot) && isAbsolute(values.repoRoot))
-      ? resolveRepoScopedDirectory(values.repoRoot, dependencies)
-      : { status: "absent", directory: null };
-    // Mirrors AC-12's discipline one tier up: an invalid repo-scoped store is a
-    // reported failure, never silently treated as absent -- it must NOT fall
-    // through to the machine plane or environment as though nothing were there.
-    if (repoScope.status === "invalid") {
-      return { error: `this repository's own remembered PO key-directory store is invalid (${repoScope.code}): fix or remove it, or pass --directory explicitly.` };
+    const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
+    // AC-12: an invalid or unreadable plane is a reported failure, never silently
+    // treated as absent -- it must NOT fall through to the legacy store or the environment
+    // variable as though nothing were there. An ABSENT plane (a machine that has not
+    // been set up yet) falls through normally and silently.
+    if (plane.status === "invalid") {
+      return { error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
     }
-    if (repoScope.status === "valid" && text(repoScope.directory)) {
-      values.directory = repoScope.directory;
-      setDirectorySource(values, "repo-scope");
+    if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
+      values.directory = plane.plane.poKeyDirectory;
+      setDirectorySource(values, "machine-plane");
     } else {
-      const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
-      // AC-12: an invalid or unreadable plane is a reported failure, never silently
-      // treated as absent -- it must NOT fall through to the environment variable as
-      // though nothing were there. An ABSENT plane (the ordinary case: a machine that
-      // has not been set up yet) falls through normally and silently, exactly as before.
-      if (plane.status === "invalid") {
-        return { error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
+      // The legacy tier needs values.repoRoot to compute a git-common-dir; the authoritative
+      // repoRoot validation stays below, unchanged -- this inline check only SKIPS the tier
+      // when repoRoot is not yet a usable absolute path.
+      const repoScope = (text(values.repoRoot) && isAbsolute(values.repoRoot))
+        ? resolveRepoScopedDirectory(values.repoRoot, dependencies)
+        : { status: "absent", directory: null };
+      // Mirrors AC-12's discipline: an invalid legacy store is a reported failure, never
+      // silently treated as absent.
+      if (repoScope.status === "invalid") {
+        return { error: `this repository's own remembered PO key-directory store is invalid (${repoScope.code}): fix or remove it, or pass --directory explicitly.` };
       }
-      if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
-        values.directory = plane.plane.poKeyDirectory;
-        setDirectorySource(values, "machine-plane");
+      if (repoScope.status === "valid" && text(repoScope.directory)) {
+        values.directory = repoScope.directory;
+        setDirectorySource(values, "repo-scope");
+        // Non-enumerable, like directorySource: exact-shape assertions elsewhere must not see it.
+        Object.defineProperty(values, "legacy", { value: true, enumerable: false, configurable: true });
       } else {
         const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
         if (text(fromEnv)) { values.directory = fromEnv; setDirectorySource(values, "environment"); }
@@ -747,7 +751,12 @@ export function parseHumanArgs(argv, dependencies = {}) {
     }
   }
   if (!text(values.directory) || !isAbsolute(values.directory)) {
-    return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, let this repository remember one (persisted automatically by 'setup --directory'), configure poKeyDirectory in the machine-scoped configuration plane, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides this repository's own remembered value, which overrides the machine-scoped plane, which overrides the environment variable).` };
+    const required = `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, configure poKeyDirectory in the machine-scoped configuration plane (one value per OS user), let this repository's legacy remembered value stand (persisted by an earlier 'setup --directory'), or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides the machine-scoped plane, which overrides the repository's legacy remembered value, which overrides the environment variable).`;
+    // Absent, as opposed to present but relative: the typed SIGN-KEY-DIRECTORY-UNSET result with its setup action.
+    if (!text(values.directory)) {
+      return { error: `${required}\nSIGN-KEY-DIRECTORY-UNSET: key-directory-unset; repair: set-po-key-directory (agent-executable, no signature) with the absolute key directory the PO states.`, code: "SIGN-KEY-DIRECTORY-UNSET", finding: keyDirectoryUnsetFinding() };
+    }
+    return { error: required };
   }
   if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) {
     return { error: `${USAGE}\nrepository root is required and must be an absolute path: pass --repo-root <path> naming the repository this ceremony operates on (a relative path such as "." is not accepted).` };
@@ -791,9 +800,228 @@ export function parseHumanArgs(argv, dependencies = {}) {
   return values;
 }
 
-function command(executable, args, dependencies) {
-  const result = (dependencies.spawn ?? spawnSync)(executable, args, { stdio: "inherit", shell: false });
-  if (result?.status !== 0) fail(`${executable} failed; the human terminal must complete the local prompt`);
+/* ------------------------------------------------------------------ *
+ * R7-6-F (Spec 22.6, PO decisions #18-#21): signing readiness.
+ *
+ * The Pipeline chooses no signing executable. Exactly one function below starts
+ * OpenSSL (`spawnOpenssl`); its executable is the constant bare name and it has no
+ * executable parameter, so no code path can hand it another one. The name is
+ * resolved by the lookup of the PATH of the PO's own attended signing terminal.
+ * Neither the signing spawn nor the probe can start a program from the working
+ * directory or from any repository: both run from an explicit working directory
+ * outside every repository (the PO key directory for the signing spawn, the OS
+ * user's home directory for the probe), and on win32 the child environment carries
+ * NoDefaultCurrentDirectoryInExePath. Neither measure selects an executable.
+ * ------------------------------------------------------------------ */
+const OPENSSL = "openssl";
+const WINDOWS_EXECUTABLE_SUFFIX = ".exe";
+const PROBE_TIMEOUT_MS = 15_000;
+const PROBE_STDERR_HEAD_CHARS = 160;
+const PROBE_PAYLOAD = "pipeline signing-readiness probe payload";
+const UNREADABLE_CODES = new Set(["EACCES", "EPERM"]);
+const NOT_STARTED_CODES = new Set(["ENOENT", "EACCES", "EPERM", "ENOTDIR"]);
+// Candidate directory NAMES inside a Git installation: data, not code.
+const GIT_NATIVE_BIN_DIRECTORIES = Object.freeze(["mingw64/bin", "usr/bin", "bin"]);
+const PATH_REDACTION = /(?:[A-Za-z]:[\\/]|(?<![\w.:-])[\\/](?=[\w.~-]))[^\s"'`<>|;,)]*/gu;
+
+function spawnOpenssl(args, options, dependencies) {
+  const platform = dependencies.platform ?? process.platform;
+  const env = { ...process.env };
+  if (platform === "win32") env.NoDefaultCurrentDirectoryInExePath = "1";
+  return (dependencies.spawn ?? spawnSync)(OPENSSL, args, { ...options, env, shell: false });
+}
+
+/** The signing/setup spawn: inherits the terminal (the passphrase prompt) and runs from `cwd`,
+ * the PO key directory. It reports its exit code only -- it has no stderr to read. */
+function runOpenssl(args, cwd, dependencies) {
+  const result = spawnOpenssl(args, { cwd, stdio: "inherit" }, dependencies);
+  if (result?.status !== 0) fail(`openssl failed with exit code ${result?.status ?? "none (the process did not run to completion)"}; the human terminal must complete the local prompt`);
+}
+
+const redactPaths = (value) => String(value).replace(PATH_REDACTION, "<path>");
+function boundedHead(value) {
+  const first = String(value ?? "").split(/\r?\n/u).map((line) => line.trim()).find((line) => line !== "") ?? "";
+  const clean = redactPaths(first).replace(/[^\x20-\x7e]/gu, "?");
+  return clean.length > PROBE_STDERR_HEAD_CHARS ? `${clean.slice(0, PROBE_STDERR_HEAD_CHARS)}...` : clean;
+}
+function exitDetail(result) {
+  if (result?.error) return `could not run to completion (${result.error.code ?? "error"})`;
+  const head = boundedHead(result?.stderr);
+  return `exit code ${result?.status ?? "none"}${head === "" ? "" : ` (${head})`}`;
+}
+
+const readinessFinding = (findingId, status, cause, repair) => ({ findingId, status, cause, repair });
+const okFinding = (findingId, cause = "ok") => readinessFinding(findingId, "ok", cause, null);
+// The typed setup action takes the value the PO states in chat. No catalogue entry carries it yet
+// (scripts/pipeline-state.mjs is a protected file), so executable and argv stay null rather than
+// naming a command that does not exist; it grants no trust and accepts no signing-executable value.
+const keyDirectorySetAction = () => ({
+  kind: "set-po-key-directory", executable: null, argv: null, mutation: true, requiresConfirmation: false,
+  setting: "poKeyDirectory", takes: "the absolute key directory the PO states in chat", expected: { schema: MACHINE_PLANE_SCHEMA },
+});
+const attendedRepair = (prerequisite, summary) => ({ kind: "attended-prerequisite", prerequisite, summary });
+export const keyDirectoryUnsetFinding = () => readinessFinding("po-key-directory", "repairable",
+  "key-directory-unset: no explicit argument, machine-wide value or legacy per-repository value names a PO key directory", keyDirectorySetAction());
+
+function readinessFailure(findings) {
+  const failing = findings.find((entry) => entry.status !== "ok");
+  const repair = failing.repair?.summary ?? failing.repair?.kind ?? "none";
+  const error = new Error(`SIGN-READINESS-FAILED: ${failing.cause}; repair: ${repair}`);
+  error.code = "SIGN-READINESS-FAILED"; error.finding = failing; error.findings = findings;
+  return error;
+}
+
+/** A directory name inside the Git installation that holds an OpenSSL file, derived at run time from the
+ * git executable the PATH finds -- by stat only, never a spawn. A suggestion, returned relative and
+ * redacted; the re-run probe in the PO's own terminal is its only test. */
+function gitNativeBinCandidate(dependencies) {
+  const platform = dependencies.platform ?? process.platform;
+  const pathKey = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH");
+  const entries = String(pathKey ? process.env[pathKey] : "").split(platform === "win32" ? ";" : ":").filter((entry) => entry !== "" && isAbsolute(entry));
+  const suffix = platform === "win32" ? WINDOWS_EXECUTABLE_SUFFIX : "";
+  const isFile = (path) => { try { return statSync(path).isFile(); } catch { return false; } };
+  const gitDirectory = entries.find((entry) => isFile(join(entry, `git${suffix}`)));
+  if (gitDirectory === undefined) return null;
+  for (const root of [dirname(gitDirectory), dirname(dirname(gitDirectory))]) {
+    for (const relative of GIT_NATIVE_BIN_DIRECTORIES) {
+      if (isFile(join(root, ...relative.split("/"), `${OPENSSL}${suffix}`))) return relative;
+    }
+  }
+  return null;
+}
+function toolchainRepair(prerequisite, instruction, dependencies) {
+  const candidate = gitNativeBinCandidate(dependencies);
+  return attendedRepair(prerequisite, candidate === null ? instruction
+    : `${instruction} A candidate to add is the ${candidate} directory inside your Git installation (a suggestion only: re-running the check in that terminal is its test).`);
+}
+
+function outsideEveryRepository(path) {
+  try {
+    let current = realpathSync(path);
+    for (;;) {
+      if (existsSync(join(current, ".git"))) return false;
+      const parent = dirname(current);
+      if (parent === current) return true;
+      current = parent;
+    }
+  } catch { return false; }
+}
+
+/** Steps (a) and (b): resolve `openssl` through the shared spawn helper, then an Ed25519 sign and verify round
+ * trip with a throwaway key in a fresh directory outside every repository, removed after a pass and after every
+ * failure. Touches no PO key: the throwaway key shows capability, not trust. */
+function probeSigningToolchain(dependencies) {
+  const noEd25519 = (detail) => readinessFinding("signing-toolchain", "attended", `openssl-no-ed25519: ${detail}`,
+    toolchainRepair("openssl-with-ed25519", "put an OpenSSL build with Ed25519 support earlier on the PATH of the terminal that signs, in that terminal's own shell, and re-run the readiness check there.", dependencies));
+  let cwd = null;
+  for (const candidate of [dependencies.homedirFn ?? homedir, dependencies.tmpdirFn ?? tmpdir]) {
+    try { const value = realpathSync(candidate()); if (statSync(value).isDirectory() && outsideEveryRepository(value)) { cwd = value; break; } } catch { /* try the next */ }
+  }
+  if (cwd === null) return [noEd25519("no working directory outside every repository was available for the probe")];
+  const options = { cwd, stdio: "pipe", encoding: "utf8", timeout: PROBE_TIMEOUT_MS, maxBuffer: 65_536 };
+  const resolved = spawnOpenssl(["version"], options, dependencies);
+  if (!resolved || (resolved.error && NOT_STARTED_CODES.has(resolved.error.code))) {
+    return [readinessFinding("signing-toolchain", "attended", "openssl-not-on-path: the name openssl is not found on the PATH of this terminal",
+      toolchainRepair("openssl-on-path", "add a directory holding an OpenSSL with Ed25519 support to the PATH of the terminal that signs, in that terminal's own shell, and re-run the readiness check there.", dependencies))];
+  }
+  if (resolved.error || resolved.status !== 0) return [noEd25519(`the openssl found on the PATH failed its version call: ${exitDetail(resolved)}`)];
+  const findings = [okFinding("signing-toolchain")];
+  let directory = null;
+  try {
+    const base = (dependencies.tmpdirFn ?? tmpdir)();
+    if (!outsideEveryRepository(base)) return [noEd25519("no throwaway directory outside every repository was available for the round trip")];
+    directory = mkdtempSync(join(base, "pipeline-sign-probe-"));
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
+    const files = { privateKey: join(directory, "probe-private.pem"), publicKey: join(directory, "probe-public.pem"), payload: join(directory, "probe-payload.txt"), signature: join(directory, "probe-signature.bin") };
+    writeFileSync(files.privateKey, privateKey, { mode: 0o600 });
+    writeFileSync(files.publicKey, publicKey);
+    writeFileSync(files.payload, PROBE_PAYLOAD);
+    const signed = spawnOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", files.privateKey, "-in", files.payload, "-out", files.signature], options, dependencies);
+    if (signed?.error || signed?.status !== 0) return [noEd25519(`the Ed25519 round trip failed at the sign step: ${exitDetail(signed)}`)];
+    const verified = spawnOpenssl(["pkeyutl", "-verify", "-rawin", "-pubin", "-inkey", files.publicKey, "-in", files.payload, "-sigfile", files.signature], options, dependencies);
+    if (verified?.error || verified?.status !== 0) return [noEd25519(`the Ed25519 round trip failed at the verify step: ${exitDetail(verified)}`)];
+  } catch (error) {
+    return [noEd25519(`the Ed25519 round trip could not be prepared (${error?.code ?? "error"})`)];
+  } finally {
+    if (directory !== null) rmSync(directory, { recursive: true, force: true });
+  }
+  return [...findings, okFinding("signing-toolchain")];
+}
+
+/** Existence and readability of the key directory, then its PUBLIC key. Never opens the private key. */
+function inspectKeyDirectory(directory, dependencies) {
+  const state = (error, otherwise) => (UNREADABLE_CODES.has(error?.code) ? "unreadable" : otherwise);
+  let info;
+  try { info = statSync(directory); } catch (error) { return { state: state(error, "missing"), publicKey: null }; }
+  if (!info.isDirectory()) return { state: "missing", publicKey: null };
+  try { readdirSync(directory); } catch (error) { return { state: state(error, "missing"), publicKey: null }; }
+  try { return { state: "readable", publicKey: String((dependencies.readFile ?? readFileSync)(join(directory, "po-public.pem"), "utf8")) }; }
+  catch (error) { return { state: state(error, "readable"), publicKey: null }; }
+}
+
+/** Step (c): the directory resolves to an existing readable directory, and the digest of the public key found
+ * there equals one committed trust anchor. Reads the public key and the anchor only. */
+function probeKeyDirectory({ repository, inspection, legacy, dependencies }) {
+  if (inspection.state === "missing") {
+    return { anchorCount: 0, findings: [readinessFinding("po-key-directory", "repairable", "key-directory-missing: the stored PO key directory value names no directory", keyDirectorySetAction())] };
+  }
+  if (inspection.state === "unreadable") {
+    return { anchorCount: 0, findings: [readinessFinding("po-key-directory", "attended", "key-directory-unreadable: the PO key directory cannot be read by this OS user",
+      attendedRepair("po-key-directory-readable", "make the PO key directory readable to your own OS user, then re-run the readiness check."))] };
+  }
+  let anchors = [];
+  try {
+    const policy = readCriticalHumanProofPolicy(repository);
+    if (policy?.ok) anchors = Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0 ? policy.trustAnchors : (policy.trustAnchor ? [policy.trustAnchor] : []);
+  } catch { anchors = []; }
+  const findings = [okFinding("po-key-directory", legacy ? "ok (resolved from the legacy per-repository value)" : "ok")];
+  const digest = inspection.publicKey === null ? null : createHash("sha256").update(inspection.publicKey).digest("hex");
+  if (digest !== null && anchors.some((anchor) => anchor?.publicKeySha256 === digest)) {
+    findings.push(okFinding("trust-anchor-match"));
+  } else {
+    const detail = digest === null ? "no public key was found in the PO key directory"
+      : anchors.length === 0 ? "no trust anchor is committed for this repository"
+        : `the public key found there matches none of the ${anchors.length} committed trust anchors`;
+    findings.push(readinessFinding("trust-anchor-match", "attended", `key-anchor-mismatch: ${detail}`,
+      attendedRepair("po-key-anchored", "point poKeyDirectory at the directory that holds the anchored key, or perform the one-time key setup (setup) in your own terminal.")));
+  }
+  return { anchorCount: anchors.length, findings };
+}
+
+/** The whole probe, steps (a) to (c), without throwing: for a read-only readiness-check command. */
+export function probeSigningReadiness({ repository, directory, legacy = false, dependencies = {} } = {}) {
+  const keyDirectory = probeKeyDirectory({ repository, inspection: inspectKeyDirectory(directory, dependencies), legacy, dependencies });
+  const findings = [...probeSigningToolchain(dependencies), ...keyDirectory.findings];
+  return { ok: findings.every((entry) => entry.status === "ok"), mutation: false, findings };
+}
+
+/** `sign-intent`'s own defence-in-depth run, before the first prompt and before any process receives a key
+ * path. A declared anchor that the key does not match ends it at once, without reading anything private; an
+ * absent anchor set is reported after the terminal precondition and the toolchain, which read the private
+ * key's armor and start the probe spawns. */
+function assertSigningReadyBeforePrompt({ repository, inspection, legacy, keys, dependencies }) {
+  const keyDirectory = probeKeyDirectory({ repository, inspection, legacy, dependencies });
+  if (keyDirectory.anchorCount > 0 && keyDirectory.findings.some((entry) => entry.status !== "ok")) throw readinessFailure(keyDirectory.findings);
+  assertAttendedTerminalWhenPassphraseKey(keys, dependencies);
+  const findings = [...probeSigningToolchain(dependencies), ...keyDirectory.findings];
+  if (findings.some((entry) => entry.status !== "ok")) throw readinessFailure(findings);
+}
+
+function assertAttendedTerminalWhenPassphraseKey(keys, dependencies) {
+  if (isPrivateKeyPassphraseProtected(keys.privateKey, dependencies) && !isAttendedTerminal(dependencies)) {
+    fail(
+      "sign-intent needs an attended terminal to complete: this process could not open a controlling " +
+      `terminal (${controllingTtyPath(dependencies)}) for OpenSSL's own interactive prompt to run on ` +
+      "(pipeline.signing-requires-attended-terminal). Run the identical command in a terminal window " +
+      "you can type into directly.",
+    );
+  }
+}
+
+function failParse(args) {
+  const error = new Error(args.error);
+  if (args.finding) { error.code = args.code; error.finding = args.finding; error.findings = [args.finding]; }
+  throw error;
 }
 
 /**
@@ -1255,16 +1483,11 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
   // Deliberately silent on what OpenSSL would have prompted for -- the point of this
   // check is that the human never sees OpenSSL's own noise, which is what reads as a
   // rejected key on a correct entry.
-  if (isPrivateKeyPassphraseProtected(keys.privateKey, dependencies) && !isAttendedTerminal(dependencies)) {
-    fail(
-      "sign-intent needs an attended terminal to complete: this process could not open a controlling " +
-      `terminal (${controllingTtyPath(dependencies)}) for OpenSSL's own interactive prompt to run on ` +
-      "(pipeline.signing-requires-attended-terminal). Run the identical command in a terminal window " +
-      "you can type into directly.",
-    );
-  }
+  assertAttendedTerminalWhenPassphraseKey(keys, dependencies);
   io.write(artifacts.intent, intentSha256, { mode: 0o600 });
-  try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dependencies); }
+  // The signing spawn runs from the PO key directory (it already receives the key path there), never
+  // from the process's inherited working directory, which may be a repository.
+  try { runOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dirname(keys.privateKey), dependencies); }
   finally { rmSync(artifacts.intent, { force: true }); }
   try {
     const authority = json(keys.authority); const publicKey = io.read(keys.publicKey, "utf8");
@@ -1298,7 +1521,7 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
 }
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
-  const args = parseHumanArgs(argv, dependencies); if (args.error) fail(args.error);
+  const args = parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
   // Fail closed rather than fall through: the fork-disposition commands need an
   // async fork inspection this synchronous entry point cannot perform, and they
   // were rejected here (as unknown commands) before they existed.
@@ -1340,6 +1563,16 @@ function executeHumanApproval(args, dependencies = {}) {
     };
   }
   const repository = resolve(args.repoRoot);
+  // R7-6-F (Spec 22.6, step (c)): for sign-intent the key directory is inspected BEFORE anything else
+  // looks inside it, so a value that names no directory or an unreadable directory ends as a typed
+  // result rather than as a generic refusal. Existence, readability and the PUBLIC key only.
+  let keyInspection = null;
+  if (args.command === "sign-intent") {
+    keyInspection = inspectKeyDirectory(resolve(args.directory), dependencies);
+    if (keyInspection.state === "missing" || keyInspection.state === "unreadable") {
+      throw readinessFailure(probeKeyDirectory({ repository, inspection: keyInspection, legacy: args.legacy === true, dependencies }).findings);
+    }
+  }
   // NVA-BL-74: resolved once, before any branch, and passed to every
   // requireExplicitConfirmation() call below -- a read-only, never-throwing lookup
   // (English on any failure), so it cannot change which error a command reports or
@@ -1416,7 +1649,7 @@ function executeHumanApproval(args, dependencies = {}) {
       // command() call, exactly like every other openssl step in this file) the public
       // key from the copy just written, mirroring the fresh-generation branch's own
       // genpkey+pkey pair below.
-      command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
+      runOpenssl(["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], directory, dependencies);
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
       persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
@@ -1483,8 +1716,8 @@ function executeHumanApproval(args, dependencies = {}) {
     }
     if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
     if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
-    command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
-    command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
+    runOpenssl(["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], directory, dependencies);
+    runOpenssl(["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], directory, dependencies);
     const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
     // Privacy-hygiene nudge (H-AC-11 O-4): fires only on this fresh-key-creation
     // branch and only when the operator chose a non-default --key-reference; the
@@ -1665,6 +1898,10 @@ function executeHumanApproval(args, dependencies = {}) {
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
     }
+    // R7-6-F (Spec 22.6): sign-intent's own run of the readiness probe, after request validation, the
+    // "run setup" check and the attended-terminal precondition, and BEFORE the first prompt and before
+    // any process receives a key path. A failure ends here with the typed result and its repair.
+    assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
     const disclosureLines = [
       `intent sha256: ${intentSha256}`,
       ...(record.resolved ? record.lines : [
@@ -1810,7 +2047,7 @@ async function forkDispositionSubject(args, repository, sequence) {
  * own key.
  */
 export async function runForkDispositionApproval(argv = process.argv.slice(2), dependencies = {}) {
-  const args = parseHumanArgs(argv, dependencies); if (args.error) fail(args.error);
+  const args = parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
   if (!FORK_DISPOSITION_COMMANDS.has(args.command)) fail(USAGE);
   const repository = resolve(args.repoRoot);
   const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "prepare-fork-disposition" });
