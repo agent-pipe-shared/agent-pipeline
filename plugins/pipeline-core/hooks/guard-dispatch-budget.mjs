@@ -94,6 +94,19 @@
  * even for denied attempts, so those attempts also consume the fixed reserve.
  * Neither repeating a closing shape nor retrying a denial renews the reserve.
  *
+ * ## Parallel tool calls of one agent (Spec 22.11 R7-11, PO decision #26)
+ * The counter lock is per agent (`<agentId>.json.binding.lock`), so parallel
+ * dispatches of different agents never contend. Parallel tool calls of ONE
+ * agent do: `acquireDispatchBudgetCounterLockWithWait` therefore waits (bounded
+ * backoff, 5 ms growing to at most 100 ms, at most `COUNTER_LOCK_WAIT_BOUND_MS`
+ * in total) while a LIVE owner holds the lock, instead of failing the call with
+ * `counter-lock-busy`. Every call that obtains the lock, at once or after
+ * waiting, is counted exactly once; a call that outwaits the bound is refused
+ * with `counter-lock-timeout` (naming the holder age, path-redacted) and is
+ * never counted. Dead-owner reclaim and the malformed/unsafe/ambiguous codes
+ * stay exactly those of the single-attempt `acquireDispatchBudgetCounterLock`,
+ * which is unchanged and never waited for.
+ *
  * ## Storage
  * Per-subagent counters persist as one JSON file each under
  * `<git-common-dir>/agent-pipeline/dispatch-budget/<agentId>.json` --
@@ -103,8 +116,9 @@
  * counter there, defeating the whole guard).
  * Every budget-bearing counter read/modify/write, including first binding, is
  * serialized by `<agentId>.json.binding.lock`. The owner record binds hostname,
- * Linux boot id, PID and `/proc` process start time; live or ambiguous owners
- * block, while a provably dead owner is reclaimed through a separate recovery
+ * Linux boot id, PID and `/proc` process start time; a live owner is waited for
+ * (bounded, see above), an ambiguous owner blocks, while a provably dead owner
+ * is reclaimed through a separate recovery
  * lock and inode/content readback. On native Windows (no `/proc`) the owner
  * record binds hostname, a boot epoch derived from `os.uptime()`, PID and a
  * process start epoch derived from `process.uptime()`; liveness of a foreign
@@ -213,7 +227,9 @@ function invalidBudgetInputBlocked({ agentId, agentType, reason }) {
     2,
     "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
       + `${INVALID_INPUT_CODE}: this dispatch (${agentType}, agent ${agentId}) has invalid budget state (${reason}).\n`
-      + "The persisted counter was left unchanged; repair or remove it through the trusted host path before continuing.\n",
+      + (String(reason).startsWith("counter-lock-timeout")
+        ? "This call was not counted and the persisted counter was left unchanged; retry the call (the holder releases the lock when its own call completes).\n"
+        : "The persisted counter was left unchanged; repair or remove it through the trusted host path before continuing.\n"),
   );
 }
 
@@ -806,6 +822,78 @@ export function acquireDispatchBudgetCounterLock(path, dependencies = {}) {
   finally { releaseDispatchBudgetCounterLock(recovery, dependencies); }
 }
 
+/**
+ * Total wait ceiling of `acquireDispatchBudgetCounterLockWithWait` (Spec 22.11
+ * R7-11d): a few seconds, a positive integer, measured on the injectable clock
+ * from the first attempt.
+ */
+export const COUNTER_LOCK_WAIT_BOUND_MS = 3000;
+const COUNTER_LOCK_BACKOFF_INITIAL_MS = 5;
+const COUNTER_LOCK_BACKOFF_MAX_MS = 100;
+
+function synchronousSleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/** The lock file's mtime in epoch ms, or null when it cannot be read (e.g. released meanwhile). */
+function counterLockMtimeMs(path, dependencies) {
+  try {
+    const info = (dependencies.lstatSyncFn ?? lstatSync)(path);
+    return Number.isFinite(info?.mtimeMs) ? info.mtimeMs : null;
+  } catch { return null; }
+}
+
+/**
+ * Bounded-wait variant of `acquireDispatchBudgetCounterLock` (Spec 22.11
+ * R7-11): repeats the single attempt (`dependencies.acquireDispatchBudgetCounterLockFn`
+ * when supplied, else the real one) while it reports `counter-lock-busy`, i.e.
+ * a live owner or the retryable publishing transition, sleeping with a bounded
+ * backoff between attempts. Every other outcome -- acquired (including dead-owner
+ * recovery), malformed, unsafe, ambiguous -- is returned at once, exactly as the
+ * single attempt produced it, with no sleep. Once `COUNTER_LOCK_WAIT_BOUND_MS`
+ * has elapsed it returns `{ status: "rejected", code: "counter-lock-timeout",
+ * holderAgeMs }`, where `holderAgeMs` is now minus the lock file's mtime; a live
+ * holder's lock is never taken over or deleted.
+ *
+ * Injectable and SYNCHRONOUS (the hook is synchronous): `dependencies.now()`
+ * (epoch ms, default `Date.now`) and `dependencies.sleep(ms)` (default a real
+ * `Atomics.wait`). The hook forwards its own options object as `dependencies`.
+ */
+export function acquireDispatchBudgetCounterLockWithWait(path, dependencies = {}) {
+  const attempt = dependencies.acquireDispatchBudgetCounterLockFn ?? acquireDispatchBudgetCounterLock;
+  const nowFn = dependencies.now ?? Date.now;
+  const sleepFn = dependencies.sleep ?? synchronousSleep;
+  const startedAt = Number(nowFn());
+  let backoffMs = COUNTER_LOCK_BACKOFF_INITIAL_MS;
+  let lastChance = false;
+  for (;;) {
+    const result = attempt(path, dependencies);
+    if (result?.status !== "rejected" || result.code !== "counter-lock-busy") return result;
+    const current = Number(nowFn());
+    const elapsedMs = current - startedAt;
+    if (!(elapsedMs < COUNTER_LOCK_WAIT_BOUND_MS)) {
+      const mtimeMs = counterLockMtimeMs(path, dependencies);
+      if (mtimeMs !== null) {
+        return { status: "rejected", code: "counter-lock-timeout", holderAgeMs: Math.max(0, Math.floor(current) - Math.floor(mtimeMs)) };
+      }
+      // The lock vanished between the last attempt and the age read: one more
+      // attempt, then give up with the wait itself as the best available age.
+      if (lastChance) return { status: "rejected", code: "counter-lock-timeout", holderAgeMs: Math.max(0, Math.floor(elapsedMs)) };
+      lastChance = true;
+      continue;
+    }
+    sleepFn(Math.max(1, Math.min(backoffMs, Math.ceil(COUNTER_LOCK_WAIT_BOUND_MS - elapsedMs))));
+    backoffMs = Math.min(backoffMs * 2, COUNTER_LOCK_BACKOFF_MAX_MS);
+  }
+}
+
+/** The text a refused lock acquisition shows the agent: the code, plus the holder age for a timeout (never a path). */
+function counterLockRefusalReason(acquired) {
+  return acquired.code === "counter-lock-timeout" && Number.isFinite(acquired.holderAgeMs)
+    ? `counter-lock-timeout: lock held for ${acquired.holderAgeMs} ms by a live holder`
+    : acquired.code;
+}
+
 function initializeBoundCounter(path, seed, pendingContext, dependencies) {
   const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
@@ -1178,9 +1266,10 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
       return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: "budget-tier-max-turns-conflict" });
     }
     const lockPath = `${path}.binding.lock`;
-    const acquired = (options.acquireDispatchBudgetCounterLockFn ?? acquireDispatchBudgetCounterLock)(lockPath, options);
+    // A hook-level stub short-circuits the wait; otherwise parallel tool calls of this one agent wait (bounded) for the lock.
+    const acquired = (options.acquireDispatchBudgetCounterLockFn ?? acquireDispatchBudgetCounterLockWithWait)(lockPath, options);
     if (acquired.status !== "acquired") {
-      return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: acquired.code });
+      return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: counterLockRefusalReason(acquired) });
     }
     try {
       options.afterCounterLockAcquiredFn?.();
