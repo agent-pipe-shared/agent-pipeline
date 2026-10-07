@@ -910,3 +910,69 @@ test("U3-21f: an unreviewedSourceDelta of 133 entries is DAB-SHAPE, while 132 ot
     "133 entries": (b) => { b.unreviewedSourceDelta = deletionEntries(133); },
   });
 });
+
+// U3-T3: the remaining SafePath forms and the finding-id size caps.
+const padTo = (path, length) => `${path}${"x".repeat(length - path.length)}`;
+
+const safePathForms = {
+  "drive letter with a slash": () => "C:/x.md",
+  "lowercase drive letter without a slash": () => "c:x.md",
+  "trailing slash": (path) => `${path}/`,
+  "empty segment": () => "a//b.md",
+  "dot segment": () => "a/./b.md",
+  "NUL character": (path) => `${path}\0`,
+  "leading whitespace": (path) => ` ${path}`,
+  "trailing whitespace": (path) => `${path} `,
+  "length 0": () => "",
+  "length 241": (path) => padTo(path, 241),
+};
+
+test("U3-21g: a drive-letter, trailing-slash, empty-segment, dot-segment, NUL, whitespace, empty or 241-character path is DAB-SHAPE on a companion, a receipt and a delta path", () => {
+  const lastCompanion = (b) => b.sources.companions[b.sources.companions.length - 1];
+  const companionMutations = {};
+  const receiptMutations = {};
+  const deltaMutations = {};
+  for (const [form, bad] of Object.entries(safePathForms)) {
+    companionMutations[`companion path ${form}`] = (b) => { lastCompanion(b).path = bad(lastCompanion(b).path); };
+    receiptMutations[`receipt path ${form}`] = (b) => { b.reviewReceipts[0].path = bad(b.reviewReceipts[0].path); };
+    deltaMutations[`delta path ${form}`] = (b) => { b.unreviewedSourceDelta[0].path = bad(b.unreviewedSourceDelta[0].path); };
+  }
+  assertMutationsRefused(plainBinding, { ...companionMutations, ...receiptMutations });
+  assertMutationsRefused(deletionBinding, deltaMutations);
+});
+
+test("U3-21h: a 240-character path is accepted on a companion, a receipt and a delta path, while one more character is DAB-SHAPE", () => {
+  const cases = {
+    companion: [plainBinding, (b) => b.sources.companions[b.sources.companions.length - 1]],
+    receipt: [plainBinding, (b) => b.reviewReceipts[0]],
+    delta: [deletionBinding, (b) => b.unreviewedSourceDelta[0]],
+  };
+  for (const [name, [make, read]] of Object.entries(cases)) {
+    const boundaryBase = () => {
+      const binding = make();
+      read(binding).path = padTo(read(binding).path, 240);
+      return binding;
+    };
+    assertMutationsRefused(boundaryBase, {
+      [`${name} path of 241 characters`]: (b) => { read(b).path = `${read(b).path}x`; },
+    });
+  }
+});
+
+test("U3-21i: an 81-character finding id and a list of 65 ids are DAB-SHAPE, while 80 characters and 64 ids are accepted", () => {
+  const idOfLength = (length) => `F-${"A".repeat(length - 2)}`;
+  const idList = (count) => Array.from({ length: count }, (_, index) => `F-${String(index).padStart(3, "0")}`);
+  const withIds = (ids) => () => {
+    const binding = plainBinding();
+    binding.openFindingIds = ids;
+    return binding;
+  };
+  assert.equal(idOfLength(80).length, 80);
+  assert.equal(idOfLength(81).length, 81);
+  assertMutationsRefused(withIds([idOfLength(80)]), {
+    "id of 81 characters": (b) => { b.openFindingIds = [idOfLength(81)]; },
+  });
+  assertMutationsRefused(withIds(idList(64)), {
+    "65 ids": (b) => { b.openFindingIds = idList(65); },
+  });
+});
