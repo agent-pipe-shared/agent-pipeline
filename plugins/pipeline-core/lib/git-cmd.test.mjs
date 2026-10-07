@@ -432,6 +432,14 @@ const GPGL3_FAIL_CLOSED_TABLE = [
   ['"GIT.EXE" --unknown-opt push origin main', "the quoted executable name is matched case-insensitively"],
   ['echo x;"git" -c a=b push origin main', "quoted executable name glued to a preceding shell operator"],
   ['"git" -c a=b "push" origin main', "the push word itself quoted"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash before a quote is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git log --grep='a\'`, "decision S: a backslash before the closing quote of a single-quoted argument, with a git word: a push candidate"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash before a quote is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git commit -m "say \"hi\""`, "decision S: an escaped quote in a double-quoted commit message, no push word: a push candidate"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash before a quote is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git log --grep "a \"b\""`, "decision S: an escaped quote in a double-quoted grep pattern, no push word: a push candidate"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash before a quote is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git tag -m "x \"y\""`, "decision S: an escaped quote in a double-quoted tag message, no push word: a push candidate"],
 ];
 for (const [cmd, why] of GPGL3_FAIL_CLOSED_TABLE) {
   const out = commandIsGitPush(cmd);
@@ -444,17 +452,10 @@ const GPGL3_NEGATIVE_TABLE = [
   ["git log --format='%s'", "a single-quoted argument with no escape is not a push"],
   ["git status", "a plain read command"],
   [String.raw`echo \"hello\" gitleaks detect --no-banner`, "escaped quotes plus a word that merely STARTS with git: no executable boundary"],
-  [String.raw`git log --grep='a\'`, "a backslash inside a plain single-quoted span is literal, not an escape"],
   ['"git" status', "a quoted executable name with no push word"],
   ['"git" -c a=b status', "a quoted executable name, a recognised option, no push word"],
   ['"git" commit -m "push later"', "a push word that only occurs inside one quoted message token"],
   [String.raw`"C:\Git Tools\cmd\git.exe" log --oneline`,"a quoted Windows path ending in git.exe, no push word"],
-  // GPGL-4: no push word, escaped quote alone is not a push
-  [String.raw`git commit -m "say \"hi\""`, "an escaped quote in a double-quoted commit message, no push word"],
-  // GPGL-4: no push word, escaped quote alone is not a push
-  [String.raw`git log --grep "a \"b\""`, "an escaped quote in a double-quoted grep pattern, no push word"],
-  // GPGL-4: no push word, escaped quote alone is not a push
-  [String.raw`git tag -m "x \"y\""`, "an escaped quote in a double-quoted tag message, no push word"],
   // GPGL-4: no push word, escaped quote alone is not a push
   [String.raw`git log -- "C:\repo\"`, "a Windows path ending in a backslash before the closing quote, no push word"],
 ];
@@ -565,6 +566,12 @@ const GPGL5_FAIL_CLOSED_TABLE = [
   [String.raw`echo \'; git status; echo \'`, "backstop: an escaped quote outside quotes plus a git word needs no push word (GPGL-3 rule)"],
   [String.raw`echo "a \\" ; git push origin main ; echo "b \\"`, "an escaped backslash does not escape the closing quote, so the push after it is executed"],
   ["git status \\", "a trailing lone backslash cannot be parsed with certainty: fail closed"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash-escaped quote inside double quotes is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git commit -m "say \"hi\""`, "decision S: an escaped quote inside a double-quoted message is a push candidate"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash-escaped quote inside double quotes is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git commit -m "say \"push\""`, "decision S: the same, with a push word inside the message: a push candidate"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash-escaped quote inside double quotes is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git log --grep "a \"push\" word"`, "decision S: push inside an escaped-quote span of a non-push subcommand argument: a push candidate"],
 ];
 for (const [cmd, why] of GPGL5_FAIL_CLOSED_TABLE) {
   const out = commandIsGitPush(cmd);
@@ -572,9 +579,6 @@ for (const [cmd, why] of GPGL5_FAIL_CLOSED_TABLE) {
 }
 
 const GPGL5_NEGATIVE_TABLE = [
-  [String.raw`git commit -m "say \"hi\""`, "an escaped quote inside a double-quoted message is parsed, never a trigger"],
-  [String.raw`git commit -m "say \"push\""`, "the same, even with a push word inside the message"],
-  [String.raw`git log --grep "a \"push\" word"`, "push only inside a quoted argument of a non-push subcommand"],
   ["gitleaks detect --no-git --redact", "the GPGL-2 trigger stays fixed"],
   ['echo "git push"', "quoted text that is not executed"],
   ["git commit -m 'say \"hi\" push'", "double quotes inside a single-quoted message"],
@@ -628,6 +632,10 @@ const GPGL7_POWERSHELL_PUSH_TABLE = [
   [String.raw`cd C:\repo\ ; git -C C:\repo\ push origin main`, "a drive path ending in a backslash on a preceding command, then the push"],
   [String.raw`echo "x\"; git -c a=b -C C:\repo\ push origin main; echo \"y"`, "the span-closing shape and the swallowing path together"],
   [String.raw`echo "x\"; git push --force origin main; echo \"y"`, "the span-closing shape around a force push with a flag"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash-escaped quote inside double quotes is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`echo "x\"; git status; echo \"y"`, "decision S: the span-closing shape around a read-only git command: a push candidate"],
+  // PO decision S (po-decisions-2026-10-07.md row S, Q12 option B): a git word plus a backslash-escaped quote inside double quotes is a push candidate; accepted false-positive cost, fail closed.
+  [String.raw`git log --grep "a \"push\" word"`, "decision S: the GPGL-5 escaped-quote grep shape is a push candidate under the third reading too"],
 ];
 for (const [cmd, why] of GPGL7_POWERSHELL_PUSH_TABLE) {
   const out = commandIsGitPush(cmd);
@@ -639,10 +647,8 @@ const GPGL7_NEGATIVE_TABLE = [
   [String.raw`git -C C:\repo\ status`, "a drive path ending in a backslash and a space, read-only subcommand"],
   [String.raw`git -c a=b -C C:\repo\ status`, "a recognised -c option, a drive path ending in a backslash, read-only subcommand"],
   [String.raw`git -C 'C:\repo\' log --oneline`, "the single-quoted drive path with a read-only subcommand"],
-  [String.raw`echo "x\"; git status; echo \"y"`, "the span-closing shape around a read-only git command"],
   [String.raw`git commit -m "see C:\repo\ for details"`, "a drive path with a backslash and a space inside a double-quoted message"],
   [String.raw`echo "C:\repo\ push"`, "a drive path and the word push inside one double-quoted argument, no git word"],
-  [String.raw`git log --grep "a \"push\" word"`, "the GPGL-5 negative stays negative under the third reading"],
 ];
 for (const [cmd, why] of GPGL7_NEGATIVE_TABLE) {
   const out = commandIsGitPush(cmd);
