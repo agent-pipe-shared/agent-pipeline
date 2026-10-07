@@ -58,3 +58,78 @@ so one override on one commit does NOT cover a commit holding several protected 
   (`apply`) and committed via `authorize-commit` (one signature if the package scope admits these paths: UNVERIFIED).
   The applied patch must be a single package-bound diff of exactly the staged paths, committed with the
   `quality-package-<sha256> (integration)` Dispatch trailer; nothing else staged.
+
+## 5. Signed quality package - scope and route (SIGN-PROBE-2; source-read, nothing executed)
+Paths are `plugins/pipeline-core/...` unless stated; `lib/sqp` = `lib/signed-quality-package.mjs`.
+
+### 5.1 Path scope
+- No allowlist or denylist by protection class. `validatePackage` (`lib/sqp:133-141`) only requires: schema
+  `pipeline.signed-quality-package.v1`, a 40-64 hex `baseCommit`, `expectedDigests` keys == the `+++ b/` paths of the diff
+  exactly, each a safe repo-relative path (`safeRepositoryPath`, `:97-101`: no absolute, no `..`, no backslash, not under `.git`).
+  PB-*, TP-*, GS-* are not consulted at all. `lib/sqp:225,294,348` refuse exactly one path: `project/critical-human-proof.json`.
+- Therefore admissible by this module: `lib/guard/evaluate.mjs`, new `lib/guard/env-dump-lane.mjs`, `harness/verify-suites.json`,
+  `harness/scripts/verify.mjs`, `scripts/pipeline-state.mjs`, `harness/scripts/pipeline-state.test.mjs`. Precedent: package
+  d6d2a8b2 landed `harness/scripts/verify.mjs`, `hooks/guard-lifecycle-ready.mjs` and `protected-baseline.json`
+  (PB-GUARD-HOOKS/TP-3 class) in commit 380eb7faa (`specs/sprint-alfred-epic/evidence/qp-d6d2a8b2/README.md:3-4`,
+  `build-intent.mjs:14-20`).
+- `hooks/hooks.json` (TP-4 + kernel): the pre-commit loop does `if (qualityPackageAuthorized) continue;` BEFORE the kernel
+  check (`scripts/pre-commit-hook-install.mjs:809` vs `:811-813`), so by source it is admitted at commit time. No test or
+  precedent exercises a package containing hooks.json (the only hooks.json test is the GMW refusal, `pre-commit-hook-install.test.mjs:662`):
+  UNVERIFIED in practice. Tranche 1 does not list hooks.json, so this is moot unless added.
+- `harness/scripts/pipeline-state.mjs` (point 5): BOTH paths are real tracked files (`git ls-files` returns
+  `harness/scripts/pipeline-state.mjs` and `plugins/pipeline-core/scripts/pipeline-state.mjs`). The README name is a real path
+  but it is the harness copy; PB-SANCTIONED-WRITER names the plugin one. Which one tranche 1 means must be decided by the author.
+
+### 5.2 Preconditions
+- Base binding: `baseCommit` must equal `HEAD` at `apply` (`lib/sqp:353-354`, else `QUALITY-PACKAGE-BASE-DRIFT`) and at
+  commit (`stagedPackageMatches`, `:145`); `apply` also needs `git status --porcelain` empty (`:354`). Any later commit
+  (including a docs commit) invalidates the package; it must be rebuilt on the new HEAD.
+- Verification in an isolated detached worktree under `plugins/tmp` (`:14,355-357`): `git apply --check --whitespace=error`
+  (whitespace errors fail), exact changed-path set and per-file sha256 readback (`:363-367`). Then main-tree `apply` (`:369-371`).
+- Signer and trust: proof is checked by `verifyPoApprovalProof` against an anchor chosen from the COMMITTED `HEAD` blob of
+  `project/critical-human-proof.json` by `proof.keyReference` (`committedTrustPolicy`, `:159-179`); the file must be
+  clean/identical in index and worktree. The current policy (v3) pins one anchor, `keyReference: local-po-key`
+  (`project/critical-human-proof.json:9-14`), i.e. the PO's existing key - no new key needed. The signed digest is `intentSha256`
+  = sha256(canonical{schema, baseCommit, unifiedDiff, expectedDigests}) (`:103-107`).
+- No Verify evidence, Critic receipt, or dispatch record is checked by the module. (Process convention only: Critic review of
+  the package before signing, `design/working-notes-2026-10/stage-plan-v3-2026-10-04.md:15-19`.) Commit-time: index must be
+  EXACTLY the package paths with exact blob sha256 and mode (`:143-157`); nothing else staged.
+- Commit message: trailer `Dispatch: quality-package-<intentSha256> (integration)` (`lib/commit-message-policy.mjs:90,118`),
+  verified pre-commit by `hooks/guard-git.mjs:1086-1110` (`verifyQualityPackageIntegrationPreCommit`, `lib/sqp:302-309`) and
+  post-commit (`:312-331`: single parent == baseCommit, changed-path set, blobs).
+
+### 5.3 Route, step by step (as run for d6d2a8b2, `evidence/qp-d6d2a8b2/README.md:15-19`)
+1. Agent: land every unprotected file of the stage as ordinary commits first (package binds HEAD + clean tree).
+2. Agent: build the intent. No tracked builder exists ("a tracked builder is an R3 item", README:7); reuse the copy
+   `evidence/qp-d6d2a8b2/build-intent.mjs` (needs clean tree, GNU `patch -p1`, retargeted TARGETS/PATCHES), writes the intent
+   json and `scratch/<dir>/<name>-request.json` containing `{intentSha256}` (basename must contain `request`). Self-check with
+   `check-intent.mjs` (HEAD==baseCommit, digest recomputes, `git apply --check`). Agent-runnable. Critic review of the package: convention.
+3. PO (attended external terminal): `node "$PIPELINE_PLUGIN_ROOT/scripts/po-human-approval.mjs" sign-intent --repo-root "$REPO" --directory "$PO_DIR" --request scratch/<dir>/<name>-request.json`
+   (`docs/po-human-approval.md:158-162`; absolute `--repo-root`; passphrase prompt). The proof lands at `$PO_DIR/proof-manual.json`
+   and is mirrored beside the request in `scratch/` (`:172-`). The proof file must be reachable inside the repo for step 4.
+4. Materialize `apply`: `node <plugin>/scripts/quality-package-materializer.mjs <root> <intent.json> <proof.json> <root>/project/critical-human-proof.json apply`
+   (exactly 5 args after the script, all absolute canonical, intent/proof/policy regular single-link files inside the root:
+   `lib/sqp:43-53`, `scripts/quality-package-materializer.mjs:6-16`). Admitted by the shell lane at `lib/guard/gate-strength-lane.mjs:282-308`
+   only for this exact shape (7 words, no `;&|<>$`), but the 2026-09-30 transfer note records the read-only materializer
+   command was blocked by the shell guard because an argument names the policy (`docs/0.7-alfred-transfer-2026-09-30.md:48-50`);
+   treat step 4 as PO-run in an external terminal (precedent: PO ran `apply`).
+5. Agent: `git add` of exactly the package paths (precedent: Elephant did this).
+6. Materialize `authorize-commit` (same shape, last arg `authorize-commit`): PO-run; the agent route was refused with
+   `GUARD-GATE-STRENGTH-SHELL` (README:17-18). Writes the receipt under the git common dir, `agent-pipeline/signed-quality-packages/commit-authorizations/<sha>.json` (`lib/sqp:189-191,232`).
+7. Agent: `git commit -F <msg>` with `Dispatch: quality-package-<sha256> (integration)` and `AI-Assisted: true`. The pre-commit hook then skips protected-path findings (`:799,809`).
+PO types: one `sign-intent --request` command, plus the `apply` and `authorize-commit` materializer commands (command shape above; no key paths).
+Agent-only: build, check, add, commit. Human-only: the signature; materializer steps are PO-run in practice.
+
+### 5.4 Fit for tranche 1
+- One package, if all slice files plus `lib/guard/env-dump-lane.mjs` fit one base commit: the whole set lands in ONE commit
+  (staged set must equal the package paths), signed once. It must contain only protected paths that need it? No: it may
+  also carry unprotected files, but per stage-plan convention unprotected files go first as ordinary commits to keep the package small.
+- Split into several packages only if a later part depends on a HEAD that includes an earlier part; each costs one signature and
+  rebuild (HEAD drifts after each commit).
+- Goes another way: `project/critical-human-proof.json` (refused by the module); any `.git/` path; `hooks.json` only if
+  its commit-time admission is not wanted untested (see 5.1).
+- Slice patches in `specs/sprint-alfred-epic/signed-package/` become input exactly as in `build-intent.mjs:51-66`: export HEAD
+  versions of targets into `a/`, copy to `b/`, apply patch files with `patch -p1`, `git diff --no-index --src-prefix= --dst-prefix=`
+  per path (note the `a/`+`b/` path prefixes in the paths of the rendered diff), digests from the `b/` files, `baseCommit`=HEAD.
+- Open: the working tree must be clean at build and `apply`; the repository currently has unrelated dirty/staged files, which
+  must be committed or removed first (not verified here).
