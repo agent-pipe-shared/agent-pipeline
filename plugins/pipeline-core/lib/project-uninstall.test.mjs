@@ -89,9 +89,33 @@ test('re-enrollment contract retains historical scope identity and does not reti
  const f=fixture(t,{keys:false}),path='.git/agent-pipeline/po-gate/retained-public-note.json';f.put(path,'{"history":"not-an-authority-receipt"}\n');const before=readFileSync(join(f.root,path)),key=f.scope.observe({rootDir:f.root}).scopeKey,plan=f.controller.plan({rootDir:f.root});f.controller.apply(plan,options(plan));const reenroll=f.scope.planDecision({rootDir:f.root,decision:'enroll',by:'Fixture Owner'});f.scope.applyDecision(reenroll,options(reenroll));assert.equal(f.scope.observe({rootDir:f.root}).state,'active');assert.equal(f.scope.observe({rootDir:f.root}).scopeKey,key);assert.deepEqual(readFileSync(join(f.root,path)),before);
  const journal=join(plan.controls,plan.planSha256,'journal.json'),journalBefore=readFileSync(journal);assert.throws(()=>f.controller.resume({rootDir:f.root,...options(plan)}),e=>e.code==='PU-DECLINE-READBACK');assert.deepEqual(readFileSync(journal),journalBefore);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
 });
+function ac34Artifacts(f){return observeGitHookFootprint({rootDir:f.root}).hooks.flatMap(h=>[h.hookPath,h.markerPath,h.implPath]).filter(p=>existsSync(p)).map(p=>[p,footprintSha256(readFileSync(p))]);}
+function ac34Refusal(f,hookName,foreignBytes){
+ const hookPath=join(f.root,'.git/hooks',hookName),keyPath=join(f.base,'home/.keys/fixture.key');f.put('.git/hooks/'+hookName,foreignBytes);mkdirSync(dirname(keyPath),{recursive:true});writeFileSync(keyPath,'fixture-key-bytes\n');
+ const hookBefore=readFileSync(hookPath),artifacts=ac34Artifacts(f),content=f.digests(),keyBefore=readFileSync(keyPath),config=readFileSync(join(f.root,'.git/config'));
+ const plan=f.controller.plan({rootDir:f.root}),conflict=plan.conflicts.find(c=>c.code==='PU-FOREIGN-HOOK-CONFLICT');
+ assert(conflict,'expected PU-FOREIGN-HOOK-CONFLICT, got '+JSON.stringify(plan.conflicts));assert.equal(conflict.path,hookPath);
+ assert.throws(()=>f.controller.apply(plan,options(plan)));
+ assert.deepEqual(readFileSync(hookPath),hookBefore);assert.deepEqual(ac34Artifacts(f),artifacts);assert.deepEqual(f.digests(),content);assert.deepEqual(readFileSync(keyPath),keyBefore);assert.deepEqual(readFileSync(join(f.root,'.git/config')),config);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
+}
+test('AC34: a foreign pre-commit hook is refused with PU-FOREIGN-HOOK-CONFLICT naming the file and nothing is removed',t=>{
+ ac34Refusal(fixture(t,{hooks:false}),'pre-commit','#!/bin/sh\nexit 0\n');
+});
+test('AC34: a pipeline hook chaining a foreign hook is refused with PU-FOREIGN-HOOK-CONFLICT and nothing is removed',t=>{
+ const f=fixture(t),hookPath=join(f.root,'.git/hooks/pre-commit');
+ ac34Refusal(f,'pre-commit',readFileSync(hookPath,'utf8')+'\n# chained foreign hook\n"$(dirname "$0")/pre-commit.foreign" "$@" || exit $?\n');
+});
+test('AC34: control - only pipeline-owned hooks are removed and project data, backlog, specs and fixture keys stay untouched',t=>{
+ const f=fixture(t),keyPath=join(f.base,'home/.keys/fixture.key');mkdirSync(dirname(keyPath),{recursive:true});writeFileSync(keyPath,'fixture-key-bytes\n');
+ const keyBefore=readFileSync(keyPath),before=f.digests(),plan=f.controller.plan({rootDir:f.root});assert.deepEqual(plan.conflicts,[]);assert.deepEqual(plan.git.hooks.map(h=>h.status),['owned','owned','owned']);
+ const markers=plan.git.hooks.map(h=>h.markerPath);assert(markers.every(p=>existsSync(p)));
+ f.controller.apply(plan,options(plan));completed(f,plan);
+ assert.deepEqual(f.digests(),before);assert.deepEqual(readFileSync(keyPath),keyBefore);assert(existsSync(join(f.root,'backlog/notes.md')));assert(existsSync(join(f.root,'specs/promoted/spec.md')));
+ for(const h of plan.git.hooks)assert(!existsSync(h.hookPath)&&!existsSync(h.implPath)&&!existsSync(h.markerPath));
+});
 
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 7) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 10) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
