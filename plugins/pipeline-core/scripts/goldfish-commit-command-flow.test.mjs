@@ -27,7 +27,15 @@ test("legacy Goldfish command flow renders separate exact-path argv without shel
   for (const step of result.steps) {
     assert.equal(typeof step.copyCommand.posix, "string");
     assert.equal(typeof step.copyCommand.powershell, "string");
-    assert.match(step.copyCommand.powershell, /Invoke-Expression \$CMD/u);
+    // T29: the PowerShell copy command is ONE physical line `& git '<argv>'...` -- no `$CMD=...; Invoke-Expression $CMD`
+    // assembly. A `$` or `;` that is part of an argv word stays inert inside its single quotes (the fixture body
+    // carries a literal `$VALUE`), so the no-`$`/no-`;` rule applies to the structure around the quoted words.
+    const powershell = step.copyCommand.powershell;
+    const quotedArgv = step.argv.map((word) => `'${word.replaceAll("'", "''")}'`).join(" ");
+    assert.equal(/[\r\n]/u.test(powershell), false, `powershell copyCommand is single-line: ${JSON.stringify(powershell)}`);
+    assert.ok(powershell.startsWith(`& git ${quotedArgv}`), `powershell copyCommand starts with & git + single-quoted argv: ${JSON.stringify(powershell)}`);
+    assert.equal(/[$;]/u.test(powershell.replace(/'(?:[^']|'')*'/gu, "")), false,
+      `powershell copyCommand has no $ or ; outside quoted argv words: ${JSON.stringify(powershell)}`);
     const parsed = parseGuardCommand(step.command, "/fixture/repository");
     assert.equal(parsed.parseStatus, "accepted", step.command);
     assert.deepEqual(parsed.segments[0].argv, step.argv);
