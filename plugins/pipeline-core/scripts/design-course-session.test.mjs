@@ -380,6 +380,72 @@ test("R7-3b: the --run-v2 course accepts and writes every digest-bound artifact 
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
 
+// R7-3 (Spec §22.3): a digest-bound path that IS git-ignored is refused. K3C009 is K3C006's setup (tracked-home
+// paths) with one change: `git check-ignore --quiet` exits 0 (ignored) for the preparation path. This is RED by
+// design until the producer replaces its must-be-ignored gate with a bound-path-must-not-be-ignored refusal.
+test("R7-3: a git-ignored preparation path is refused as a bound path", async () => {
+  const fixture = mkdtempSync(join(tmpdir(), "design-course-ignored-bound-"));
+  try {
+    mkdirSync(join(fixture, "docs")); mkdirSync(join(fixture, "evidence"));
+    const trackedHome = "specs/feature-x/evidence/design-course/claude";
+    mkdirSync(join(fixture, ...trackedHome.split("/")), { recursive: true });
+    const current = { commit: "9".repeat(40), tree: "8".repeat(40) };
+    const contents = {};
+    const refs = {};
+    for (const name of ["input", "prd", "spec", "design", "traceability"]) {
+      const path = `docs/${name}.md`; const bytes = Buffer.from(`${name} source\n`);
+      contents[path] = bytes; writeFileSync(join(fixture, path), bytes);
+      refs[name] = { path, sha256: createHash("sha256").update(bytes).digest("hex") };
+    }
+    const initial = { featureId: "feature-x", authoringDispatchId: "author-x", initialCandidate: current, sources: refs };
+    const initialBytes = Buffer.from(JSON.stringify(initial)); writeFileSync(join(fixture, "evidence/initial.json"), initialBytes);
+    const failure = { schema: "pipeline.design-advisor-failure.v1", code: "native-initial-answer-provenance-unavailable",
+      childStarted: false, inputSubmitted: false, attemptCount: 0 };
+    const failureBytes = Buffer.from(JSON.stringify(failure)); writeFileSync(join(fixture, "evidence/failure.json"), failureBytes);
+    const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+    const advisor = { ok: false, status: "unavailable-pending-final-approval", code: failure.code, runner: "claude",
+      profile: "feature", route: { model: null, effort: null, sourceSha256: "c".repeat(64), candidateCommit: current.commit },
+      courseBinding: { courseId: "course-x" }, hostReceipt: null,
+      artifacts: { initial: { path: "evidence/initial.json", sha256: digest(initialBytes) },
+        failure: { path: "evidence/failure.json", sha256: digest(failureBytes) } }, implementationAuthority: false };
+    const preparationPath = `${trackedHome}/preparation.json`;
+    const fakeGit = (_executable, args) => {
+      if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "--show-toplevel") return fixture;
+      if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "HEAD") return current.commit;
+      if (args[0] === "-C" && args[2] === "rev-parse" && args[3] === "HEAD^{tree}") return current.tree;
+      if (args[0] === "show") return contents[args[1].slice(current.commit.length + 1)];
+      if (args[0] === "check-ignore") {
+        // The preparation path is git-ignored: `git check-ignore --quiet` exits 0 and execFileSync returns normally.
+        if (args.at(-1) === preparationPath) return "";
+        throw Object.assign(new Error("path is not ignored"), { status: 1 });
+      }
+      throw new Error(`unexpected Git request: ${args.join(" ")}`);
+    };
+    const input = { root: fixture, pluginRoot, runner: "claude", confirmProducerExecution: true,
+      featureId: "feature-x", authoringDispatchId: "author-x", profile: "feature", sources: refs,
+      outputPrefix: "evidence/advisor", preparationPath,
+      readinessPath: `${trackedHome}/readiness.json`, packagePath: `${trackedHome}/package.json`, readinessDispatchId: "ready-x",
+      proposedExceptionRationale: "The native Advisor route produced verified no-child evidence; request one final package review." };
+    const dependencies = {
+      execFileSync: fakeGit, canonicalJson: JSON.stringify,
+      readPreparation: async () => ({ ok: true, advisorObservation: { candidate: current, sources: refs } }),
+      executeProducer: async (action) => action.stage === "advisor"
+        ? { status: "advisor-unavailable-no-child", producerResult: advisor }
+        : { status: "readiness-published", producerResult: { ok: true, code: "DESIGN-READINESS-RECEIPT-PUBLISHED",
+          runner: "claude", candidate: current, path: `${trackedHome}/readiness.json`, dispatchId: "ready-x" } },
+      buildPackageV2: async (input) => ({ ok: true, code: "DWP2-PACKAGE-BUILT", packagePath: input.packagePath,
+        packageSha256: "e".repeat(64), candidate: current, packageRead: { implementationAuthority: false },
+        advisorStatus: "unavailable", advisorExceptionRequired: true }),
+      approvalModule: { createDesignWorkflowPackageApprovalRequest: () => ({ ok: true,
+        packageRead: { implementationAuthority: false, packageSha256: "e".repeat(64) }, request: { packageSha256: "e".repeat(64),
+          approvalIntent: { sha256: "f".repeat(64), value: { decision: "approve" } } } }) },
+    };
+    const result = await runDesignCourseV2(input, dependencies);
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "DESIGN-COURSE-BOUND-PATH-IGNORED", JSON.stringify(result));
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
