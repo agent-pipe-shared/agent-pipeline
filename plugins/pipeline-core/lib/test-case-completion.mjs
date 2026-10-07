@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
+// Verify signal rule: verify-journal.mjs sets PIPELINE_VERIFY_CASE_COMPLETION_FD for
+// suite children. With that variable PRESENT a completion fd write failure is strict
+// (TCC-FD-WRITE). With it ABSENT and the fd write failing because the descriptor does
+// not exist (EBADF), the recorder made by registerTestCaseCompletion becomes a no-op for the rest of the process, so a
+// completion suite runs as a plain single file outside Verify.
 import { createHash } from "node:crypto";
 import { writeSync } from "node:fs";
 import test from "node:test";
@@ -50,6 +55,10 @@ function validateChannel({ caseIds, fd, maxBytes }) {
   }
 }
 
+function verifySignalled() {
+  return process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD !== undefined;
+}
+
 function line(record) {
   return `${JSON.stringify(record)}\n`;
 }
@@ -90,6 +99,10 @@ function maximumTerminal(caseIds, caseSetSha256) {
 }
 
 export function createTestCaseCompletionRecorder(configuration) {
+  return buildRecorder(configuration, false);
+}
+
+function buildRecorder(configuration, plainFileFallback) {
   if (!exactKeys(configuration, CONFIG_KEYS)) fail("TCC-CONFIG", "completion recorder configuration is not closed");
   const { fd, maxBytes } = configuration;
   const caseIds = structuredClone(configuration.caseIds);
@@ -117,10 +130,21 @@ export function createTestCaseCompletionRecorder(configuration) {
   let emittedBytes = 0;
   const disposed = new Map();
   let terminal = false;
+  let inert = false;
   function emit(record) {
+    if (inert) return;
     const output = Buffer.from(line(record), "utf8");
     if (emittedBytes + output.length > maxBytes) fail("TCC-OUTPUT-OVERFLOW", "completion stream exceeded its declared bound");
-    emittedBytes += writeTestCaseCompletionBytes(fd, output);
+    try {
+      emittedBytes += writeTestCaseCompletionBytes(fd, output);
+    } catch (error) {
+      // No Verify signal and no such descriptor: plain single-file run, record nothing.
+      if (plainFileFallback && error?.code === "TCC-FD-WRITE" && !verifySignalled() && error.cause?.code === "EBADF") {
+        inert = true;
+        return;
+      }
+      throw error;
+    }
   }
   emit(declared);
 
@@ -188,7 +212,7 @@ export function registerTestCaseCompletion(configuration) {
   if (!exactKeys(configuration, REGISTRATION_KEYS)) fail("TCC-CONFIG", "completion registration configuration is not closed");
   validateCases(configuration.cases);
   const caseIds = configuration.cases.map((entry) => entry.id);
-  const recorder = createTestCaseCompletionRecorder({ fd: configuration.fd, maxBytes: configuration.maxBytes, caseIds });
+  const recorder = buildRecorder({ fd: configuration.fd, maxBytes: configuration.maxBytes, caseIds }, true);
 
   // Registration is deliberately synchronous. Callback execution may be async,
   // but every intended sibling is handed to node:test before this function returns.
