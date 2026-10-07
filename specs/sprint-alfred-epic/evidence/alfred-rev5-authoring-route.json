@@ -11,13 +11,14 @@
     "authoringCommits": ["0773a9b43", "27829cc6f"],
     "correctionCommits": [
       "6ac16e601", "3901ada88", "56b21d68d", "d3d8799ce", "272bf0029",
-      "1a14abaa8", "cca125b82", "a5b8cc836", "e582502ed", "251e411aa", "ca7a325b7"
+      "1a14abaa8", "cca125b82", "a5b8cc836", "e582502ed", "251e411aa", "ca7a325b7", "49b41f5c1"
     ],
     "route": "goldfish dispatches (goldfish-deep, goldfish-mechanic) under the Elephant; stage-0 Elephant commits for the PRD marker and the FIX5 completion (ca7a325b7)"
   },
   "review": {
     "criticRounds": 4,
     "finalRoundVerdict": "partial (no PASS); open items resolved by PO decisions 2026-10-07 #20-#26",
+    "readiness": "ALFRED-READINESS-20261007 on 48733052d: not-ready (two blocking findings), closed in 49b41f5c1 (design.md R7 counts; branch A narrowed, PO decision #27)",
     "furtherCritic": "suspended by PO decision 2026-10-07 (time pressure); the decision #20-#26 text (251e411aa, ca7a325b7) is not independently reviewed"
   }
 }
