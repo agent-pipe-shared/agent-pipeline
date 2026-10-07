@@ -74,6 +74,7 @@ const AGENT_DEF_PATH = agentDefPath("goldfish-deep");
 // The runner is written once, to a temp file, and reused (spawned fresh) by every test
 // below -- it is a child-process helper, never a same-process import of the guard.
 const RUNNER_SOURCE = [
+  "import { pathToFileURL } from 'node:url';",
   "const [, , guardPath, scenarioB64] = process.argv;",
   "const scenario = JSON.parse(Buffer.from(scenarioB64, 'base64').toString('utf8'));",
   "",
@@ -96,7 +97,7 @@ const RUNNER_SOURCE = [
   "const linkSyncFn = (from, to) => { if (files.has(to)) { const e = new Error('EEXIST ' + to); e.code = 'EEXIST'; throw e; } if (!files.has(from)) { const e = new Error('ENOENT ' + from); e.code = 'ENOENT'; throw e; } files.set(to, files.get(from)); };",
   "const unlinkSyncFn = (p) => { files.delete(p); };",
   "",
-  "const mod = await import(guardPath);",
+  "const mod = await import(pathToFileURL(guardPath).href);",
   "",
   "const commonDirCalls = [];",
   "const hasCommonDir = Object.prototype.hasOwnProperty.call(scenario, 'commonDir');",
@@ -166,9 +167,10 @@ const RUNNER_PATH = join(runnerDir, "runner.mjs");
 writeFileSync(RUNNER_PATH, RUNNER_SOURCE);
 const PARALLEL_COUNTER_RUNNER_PATH = join(runnerDir, "parallel-counter-runner.mjs");
 writeFileSync(PARALLEL_COUNTER_RUNNER_PATH, [
+  "import { pathToFileURL } from 'node:url';",
   "const [, , guardPath, configB64] = process.argv;",
   "const { commonDir, counterPath, rootDir } = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8'));",
-  "const { evaluateDispatchBudgetGuard } = await import(guardPath);",
+  "const { evaluateDispatchBudgetGuard } = await import(pathToFileURL(guardPath).href);",
   "const input = { agent_id: 'parallel-agent', agent_type: 'pipeline-core:goldfish-implementor', transcript_path: '/unused.jsonl', tool_name: 'Read', tool_input: { file_path: '/x' } };",
   "let result;",
   "for (let attempt = 0; attempt < 1000; attempt += 1) {",
@@ -625,7 +627,7 @@ test("a live counter owner blocks a second acquisition and releases its exact in
   assert.equal(results[2], true);
 });
 
-test("a complete lock in its two-link publication interval is retryable contention", () => {
+test("a complete lock in its two-link publication interval is retryable contention", { skip: process.platform === "linux" ? false : `Linux-only: reads /proc/<pid>/stat and /proc/sys/kernel/random/boot_id and asserts owner platform "linux"; process.platform is "${process.platform}"` }, () => {
   const lockDir = mkdtempSync(join(runnerDir, "publishing-lock-"));
   const lockPath = join(lockDir, "agent.json.binding.lock");
   const temporaryPath = `${lockPath}.publisher.tmp`;
@@ -927,8 +929,9 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): concurrent real-file
   const runner = join(fixture, "concurrent-runner.mjs");
   const input = measuredOrchestratorPayload({ agent_id: null, agent_type: "pipeline-core:goldfish-deep", session_id: "same-session" });
   writeFileSync(runner, [
+    "import { pathToFileURL } from 'node:url';",
     "const [guardPath, commonDir, rootDir, inputB64] = process.argv.slice(2);",
-    "const mod = await import(guardPath);",
+    "const mod = await import(pathToFileURL(guardPath).href);",
     "const result = mod.evaluateDispatchBudgetGuard(JSON.parse(Buffer.from(inputB64, 'base64url').toString('utf8')), { rootDir, resolveGitCommonDirFn: () => commonDir });",
     "process.exit(result.exitCode);",
   ].join("\n"));
