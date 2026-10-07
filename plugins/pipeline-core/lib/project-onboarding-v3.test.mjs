@@ -15,6 +15,7 @@ import {observeOnboardingEnrollmentHistory} from "./onboarding-continuity.mjs";
 import {createGovernanceScopeController,readGovernanceEnrollmentRetirement} from "./governance-scope.mjs";
 import {derivePlanLifecycle} from "./plan-spec-state-v2.mjs";
 import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 import {
   applyProjectOnboardingManifestRepairV4,
@@ -443,7 +444,7 @@ export function fakeGit(command, args, options = {}) {
     // Successful fixture initialization must satisfy the canonical physical
     // Git owner; failure-specific test adapters still override this branch.
     return spawnSync("git", gitArgs, { ...options, encoding: "utf8", shell: false,
-      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" } });
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, LC_ALL: "C" } });
   }
   return { status: 1, stderr: "unexpected git arguments" };
 }
@@ -455,7 +456,7 @@ function hostGit(rootDir, args) {
     env: {
       ...process.env,
       GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,
       LC_ALL: "C",
     },
   });
@@ -7731,7 +7732,7 @@ test("Git capability rejects nonzero, missing-status, and non-EPERM spawn result
 test("adoption preserves directory and linked-worktree Git metadata and blocks user-owned reserved paths", () => {
   const adopted = root(); const linked = root(); const reserved = root(); const worktreeOwner = root();
   const linkedDeps = { ...fakeDeps, spawnSync: (command, args, options = {}) => spawnSync(command, args, {
-    ...options, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" },
+    ...options, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, LC_ALL: "C" },
   }) };
   try {
     writeFileSync(join(adopted, "README.md"), "existing project\n");
