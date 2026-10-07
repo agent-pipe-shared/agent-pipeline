@@ -55,7 +55,23 @@ let passed = 0;
 let failed = 0;
 const fixtureRoots = [];
 
+// This file runs plain check() calls, not node:test cases, so the runner's `--test-name-pattern <regex>` (forwarded to
+// this file's own process by `node --test`, or given on the command line) would otherwise be ignored and a one-case
+// iteration would execute the whole multi-minute file. With no pattern given, every check runs exactly as before.
+const namePatterns = (() => {
+  const argv = [...process.execArgv, ...process.argv.slice(2)];
+  const patterns = [];
+  argv.forEach((arg, index) => {
+    const raw = arg === "--test-name-pattern" ? argv[index + 1] : arg.startsWith("--test-name-pattern=") ? arg.slice("--test-name-pattern=".length) : null;
+    if (typeof raw !== "string" || raw === "") return;
+    const slashed = /^\/(.*)\/([a-z]*)$/s.exec(raw);
+    patterns.push(slashed ? new RegExp(slashed[1], slashed[2]) : new RegExp(raw));
+  });
+  return patterns;
+})();
+
 function check(name, fn) {
+  if (namePatterns.length > 0 && !namePatterns.some((pattern) => pattern.test(name))) return;
   try {
     fn();
     passed += 1;
@@ -1390,45 +1406,149 @@ function r71aNulOffences(source) {
   return hits;
 }
 
-function r71aProductionModules(root) {
+// Single source (Spec section 22.1, contract bullet 1): the null-device value of every git child comes from the shared
+// GIT_NULL_DEVICE constant (lib/git-null-device.mjs), never from an inline "/dev/null" literal. Same key set and the
+// same comment / wrapped-continuation handling as the NUL detector above; a line that holds only the literal (the
+// value of a key named on the line above) is treated like a wrapped continuation.
+const R71A_DEVNULL_LITERAL = /(["'`])\/dev\/null\1/;
+const R71A_DEVNULL_EMBEDDED = /\bcore\.(?:hooksPath|attributesFile|excludesFile|askPass)=\/dev\/null(?![\w/.-])/;
+const R71A_DEVNULL_VALUE_ONLY = /^\s*(["'`])\/dev\/null\1[\s,)\];}]*$/;
+
+function r71aInlineDevNullOffences(source) {
+  const lines = source.split(/\r?\n/);
+  const hits = [];
+  lines.forEach((text, index) => {
+    if (/^\s*(?:\/\/|\/\*|\*)/.test(text)) return;
+    const match = R71A_DEVNULL_LITERAL.exec(text) ?? R71A_DEVNULL_EMBEDDED.exec(text);
+    if (!match || text.slice(0, match.index).includes("//")) return;
+    const wrapped = /^\s*(?:\?\?|\|\||\?|:)/.test(text) || R71A_DEVNULL_VALUE_ONLY.test(text);
+    const above = wrapped ? lines.slice(Math.max(0, index - 2), index) : [];
+    const context = [text, ...above].join("\n");
+    if (R71A_GIT_NULL_KEYS.some((key) => context.includes(key))) hits.push({ line: index + 1, text });
+  });
+  return hits;
+}
+
+// Production modules answer to both detectors (one hit per line, even when a win32 ternary trips both).
+function r71aGitNullOffences(source) {
+  const byLine = new Map();
+  for (const hit of [...r71aNulOffences(source), ...r71aInlineDevNullOffences(source)]) if (!byLine.has(hit.line)) byLine.set(hit.line, hit);
+  return [...byLine.values()].sort((a, b) => a.line - b.line);
+}
+
+// This file is itself a fixture the NUL ratchet scans, and the detector's positive controls must spell the offending
+// forms. The NUL spelling is therefore assembled at run time so that no source line here matches the detector.
+const R71A_NUL = ["N", "U", "L"].join("");
+const r71aSample = (template) => template.replaceAll("@NUL@", R71A_NUL);
+
+// Scan roots: the plugin's lib/, scripts/ and hooks/ trees (never harness/ -- a plugin test must stay consumer-safe).
+const R71A_SCAN_ROOTS = ["lib", "scripts", "hooks"];
+
+function r71aModules(root, { fixtures }) {
   const found = [];
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === "node_modules") continue;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (entry.isFile() && entry.name.endsWith(".mjs") && !entry.name.endsWith(".test.mjs")) found.push(full);
+      else if (entry.isFile() && entry.name.endsWith(".mjs") && entry.name.endsWith(".test.mjs") === fixtures) found.push(full);
     }
   };
   walk(root);
   return found.sort();
 }
 
-check("R7-1a ratchet detector self-check: flags a reintroduced win32 NUL literal for a git value, ignores look-alikes", () => {
-  assert.equal(r71aNulOffences('      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",').length, 1);
-  assert.equal(r71aNulOffences("env.SSH_ASKPASS = 'NUL';").length, 1);
-  assert.equal(r71aNulOffences('const args = ["-c", "core.hooksPath=NUL", "status"];').length, 1);
-  assert.equal(r71aNulOffences(['GIT_ASKPASS:', '  process.platform === "win32"', '    ? "NUL"', '    : "/bin/false",'].join("\n")).length, 1);
+function r71aProductionModules(root) {
+  return r71aModules(root, { fixtures: false });
+}
+
+function r71aFixtureModules(root) {
+  return r71aModules(root, { fixtures: true });
+}
+
+// Scan one class of module (production or *.test.mjs fixtures) under every scan root with one detector.
+function r71aScanOffences({ fixtures, detect }) {
+  const libDir = dirname(fileURLToPath(import.meta.url));
+  const pluginRoot = resolve(libDir, "..");
+  const repoRoot = resolve(pluginRoot, "..", "..");
+  const files = [];
+  for (const name of R71A_SCAN_ROOTS) {
+    const found = (fixtures ? r71aFixtureModules : r71aProductionModules)(resolve(pluginRoot, name));
+    assert.ok(found.length > 0, `ratchet found no ${fixtures ? "fixture" : "production"} modules under ${name}/; the scan roots are wrong`);
+    files.push(...found);
+  }
+  assert.ok(files.length > 20, `ratchet scanned only ${files.length} modules; the scan roots are wrong`);
+  const offences = [];
+  for (const file of files) {
+    for (const hit of detect(readFileSync(file, "utf8"))) {
+      offences.push(`${relative(repoRoot, file).split(sep).join("/")}:${hit.line}: ${hit.text.trim().slice(0, 140)}`);
+    }
+  }
+  return offences;
+}
+
+check("R7-1a ratchet detector self-check: flags a win32 NUL ternary and an inline /dev/null for a git value, ignores look-alikes and the shared GIT_NULL_DEVICE constant", () => {
+  assert.equal(r71aNulOffences(r71aSample('      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "@NUL@" : "/dev/null",')).length, 1);
+  assert.equal(r71aNulOffences(r71aSample("env.SSH_ASKPASS = '@NUL@';")).length, 1);
+  assert.equal(r71aNulOffences(r71aSample('const args = ["-c", "core.hooksPath=@NUL@", "status"];')).length, 1);
+  assert.equal(r71aNulOffences(r71aSample(['GIT_ASKPASS:', '  process.platform === "win32"', '    ? "@NUL@"', '    : "/bin/false",'].join("\n"))).length, 1);
   assert.equal(r71aNulOffences('      GIT_CONFIG_GLOBAL: "/dev/null",').length, 0);
   assert.equal(r71aNulOffences('const placeholder = "NUL";').length, 0);
   assert.equal(r71aNulOffences('const kind = "NULL"; // GIT_CONFIG_GLOBAL').length, 0);
   assert.equal(r71aNulOffences('// GIT_CONFIG_GLOBAL must never be "NUL" on win32').length, 0);
   assert.equal(r71aNulOffences('GIT_CONFIG_NOSYSTEM: "1",\n"x" ? y : "NUL"').length, 0);
+  // Positive controls (exactly one hit each): the win32 ternary form and an inline "/dev/null" literal, each assigned to a
+  // git environment value or a -c value, in every spelling the key set knows (wrapped values included).
+  const flagged = [
+    '      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "@NUL@" : "/dev/null",',
+    'const args = ["-c", `core.hooksPath=${process.platform === "win32" ? "@NUL@" : "/dev/null"}`, "status"];',
+    'const nullDevice = process.platform === "win32" ? "@NUL@" : "/dev/null";',
+    '      GIT_CONFIG_GLOBAL: "/dev/null",',
+    '  GIT_CONFIG_SYSTEM: "/dev/null",',
+    "env.GIT_ASKPASS = '/dev/null';",
+    'env.SSH_ASKPASS = "/dev/null";',
+    '  "-c", "core.hooksPath=/dev/null",',
+    '  "-c", "core.attributesFile=/dev/null",',
+    'runGit(dir, ["config", "--local", "core.hooksPath", "/dev/null"]);',
+    ["GIT_CONFIG_GLOBAL:", '  "/dev/null",'].join("\n"),
+    ["GIT_CONFIG_SYSTEM:", '  process.platform === "win32"', '    ? "@NUL@"', '    : "/dev/null",'].join("\n"),
+  ];
+  for (const sample of flagged) assert.equal(r71aGitNullOffences(r71aSample(sample)).length, 1, `must be flagged: ${sample}`);
+  // Negative controls: the shared constant (its import and every use), non-git keys, comments and unrelated /dev/null checks.
+  const clean = [
+    'import { GIT_NULL_DEVICE } from "./git-null-device.mjs";',
+    "      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,",
+    "  GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,",
+    "env.GIT_ASKPASS = GIT_NULL_DEVICE;",
+    'const args = ["-c", `core.hooksPath=${GIT_NULL_DEVICE}`, "status"];',
+    '  "-c", `core.hooksPath=${GIT_NULL_DEVICE}`,',
+    '      NPM_CONFIG_USERCONFIG: "/dev/null",',
+    '  return fd === 2 && target === "/dev/null";',
+    '// GIT_CONFIG_GLOBAL: "/dev/null" is the retired inline spelling',
+    'const note = "GIT_CONFIG_GLOBAL"; // "/dev/null"',
+    ["GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE,", '      NPM_CONFIG_USERCONFIG: "/dev/null",'].join("\n"),
+  ];
+  for (const sample of clean) assert.equal(r71aGitNullOffences(r71aSample(sample)).length, 0, `must not be flagged: ${sample}`);
 });
 
-check("R7-1a ratchet (RED today: 9 win32 sites): no production module assigns a \"NUL\" literal to a git environment or -c value", () => {
-  const libDir = dirname(fileURLToPath(import.meta.url));
-  const repoRoot = resolve(libDir, "..", "..", "..");
-  const files = [...r71aProductionModules(libDir), ...r71aProductionModules(resolve(libDir, "..", "scripts"))];
-  assert.ok(files.length > 20, `ratchet scanned only ${files.length} production modules; the scan roots are wrong`);
-  const offences = [];
-  for (const file of files) {
-    for (const hit of r71aNulOffences(readFileSync(file, "utf8"))) {
-      offences.push(`${relative(repoRoot, file).split(sep).join("/")}:${hit.line}: ${hit.text.trim().slice(0, 140)}`);
-    }
-  }
+check("R7-1a ratchet: no production module (lib, scripts, hooks) assigns a \"NUL\" literal to a git environment or -c value", () => {
+  const offences = r71aScanOffences({ fixtures: false, detect: r71aNulOffences });
   if (offences.length > 0) {
-    assert.fail(`${offences.length} git null-device site(s) still spell "NUL" (Git for Windows 2.56.0.windows.1 rejects it; use the shared "/dev/null" constant):\n  ${offences.join("\n  ")}`);
+    assert.fail(`${offences.length} git null-device site(s) spell "NUL" (Git for Windows 2.56.0.windows.1 rejects it; use the shared GIT_NULL_DEVICE constant):\n  ${offences.join("\n  ")}`);
+  }
+});
+
+check("R7-1a ratchet: no *.test.mjs fixture (lib, scripts, hooks) assigns a \"NUL\" literal to a git environment or -c value (fixtures may keep /dev/null)", () => {
+  const offences = r71aScanOffences({ fixtures: true, detect: r71aNulOffences });
+  if (offences.length > 0) {
+    assert.fail(`${offences.length} fixture git null-device site(s) spell "NUL" (Git for Windows 2.56.0.windows.1 rejects it; fixtures keep /dev/null or use GIT_NULL_DEVICE):\n  ${offences.join("\n  ")}`);
+  }
+});
+
+check("R7-1a single-source ratchet (RED until every site is converted): no production module (lib, scripts, hooks) spells an inline /dev/null git value; each takes GIT_NULL_DEVICE", () => {
+  const offences = r71aScanOffences({ fixtures: false, detect: r71aInlineDevNullOffences });
+  if (offences.length > 0) {
+    assert.fail(`${offences.length} git null-device site(s) spell an inline /dev/null literal (Spec section 22.1: one shared constant; import GIT_NULL_DEVICE from lib/git-null-device.mjs):\n  ${offences.join("\n  ")}`);
   }
 });
 
