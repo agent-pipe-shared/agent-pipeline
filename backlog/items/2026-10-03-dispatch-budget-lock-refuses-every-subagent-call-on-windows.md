@@ -16,6 +16,23 @@ done_when: manual
 
 Defect 5 of the ALFRED-BACKLOG-20261005 set: when a dispatched agent issues parallel tool calls, the budget-counter lock collides and the refusal tells the agent to "repair through the trusted host path", although a plain retry of the same call succeeds. Impact: the misleading message sends agents hunting for a repair route that does not exist and each refused attempt spends budget. Fix direction: distinguish a transient lock collision from a genuine counter fault and say "retry this call once" (or retry inside the guard with a short bounded back-off) before surfacing a refusal.
 
+## Observed again 2026-10-06/07 — root cause in source, PO decision #26
+
+Night run on the second PC (IC-2d installed): several dispatches lost calls to
+`DISPATCH-BUDGET-INPUT-INVALID (counter-lock-busy)` whenever they issued parallel
+tool calls; the Elephant then serialized all dispatches. Source reading
+(`plugins/pipeline-core/hooks/guard-dispatch-budget.mjs` at IC-2d): the counter
+and its `<path>.binding.lock` are per agent (`counterPath`, ~516), so separate
+agents never contend; contention is between concurrent hook processes of ONE
+agent's parallel tool calls. `acquireDispatchBudgetCounterLock` (~749) returns
+`counter-lock-busy` immediately when the live owner holds the lock (~765-771);
+the only caller (~1181-1184) converts that into `invalidBudgetInputBlocked`
+without any retry, although the code comment says contention "must remain
+retryable by the caller". PO decision 2026-10-07 #26 makes parallel dispatch a
+required supported mode; Spec §22 R7-11 (design revision 5) carries the contract:
+bounded wait with backoff while the owner is live, counted exactly once, typed
+`counter-lock-timeout` only after the bound.
+
 ## Description
 
 A `pipeline-core:goldfish-deep` dispatch from a Claude Code session on native
