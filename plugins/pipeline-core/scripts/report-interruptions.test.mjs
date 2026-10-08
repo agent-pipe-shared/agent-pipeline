@@ -340,3 +340,220 @@ test("CLI reports real receipts and supports filtering by --from, --through, --f
     rmSync(fx.root, { recursive: true, force: true });
   }
 });
+
+// AC6-T3 (ruling 45; Critic AC6-D1/AC6-D2). The baseline separates `requestedWindow` (the --from/--through
+// values, status "requested", or null) from `window`, the observed collection window: the earliest and latest
+// receipt timestamps actually read, each "measured", or { value: null, status: "unknown" } when nothing was
+// observed or receipts coverage is not "measured". These cases also pin both limitation branches and the
+// all-null scope VALUE. Seam: main(argv, ports) takes --root and an injected storeFactory, so the cases build
+// a store stub and a temp root from os.tmpdir() instead of the Linux-only /var/tmp store; they reach their
+// assertions on win32 (the T2 writer cases above do not).
+const { tmpdir: ac6t3Tmpdir } = await import("node:os");
+const ac6t3Reporter = await import("./report-interruptions.mjs");
+const ac6t3Lib = await import("../lib/interruption-receipts.mjs");
+const ac6t3Registry = JSON.parse(readFileSync(new URL("../../../policies/interruption-registry.v1.json", import.meta.url), "utf8"));
+const AC6T3_FROM = "2026-08-01T00:00:00.000Z";
+const AC6T3_THROUGH = "2026-08-01T01:00:00.000Z";
+const ac6t3At = (seconds) => `2026-08-01T00:00:${String(seconds).padStart(2, "0")}.000Z`;
+
+// Single-instant receipts (firstObservedAt === observedThroughAt) make "the earliest/latest receipt timestamp"
+// unambiguous whichever timestamp field an implementation reads. eventId order (event-1, event-2, event-3) is
+// deliberately NOT chronological (40s, 10s, 25s), so first/last-in-array shortcuts cannot satisfy the pin.
+function ac6t3Receipt(n, seconds) {
+  const stamp = () => ({ value: ac6t3At(seconds), status: "measured" });
+  const absent = () => ({ value: null, status: "unknown" });
+  const sha256 = String(n).repeat(64);
+  const built = ac6t3Lib.buildInterruptionReceipt({
+    eventId: `event-${n}`,
+    lineageId: `episode-${n}`,
+    scope: { featureId: "alfred", packageId: "C1", dispatchId: "dispatch-1", phase: "implementation" },
+    actor: { runner: "test-runner", role: "worker" },
+    typedCode: "SOURCE-REQUIRED",
+    observations: [{ sourceKind: "lifecycle-boundary", facts: ["expected-boundary"], artifact: { id: `observation-${n}`, sha256 } }],
+    state: "unresolved",
+    firstObservedAt: stamp(),
+    observedThroughAt: stamp(),
+    resolvedAt: absent(),
+    terminalAt: absent(),
+    attemptCoverage: "measured",
+    recoveryCoverage: "measured",
+    joins: { invocations: [], reviews: [], usages: [], recoveries: [] },
+    resolution: null,
+    binding: { candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, artifacts: [{ id: `observation-${n}`, sha256 }] },
+  }, ac6t3Registry);
+  assert.equal(built.ok, true, `AC6-T3 fixture receipt ${n} rejected: ${built.code}`);
+  return built.receipt;
+}
+const ac6t3Receipts = () => [ac6t3Receipt(1, 40), ac6t3Receipt(2, 10), ac6t3Receipt(3, 25)];
+
+// A store stub that serves a snapshot (store path); coverage and unsupported kinds are the knobs under test.
+function ac6t3StoreStub({ coverage, unsupportedSourceKinds = [] }) {
+  return {
+    readSnapshot: () => ({
+      ok: true,
+      snapshot: {
+        schema: "pipeline.interruption-store-snapshot.v1",
+        storeId: "ac6t3-store",
+        receipts: ac6t3Receipts(),
+        coverage,
+        collection: {
+          qualification: "established",
+          supportedSources: ["critic-dispatch-preflight"],
+          unsupportedSourceKinds,
+          diagnostics: [],
+          entrySetSha256: "0".repeat(64),
+        },
+        sourceEntries: [],
+      },
+    }),
+  };
+}
+const ac6t3MeasuredStore = (extra = {}) => ac6t3StoreStub({ coverage: { receipts: "measured", followup: "measured" }, ...extra });
+// A store stub that cannot produce a snapshot: the CLI falls back to reading the on-disk entries and receipts.
+const ac6t3FallbackStore = () => ({ readSnapshot: () => ({ ok: false, code: null }) });
+
+function ac6t3FallbackFiles(root) {
+  const storeDir = join(root, "evidence/interruption-collection/store");
+  mkdirSync(storeDir, { recursive: true });
+  writeFileSync(join(storeDir, "commit.json"), "{}\n");
+  writeFileSync(join(storeDir, "metadata.json"), `${JSON.stringify({ schema: "pipeline.interruption-store.v1", storeId: "ac6t3-store" })}\n`);
+  for (const receipt of ac6t3Receipts()) {
+    const dir = join(root, "evidence/interruption-receipts", receipt.eventId);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "commit.json"), "{}\n");
+    writeFileSync(join(dir, "receipt.json"), `${JSON.stringify(receipt)}\n`);
+  }
+}
+
+function ac6t3WithRoot(body) {
+  const root = mkdtempSync(join(ac6t3Tmpdir(), "report-interruptions-ac6t3-"));
+  try {
+    return body(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// In-process main() with captured output; the process exit code is restored so a deliberate exit 2 cannot leak.
+function ac6t3Main(argv, ports) {
+  const out = [];
+  const err = [];
+  const stdoutWrite = process.stdout.write;
+  const stderrWrite = process.stderr.write;
+  const exitCode = process.exitCode;
+  process.stdout.write = (chunk) => { out.push(String(chunk)); return true; };
+  process.stderr.write = (chunk) => { err.push(String(chunk)); return true; };
+  let status;
+  try {
+    status = ac6t3Reporter.main(argv, ports);
+  } finally {
+    process.stdout.write = stdoutWrite;
+    process.stderr.write = stderrWrite;
+    process.exitCode = exitCode;
+  }
+  return { status, stdout: out.join(""), stderr: err.join("") };
+}
+
+// Runs `--write-baseline` against the injected store and returns the written baseline plus the printed report.
+function ac6t3Run(root, store, args) {
+  const ports = { ...ac6t3Reporter.productionPorts, storeFactory: () => store };
+  const result = ac6t3Main(["--root", root, "--write-baseline", ...args], ports);
+  assert.equal(result.status, 0, `AC6-T3 run exited ${result.status}: ${result.stdout}${result.stderr}`);
+  return {
+    baseline: JSON.parse(readFileSync(join(root, "telemetry/interruption-baseline.json"), "utf8")),
+    report: JSON.parse(result.stdout),
+  };
+}
+const ac6t3Window = ["--from", AC6T3_FROM, "--through", AC6T3_THROUGH];
+const ac6t3Requested = {
+  start: { value: AC6T3_FROM, status: "requested" },
+  end: { value: AC6T3_THROUGH, status: "requested" },
+};
+const ac6t3Unknown = { start: { value: null, status: "unknown" }, end: { value: null, status: "unknown" } };
+
+test("AC6-T3: store path with --from/--through records requestedWindow with status requested", () => {
+  ac6t3WithRoot((root) => {
+    const { baseline, report } = ac6t3Run(root, ac6t3MeasuredStore(), ac6t3Window);
+    assert.equal(report.snapshot.receipts.length, 3, "precondition: the store path served all three receipts");
+    assert.ok(Object.hasOwn(baseline, "requestedWindow"), "baseline must carry a requestedWindow key");
+    assert.deepEqual(baseline.requestedWindow, ac6t3Requested);
+  });
+});
+
+test("AC6-T3: store path records window as the earliest and latest receipt timestamps, each measured", () => {
+  ac6t3WithRoot((root) => {
+    const { baseline, report } = ac6t3Run(root, ac6t3MeasuredStore(), ac6t3Window);
+    assert.deepEqual(report.aggregate.coverage, { receipts: "measured", followup: "measured" }, "precondition: receipts coverage is measured");
+    assert.deepEqual(baseline.window, {
+      start: { value: ac6t3At(10), status: "measured" },
+      end: { value: ac6t3At(40), status: "measured" },
+    });
+    assert.notEqual(baseline.window.start.value, AC6T3_FROM, "the observed start must not be the requested --from");
+    assert.notEqual(baseline.window.end.value, AC6T3_THROUGH, "the observed end must not be the requested --through");
+  });
+});
+
+test("AC6-T3: fallback collection with a requested window records window start/end as unknown", () => {
+  ac6t3WithRoot((root) => {
+    ac6t3FallbackFiles(root);
+    const { baseline, report } = ac6t3Run(root, ac6t3FallbackStore(), ac6t3Window);
+    assert.equal(report.snapshot.receipts.length, 3, "precondition: the fallback read all three receipts");
+    assert.equal(report.snapshot.collection.qualification, "unestablished", "precondition: this is the fallback collection");
+    assert.deepEqual(baseline.window, ac6t3Unknown);
+  });
+});
+
+test("AC6-T3: fallback collection with a requested window still records requestedWindow with status requested", () => {
+  ac6t3WithRoot((root) => {
+    ac6t3FallbackFiles(root);
+    const { baseline } = ac6t3Run(root, ac6t3FallbackStore(), ac6t3Window);
+    assert.ok(Object.hasOwn(baseline, "requestedWindow"), "baseline must carry a requestedWindow key");
+    assert.deepEqual(baseline.requestedWindow, ac6t3Requested);
+  });
+});
+
+test("AC6-T3: fallback collection with a requested window carries the 'requested window was not observed' limitation", () => {
+  ac6t3WithRoot((root) => {
+    ac6t3FallbackFiles(root);
+    const { baseline } = ac6t3Run(root, ac6t3FallbackStore(), ac6t3Window);
+    assert.ok(baseline.limitations.includes("requested window was not observed"), `limitations: ${JSON.stringify(baseline.limitations)}`);
+  });
+});
+
+test("AC6-T3: a run with no window records requestedWindow null", () => {
+  ac6t3WithRoot((root) => {
+    const store = ac6t3StoreStub({ coverage: { receipts: "unknown", followup: "unknown" } });
+    const { baseline } = ac6t3Run(root, store, []);
+    assert.ok(Object.hasOwn(baseline, "requestedWindow"), "baseline must carry a requestedWindow key even when no window was requested");
+    assert.equal(baseline.requestedWindow, null);
+  });
+});
+
+test("AC6-T3: a run with no window records window unknown and no 'requested window was not observed' limitation", () => {
+  ac6t3WithRoot((root) => {
+    const store = ac6t3StoreStub({ coverage: { receipts: "unknown", followup: "unknown" } });
+    const { baseline } = ac6t3Run(root, store, []);
+    assert.deepEqual(baseline.window, ac6t3Unknown);
+    assert.ok(!baseline.limitations.includes("requested window was not observed"), `limitations: ${JSON.stringify(baseline.limitations)}`);
+  });
+});
+
+test("AC6-T3: unsupported source kinds from the collection become one limitation, and none when the list is empty", () => {
+  ac6t3WithRoot((root) => {
+    const store = ac6t3MeasuredStore({ unsupportedSourceKinds: ["alpha-kind", "beta-kind"] });
+    const { baseline } = ac6t3Run(root, store, ac6t3Window);
+    assert.ok(baseline.limitations.includes("unsupported source kinds: alpha-kind, beta-kind"), `limitations: ${JSON.stringify(baseline.limitations)}`);
+  });
+  ac6t3WithRoot((root) => {
+    const { baseline } = ac6t3Run(root, ac6t3MeasuredStore(), ac6t3Window);
+    assert.ok(!baseline.limitations.some((limitation) => /unsupported source kinds/u.test(limitation)), `limitations: ${JSON.stringify(baseline.limitations)}`);
+  });
+});
+
+test("AC6-T3: the baseline scope is the all-null scope value", () => {
+  ac6t3WithRoot((root) => {
+    ac6t3FallbackFiles(root);
+    const { baseline } = ac6t3Run(root, ac6t3FallbackStore(), []);
+    assert.deepEqual(baseline.scope, { featureId: null, packageId: null, dispatchId: null });
+  });
+});
