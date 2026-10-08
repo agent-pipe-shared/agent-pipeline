@@ -100,10 +100,10 @@ function applyPlan(root, now) {
       if (stat.isSymbolicLink() || !stat.isFile()) continue;
       const target = realpathSync(full);
       const inner = relative(physicalScratch, target);
-      if (inner === '' || inner.startsWith('..') || inner.startsWith(sep) || isAbsolute(inner)) continue;
+      if (inner === '' || inner === '..' || inner.startsWith(`..${sep}`) || inner.startsWith(sep) || isAbsolute(inner)) continue;
       if (process.platform === 'win32' && /^[A-Za-z]:/u.test(inner)) continue;
       // Re-apply the exclusions to the RESOLVED target: a parent link may land in dispatch/ or a live plugin root.
-      if (/^dispatch(?:[\\/]|$)/iu.test(inner)) continue;
+      if (/^dispatch[\\/]/iu.test(inner)) continue;
       if (liveRoots.some((liveRoot) => insideRoot(liveRoot, target))) continue;
       unlinkSync(full);
       deleted.push(rel);
