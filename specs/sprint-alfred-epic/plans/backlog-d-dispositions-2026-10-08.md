@@ -34,6 +34,24 @@ One read-only probe dispatch establishes fixed / not fixed with `file:line` or c
 2026-09-29-reconnect-sandbox-empty-child-output-breaks-bootstrap · 2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries ·
 2026-10-08-codex-bootstrap-in-the-typed-next-action. Fixed → triage "fixed in source"; not fixed → group A slice or D.
 
+### B results (PROBE-B, read-only Explore, 2026-10-08 late)
+
+| Item | Verdict | Evidence | Next |
+|---|---|---|---|
+| 2026-08-09-two-minor-happy-path-retries-in-the-final-codex-run | partly fixed | 00503e0e5 (`onboarding-continuity.mjs:5075-5076` reserved `kickoff-` prefix); direction 2 (session-capability refresh before the first network command after a HEAD change) absent | nightwing → deferred (BN) |
+| 2026-08-28-two-signature-ceremonies-in-one-sitting-overwrite-each-others-proof | partly fixed | 7ea20f407 per-intent names (`po-human-approval.mjs:2097-2102`); scratch proof mirror still written (`:2110-2119`) while `guard-human-override.mjs:94` refuses an in-repo proof | nightwing → deferred (BN) |
+| 2026-09-28-model-role-confirmation-prompt-obscures-required-digest | fixed in source | 26fef9e7d (`model-role-bootstrap.mjs:75,78,101-104`) | triage "fixed in source"; host checklist |
+| 2026-09-29-worktrees-share-onboarding-private-state-with-root-bound-intake | fixed in source | 26fef9e7d (`codex-onboarding-runtime.mjs:925-938`, scope v2) | triage "fixed in source" |
+| 2026-09-28-design-approval-validator-rejects-json-key-reordering | fixed | 3d9ffe770 (`design-workflow-approval.mjs:111` canonical compare) | triage "fixed in source" |
+| 2026-09-28-onboarding-home-override-does-not-bind-machine-plane | fixed | 26fef9e7d (`project-onboarding-v3.mjs:350`) | triage "fixed in source" |
+| 2026-09-29-governance-scope-rejects-readonly-host-git-control | fixed in source | 26fef9e7d (`governance-scope.mjs:334,412-417`) | host checklist |
+| 2026-09-29-nongit-retirement-reader-calls-inaccessible-controller-helper | fixed | 26fef9e7d (`governance-scope.mjs:419-423`) | triage "fixed in source" |
+| 2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another | not fixed | `human-guard-override.mjs:4207` whole-repo compare at consumption; `:933`/`:640` fold `statusSha256` | group A slice HGO-DISJOINT (GUARDRAIL; protected parts → tranche) |
+| 2026-09-29-cross-runner-chat-intake-reference-needs-host-capture | not fixed | `project-onboarding-v3.mjs:2800` | group A slice HOST-TURN (typed unavailable + digest-bound input) |
+| 2026-09-29-reconnect-sandbox-empty-child-output-breaks-bootstrap | partly fixed | d1a015ff5 typed `GS-RETIREMENT-READBACK-EMPTY/-INVALID` (`governance-scope.mjs:424-428`); no typed retry action, no tests | group A slice GS-RETRY |
+| 2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries | not fixed | no empty-log check found | group A slice DREC-LOG (close validator) |
+| 2026-10-08-codex-bootstrap-in-the-typed-next-action | not fixed (premise unverified) | no reference in `project-onboarding-v3.mjs` | group A slice CODEX-NEXT (premise probe first) |
+
 ## C. Host checklist (needs a real host; added to H1–H12)
 
 2026-10-07-desktop-app-support-is-unverified · 2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.
