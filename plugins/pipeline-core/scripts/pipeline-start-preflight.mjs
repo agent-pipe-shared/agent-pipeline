@@ -1058,6 +1058,13 @@ export function observePipelineStartPreflight({
   // its own -- see the module-level open-follow-up note at the bottom of
   // this file); callers that DO register one may pass its sessionId here.
   currentSessionId = null,
+  // HOOKREFRESH (Rulings 67, 70): the declared session role. Only "goldfish" and "critic" are
+  // exempt from refresh enforcement; an absent or unrecognised value is the Elephant (strict default).
+  role = "elephant",
+  // HOOKREFRESH (Ruling 69): optional model-role readback seam. When it is a function the preflight
+  // calls it once and carries the outcome as `modelRoleBootstrap`; a thenable result makes the return
+  // value a Promise of the envelope. Without the seam the return value stays a plain object.
+  runModelRoleBootstrapFn,
 } = {}) {
   // Repository enrollment precedes distribution/onboarding/housekeeping work.
   // An installed runner plugin or unrelated AGENTS.md does not opt this root in.
@@ -1547,7 +1554,18 @@ export function observePipelineStartPreflight({
   }
   const cloneProvisioning = checkCloneProvisioningFn(cwd);
   const mandatoryHookReadiness = assessMandatoryHookReadiness(cloneProvisioning);
-  const resultStatus = applyMandatoryHookGate(status, mandatoryHookReadiness);
+  const hookRefresh = planMandatoryHookRefresh({
+    role,
+    baseStatus: status,
+    gatedStatus: applyMandatoryHookGate(status, mandatoryHookReadiness),
+    cloneProvisioning,
+    mandatoryHookReadiness,
+    pluginRoot,
+    cwd,
+    executionBoundary,
+  });
+  const resultStatus = hookRefresh.status;
+  const refreshAction = hookRefresh.action;
   const result = {
     schema: SCHEMA,
     status: resultStatus,
@@ -1577,8 +1595,12 @@ export function observePipelineStartPreflight({
           executionBoundary,
           expected: { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" },
         }
+      : resultStatus === "hook-refresh-required"
+      ? refreshAction
+      // `refreshAction` is null unless an Elephant session has a stale mandatory hook next to a
+      // missing one (HOOKREFRESH, Ruling 70): that mix used to be a dead end with no action.
       : resultStatus === "hook-provisioning-blocked"
-      ? null
+      ? refreshAction
       : resultStatus === "antigravity-topology-refresh-required"
       ? { kind: "command", executable: "node", argv: [resolve(antigravityTopology?.sourcePluginRoot ?? pluginRoot, "install-agy.mjs")], mutation: true, requiresConfirmation: true, executionBoundary: "host", expected: { schema: "pipeline.antigravity-refresh-result.v1", status: "refreshed" } }
       : status === "plugin-attestation-required"
@@ -1667,7 +1689,7 @@ export function observePipelineStartPreflight({
     // `status` or the exit code.
     ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHookUnseenRemotePush: unseenRemotePush } : {}),
   };
-  return {
+  const envelope = {
     ...result,
     cloneProvisioning,
     mandatoryHookReadiness,
@@ -1676,6 +1698,76 @@ export function observePipelineStartPreflight({
     // preflight readback; no cached or static skill-size surrogate is used.
     bootstrapPayload: normalBootstrapPayloadReceipt(result),
   };
+  // HOOKREFRESH (Ruling 69): the model-role readback is attached AFTER the payload measurement above,
+  // so the measured budget is unchanged. Without the seam the plain envelope is returned, byte-identical
+  // to before, which keeps every synchronous caller and the pinned key set unchanged.
+  if (typeof runModelRoleBootstrapFn !== "function") return envelope;
+  return attachModelRoleBootstrap(envelope, runModelRoleBootstrapFn, { rootDir: resolve(cwd), runner, env });
+}
+
+/**
+ * HOOKREFRESH (Rulings 67 and 70): turn a stale mandatory hook into an enforced, typed refresh. It applies
+ * only to an Elephant session (every role except "goldfish" and "critic") whose base status is already
+ * `ready` -- the same precondition as `applyMandatoryHookGate`. Two shapes qualify: a ready mandatory-hook
+ * report with stale hooks (status becomes `hook-refresh-required`, which the exit-code allowlist does not
+ * list, so it exits non-zero), and the blocked stale+missing mix (status stays `hook-provisioning-blocked`
+ * but now carries the action instead of a dead end). The advisory pre-push hook never changes the status;
+ * it is only listed in `refreshes` when it is stale beside a mandatory one. Anything else is returned unchanged.
+ */
+function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisioning, mandatoryHookReadiness, pluginRoot, cwd, executionBoundary }) {
+  const unchanged = { status: gatedStatus, action: null };
+  if (role === "goldfish" || role === "critic" || baseStatus !== "ready") return unchanged;
+  const staleReady = mandatoryHookReadiness?.status === "ready"
+    && Array.isArray(mandatoryHookReadiness.refreshAvailable)
+    && mandatoryHookReadiness.refreshAvailable.length > 0;
+  const staleMissingMix = mandatoryHookReadiness?.status === "blocked"
+    && mandatoryHookReadiness.code === "HOOK-READINESS-STATE-UNSUPPORTED"
+    && Array.isArray(mandatoryHookReadiness.required)
+    && mandatoryHookReadiness.required.some((entry) => entry?.status === "refresh");
+  if (!staleReady && !staleMissingMix) return unchanged;
+  const refreshes = (Array.isArray(cloneProvisioning?.checks) ? cloneProvisioning.checks : [])
+    .filter((entry) => entry?.status === "refresh" && typeof entry.id === "string" && entry.id.endsWith("-hook"))
+    .map((entry) => entry.id)
+    .sort();
+  return {
+    status: staleReady ? "hook-refresh-required" : gatedStatus,
+    action: {
+      kind: "command",
+      executable: process.execPath,
+      argv: [resolve(pluginRoot, "scripts/refresh-mandatory-hooks.mjs"), "--root", resolve(cwd)],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary,
+      expected: { schema: "pipeline.mandatory-hook-refresh.v1", status: "ready" },
+      refreshes,
+    },
+  };
+}
+
+const MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE = "MODEL-ROLE-BOOTSTRAP-UNAVAILABLE";
+
+/** The readback field: only the bootstrap's own `status` and `code`, folded to a closed shape. */
+function modelRoleBootstrapField(value) {
+  return {
+    status: value?.status === "ready" ? "ready" : "unavailable",
+    code: typeof value?.code === "string" ? value.code : MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE,
+  };
+}
+
+/**
+ * Conditional thenable (Ruling 69): a plain bootstrap value attaches synchronously; a thenable makes the
+ * return a Promise of the same envelope. A throw or a rejection becomes a present `unavailable` field --
+ * never an absent one, and never a change of the envelope's own status.
+ */
+function attachModelRoleBootstrap(envelope, runModelRoleBootstrapFn, args) {
+  const attach = (value) => ({ ...envelope, modelRoleBootstrap: modelRoleBootstrapField(value) });
+  let value;
+  try { value = runModelRoleBootstrapFn(args); }
+  catch { return attach(null); }
+  if (value !== null && typeof value === "object" && typeof value.then === "function") {
+    return value.then(attach, () => attach(null));
+  }
+  return attach(value);
 }
 
 // PHX-WP-AAC01-MULTISESSION -- OPEN FOLLOW-UP, documented honestly rather
@@ -1896,7 +1988,15 @@ export async function observeAgyStartHintField({
 export function main(options = {}) {
   const environmentReadiness = options?.environmentReadiness;
   const agyStartHint = options?.agyStartHint;
-  const result = observePipelineStartPreflight();
+  // HOOKREFRESH (Rulings 67, 69, 70): both are optional plain values from the async process entry. With
+  // neither set this is exactly the zero-argument call it always was, and `main` stays synchronous
+  // because a plain-value seam attaches synchronously.
+  const role = options?.role;
+  const modelRoleBootstrap = options?.modelRoleBootstrap;
+  const result = observePipelineStartPreflight({
+    ...(role === undefined ? {} : { role }),
+    ...(modelRoleBootstrap === undefined ? {} : { runModelRoleBootstrapFn: () => modelRoleBootstrap }),
+  });
   const envelope = {
     ...result,
     ...(environmentReadiness === undefined ? {} : { environmentReadiness }),
@@ -1937,10 +2037,48 @@ export function main(options = {}) {
 }
 
 /** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */
-async function runEntry() {
+async function runEntry(argv = process.argv.slice(2)) {
   const environmentReadiness = await observeEnvironmentReadiness();
   const agyStartHint = await observeAgyStartHintField();
-  return main({ environmentReadiness, agyStartHint });
+  const role = parseRoleArgument(argv);
+  const modelRoleBootstrap = await observeModelRoleBootstrapReadback();
+  return main({
+    environmentReadiness,
+    agyStartHint,
+    ...(role === undefined ? {} : { role }),
+    ...(modelRoleBootstrap === undefined ? {} : { modelRoleBootstrap }),
+  });
+}
+
+/**
+ * `--role <elephant|goldfish|critic>` (Ruling 70 R1). Deliberately lenient: an absent flag, a missing or
+ * unknown value, or any other token yields `undefined`, which the preflight reads as the Elephant. It never
+ * throws -- a throw here would turn the receipt command the guard prescribes into a failed bootstrap.
+ */
+function parseRoleArgument(argv) {
+  const index = Array.isArray(argv) ? argv.indexOf("--role") : -1;
+  const value = index >= 0 ? argv[index + 1] : undefined;
+  return value === "elephant" || value === "goldfish" || value === "critic" ? value : undefined;
+}
+
+/**
+ * The real model-role bootstrap readback for the process entry (Ruling 70 R3): a dynamic import, because
+ * `model-role-bootstrap.mjs` statically imports this module. Runs only in an active governed repository,
+ * with no confirmation callback, so it can only read back. Returns `undefined` when governance is not
+ * active (no readback expected) and an `unavailable` marker when the bootstrap cannot run or throws.
+ */
+async function observeModelRoleBootstrapReadback() {
+  try {
+    if (observeGovernanceScope({ rootDir: process.cwd() })?.state !== "active") return undefined;
+    const { runModelRoleBootstrap } = await import("./model-role-bootstrap.mjs");
+    return await runModelRoleBootstrap({
+      rootDir: process.cwd(),
+      runner: resolveActiveRunner({ env: process.env, read: readFileSync }),
+      env: process.env,
+    });
+  } catch {
+    return { ok: false, code: MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE, status: "unavailable" };
+  }
 }
 
 if (isDirectInvocation(import.meta.url)) {
