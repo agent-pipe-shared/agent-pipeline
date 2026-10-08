@@ -83,3 +83,4 @@ this item does not claim productive integration or a release readiness PASS.
 ## Triage
 
 - **2026-10-08 close-out check:** not closable — no two-capability stale-then-current regression test exists.
+- **2026-10-09 re-check (PROBE-A, Elephant live-verified):** that check was stale. The fix is in source (`26fef9e7d`, `human-guard-override.mjs` capability scan). All three acceptance regressions are pinned in `lib/human-guard-override-capability-scan.test.mjs`: (1) a stale matching record cannot shadow a current one, (2) stale-only stays `HGO-DRIFT` with no consumption, (3) a corrupt audit still fails globally before later valid candidates. Disposition: fixed in source; flip `status` to closed together with the backlog index regeneration in the 0.7.0 close-out.
