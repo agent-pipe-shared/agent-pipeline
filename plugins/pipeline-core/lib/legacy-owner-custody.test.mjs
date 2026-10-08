@@ -784,6 +784,14 @@ describe("RV-S4-T2: the verifier re-checks the package shape before the proof an
     test(`RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - ${label}`, async () => {
       const verify = await rv3Export("verifyLegacyCustodyProof");
       const pkg = rv3Package(s4t2Inputs(disposition));
+      if (label === "repository missing tree") {
+        // The signing helper refuses a tree-less repository, so sign the intact package and strip the tree afterwards.
+        const proof = signCustodyPackage(pkg, signer);
+        const treeless = structuredClone(pkg);
+        mutate(treeless);
+        assertRefusal(verify({ package: treeless, proof, anchor }), S4T2_CODES.packageInvalid, label);
+        return;
+      }
       mutate(pkg);
       // The signature covers the malformed package, so the shape is the only defect.
       assertRefusal(verify({ package: pkg, proof: signCustodyPackage(pkg, signer), anchor }), S4T2_CODES.packageInvalid, label);
