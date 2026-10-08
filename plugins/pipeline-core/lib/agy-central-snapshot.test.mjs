@@ -273,3 +273,276 @@ test('AM-13: static - module has no .gemini, homedir or drive-letter literal out
   assert.equal(/['"`][A-Za-z]:[\\/]/.test(source), false, 'no drive-letter literal');
   assert.match(source, /machinePlaneFilePath/, 'anchor derives from machinePlaneFilePath, never a second home derivation');
 });
+
+// ================================================================================================
+// AM-T2: refresh wiring pins, cases AM-14..AM-17 (design note section 3 "Refresh wiring" and
+// "Stays per project / Retired per project", section 4 cases 14-17, slice F2). RED by design where a
+// wiring entry point does not exist yet; the cases drive the REAL createAntigravityRefreshHost and the
+// REAL topology observers with a fake agy CLI (`runCli`) and a fixture configRoot, so the real CLI and
+// the real home are never reached (refresh-host:89 only spawns when configRoot is the real agy home).
+//
+// AM-T2 assumptions (for ratification) - names and signatures chosen here, the note leaves them open:
+//  B1. NEW module lib/agy-central-refresh.mjs (F2): a thin host-boundary orchestrator over
+//      createAntigravityRefreshHost. The installer source kind `central-snapshot` and the update verb
+//      are its two callers. Chosen as a new lib module, not as an export of an existing script, so that
+//      importing it can never run an installer or updater main().
+//      installAgyFromCentralSnapshot({ sourcePluginRoot, attestationSourceRoot, configRoot, workspaceRoot,
+//        deps, runCli, writeInstalledReceipt }) -> Promise<{ status, reason, snapshot, refresh }>
+//        = publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, deps }), then
+//          createAntigravityRefreshHost({ configRoot, workspaceRoot, approvedSourceRoot: snapshot.root,
+//          scope: 'global', globalChangeApproved: true, runCli, writeInstalledReceipt }).refresh().
+//        status is the host status ('refreshed' | 'refused' | 'partial'); reason is the host ATR-* code or null;
+//        snapshot = { root, snapshotSha256, version } as returned by publishAgySnapshot.
+//        The injected writeInstalledReceipt receives the host receipt (sourcePluginRoot = SNAPSHOT root,
+//        installedPluginRoot = managed copy, plugin.version) plus attestationSourceRoot = the clean Git
+//        source (the installer's attestation split, install-agy.mjs:204-207).
+//  B2. applyAgyCentralSnapshotAfterUpdate({ ...B1 options, resolveCliPath }) (the update verb's call after apply):
+//        same result as B1; but when resolveCliPath() (default: resolveAntigravityCliPath, refresh-host:62)
+//        returns null it resolves { status: 'skipped', reason: <string>, snapshot: null } WITHOUT publishing and
+//        without calling runCli. Publish precedes refresh. A refused refresh surfaces the host code unchanged in
+//        `reason` and does not throw; a snapshot published before a refused refresh is kept (not pinned).
+//  B3. NEW module lib/agy-start-hint.mjs: observeAgyStartHint({ workspaceRoot, configRoot, loadedPluginRoot,
+//        deps }) -> Promise<{ governed: boolean, loaded }>, loaded = observeAntigravityLoadedTopology(...) result.
+//        Read-only: it writes nothing in workspaceRoot, the anchor dir or configRoot (no bootstrap lock, no state).
+//        The lock file name is deliberately not pinned (the note gives none): any path matching /lock/i is refused.
+//  B4. The fake agy implements `--version` (1.2.12), `plugin validate <root>`, `plugin install <root>` (copies the
+//      tree to <configRoot>/config/plugins/agent-pipeline-core and records config/import_manifest.json) and
+//      `plugin uninstall agent-pipeline-core`. Source fixtures carry plugin.json name `agent-pipeline-core`,
+//      the plugin name the topology observer matches (topology:84-85); AM-1..13 fixtures use another name.
+//  B5. Observation, NOT pinned (for the Elephant): in scope 'global' the host always writes a global
+//      config/plugins.json entry for the source root (its final readback requires one, refresh-host:153-156),
+//      and with globalChangeApproved it rebinds an existing WORKSPACE Pipeline entry to the source root
+//      instead of retiring it (refresh-host:131,151). Item option A says "no plugins.json entry" and the note
+//      retires workspace entries. AM-15 therefore retires explicitly through removeAntigravityWorkspaceRegistration
+//      BEFORE the refresh and pins "no Pipeline entry in any workspace afterwards"; it does not pin the global
+//      plugins.json content.
+// ================================================================================================
+import { cpSync, lstatSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+
+const AGY_NAME = 'agent-pipeline-core';
+const digestOf = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const loadEntry = () => import(pathToFileURL(join(HERE, 'agy-central-refresh.mjs')).href);
+const loadStart = () => import(pathToFileURL(join(HERE, 'agy-start-hint.mjs')).href);
+async function loadSeams() {
+  return {
+    host: await import(pathToFileURL(join(HERE, 'antigravity-topology-refresh-host.mjs')).href),
+    topo: await import(pathToFileURL(join(HERE, 'antigravity-plugin-topology.mjs')).href),
+  };
+}
+function physicalTmp(prefix) { return realpathSync(mkdtempSync(join(tmpdir(), prefix))); }
+function agyPlugin(version) { return makePlugin(version, { 'plugin.json': JSON.stringify({ name: AGY_NAME, version }) }); }
+function listTree(dir) {
+  const out = {};
+  const walk = (current, prefix) => {
+    for (const name of readdirSync(current).sort()) {
+      const full = join(current, name);
+      const rel = `${prefix}${name}`;
+      const st = lstatSync(full);
+      if (st.isDirectory()) { out[`${rel}/`] = 'dir'; walk(full, `${rel}/`); }
+      else out[rel] = st.isSymbolicLink() ? 'symlink' : digestOf(readFileSync(full));
+    }
+  };
+  if (existsSync(dir)) walk(dir, '');
+  return out;
+}
+function makeFakeAgy() {
+  const configRoot = physicalTmp('ags-agyhome-');
+  mkdirSync(join(configRoot, 'config'), { recursive: true });
+  const plugins = join(configRoot, 'config', 'plugins');
+  const importManifest = join(configRoot, 'config', 'import_manifest.json');
+  const managedRoot = join(plugins, AGY_NAME);
+  const calls = [];
+  const runCli = (argv) => {
+    calls.push([...argv]);
+    if (argv[0] === '--version') return { status: 'ok', version: '1.2.12' };
+    if (argv[0] === 'plugin' && argv[1] === 'validate') return { status: 'ok' };
+    if (argv[0] === 'plugin' && argv[1] === 'uninstall' && argv[2] === AGY_NAME) {
+      rmSync(managedRoot, { recursive: true, force: true });
+      writeFileSync(importManifest, JSON.stringify({ imports: [] }));
+      return { status: 'ok' };
+    }
+    if (argv[0] === 'plugin' && argv[1] === 'install' && typeof argv[2] === 'string') {
+      mkdirSync(plugins, { recursive: true });
+      cpSync(argv[2], managedRoot, { recursive: true });
+      writeFileSync(importManifest, JSON.stringify({ imports: [{ name: AGY_NAME, source: argv[2] }] }));
+      return { status: 'ok' };
+    }
+    return { status: 'failed' };
+  };
+  return { configRoot, managedRoot, calls, runCli, mutating: () => calls.filter((argv) => argv[0] !== '--version') };
+}
+function makeReceipts() {
+  const written = [];
+  return { written, writeInstalledReceipt: (receipt) => { written.push(receipt); return { status: 'written' }; } };
+}
+// Pre-state helper: install an already published snapshot through the REAL host and the fake CLI.
+function seedManagedCopy(seams, { configRoot, workspaceRoot, snapshotRoot, agy, receipts }) {
+  const host = seams.host.createAntigravityRefreshHost({ configRoot, workspaceRoot, approvedSourceRoot: snapshotRoot, scope: 'global', globalChangeApproved: true, runCli: agy.runCli, writeInstalledReceipt: receipts.writeInstalledReceipt });
+  const result = host.refresh();
+  assert.equal(result.status, 'refreshed', `seeding the managed copy through the real host failed: ${result.reason ?? ''}`);
+}
+
+test('AM-14: refresh uses the snapshot - uninstall, validate <snapshot>, install <snapshot> in order; receipt bound to the Git source; fixture config root only', async () => {
+  const seams = await loadSeams();
+  const mod = await load();
+  const home = makeHome();
+  const deps = { homedirFn: () => home };
+  const root = join(realpathSync(home), '.agent-pipeline', 'agy-snapshot');
+  const agy = makeFakeAgy();
+  const ws = physicalTmp('ags-ws-');
+  const receipts = makeReceipts();
+  assert.ok(agy.configRoot.startsWith(realpathSync(tmpdir())), 'the agy config root is a fixture under the temp dir, so the real CLI is never reached');
+  const git1 = agyPlugin('1.0.0');
+  const v1 = mod.publishAgySnapshot({ sourcePluginRoot: git1, attestationSourceRoot: git1, deps });
+  seedManagedCopy(seams, { configRoot: agy.configRoot, workspaceRoot: ws, snapshotRoot: v1.root, agy, receipts });
+  assert.deepEqual(agy.mutating(), [['plugin', 'validate', v1.root], ['plugin', 'install', v1.root]], 'pre-state: v1 installed from its snapshot');
+  const git2 = agyPlugin('1.1.0');
+  const seededCalls = agy.calls.length;
+  const { installAgyFromCentralSnapshot } = await loadEntry();
+  const result = await installAgyFromCentralSnapshot({ sourcePluginRoot: git2, attestationSourceRoot: git2, configRoot: agy.configRoot, workspaceRoot: ws, deps, runCli: agy.runCli, writeInstalledReceipt: receipts.writeInstalledReceipt });
+  assert.equal(result.status, 'refreshed', result.reason ?? '');
+  const snap = result.snapshot;
+  assert.notEqual(snap.snapshotSha256, v1.snapshotSha256);
+  assert.equal(snap.root, join(root, `plugin-${snap.snapshotSha256}`));
+  const issued = agy.calls.slice(seededCalls);
+  assert.deepEqual(issued.filter((argv) => argv[0] !== '--version'), [['plugin', 'uninstall', AGY_NAME], ['plugin', 'validate', snap.root], ['plugin', 'install', snap.root]]);
+  assert.equal(issued.flat().includes(git2), false, 'the Git source is attested, never handed to agy');
+  const managedDigest = digestOf(readFileSync(join(agy.managedRoot, 'snapshot.json')));
+  assert.equal(managedDigest, snap.snapshotSha256, 'the managed copy is the snapshot');
+  assert.equal(pointer(root).snapshotSha256, snap.snapshotSha256);
+  const verdict = mod.classifyAgySnapshot({ observation: { attestedSourceSnapshotSha256: snap.snapshotSha256, managedCopySha256: managedDigest }, deps });
+  assert.deepEqual({ ...verdict }, { status: 'current', code: null });
+  const receipt = receipts.written.at(-1);
+  assert.equal(receipt.sourcePluginRoot, snap.root);
+  assert.equal(receipt.installedPluginRoot, agy.managedRoot);
+  assert.equal(receipt.attestationSourceRoot, git2);
+  assert.equal(receipt.plugin.version, '1.1.0');
+  cleanup(home, agy.configRoot, ws, git1, git2);
+});
+
+test('AM-15: several projects - a workspace entry to a source checkout holds the plan; after retirement it is prepared; both workspaces observe one loaded digest; per-project state stays', async () => {
+  const seams = await loadSeams();
+  const mod = await load();
+  const home = makeHome();
+  const deps = { homedirFn: () => home };
+  const agy = makeFakeAgy();
+  const wsA = physicalTmp('ags-wsa-');
+  const wsB = physicalTmp('ags-wsb-');
+  const receipts = makeReceipts();
+  const git = agyPlugin('1.0.0');
+  const checkout = agyPlugin('1.0.0');
+  const foreign = physicalTmp('ags-foreign-');
+  writeFileSync(join(foreign, 'plugin.json'), JSON.stringify({ name: 'someone-elses-plugin', version: '1.0.0' }));
+  const stays = { 'project/pipeline.json': '{"calibration":true}\n', 'pipeline.user.yaml': 'gates:\n  push_approval: signature\n', '.git/agent-pipeline/state.json': '{"state":"per-project"}\n' };
+  for (const ws of [wsA, wsB]) for (const [rel, body] of Object.entries(stays)) { mkdirSync(dirname(join(ws, rel)), { recursive: true }); writeFileSync(join(ws, rel), body); }
+  const stayDigests = (ws) => Object.fromEntries(Object.keys(stays).map((rel) => [rel, digestOf(readFileSync(join(ws, rel)))]));
+  const staysBefore = { A: stayDigests(wsA), B: stayDigests(wsB) };
+  mkdirSync(join(wsA, '.agents'), { recursive: true });
+  writeFileSync(join(wsA, '.agents', 'plugins.json'), JSON.stringify({ entries: [{ path: checkout }, { path: foreign }] }));
+  const v1 = mod.publishAgySnapshot({ sourcePluginRoot: git, attestationSourceRoot: git, deps });
+  const planFor = (ws) => seams.topo.planAntigravityTopologyRefresh({ observation: seams.topo.observeAntigravityPluginTopology({ configRoot: agy.configRoot, workspaceRoot: ws, approvedSourceRoot: v1.root }), scope: 'global', globalChangeApproved: true, cliVersion: '1.2.12' });
+  const held = planFor(wsA);
+  assert.equal(held.status, 'held');
+  assert.equal(held.reason, 'AT-OTHER-SCOPE-PIPELINE-CONFLICT');
+  const bindings = seams.host.observeAntigravityWorkspaceBindings({ workspaceRoot: wsA });
+  assert.deepEqual([bindings.ownedIndexes, bindings.foreignIndexes], [[0], [1]]);
+  assert.deepEqual(seams.host.removeAntigravityWorkspaceRegistration({ workspaceRoot: wsA, expectedSha256: bindings.sha256 }), { status: 'removed' });
+  assert.deepEqual(JSON.parse(readFileSync(join(wsA, '.agents', 'plugins.json'), 'utf8')).entries, [{ path: foreign }], 'only the Pipeline entry is retired');
+  assert.equal(planFor(wsA).status, 'prepared');
+  assert.equal(planFor(wsB).status, 'prepared');
+  const { installAgyFromCentralSnapshot } = await loadEntry();
+  const result = await installAgyFromCentralSnapshot({ sourcePluginRoot: git, attestationSourceRoot: git, configRoot: agy.configRoot, workspaceRoot: wsA, deps, runCli: agy.runCli, writeInstalledReceipt: receipts.writeInstalledReceipt });
+  assert.equal(result.status, 'refreshed', result.reason ?? '');
+  assert.equal(result.snapshot.snapshotSha256, v1.snapshotSha256, 'same source, same snapshot');
+  const loadedFor = (ws) => seams.topo.observeAntigravityLoadedTopology({ loadedPluginRoot: agy.managedRoot, configRoot: agy.configRoot, workspaceRoot: ws });
+  const a = loadedFor(wsA);
+  const b = loadedFor(wsB);
+  for (const loaded of [a, b]) {
+    assert.equal(loaded.status, 'current');
+    assert.equal(loaded.loadedKind, 'managed-copy');
+    assert.equal(loaded.sourcePluginRoot, result.snapshot.root);
+  }
+  assert.equal(a.loadedContentSha256, b.loadedContentSha256, 'both workspaces observe the same loaded digest');
+  assert.equal(a.loadedContentSha256, a.sourceContentSha256);
+  for (const ws of [wsA, wsB]) assert.deepEqual(seams.host.observeAntigravityWorkspaceBindings({ workspaceRoot: ws }).ownedIndexes, [], 'no workspace registers its own Pipeline copy');
+  assert.equal(existsSync(join(wsB, '.agents')), false, 'B never gains agy workspace state');
+  assert.deepEqual({ A: stayDigests(wsA), B: stayDigests(wsB) }, staysBefore, 'calibration, user config and .git/agent-pipeline state stay per project and untouched');
+  cleanup(home, agy.configRoot, wsA, wsB, git, checkout, foreign);
+});
+
+test('AM-16: update verb - publishes then refreshes; no agy CLI means no snapshot and no error; an unverifiable surface is refused with the host code and mutates nothing', async () => {
+  const mod = await load();
+  const home = makeHome();
+  const deps = { homedirFn: () => home };
+  const root = join(realpathSync(home), '.agent-pipeline', 'agy-snapshot');
+  const agy = makeFakeAgy();
+  const ws = physicalTmp('ags-ws-');
+  const receipts = makeReceipts();
+  const git = agyPlugin('1.0.0');
+  const atValidate = [];
+  const spy = (argv) => {
+    if (argv[0] === 'plugin' && argv[1] === 'validate') atValidate.push({ target: argv[2], manifest: existsSync(join(argv[2], 'snapshot.json')), pointer: existsSync(join(root, 'current.json')) ? pointer(root).snapshotSha256 : null });
+    return agy.runCli(argv);
+  };
+  const cliFound = () => join(agy.configRoot, 'agy-stub');
+  const { applyAgyCentralSnapshotAfterUpdate } = await loadEntry();
+  const common = { sourcePluginRoot: git, attestationSourceRoot: git, workspaceRoot: ws, writeInstalledReceipt: receipts.writeInstalledReceipt };
+
+  const applied = await applyAgyCentralSnapshotAfterUpdate({ ...common, configRoot: agy.configRoot, deps, runCli: spy, resolveCliPath: cliFound });
+  assert.equal(applied.status, 'refreshed', applied.reason ?? '');
+  assert.equal(atValidate.length, 1);
+  assert.equal(atValidate[0].target, applied.snapshot.root, 'agy validates the snapshot');
+  assert.equal(atValidate[0].manifest, true, 'the snapshot is published when agy first sees it');
+  assert.equal(atValidate[0].pointer, applied.snapshot.snapshotSha256, 'the pointer moved before the refresh');
+
+  const homeNoCli = makeHome();
+  const agyNoCli = makeFakeAgy();
+  const skipped = await applyAgyCentralSnapshotAfterUpdate({ ...common, configRoot: agyNoCli.configRoot, deps: { homedirFn: () => homeNoCli }, runCli: agyNoCli.runCli, resolveCliPath: () => null });
+  assert.equal(skipped.status, 'skipped');
+  assert.equal(skipped.snapshot ?? null, null);
+  assert.deepEqual(entries(join(realpathSync(homeNoCli), '.agent-pipeline')), [], 'no CLI: nothing published');
+  assert.deepEqual(agyNoCli.calls, [], 'no CLI: no call');
+
+  const homeBroken = makeHome();
+  const agyBroken = makeFakeAgy();
+  const receiptsBroken = makeReceipts();
+  writeFileSync(join(agyBroken.configRoot, 'config', 'plugins.json'), '{"entries":"not-an-array"}\n');
+  const before = listTree(agyBroken.configRoot);
+  const refused = await applyAgyCentralSnapshotAfterUpdate({ ...common, writeInstalledReceipt: receiptsBroken.writeInstalledReceipt, configRoot: agyBroken.configRoot, deps: { homedirFn: () => homeBroken }, runCli: agyBroken.runCli, resolveCliPath: cliFound });
+  assert.equal(refused.status, 'refused');
+  assert.equal(refused.reason, 'ATR-TOPOLOGY-UNVERIFIABLE', 'the host code, unchanged');
+  assert.deepEqual(agyBroken.mutating(), [], 'no agy lifecycle command ran');
+  assert.deepEqual(listTree(agyBroken.configRoot), before, 'agy state is byte-identical');
+  assert.equal(receiptsBroken.written.length, 0);
+  cleanup(home, homeNoCli, homeBroken, agy.configRoot, agyNoCli.configRoot, agyBroken.configRoot, ws, git);
+});
+
+test('AM-17: ungoverned directory - the managed copy loads and is current there, and the start hint writes no bootstrap lock or state', async () => {
+  const seams = await loadSeams();
+  const mod = await load();
+  const home = makeHome();
+  const deps = { homedirFn: () => home };
+  const agy = makeFakeAgy();
+  const seedWs = physicalTmp('ags-seed-');
+  const receipts = makeReceipts();
+  const git = agyPlugin('1.0.0');
+  const v1 = mod.publishAgySnapshot({ sourcePluginRoot: git, attestationSourceRoot: git, deps });
+  seedManagedCopy(seams, { configRoot: agy.configRoot, workspaceRoot: seedWs, snapshotRoot: v1.root, agy, receipts });
+  const ungoverned = physicalTmp('ags-ungoverned-');
+  const loaded = seams.topo.observeAntigravityLoadedTopology({ loadedPluginRoot: agy.managedRoot, configRoot: agy.configRoot, workspaceRoot: ungoverned });
+  assert.equal(loaded.status, 'current', 'pre-state: the central copy is current in a directory that never registered it');
+  assert.equal(loaded.loadedKind, 'managed-copy');
+  const anchor = join(realpathSync(home), '.agent-pipeline');
+  const watched = () => ({ workspace: listTree(ungoverned), anchor: listTree(anchor), agyConfig: listTree(agy.configRoot) });
+  const before = watched();
+  const { observeAgyStartHint } = await loadStart();
+  const hint = await observeAgyStartHint({ workspaceRoot: ungoverned, configRoot: agy.configRoot, loadedPluginRoot: agy.managedRoot, deps });
+  assert.equal(hint.governed, false);
+  assert.equal(hint.loaded.status, 'current');
+  const after = watched();
+  assert.deepEqual(after, before, 'the start hint is read-only');
+  for (const [where, tree] of Object.entries(after)) assert.deepEqual(Object.keys(tree).filter((rel) => /lock/i.test(rel)), [], `no lock file under ${where}`);
+  assert.deepEqual(entries(ungoverned), [], 'the ungoverned directory stays empty: no .git, no .agent-pipeline');
+  cleanup(home, agy.configRoot, seedWs, ungoverned, git);
+});
