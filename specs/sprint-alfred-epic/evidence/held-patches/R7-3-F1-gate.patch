@@ -1,0 +1,61 @@
+diff --git a/plugins/pipeline-core/lib/design-workflow-approval.mjs b/plugins/pipeline-core/lib/design-workflow-approval.mjs
+index d6a575be8..ebbfc906b 100644
+--- a/plugins/pipeline-core/lib/design-workflow-approval.mjs
++++ b/plugins/pipeline-core/lib/design-workflow-approval.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+
+ /** Exact PO-decision contract for a complete design workflow package. */
++import { execFileSync } from "node:child_process";
+ import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
+ import { designWorkflowAdvisorExceptionBinding, readApprovedDesignWorkflowPackage, readDesignWorkflowPackageFromRepository } from "./design-workflow-package.mjs";
+ import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+@@ -44,6 +45,39 @@ function candidateReader(readCandidate) {
+   return typeof readCandidate === "function" ? readCandidate : () => null;
+ }
+
++/** Exit status of a git probe: 0, a numeric non-zero status, or null when git itself could not run. */
++function gitStatus(repoRoot, args) {
++  try {
++    execFileSync("git", args, { cwd: repoRoot, shell: false, timeout: 10_000, stdio: ["ignore", "ignore", "ignore"] });
++    return 0;
++  } catch (error) { return typeof error?.status === "number" ? error.status : null; }
++}
++
++/**
++ * Bound-path gate (R7-3a): the package path is digest-bound, so it must be a
++ * tracked, clean file or the signature would bind bytes that do not travel.
++ * Runs before any package content validation. A root that is not a git
++ * repository (or has no HEAD yet) is outside the gate's reach and skipped.
++ */
++function refuseUnsoundBoundPath(repoRoot, packagePath) {
++  if (typeof repoRoot !== "string" || !SAFE_PATH.test(packagePath ?? "")) return null;
++  if (gitStatus(repoRoot, ["rev-parse", "--git-dir"]) !== 0) return null;
++  if (gitStatus(repoRoot, ["check-ignore", "-q", "--", packagePath]) === 0) {
++    return { ok: false, code: "DWP-BOUND-PATH-IGNORED",
++      repair: `${packagePath} is git-ignored, so the signed package would not travel; write the package under a tracked specs/<feature>/evidence/ directory, then stage and commit it.` };
++  }
++  if (gitStatus(repoRoot, ["ls-files", "--error-unmatch", "--", packagePath]) === 1) {
++    return { ok: false, code: "DWP-BOUND-PATH-UNTRACKED",
++      repair: `${packagePath} is not tracked; stage it with git add and commit it before presenting the plan.` };
++  }
++  if (gitStatus(repoRoot, ["rev-parse", "--verify", "-q", "HEAD"]) === 0
++    && gitStatus(repoRoot, ["diff", "--quiet", "HEAD", "--", packagePath]) === 1) {
++    return { ok: false, code: "DWP-BOUND-PATH-MODIFIED",
++      repair: `${packagePath} differs from HEAD; stage and commit the change before presenting the plan.` };
++  }
++  return null;
++}
++
+ /**
+  * Build the one final-approval request only after every package byte and source
+  * is physically re-read against the current repository candidate.
+@@ -53,6 +87,8 @@ export function createDesignWorkflowPackageApprovalRequest({
+ } = {}) {
+   if (!ID.test(featureId ?? "") || !SAFE_PATH.test(planPath ?? "") || !SHA256.test(planSha256 ?? "")
+     || !SAFE_PATH.test(specPath ?? "") || !SHA256.test(specSha256 ?? "")) return { ok: false, code: "DWP-APPROVAL-BINDING" };
++  const boundPathRefusal = refuseUnsoundBoundPath(repoRoot, packagePath);
++  if (boundPathRefusal) return boundPathRefusal;
+   const packageRead = readDesignWorkflowPackageFromRepository({ repoRoot, packagePath, readCandidate: candidateReader(readCandidate),
+     ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath });
+   if (!packageRead.ok) return packageRead;
