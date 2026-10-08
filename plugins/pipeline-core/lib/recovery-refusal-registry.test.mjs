@@ -70,3 +70,38 @@ test("RV-7: every registered ATR-UNAVAILABLE-* code has disposition unavailable"
     }
   }
 });
+
+// RV-S4-T2 (RV-F4, RV-F5 of specs/sprint-alfred-epic/evidence/critic-2026-10-07/rv-s1s4-full.md;
+// dispatcher disposition 2026-10-08). Test-only; the registry does not satisfy these yet.
+test("RV-S4-T2: every literal LOC- code produced by legacy-owner-custody.mjs is registered", () => {
+  const source = readFileSync(path.join(here, "legacy-owner-custody.mjs"), "utf8");
+  const pattern = /["'](LOC-[A-Z0-9-]+)["']/g;
+  const found = [...new Set([...source.matchAll(pattern)].map((m) => m[1]))];
+  // Scan control: the producer carries the full RV-2/RV-3/RV-4 set, so an empty or
+  // truncated match cannot pass this case vacuously.
+  assert.ok(found.length >= 11, `producer scan found only ${found.length} LOC- codes`);
+  assert.ok(found.includes("LOC-TARGET-UNSAFE"), "producer scan must see LOC-TARGET-UNSAFE");
+  assert.deepEqual([...findUnregisteredCodes(source, /["'](LOC-[A-Z0-9-]+)["']/g)], []);
+  for (const code of found) {
+    assert.ok(Object.hasOwn(RECOVERY_REFUSAL_REGISTRY, code), `unregistered producer code ${code}`);
+  }
+});
+
+test("RV-S4-T2: the codes rulings 25 and 26 introduce are registered with a valid entry", () => {
+  for (const code of ["LOC-PACKAGE-INVALID", "LOC-PROOF-EXPIRED", "LOC-RECEIPT-OVERSIZE"]) {
+    assert.ok(Object.hasOwn(RECOVERY_REFUSAL_REGISTRY, code), `unregistered ruling code ${code}`);
+    const entry = lookupRecoveryDisposition(code);
+    assert.ok(DISPOSITIONS.has(entry.disposition), `${code}: disposition`);
+    assert.match(entry.rv, /^RV-(?:[1-9]|1[01])$/, `${code}: rv`);
+  }
+});
+
+test("RV-S4-T2: WT-ORPHAN-ARCHIVE-READBACK is an attended handoff with a named prerequisite, not a bare refuse", () => {
+  // It is raised after a write, and a retry then fails WT-ORPHAN-ARCHIVE-TARGET-EXISTS.
+  assert.ok(Object.hasOwn(RECOVERY_REFUSAL_REGISTRY, "WT-ORPHAN-ARCHIVE-READBACK"));
+  const entry = lookupRecoveryDisposition("WT-ORPHAN-ARCHIVE-READBACK");
+  assert.equal(entry.disposition, "handoff");
+  assert.ok(entry.prerequisite && typeof entry.prerequisite === "object", "a handoff needs a prerequisite object");
+  assert.ok(nonEmpty(entry.prerequisite.kind), "prerequisite.kind");
+  assert.ok(nonEmpty(entry.prerequisite.action), "prerequisite.action");
+});

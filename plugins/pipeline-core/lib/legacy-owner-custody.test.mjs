@@ -77,10 +77,11 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { after, before, describe, test } from "node:test";
 
 import { CLEANUP_RECEIPT_SCHEMA } from "./worktree-lifecycle.mjs";
@@ -384,8 +385,17 @@ function rv3PresentInputs() {
     disposition: "archive",
     sessionEnded: true,
     casPrecondition: { receiptPath: `${SESSION_ID}.json`, expectedState: "present" },
+    // Ruling 25 (amends ruling 16): sessionId, expiresAt and archiveDestination
+    // are part of the signed package. archiveDestination is non-null iff the
+    // disposition is "archive".
+    sessionId: SESSION_ID,
+    expiresAt: RV3_EXPIRES_AT,
+    archiveDestination: "archive",
   };
 }
+
+/** Far-future expiry shared by every fixture package. */
+const RV3_EXPIRES_AT = "2099-01-01T00:00:00.000Z";
 
 /** Absent-receipt inputs: explicit absence, bound without fabricating a digest. */
 function rv3AbsentInputs() {
@@ -395,6 +405,7 @@ function rv3AbsentInputs() {
     classification: { classification: "absent" },
     disposition: "bind-absence",
     casPrecondition: { receiptPath: `${SESSION_ID}.json`, expectedState: "absent" },
+    archiveDestination: null,
   };
 }
 
@@ -604,4 +615,328 @@ describe("RV-3: detached human proof binds the legacy custody authorization", ()
       assert.equal(Object.hasOwn(result, "schema"), false, "a refusal must not carry a package");
     });
   }
+});
+
+// ===========================================================================
+// RV-S4-T2 pins (rulings 25 and 26; Critic record
+// specs/sprint-alfred-epic/evidence/critic-2026-10-07/rv-s1s4-full.md, RV-F1,
+// RV-F2, RV-F3). Test-only; the production module does not satisfy them yet.
+//
+// Ruling 25 (amends ruling 16, so the ten-key package below supersedes the
+// seven-key list in the RV-3 contract comment above): the package adds
+//   sessionId           required string
+//   expiresAt           required ISO-8601 UTC string; the verifier refuses an
+//                       expired package with LOC-PROOF-EXPIRED
+//   archiveDestination  required repository-relative path iff disposition is
+//                       "archive"; null otherwise
+// The builder validates every key's shape and refuses with LOC-PACKAGE-INVALID
+// (receipt exactly { sha256: 64 lowercase hex, size: non-negative integer } or
+// exactly { absent: true }; repository exactly { commit, tree } of 40/64 hex;
+// classification from the RV-2 vocabulary; casPrecondition an object with a
+// non-empty receiptPath); the verifier re-checks that shape BEFORE the proof.
+//
+// Ruling 26: classifyLegacyReceipt lstat-checks before reading. A symlink or a
+// non-regular entry is typed unavailable LOC-TARGET-UNSAFE; a file above 1 MiB
+// is typed unavailable LOC-RECEIPT-OVERSIZE; neither is read.
+//
+// NOT pinned (design choices the rulings do not make, left to RV-S4-F2): which
+// layer enforces "sessionId equals the receipt name stem" and with which code;
+// the verifier's precedence between LOC-PROOF-EXPIRED and a proof defect.
+// ===========================================================================
+const S4T2_CODES = Object.freeze({
+  packageInvalid: "LOC-PACKAGE-INVALID",
+  proofExpired: "LOC-PROOF-EXPIRED",
+  targetUnsafe: "LOC-TARGET-UNSAFE",
+  receiptOversize: "LOC-RECEIPT-OVERSIZE",
+});
+const S4T2_MAX_RECEIPT_BYTES = 1024 * 1024;
+const S4T2_PACKAGE_KEYS = Object.freeze([
+  "archiveDestination",
+  "casPrecondition",
+  "classification",
+  "disposition",
+  "expiresAt",
+  "receipt",
+  "repository",
+  "schema",
+  "sessionEnded",
+  "sessionId",
+]);
+const S4T2_DISPOSITIONS = Object.freeze(["archive", "preserve", "replay", "bind-absence"]);
+
+/** Valid builder inputs for one disposition, every ruling-25 field present. */
+function s4t2Inputs(disposition) {
+  if (disposition === "archive") return rv3PresentInputs();
+  if (disposition === "bind-absence") return rv3AbsentInputs();
+  const bytes = JSON.stringify(validReceipt());
+  return {
+    ...rv3PresentInputs(),
+    receipt: { sha256: sha256Of(bytes), size: Buffer.byteLength(bytes) },
+    classification: { classification: "matching", compare: allTrueFlags() },
+    disposition,
+    archiveDestination: null,
+  };
+}
+
+// [label, disposition of the base inputs, mutation that introduces exactly one defect]
+const S4T2_DEFECTS = [
+  ["receipt undefined", "archive", (i) => { i.receipt = undefined; }],
+  ["receipt missing", "archive", (i) => { delete i.receipt; }],
+  ["raw receipt bytes (Buffer)", "archive", (i) => { i.receipt = Buffer.from(JSON.stringify(validReceipt())); }],
+  ["raw receipt bytes (string)", "archive", (i) => { i.receipt = JSON.stringify(validReceipt()); }],
+  ["receipt sha256 is not 64 hex", "archive", (i) => { i.receipt = { sha256: "XYZ", size: 1 }; }],
+  ["receipt sha256 is uppercase hex", "archive", (i) => { i.receipt = { sha256: sha256Of("x").toUpperCase(), size: 1 }; }],
+  ["receipt size is negative", "archive", (i) => { i.receipt = { sha256: sha256Of("x"), size: -1 }; }],
+  ["receipt size is fractional", "archive", (i) => { i.receipt = { sha256: sha256Of("x"), size: 1.5 }; }],
+  ["receipt carries an extra key", "archive", (i) => { i.receipt = { sha256: sha256Of("x"), size: 1, bytes: "abc" }; }],
+  ["absent receipt that also carries a sha256", "bind-absence", (i) => { i.receipt = { absent: true, sha256: sha256Of("x") }; }],
+  ["absent receipt that also carries a size", "bind-absence", (i) => { i.receipt = { absent: true, size: 1 }; }],
+  ["absent receipt that carries sha256 and size", "bind-absence", (i) => { i.receipt = { absent: true, sha256: sha256Of("x"), size: 1 }; }],
+  ["receipt { absent: false }", "bind-absence", (i) => { i.receipt = { absent: false }; }],
+  ["repository missing tree", "archive", (i) => { delete i.repository.tree; }],
+  ["repository missing commit", "archive", (i) => { delete i.repository.commit; }],
+  ["repository commit of 41 hex characters", "archive", (i) => { i.repository.commit = sha256Of("c").slice(0, 41); }],
+  ["repository tree that is not hex", "archive", (i) => { i.repository.tree = "z".repeat(40); }],
+  ["repository carries an extra key", "archive", (i) => { i.repository.branch = "main"; }],
+  ["unknown classification", "archive", (i) => { i.classification = { classification: "bogus" }; }],
+  ["classification missing", "archive", (i) => { delete i.classification; }],
+  ["classification is a bare string", "archive", (i) => { i.classification = "conflicting"; }],
+  ["casPrecondition missing", "archive", (i) => { delete i.casPrecondition; }],
+  ["casPrecondition null", "archive", (i) => { i.casPrecondition = null; }],
+  ["casPrecondition without receiptPath", "archive", (i) => { i.casPrecondition = { expectedState: "present" }; }],
+  ["casPrecondition with an empty receiptPath", "archive", (i) => { i.casPrecondition = { receiptPath: "", expectedState: "present" }; }],
+  ["sessionId missing", "archive", (i) => { delete i.sessionId; }],
+  ["sessionId empty", "archive", (i) => { i.sessionId = ""; }],
+  ["sessionId not a string", "archive", (i) => { i.sessionId = 7; }],
+  ["expiresAt missing", "archive", (i) => { delete i.expiresAt; }],
+  ["expiresAt empty", "archive", (i) => { i.expiresAt = ""; }],
+  ["expiresAt not a date", "archive", (i) => { i.expiresAt = "not-a-date"; }],
+  ["expiresAt a number", "archive", (i) => { i.expiresAt = 4102444800000; }],
+  ["expiresAt with a non-UTC offset", "archive", (i) => { i.expiresAt = "2099-01-01T00:00:00+02:00"; }],
+  ["archive without archiveDestination (key missing)", "archive", (i) => { delete i.archiveDestination; }],
+  ["archive with archiveDestination null", "archive", (i) => { i.archiveDestination = null; }],
+  ["archive with an empty archiveDestination", "archive", (i) => { i.archiveDestination = ""; }],
+  ["archive with an absolute archiveDestination", "archive", (i) => { i.archiveDestination = resolve(tmpdir(), "elsewhere"); }],
+  ["archive with an archiveDestination escaping the repository", "archive", (i) => { i.archiveDestination = "../escape"; }],
+  ["preserve with a non-null archiveDestination", "preserve", (i) => { i.archiveDestination = "archive"; }],
+  ["replay with a non-null archiveDestination", "replay", (i) => { i.archiveDestination = "archive"; }],
+  ["bind-absence with a non-null archiveDestination", "bind-absence", (i) => { i.archiveDestination = "archive"; }],
+];
+
+describe("RV-S4-T2: the builder validates the shape of every package key (ruling 25, RV-F1)", () => {
+  for (const [label, disposition, mutate] of S4T2_DEFECTS) {
+    test(`RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - ${label}`, async () => {
+      const build = await rv3Export("buildLegacyCustodyAuthorization");
+      const inputs = s4t2Inputs(disposition);
+      mutate(inputs);
+      const result = build(inputs);
+      assertRefusal(result, S4T2_CODES.packageInvalid, label);
+      assert.equal(Object.hasOwn(result, "schema"), false, "a refusal must not carry a package");
+    });
+  }
+
+  for (const disposition of S4T2_DISPOSITIONS) {
+    test(`RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - ${disposition}`, async () => {
+      const build = await rv3Export("buildLegacyCustodyAuthorization");
+      const inputs = s4t2Inputs(disposition);
+      const untouched = structuredClone(inputs);
+      const pkg = build(inputs);
+      assert.notEqual(pkg?.ok, false, `a well-formed input was refused: ${JSON.stringify(pkg)}`);
+      assert.deepStrictEqual(Object.keys(pkg).sort(), [...S4T2_PACKAGE_KEYS].sort());
+      assert.deepStrictEqual(pkg, rv3Package(untouched));
+      assert.equal(pkg.sessionId, SESSION_ID);
+      assert.equal(pkg.archiveDestination, disposition === "archive" ? untouched.archiveDestination : null);
+      assert.deepStrictEqual(inputs, untouched, "the builder mutated its inputs");
+    });
+  }
+});
+
+describe("RV-S4-T2: the verifier re-checks the package shape before the proof and enforces expiry (ruling 25, RV-F1, RV-F3)", () => {
+  const signer = rv3Signer();
+  const stranger = rv3Signer();
+  const anchor = signer.anchor;
+
+  for (const disposition of S4T2_DISPOSITIONS) {
+    test(`RV-S4-T2: control - the verifier accepts a hand-built well-formed package - ${disposition}`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      const pkg = rv3Package(s4t2Inputs(disposition));
+      const result = verify({ package: pkg, proof: signCustodyPackage(pkg, signer), anchor });
+      assert.equal(result.ok, true, `well-formed package refused: ${JSON.stringify(result)}`);
+    });
+  }
+
+  const MALFORMED = [
+    ["receipt missing", "archive", (p) => { delete p.receipt; }],
+    ["receipt sha256 is not 64 hex", "archive", (p) => { p.receipt = { sha256: "XYZ", size: 1 }; }],
+    ["absent receipt that also carries a sha256", "bind-absence", (p) => { p.receipt = { absent: true, sha256: sha256Of("x") }; }],
+    ["repository missing tree", "archive", (p) => { delete p.repository.tree; }],
+    ["unknown classification", "archive", (p) => { p.classification = { classification: "bogus" }; }],
+    ["casPrecondition missing", "archive", (p) => { delete p.casPrecondition; }],
+    ["casPrecondition with an empty receiptPath", "archive", (p) => { p.casPrecondition = { receiptPath: "", expectedState: "present" }; }],
+    ["sessionId missing", "archive", (p) => { delete p.sessionId; }],
+    ["expiresAt missing", "archive", (p) => { delete p.expiresAt; }],
+    ["expiresAt not a date", "archive", (p) => { p.expiresAt = "not-a-date"; }],
+    ["archive without archiveDestination", "archive", (p) => { p.archiveDestination = null; }],
+    ["preserve with an archiveDestination", "preserve", (p) => { p.archiveDestination = "archive"; }],
+    ["wrong package schema", "archive", (p) => { p.schema = "pipeline.legacy-custody-authorization.v0"; }],
+  ];
+  for (const [label, disposition, mutate] of MALFORMED) {
+    test(`RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - ${label}`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      const pkg = rv3Package(s4t2Inputs(disposition));
+      mutate(pkg);
+      // The signature covers the malformed package, so the shape is the only defect.
+      assertRefusal(verify({ package: pkg, proof: signCustodyPackage(pkg, signer), anchor }), S4T2_CODES.packageInvalid, label);
+    });
+  }
+
+  test("RV-S4-T2: the shape is checked before the proof - a malformed package with a null proof refuses with LOC-PACKAGE-INVALID", async () => {
+    const verify = await rv3Export("verifyLegacyCustodyProof");
+    const pkg = rv3Package(rv3PresentInputs());
+    delete pkg.expiresAt;
+    assertRefusal(verify({ package: pkg, proof: null, anchor }), S4T2_CODES.packageInvalid, "null proof");
+  });
+
+  test("RV-S4-T2: the shape is checked before the proof - a malformed package signed by a stranger refuses with LOC-PACKAGE-INVALID", async () => {
+    const verify = await rv3Export("verifyLegacyCustodyProof");
+    const pkg = rv3Package(rv3PresentInputs());
+    delete pkg.sessionId;
+    const proof = signCustodyPackage(pkg, stranger, { keyReference: anchor.keyReference });
+    assertRefusal(verify({ package: pkg, proof, anchor }), S4T2_CODES.packageInvalid, "stranger key");
+  });
+
+  for (const [label, makePackage] of [["null", () => null], ["undefined", () => undefined], ["a string", () => "not-a-package"], ["an array", () => []]]) {
+    test(`RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - ${label}`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      const valid = rv3Package(rv3PresentInputs());
+      assertRefusal(verify({ package: makePackage(), proof: signCustodyPackage(valid, signer), anchor }), S4T2_CODES.packageInvalid, label);
+    });
+  }
+
+  const PAST = [
+    ["years in the past", () => "2020-01-01T00:00:00.000Z"],
+    ["one minute in the past", () => new Date(Date.now() - 60_000).toISOString()],
+  ];
+  for (const [label, makeExpiry] of PAST) {
+    test(`RV-S4-T2: an otherwise valid, validly signed package whose expiresAt is ${label} refuses with LOC-PROOF-EXPIRED`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      const pkg = rv3Package({ ...rv3PresentInputs(), expiresAt: makeExpiry() });
+      assertRefusal(verify({ package: pkg, proof: signCustodyPackage(pkg, signer), anchor }), S4T2_CODES.proofExpired, label);
+    });
+  }
+
+  test("RV-S4-T2: control - the same package with an expiresAt one hour ahead verifies", async () => {
+    const verify = await rv3Export("verifyLegacyCustodyProof");
+    const pkg = rv3Package({ ...rv3PresentInputs(), expiresAt: new Date(Date.now() + 3_600_000).toISOString() });
+    const result = verify({ package: pkg, proof: signCustodyPackage(pkg, signer), anchor });
+    assert.equal(result.ok, true, `unexpired package refused: ${JSON.stringify(result)}`);
+  });
+
+  // The two new keys whose values cannot contradict the receipt name are bound by the signature too.
+  const BINDING = [
+    ["expiresAt", (p) => { p.expiresAt = "2098-01-01T00:00:00.000Z"; }],
+    ["archiveDestination", (p) => { p.archiveDestination = "archive-other"; }],
+  ];
+  for (const [field, mutate] of BINDING) {
+    test(`RV-S4-T2: changing ${field} after signing refuses with LOC-PROOF-BINDING-MISMATCH`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      const signed = rv3Package(rv3PresentInputs());
+      const proof = signCustodyPackage(signed, signer);
+      assert.equal(verify({ package: signed, proof, anchor }).ok, true, "control: the untouched package must verify first");
+      const tampered = structuredClone(signed);
+      mutate(tampered);
+      assert.notDeepStrictEqual(tampered, signed, "the row did not change the package");
+      assertRefusal(verify({ package: tampered, proof, anchor }), RV3_CODES.bindingMismatch, field);
+    });
+  }
+});
+
+describe("RV-S4-T2: classifyLegacyReceipt never reads an unsafe or oversized target (ruling 26, RV-F2)", () => {
+  let root;
+  let counter = 0;
+
+  before(() => {
+    root = mkdtempSync(join(tmpdir(), "rv-s4-t2-legacy-owner-custody-"));
+  });
+
+  after(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  function fixture() {
+    counter += 1;
+    const caseRoot = join(root, `case-${counter}`);
+    const receiptsDirectory = join(caseRoot, "session-cleanup", "receipts");
+    mkdirSync(receiptsDirectory, { recursive: true });
+    return { caseRoot, receiptsDirectory, receiptPath: join(receiptsDirectory, `${SESSION_ID}.json`) };
+  }
+
+  function classify(f) {
+    return classifyLegacyReceipt({ receiptsDirectory: f.receiptsDirectory, sessionId: SESSION_ID, compare: allTrueFlags() });
+  }
+
+  /** A typed-unavailable outcome, judged from the result and the untouched tree alone. */
+  function assertUnavailableAndUntouched(f, code, label) {
+    const before = snapshot(f.caseRoot);
+    const result = classify(f);
+    assert.equal(result?.status, "unavailable", `${label}: expected unavailable, got ${JSON.stringify(result)}`);
+    assert.equal(result.code, code, `${label}: wrong code`);
+    assert.equal(result.mutated, false, `${label}: classification must not mutate`);
+    assert.notEqual(result.classification, "matching", `${label}: an unsafe target must never classify as matching`);
+    assertSnapshotsIdentical(before, snapshot(f.caseRoot), label);
+  }
+
+  /** Valid receipt JSON of exactly `size` bytes (padding inside one string field). */
+  function receiptOfSize(size) {
+    const empty = JSON.stringify({ ...validReceipt(), padding: "" });
+    const text = JSON.stringify({ ...validReceipt(), padding: "x".repeat(size - Buffer.byteLength(empty)) });
+    assert.equal(Buffer.byteLength(text), size, "fixture guard: the padded receipt has the requested size");
+    return text;
+  }
+
+  test("RV-S4-T2: a directory named <sessionId>.json is typed unavailable LOC-TARGET-UNSAFE", () => {
+    const f = fixture();
+    mkdirSync(f.receiptPath);
+    assertUnavailableAndUntouched(f, S4T2_CODES.targetUnsafe, "directory target");
+  });
+
+  test("RV-S4-T2: a symlink named <sessionId>.json to a matching receipt is typed unavailable LOC-TARGET-UNSAFE", (context) => {
+    const f = fixture();
+    const real = join(f.caseRoot, "elsewhere", "real-receipt.json");
+    mkdirSync(dirname(real), { recursive: true });
+    writeFileSync(real, `${JSON.stringify(validReceipt())}\n`);
+    try {
+      symlinkSync(real, f.receiptPath);
+    } catch (error) {
+      if (process.platform === "win32" && error?.code === "EPERM") {
+        context.skip("win32 without symlink privilege: symlinkSync threw EPERM, so a symlinked receipt cannot be constructed here");
+        return;
+      }
+      throw error;
+    }
+    assert.ok(lstatSync(f.receiptPath).isSymbolicLink(), "fixture guard: the receipt path is a symlink");
+    assertUnavailableAndUntouched(f, S4T2_CODES.targetUnsafe, "symlinked target");
+  });
+
+  test("RV-S4-T2: a valid receipt one byte above 1 MiB is typed unavailable LOC-RECEIPT-OVERSIZE and is not classified", () => {
+    const f = fixture();
+    writeFileSync(f.receiptPath, receiptOfSize(S4T2_MAX_RECEIPT_BYTES + 1));
+    assertUnavailableAndUntouched(f, S4T2_CODES.receiptOversize, "oversize valid receipt");
+  });
+
+  test("RV-S4-T2: a 2 MiB file that is not JSON is typed unavailable LOC-RECEIPT-OVERSIZE (size is judged before any parse)", () => {
+    const f = fixture();
+    writeFileSync(f.receiptPath, "x".repeat(2 * S4T2_MAX_RECEIPT_BYTES));
+    assertUnavailableAndUntouched(f, S4T2_CODES.receiptOversize, "oversize non-JSON");
+  });
+
+  test("RV-S4-T2: control - a valid receipt of exactly 1 MiB is within the bound and classifies as matching", () => {
+    const f = fixture();
+    writeFileSync(f.receiptPath, receiptOfSize(S4T2_MAX_RECEIPT_BYTES));
+    const before = snapshot(f.caseRoot);
+    const result = classify(f);
+    assert.equal(result?.classification, "matching", `a receipt at the bound was refused: ${JSON.stringify(result)}`);
+    assert.equal(result.mutated, false);
+    assertSnapshotsIdentical(before, snapshot(f.caseRoot), "receipt at the bound");
+  });
 });

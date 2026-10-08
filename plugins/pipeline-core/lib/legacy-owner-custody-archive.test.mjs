@@ -189,6 +189,7 @@ function presentPackage(bytes, classification, disposition, { sessionId = SESSIO
     disposition,
     sessionEnded: true,
     casPrecondition: { receiptPath: `${sessionId}.json`, expectedState: "present" },
+    ...ruling25Fields(sessionId, disposition),
   };
 }
 
@@ -202,6 +203,21 @@ function absentPackage(disposition = "bind-absence", { sessionId = SESSION_ID } 
     disposition,
     sessionEnded: true,
     casPrecondition: { receiptPath: `${sessionId}.json`, expectedState: "absent" },
+    ...ruling25Fields(sessionId, disposition),
+  };
+}
+
+// Ruling 25 (amends ruling 16): every package also carries sessionId, a
+// far-future expiresAt and archiveDestination (a repository-relative path iff
+// the disposition is "archive", null otherwise).
+const FAR_FUTURE_EXPIRES_AT = "2099-01-01T00:00:00.000Z";
+const ARCHIVE_DESTINATION = "archive";
+
+function ruling25Fields(sessionId, disposition) {
+  return {
+    sessionId,
+    expiresAt: FAR_FUTURE_EXPIRES_AT,
+    archiveDestination: disposition === "archive" ? ARCHIVE_DESTINATION : null,
   };
 }
 
