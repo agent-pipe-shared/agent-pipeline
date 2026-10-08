@@ -1813,7 +1813,136 @@ record("a Claude project can explicitly enable Codex after its initial runner-on
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 56, "the complete runner profile migration corpus must be registered before execution begins");
+// GREENFIELD-T (backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md).
+// d1a015ff5 made a single-runner enrolment project only its own native runtime.
+// The two cases it added assert the DISK after runtime apply; neither asserts
+// the PUBLISHED PLAN surface. The cases below pin that surface -- which paths a
+// plan publishes in plan.targets / plan.changes per enrolled runner -- so an
+// unselected `.codex/*` target cannot reappear there.
+const claudeTierPaths = runtimePaths.filter((path) => path.startsWith(".claude/"));
+const codexTierPaths = runtimePaths.filter((path) => path.startsWith(".codex/"));
+function slimRuntimePlan(root) {
+  return planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true, overlayCalibration: false });
+}
+function publishedRuntimePaths(plan) {
+  return plan.targets.map((target) => target.path).filter((path) => runtimePaths.includes(path)).sort();
+}
+function portableOnboardedRoot(runner) {
+  const root = mkdtempSync(join(tmpdir(), `runner-profile-v3-portable-${runner}-`));
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: root, runner });
+    assert.equal(seed.status, "ready", `${runner} portable onboarding must plan`);
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: root, activate: true }).status, "applied");
+    assert.deepEqual(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).runners, { enabled: [runner], default: runner });
+    return root;
+  } catch (error) { rmSync(root, { recursive: true, force: true }); throw error; }
+}
+function assertNoUnselectedCodexTargets(runner) {
+  const root = portableOnboardedRoot(runner);
+  try {
+    const plan = slimRuntimePlan(root);
+    assert.equal(plan.status, "ready", `${runner}: ${JSON.stringify(plan.diagnostics)}`);
+    assert.equal(plan.runtimeMode, "standard");
+    assert.deepEqual(plan.targets.filter((target) => target.path.startsWith(".codex/")).map((target) => target.path), [], `${runner} must not publish an unselected Codex target`);
+    assert.deepEqual(plan.changes.filter((change) => change.path.startsWith(".codex/")).map((change) => change.path), [], `${runner} must not change an unselected Codex target`);
+    const published = publishedRuntimePaths(plan);
+    assert.deepEqual(published, [...claudeTierPaths].sort(), `${runner} publishes the shared neutral/Claude tier in full`);
+    for (const target of plan.targets.filter((entry) => claudeTierPaths.includes(entry.path))) {
+      assert.deepEqual(target.before, { status: "absent", sha256: null, byteLength: 0 }, `${runner}: ${target.path} is a first-time addition`);
+      assert.equal(target.changed, true);
+    }
+    assert.deepEqual(plan.decisionConflicts, [], `${runner} must not owe Codex model decisions`);
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    assert.equal(existsSync(join(root, ".codex")), false, `${runner} apply must not create .codex`);
+    const after = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(after.status, "noop", `${runner} must be current without any Codex file: ${JSON.stringify(after.diagnostics)}`);
+    assert.deepEqual(after.targets.filter((target) => target.path.startsWith(".codex/")).map((target) => target.path), []);
+    assert.deepEqual(after.decisionConflicts, []);
+    return published;
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+record("a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed", () => {
+  assertNoUnselectedCodexTargets("claude");
+  // The V3 and V3-refresh sources reach the disabled-Codex baseline branch of
+  // runtimeBaselines() with the Claude tier present and every .codex/* target
+  // absent: the plan must neither fail "baseline is missing" nor publish one.
+  for (const refresh of [false, true]) {
+    const label = refresh ? "v3-refresh" : "v3";
+    const intent = v3Intent();
+    intent.runners = { enabled: ["claude"], default: "claude" };
+    if (refresh) intent.routing.duties.implement.codex.effort = "low";
+    const root = fixture(yaml(intent), { omitCodex: true });
+    try {
+      const plan = planRunnerProfileMigrationV3({ rootDir: root });
+      assert.ok(["ready", "noop"].includes(plan.status), `${label}: ${plan.status} ${JSON.stringify(plan.diagnostics)}`);
+      assert.deepEqual(plan.targets.filter((target) => target.path.startsWith(".codex/")).map((target) => target.path), [], `${label} must not publish a Codex target`);
+      assert.deepEqual(plan.changes.filter((change) => change.path.startsWith(".codex/")).map((change) => change.path), [], `${label} must not change a Codex target`);
+      if (plan.status === "ready") assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+      assert.equal(existsSync(join(root, ".codex")), false, `${label} must not create .codex`);
+      assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop", `${label} must be current without a Codex file`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+record("a Codex enrolment publishes every native .codex/* target alongside the shared tier", () => {
+  const root = portableOnboardedRoot("codex");
+  try {
+    const plan = slimRuntimePlan(root);
+    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+    assert.equal(plan.runtimeMode, "standard");
+    const codexTargets = plan.targets.filter((target) => target.path.startsWith(".codex/"));
+    assert.deepEqual(codexTargets.map((target) => target.path).sort(), [...codexTierPaths].sort(), "the complete native Codex set is published");
+    for (const target of codexTargets) {
+      assert.deepEqual(target.before, { status: "absent", sha256: null, byteLength: 0 }, `${target.path} is a first-time addition`);
+      assert.equal(target.after.status, "present");
+      assert.equal(target.changed, true);
+    }
+    assert.deepEqual(publishedRuntimePaths(plan), [...runtimePaths].sort(), "the shared neutral/Claude tier is still published");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    for (const path of runtimePaths) assert.equal(existsSync(join(root, path)), true, `${path} is written`);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("an Antigravity enrolment publishes its own tier and no Codex target", () => {
+  // Antigravity has no native runtime target in this projection: its own tier is
+  // the shared neutral/Claude one, so it must publish exactly what Claude does.
+  const antigravity = assertNoUnselectedCodexTargets("antigravity");
+  const claude = assertNoUnselectedCodexTargets("claude");
+  assert.deepEqual(antigravity, claude);
+});
+
+record("a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines", () => {
+  const root = freshlyOnboardedRoot("claude");
+  const shared = [...claudeTierPaths, "project/pipeline.json", "project/pipeline.yaml"];
+  const bytes = () => Object.fromEntries(shared.map((path) => [path, readFileSync(join(root, path), "utf8")]));
+  try {
+    assert.equal(existsSync(join(root, ".codex")), false);
+    const baselines = bytes();
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const before = readFileSync(sourcePath, "utf8");
+    const after = before.replace('enabled:\n    - "claude"\n', 'enabled:\n    - "claude"\n    - "codex"\n');
+    assert.notEqual(after, before);
+    writeFileSync(sourcePath, after);
+    const plan = slimRuntimePlan(root);
+    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+    assert.equal(plan.runtimeMode, "standard");
+    for (const target of plan.targets.filter((entry) => shared.includes(entry.path))) {
+      assert.equal(target.before.status, "present", `${target.path} keeps its own preimage`);
+      assert.equal(target.changed, false, `${target.path} must not drift when Codex is activated`);
+    }
+    assert.deepEqual(plan.changes.map((change) => change.path).sort(), [...codexTierPaths].sort(), "only the Codex targets change");
+    assert.deepEqual(plan.targets.filter((target) => target.path === "pipeline.user.yaml").map((target) => target.changed), [false]);
+    assert.ok(plan.decisionConflicts.every((conflict) => conflict.target.startsWith(".codex/")), "no model decision is owed for a baseline target");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    assert.deepEqual(bytes(), baselines, "the existing baselines are byte-identical after activation");
+    for (const path of codexTierPaths) assert.equal(existsSync(join(root, path)), true, `${path} is written`);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 60, "the complete runner profile migration corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
