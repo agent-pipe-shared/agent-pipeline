@@ -1056,9 +1056,20 @@ function wordAfterOperator(word) {
   return word.replace(/^[\s\S]*[;&|(`]/u, "");
 }
 
-/** The string arguments of every `env -S` / `--split-string` found among `words` (see the block comment above). */
+/**
+ * The command lines handed to a shell by every `env -S` / `--split-string` found among `words` (see the block comment above).
+ * For each string two texts are returned: the string alone, and the string followed by the words that come after it (GITCLS-F2,
+ * ruling 48): `env` runs the tokens of the string and then the operands after it as the rest of one argv, so
+ * `env -Sgit push origin main` runs `git push origin main` although the string alone is `git`. The operand words are read to the
+ * end of `words`, not up to a guessed end of env's own command (the same safe direction as the option reading above); the texts
+ * are de-duplicated so that two `env` words reading the same string cost one classification, not two.
+ */
 function envSplitStringPayloads(words) {
-  const payloads = [];
+  const payloads = new Set();
+  const add = (text, operandsFrom) => {
+    payloads.add(text);
+    if (operandsFrom < words.length) payloads.add([text, ...words.slice(operandsFrom)].join(" "));
+  };
   for (let i = 0; i < words.length; i += 1) {
     if (heredocWordBase(wordAfterOperator(words[i])) !== "env") continue;
     for (let j = i + 1; j < words.length; j += 1) {
@@ -1067,17 +1078,17 @@ function envSplitStringPayloads(words) {
         const equals = word.indexOf("=");
         const name = equals === -1 ? word : word.slice(0, equals);
         if (name.length < 3 || !ENV_SPLIT_STRING_OPTION.startsWith(name)) continue;
-        if (equals !== -1) payloads.push(word.slice(equals + 1));
-        else if (j + 1 < words.length) payloads.push(words[j + 1]);
+        if (equals !== -1) add(word.slice(equals + 1), j + 1);
+        else if (j + 1 < words.length) add(words[j + 1], j + 2);
         continue;
       }
       const cluster = ENV_SPLIT_SHORT_RE.exec(word);
       if (cluster === null) continue;
-      if (cluster[1] !== "") payloads.push(cluster[1]);
-      else if (j + 1 < words.length) payloads.push(words[j + 1]);
+      if (cluster[1] !== "") add(cluster[1], j + 1);
+      else if (j + 1 < words.length) add(words[j + 1], j + 2);
     }
   }
-  return payloads;
+  return [...payloads];
 }
 
 /** The ex command of every `-c` / `--cmd` / `+` argument that follows a vi-family editor word among `words`. */
@@ -1212,7 +1223,12 @@ function innerCommandIsPush(cmd, depth) {
  * GITCLS-F (a rule after the marker rule, see `innerCommandIsPush`): the string of `env -S` / `--split-string` and the ex
  * command of a vi-family editor's `-c` / `--cmd` / `+` argument that holds a `!` are command lines in a quoted word, which the
  * view blanks. Each is classified by this function recursively (so its own markers and fail-closed checks apply), and the text
- * is a candidate when ANY of them is. A nested `bash -c` is not re-tokenized anywhere in this file: it is a marker, so the
+ * is a candidate when ANY of them is. GITCLS-F2 (ruling 48): an `env -S` string is classified twice, alone and followed by the
+ * operands after it on the line, because `env` runs the string's tokens and those operands as ONE argv (`env -Sgit push origin
+ * main` is a push although the string alone is `git`; `env -S 'git log' --oneline` stays plain). The operand words run to the
+ * end of the text, not to a guessed end of env's command: more candidates, never fewer. The depth cap is unchanged; a chain of
+ * more than INNER_COMMAND_MAX_DEPTH `env -S` words reaches it at once and is a candidate, while a chain of exactly that many
+ * costs about a second of classification. A nested `bash -c` is not re-tokenized anywhere in this file: it is a marker, so the
  * unparseable and the nested direction is always the candidate (`true`), and the payload rule above chooses the same direction.
  *
  * Returns `true` for a candidate, `false` for a command the rule proves plain.
