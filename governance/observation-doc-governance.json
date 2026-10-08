@@ -123,6 +123,7 @@
           "docs/0.7-greenfield-resume-2026-10-02.md",
           "docs/0.7-local-test-handover-2026-10-02.md",
           "docs/0.7-recovery-2026-10-03.md",
+          "docs/admin-steps-inventory.md",
           "docs/artifact-topology.md",
           "docs/audit-bundles-technical.md",
           "docs/bootstrap-step-accounting.md",
@@ -304,6 +305,7 @@
         "lifecycle": "review-candidate",
         "paths": [
           "docs/adr/0083-governance-action-events.md",
+          "docs/adr/0085-one-review-one-signature-design-approval.md",
           "docs/adr/draft-agy-e3-lower-assurance-admission.json",
           "docs/adr/draft-agy-e3-lower-assurance-admission.md",
           "docs/adr/draft-agy-host-observed-authorship.json",
