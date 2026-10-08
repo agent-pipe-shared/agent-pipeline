@@ -269,3 +269,30 @@ test("PR-S1-T2: (b) negative control: `echo gh` stays non-refused (no pr, api, r
   assert.ok(result !== null && typeof result === "object", "classifyGhCommand must return an object");
   assert.notEqual(result.kind, "refused", "a bare gh word with no pr, api, release, repo or gist after it is data");
 });
+
+// ---- PR-S1-T3: the marker rule across redirections and glued options (Critic PR-D1; dispatcher ruling 43) -----------
+// Contract source: specs/sprint-alfred-epic/evidence/critic-2026-10-07/pr-s1-delta.md, finding PR-D1 and ruling 43.
+// A redirection between the gh word and its subcommand, or an option glued to its value, must not hide the marker.
+// Every input is only ever handed to classifyGhCommand as text; none of it is executed.
+const PR_S1_T3_REFUSED = [
+  "winpty gh 2>/dev/null pr merge 1",
+  "strace -f gh >/dev/null pr merge 1",
+  "winpty gh 2>&1 pr create",
+  "flock /tmp/l -c'gh pr merge 1'",
+  "env -S'gh pr merge 1'",
+];
+
+for (const command of PR_S1_T3_REFUSED) {
+  test(`PR-S1-T3: ${command}`, () => {
+    assertClassification(refused(UNCLASSIFIED, command));
+  });
+}
+
+// Controls: the module's current result is `{ kind: "none" }` for both.
+for (const command of ["winpty gh 2>/dev/null --version", "echo gh 2>/dev/null pr merge 1"]) {
+  test(`PR-S1-T3: control stays none: ${command}`, () => {
+    const result = classifyGhCommand(command);
+    assert.ok(result !== null && typeof result === "object", "classifyGhCommand must return an object");
+    assert.equal(result.kind, "none", `control must keep its current result for: ${command}`);
+  });
+}
