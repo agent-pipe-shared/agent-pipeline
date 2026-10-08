@@ -460,8 +460,30 @@ export function writeBaseline(root, aggregate, ports = productionPorts, snapshot
   if (requested && (requested.start?.status === "measured" || requested.end?.status === "measured") && aggregate.coverage?.receipts !== "measured") {
     limitations.push("requested window was not observed");
   }
+  const requestedWindow = requested && (requested.start?.value != null || requested.end?.value != null)
+    ? {
+      start: { value: requested.start?.value ?? null, status: "requested" },
+      end: { value: requested.end?.value ?? null, status: "requested" },
+    }
+    : null;
+  // Observed window: min firstObservedAt / max observedThroughAt over the receipts actually read.
+  let observedStart = null;
+  let observedEnd = null;
+  if (aggregate.coverage?.receipts === "measured") {
+    for (const receipt of snapshot?.receipts ?? []) {
+      const first = receipt.firstObservedAt?.value;
+      const through = receipt.observedThroughAt?.value;
+      if (typeof first === "string" && (observedStart === null || first < observedStart)) observedStart = first;
+      if (typeof through === "string" && (observedEnd === null || through > observedEnd)) observedEnd = through;
+    }
+  }
+  const observedWindow = {
+    start: observedStart === null ? { value: null, status: "unknown" } : { value: observedStart, status: "measured" },
+    end: observedEnd === null ? { value: null, status: "unknown" } : { value: observedEnd, status: "measured" },
+  };
   const baseline = {
-    window: aggregate.window,
+    requestedWindow,
+    window: observedWindow,
     coverage: aggregate.coverage,
     registrySha256: aggregate.registrySha256,
     scope: { featureId: null, packageId: null, dispatchId: null },
