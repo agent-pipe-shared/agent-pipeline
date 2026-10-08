@@ -197,3 +197,75 @@ test("PR-S1: gh release create is not reclassified as an artifact hand-off (its 
   );
   assert.notEqual(result.kind, "read-only", "gh release create publishes; it is not read-only");
 });
+
+// ---- PR-S1-T2: the classifier's fail-open paths (Critic PR-F1, PR-F2, PR-F4; dispatcher ruling 28) -------------------
+// Contract source: specs/sprint-alfred-epic/evidence/critic-2026-10-07/pr-s1-full.md, finding PR-F1 (a redirection
+// prefix or an unlisted wrapper hides the gh word, so the command classifies `none`), PR-F2 (GH_REPO / GH_HOST are
+// ignored, so a cross-repo or cross-host pull request is admitted) and PR-F4 (two deliveries in one command report
+// only the first), and the "Dispatcher disposition" ruling 28 beneath them. These pins are RED by design until the
+// classifier follows the ruling (QG-04: the pin comes first, the implementation follows). Every input below is only
+// ever handed to classifyGhCommand as text; none of it is executed. The cases reuse the helpers and the assertion
+// above and live in their own table so the existing cases and the closed-code-list checks are untouched.
+const PR_S1_T2_GROUPS = [
+  {
+    // Ruling 28 (a): redirection tokens (`[0-9]*[<>]...`, `&>...`) are skipped when locating the command word, so the
+    // command is classified exactly like the plain `gh pr merge 1`.
+    label: "(a) a redirection prefix is skipped",
+    cases: [
+      refused(PLATFORM_MERGE, "2>/dev/null gh pr merge 1"),
+      refused(PLATFORM_MERGE, ">out.txt gh pr merge 1"),
+      refused(PLATFORM_MERGE, "</dev/null gh pr merge 1"),
+      refused(PLATFORM_MERGE, "&>/dev/null gh pr merge 1"),
+      refused(PLATFORM_MERGE, "gh pr view 1 >/dev/null && 2>/dev/null gh pr merge 1"),
+    ],
+  },
+  {
+    // Ruling 28 (b), the fail-closed marker rule: a segment whose command word is not gh, a transparent wrapper or an
+    // opaque runner, but whose text holds a gh word followed by pr, api, release, repo or gist, is unclassified
+    // (refused), never `none` and never `read-only`. `env -S` and the git / vim shapes are pinned for gh only.
+    label: "(b) the marker rule refuses an unlisted wrapper",
+    cases: [
+      refused(UNCLASSIFIED, "winpty gh pr merge 1"),
+      refused(UNCLASSIFIED, "strace -f gh pr merge 1"),
+      refused(UNCLASSIFIED, "flock /tmp/l gh pr merge 1"),
+      refused(UNCLASSIFIED, "op run -- gh pr merge 1"),
+      refused(UNCLASSIFIED, "coproc gh pr merge 1"),
+      refused(UNCLASSIFIED, "winpty gh api -X PUT repos/o/r/pulls/12/merge"),
+      refused(UNCLASSIFIED, "env -S 'gh pr merge 1'"),
+      refused(UNCLASSIFIED, "git -c alias.x='!gh pr merge 1' x"),
+      refused(UNCLASSIFIED, "vim -c '!gh pr merge 1'"),
+    ],
+  },
+  {
+    // Ruling 28 (c): any GH_REPO or GH_HOST assignment in the command (prefix, `env`, `export`) makes a delivery
+    // unsupported cross-repo, in the shape the existing --repo case asserts.
+    label: "(c) a GH_REPO / GH_HOST assignment is cross-repo",
+    cases: [
+      refused(CROSS_REPO, "GH_REPO=other/repo gh pr create --base main --head feat/x"),
+      refused(CROSS_REPO, "env GH_REPO=o/r gh pr create --base main --head feat/x"),
+      refused(CROSS_REPO, "export GH_REPO=other/repo && gh pr create --base main --head feat/x"),
+      refused(CROSS_REPO, "GH_HOST=evil.example gh pr create --base main --head feat/x"),
+    ],
+  },
+  {
+    // Ruling 28 (d): more than one delivery action in one command cannot be bound to one head and base.
+    label: "(d) two deliveries in one command are an incomplete binding",
+    cases: [
+      refused(BINDING_INCOMPLETE, "gh pr create --base main --head feat/x && gh pr create --base release --head feat/y"),
+    ],
+  },
+];
+
+for (const { label, cases } of PR_S1_T2_GROUPS) {
+  for (const expected of cases) {
+    test(`PR-S1-T2: ${label}: ${describeExpectation(expected)}: ${expected.command}`, () => {
+      assertClassification(expected);
+    });
+  }
+}
+
+test("PR-S1-T2: (b) negative control: `echo gh` stays non-refused (no pr, api, release, repo or gist after the gh word)", () => {
+  const result = classifyGhCommand("echo gh");
+  assert.ok(result !== null && typeof result === "object", "classifyGhCommand must return an object");
+  assert.notEqual(result.kind, "refused", "a bare gh word with no pr, api, release, repo or gist after it is data");
+});
