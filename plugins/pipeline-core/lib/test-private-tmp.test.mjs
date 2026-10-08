@@ -164,8 +164,7 @@ test(
 // (TMPDIR / TMP / TEMP). Cases that need a fresh process or a different temp
 // directory therefore run the module in a child Node process whose temp
 // directory is a fixture owned by this test. `PRIVATE_TMP_ROOT_NOT_SECURE` is
-// deliberately not pinned here: `privateTempRoot()` takes no options and calls
-// the Windows adapter without any, so no seam reaches that branch.
+// pinned further down (TEMP-SEAM-T) through the `harden`/`assess` options.
 
 const TMP_ENVIRONMENT_KEYS = ["TMPDIR", "TMP", "TEMP"];
 const CHILD_TIMEOUT_MS = 120_000;
@@ -267,6 +266,47 @@ for (const marker of ["directory", "file"]) {
     assert.deepEqual(readdirSync(nested), [], "no directory may remain in the temp directory after the child exited");
   });
 }
+
+// TEMP-SEAM-T: `privateTempRoot({ harden, assess })` seams, consulted on win32 only.
+// A fresh child process is needed because the root is memoized per process.
+test(
+  "TEMP-SEAM-T: PRIVATE_TMP_ROOT_NOT_SECURE is refused through the assess seam and a failed call memoizes no root",
+  { skip: IS_WIN32 ? false : "the harden/assess seams are consulted on win32 only" },
+  async () => {
+    const sandbox = await child("temp-seam-t-");
+    const source = [
+      'import { readdirSync } from "node:fs";',
+      'import { tmpdir } from "node:os";',
+      "const { privateTempRoot } = await import(process.argv[1]);",
+      "let hardened = 0;",
+      "const harden = () => { hardened += 1; };",
+      'const insecure = () => ({ status: "insecure", reason: "injected-by-test" });',
+      'const secure = () => ({ status: "secure" });',
+      "function attempt(run) {",
+      "  try { return { value: run(), code: null, message: null }; } catch (error) { return { value: null, code: error?.code ?? null, message: String(error?.message) }; }",
+      "}",
+      "const first = attempt(() => privateTempRoot({ harden, assess: insecure }));",
+      "const entriesAfterFirst = readdirSync(tmpdir()).sort();",
+      "const second = attempt(() => privateTempRoot({ harden, assess: insecure }));",
+      "const third = attempt(() => privateTempRoot({ harden, assess: secure }));",
+      "const fourth = attempt(() => privateTempRoot());",
+      'process.stdout.write(JSON.stringify({ first, entriesAfterFirst, second, third, fourth, hardened }) + "\\n");',
+    ].join("\n");
+    const report = runModuleChild(source, sandbox);
+    for (const [label, outcome] of [["first call", report.first], ["second call after a refusal", report.second]]) {
+      assert.equal(outcome.value, null, `${label} must not return a root`);
+      assert.equal(outcome.code, "PRIVATE_TMP_ROOT_NOT_SECURE", `${label} must be refused with PRIVATE_TMP_ROOT_NOT_SECURE, got ${outcome.code}: ${outcome.message}`);
+      assert.equal(String(outcome.message).includes("PRIVATE_TMP_ROOT_NOT_SECURE"), true, `${label}: the message must name the code: ${outcome.message}`);
+      assert.equal(String(outcome.message).includes("injected-by-test"), true, `${label}: the message must carry the assessed reason: ${outcome.message}`);
+    }
+    assert.deepEqual(report.entriesAfterFirst, [], "the rejected root must already be removed when the refusal surfaces");
+    assert.equal(report.hardened >= 2, true, `the injected harden seam must have been consulted on every attempt (calls=${report.hardened})`);
+    assert.equal(report.third.code, null, `a later call with a secure assessment must succeed (a failed call memoizes nothing): ${report.third.message}`);
+    assert.equal(typeof report.third.value, "string", "the later call must return a root path");
+    assert.equal(isInside(sandbox, report.third.value), true, `the later root ${report.third.value} must sit inside the child's temp directory ${sandbox}`);
+    assert.equal(report.fourth.value, report.third.value, "after a success the root is memoized and later calls (without seams) return the same path");
+  },
+);
 
 test("B-S1-T2: PRIVATE_TMP_PREFIX_INVALID refuses an empty or non-string prefix and creates nothing", async () => {
   const { privateTempRoot, privateMkdtemp } = await api();
