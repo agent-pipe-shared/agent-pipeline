@@ -1404,6 +1404,201 @@ test("NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a miss
   }
 });
 
+/* ------------------------------------------------------------------------- *
+ * TR-S1-T (QG-04 test-only slice, class SECURITY): RED pins for the TR-S1 encrypted-key gate,
+ * specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md section 3.4 "TR-S1" (a3).
+ *
+ * The gate: setup --existing-key, setup's recover branch and sign-intent refuse a private key that is
+ * not passphrase-protected (isPrivateKeyPassphraseProtected, which is false for an UNREADABLE key too,
+ * so the gate fails closed). Five pins: unencrypted --existing-key refused with nothing copied (1);
+ * encrypted --existing-key accepted, regression guard, GREEN today (2); recover with an unencrypted
+ * key refused (3); sign-intent with a registered unencrypted key refused before any spawn (4); an
+ * unreadable key refused (5). Pins 1, 3, 4, 5 are RED today; pin 2 is green today.
+ *
+ * ASSUMPTIONS (the briefing leaves these undecided; the fix slice must confirm or amend them):
+ *  A1. The refusal code is NOT decided. The note proposes PO-KEY-UNENCRYPTED [C]; it is recorded here as
+ *      the assumption and is deliberately NOT asserted by name. What is asserted is a TYPED code: either
+ *      error.code or a token inside error.message shaped like an uppercase hyphenated code (at least two
+ *      segments). A raw Node errno (EISDIR, EACCES: one segment, no hyphen) is NOT a typed code, so a
+ *      fix that merely lets the failing read throw does not satisfy pins 1, 3, 4 or 5.
+ *  A2. Pin 4 is strict about "before any OpenSSL spawn": ZERO spawns of any kind (not only none that
+ *      touches the PO key). If the fix places the gate after sign-intent's readiness probe, this pin goes
+ *      red on that assertion and the placement (the note's [C] "near :1639-1649") must move earlier.
+ *  A3. The unreadable key of pin 5 is exercised on the --existing-key route in two shapes: a directory
+ *      where the key file should be (every read fails, no seam involved) and an injected readFile that
+ *      denies exactly that path (EACCES). Both pass the existence check, so they reach the detector.
+ *  A4. Existing cases that register keyFixture() (an UNENCRYPTED key) and expect sign-intent or
+ *      authorize-critical to proceed will be refused once the gate lands. They are left unchanged here
+ *      (briefing); migrating them to encryptedKeyFixture() is test maintenance for a separate dispatch.
+ * Fixtures are throwaway node:crypto keys in mkdtemp directories: no real home, no real key directory,
+ * no network, no real OpenSSL (every spawn goes through an injected stub).
+ * ------------------------------------------------------------------------- */
+import { readdirSync as tr1ReadDirectory } from "node:fs";
+
+const TR1_PASSPHRASE = "tr-s1-t-fixture-passphrase";
+const TR1_CODE_SHAPE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u;
+const TR1_CODE_IN_MESSAGE = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b/u;
+
+function tr1RefusalCode(error) {
+  if (typeof error?.code === "string" && TR1_CODE_SHAPE.test(error.code)) return error.code;
+  const embedded = String(error?.message ?? "").match(TR1_CODE_IN_MESSAGE);
+  return embedded ? embedded[0] : null;
+}
+
+function tr1AssertTypedRefusal(error, label) {
+  assert.ok(error, `TR-S1-T ${label}: must be refused with a typed code, but the call returned normally`);
+  assert.ok(tr1RefusalCode(error), `TR-S1-T ${label}: the refusal must carry a typed code (A1), got code=${String(error.code)} message=${String(error.message).slice(0, 160)}`);
+}
+
+/** A throwaway Ed25519 key (unencrypted unless a passphrase is given) in `directory`, as <name>.pem + <name>.pub.pem. */
+function tr1Key(directory, { passphrase = null, name = "key" } = {}) {
+  mkdirSync(directory, { recursive: true });
+  const privatePath = join(directory, `${name}.pem`);
+  const publicPath = join(directory, `${name}.pub.pem`);
+  writeEd25519KeyPair(privatePath, publicPath, passphrase);
+  return { privatePath, publicPath };
+}
+
+/** Injected spawn for setup: derives the public key in-process (with the passphrase when the key is encrypted), records every call. */
+function tr1Spawn(passphrase = null) {
+  const calls = [];
+  const spawn = (executable, args = []) => {
+    const a = args.map(String);
+    calls.push({ executable, args: a, touchesPoKey: a.some((entry) => /po-private\.pem/u.test(entry)) });
+    if (executable === "openssl" && a[0] === "pkey" && a.includes("-pubout")) {
+      const key = createPrivateKey({ key: readFileSync(a[a.indexOf("-in") + 1], "utf8"), format: "pem", ...(passphrase === null ? {} : { passphrase }) });
+      writeFileSync(a[a.indexOf("-out") + 1], createPublicKey(key).export({ type: "spki", format: "pem" }));
+      return { status: 0 };
+    }
+    return answerOpensslProbe(executable, a);
+  };
+  return { spawn, calls };
+}
+
+function tr1AssertNothingRegistered(directory, spawnCalls, label) {
+  for (const name of ["po-private.pem", "po-public.pem", "trust-policy.json"]) {
+    assert.equal(existsSync(join(directory, name)), false, `TR-S1-T ${label}: ${name} must not exist in the key directory -- nothing may be copied or registered`);
+  }
+  assert.deepEqual(spawnCalls.filter((call) => call.touchesPoKey), [], `TR-S1-T ${label}: no spawn may touch a registered PO key`);
+}
+
+test("TR-S1-T pin 1: setup --existing-key refuses an UNENCRYPTED key with a typed code and copies nothing", () => {
+  const dirs = fixtureDirs();
+  const source = mkdtempSync(join(tmpdir(), "po-tr1-source-"));
+  try {
+    const { privatePath } = tr1Key(source);
+    const { spawn, calls } = tr1Spawn();
+    const error = thrown(() => runHumanApproval([
+      "setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--existing-key", privatePath, "--human-name", "Test Operator",
+    ], { spawn }));
+    tr1AssertTypedRefusal(error, "unencrypted --existing-key");
+    tr1AssertNothingRegistered(dirs.directory, calls, "unencrypted --existing-key");
+  } finally {
+    cleanup(dirs);
+    rmSync(source, { recursive: true, force: true });
+  }
+});
+
+test("TR-S1-T pin 2 (regression guard, green today): setup --existing-key accepts an ENCRYPTED key and copies it verbatim", () => {
+  const dirs = fixtureDirs();
+  const source = mkdtempSync(join(tmpdir(), "po-tr1-source-"));
+  try {
+    const { privatePath, publicPath } = tr1Key(source, { passphrase: TR1_PASSPHRASE });
+    assert.match(readFileSync(privatePath, "utf8"), /-----BEGIN ENCRYPTED PRIVATE KEY-----/u, "fixture sanity: the key must carry the encrypted PKCS#8 armor");
+    const { spawn } = tr1Spawn(TR1_PASSPHRASE);
+    const result = runHumanApproval([
+      "setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--existing-key", privatePath, "--human-name", "Test Operator",
+    ], { spawn });
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-AUTHORITY-READY");
+    assert.equal(result.imported, true);
+    assert.equal(readFileSync(result.paths.privateKey, "utf8"), readFileSync(privatePath, "utf8"), "the encrypted key is copied byte for byte");
+    assert.equal(readFileSync(result.paths.publicKey, "utf8"), readFileSync(publicPath, "utf8"), "the registered public key is the encrypted key's own public half");
+    assert.equal(existsSync(result.paths.authority), true);
+  } finally {
+    cleanup(dirs);
+    rmSync(source, { recursive: true, force: true });
+  }
+});
+
+test("TR-S1-T pin 3: setup's recover branch refuses an UNENCRYPTED key with a typed code and registers no authority", () => {
+  const controlDirs = fixtureDirs();
+  const dirs = fixtureDirs();
+  try {
+    // Control (green today): the same recover route with an ENCRYPTED key registers the authority, so
+    // the refusal below can only be about the key's encryption, not about the fixture shape.
+    writeEd25519KeyPair(join(controlDirs.directory, "po-private.pem"), join(controlDirs.directory, "po-public.pem"), TR1_PASSPHRASE);
+    const control = runHumanApproval(["setup", "--repo-root", controlDirs.repoRoot, "--directory", controlDirs.directory, "--human-name", "Test Operator"], { spawn: tr1Spawn(TR1_PASSPHRASE).spawn });
+    assert.equal(control.recovered, true, "control: an encrypted key at the directory is recovered");
+
+    writeEd25519KeyPair(join(dirs.directory, "po-private.pem"), join(dirs.directory, "po-public.pem"));
+    const { spawn, calls } = tr1Spawn();
+    const error = thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"], { spawn }));
+    tr1AssertTypedRefusal(error, "recover with an unencrypted key");
+    assert.equal(existsSync(join(dirs.directory, "trust-policy.json")), false, "TR-S1-T recover: the authority record must not be written for an unencrypted key");
+    assert.deepEqual(calls.filter((call) => call.touchesPoKey), [], "TR-S1-T recover: no spawn may touch the key");
+  } finally {
+    cleanup(controlDirs);
+    cleanup(dirs);
+  }
+});
+
+test("TR-S1-T pin 4: sign-intent refuses a REGISTERED unencrypted key with a typed code before any OpenSSL spawn", () => {
+  const dirs = fixtureDirs();
+  try {
+    // keyFixture() registers an UNENCRYPTED key exactly as a pre-fix machine would have it on disk.
+    keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    const intentSha256 = createHash("sha256").update("pipeline.tr-s1-t-sign-intent-unencrypted-fixture").digest("hex");
+    const spy = r76Spy("healthy");
+    const error = thrown(() => runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+      { readConfirmation: () => "approve", spawn: spy.spawn },
+    ));
+    tr1AssertTypedRefusal(error, "sign-intent with a registered unencrypted key");
+    assert.deepEqual(r76KeyPathSpawns(spy), [], "TR-S1-T sign-intent: OpenSSL must never be handed the unencrypted key");
+    assert.deepEqual(spy.calls.map((call) => `${call.executable} ${call.args[0]}`), [], "TR-S1-T sign-intent (A2): no OpenSSL spawn of ANY kind may happen before the refusal");
+    assert.deepEqual(tr1ReadDirectory(dirs.directory).filter((name) => /^(proof|signer|signature|intent)/u.test(name)), [], "TR-S1-T sign-intent: no intent, signature, proof or signer artifact may be written");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("TR-S1-T pin 5: setup --existing-key refuses an UNREADABLE key with a typed code (the gate fails closed) and copies nothing", () => {
+  const variants = [
+    { label: "a directory where the key file should be", dependencies: () => ({}), make: (source) => { const path = join(source, "not-a-file.pem"); mkdirSync(path); return path; } },
+    {
+      label: "a key file whose read is denied (EACCES)",
+      make: (source) => tr1Key(source, { name: "denied" }).privatePath,
+      dependencies: (path) => ({
+        readFile: (candidate, ...rest) => {
+          if (String(candidate) === path) throw Object.assign(new Error("EACCES: permission denied, open"), { code: "EACCES" });
+          return readFileSync(candidate, ...rest);
+        },
+      }),
+    },
+  ];
+  for (const variant of variants) {
+    const dirs = fixtureDirs();
+    const source = mkdtempSync(join(tmpdir(), "po-tr1-source-"));
+    try {
+      const keyPath = variant.make(source);
+      const { spawn, calls } = tr1Spawn();
+      const error = thrown(() => runHumanApproval([
+        "setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--existing-key", keyPath, "--human-name", "Test Operator",
+      ], { spawn, ...variant.dependencies(keyPath) }));
+      tr1AssertTypedRefusal(error, `unreadable --existing-key (${variant.label})`);
+      tr1AssertNothingRegistered(dirs.directory, calls, `unreadable --existing-key (${variant.label})`);
+    } finally {
+      cleanup(dirs);
+      rmSync(source, { recursive: true, force: true });
+    }
+  }
+});
+
 test("NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel on a mismatched confirmation, OpenSSL never invoked", () => {
   const dirs = fixtureDirs();
   try {
