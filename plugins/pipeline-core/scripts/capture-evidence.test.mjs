@@ -558,3 +558,112 @@ test("captureEvidence: a relative `out` resolves against the given `cwd`, not th
     rmSync(workDir, { recursive: true, force: true });
   }
 });
+
+// --- EVID-T: the evidence header pins the commit/tree identity the command ran against
+// (backlog 2026-10-08-evidence-artifacts-carry-no-commit-identity, dispatcher ruling 36). ---
+
+function gitIn(cwd, args) {
+  const r = spawnSync("git", args, { cwd, encoding: "utf8" });
+  assert.equal(r.status, 0, `git ${args.join(" ")} failed: ${r.stderr}`);
+  return r.stdout.trim();
+}
+
+function makeTempRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "capture-evidence-evidt-"));
+  gitIn(dir, ["init"]);
+  writeFileSync(join(dir, "tracked.txt"), "one\n");
+  gitIn(dir, ["add", "tracked.txt"]);
+  gitIn(dir, ["-c", "user.name=EvidT", "-c", "user.email=evidt@example.invalid", "-c", "commit.gpgsign=false", "commit", "-m", "init"]);
+  return dir;
+}
+
+function runCliIn(cwd, childScript) {
+  const result = spawnSync(
+    process.execPath,
+    [CLI_PATH, "--out", "evidence.txt", "--label", "evid-t", "--", "node", "-e", childScript],
+    { cwd, encoding: "utf8" },
+  );
+  return { result, artifact: existsSync(join(cwd, "evidence.txt")) ? readFileSync(join(cwd, "evidence.txt"), "utf8") : null };
+}
+
+test("EVID-T: header carries head equal to git rev-parse HEAD", () => {
+  const dir = makeTempRepo();
+  try {
+    const { result, artifact } = runCliIn(dir, "process.exit(0)");
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(artifact, "artifact must be written");
+    assert.ok(artifact.split("\n").includes(`head: ${gitIn(dir, ["rev-parse", "HEAD"])}`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("EVID-T: header carries tree equal to git rev-parse HEAD^{tree}", () => {
+  const dir = makeTempRepo();
+  try {
+    const { result, artifact } = runCliIn(dir, "process.exit(0)");
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(artifact, "artifact must be written");
+    assert.ok(artifact.split("\n").includes(`tree: ${gitIn(dir, ["rev-parse", "HEAD^{tree}"])}`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("EVID-T: dirty is false on a clean repository", () => {
+  const dir = makeTempRepo();
+  try {
+    const { artifact } = runCliIn(dir, "process.exit(0)");
+    assert.ok(artifact, "artifact must be written");
+    assert.ok(artifact.split("\n").includes("dirty: false"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("EVID-T: dirty is true after a tracked file is modified", () => {
+  const dir = makeTempRepo();
+  try {
+    writeFileSync(join(dir, "tracked.txt"), "two\n");
+    const { artifact } = runCliIn(dir, "process.exit(0)");
+    assert.ok(artifact, "artifact must be written");
+    assert.ok(artifact.split("\n").includes("dirty: true"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("EVID-T: outside a Git repository the three identity lines read unavailable", () => {
+  const dir = mkdtempSync(join(tmpdir(), "capture-evidence-evidt-nogit-"));
+  try {
+    // The CLI refuses a non-Git cwd (findRepoRoot), so the contract is pinned on the function
+    // with an explicit repoRoot, exactly as the existing redaction tests do.
+    captureEvidence({
+      command: ["node", "-e", "process.exit(0)"],
+      label: "evid-t",
+      out: "evidence.txt",
+      cwd: dir,
+      repoRoot: syntheticRoot("repo"),
+      homeDir: syntheticRoot("home"),
+    });
+    const lines = readFileSync(join(dir, "evidence.txt"), "utf8").split("\n");
+    assert.ok(lines.includes("head: unavailable"));
+    assert.ok(lines.includes("tree: unavailable"));
+    assert.ok(lines.includes("dirty: unavailable"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("EVID-T: a child exiting 3 still records exitCode 3 and the CLI exits 3", () => {
+  const dir = makeTempRepo();
+  try {
+    const { result, artifact } = runCliIn(dir, "process.exit(3)");
+    assert.equal(result.status, 3);
+    assert.ok(artifact, "artifact must be written");
+    assert.ok(artifact.split("\n").includes("exitCode: 3"));
+    assert.match(artifact, /^head: [0-9a-f]{40}$/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
