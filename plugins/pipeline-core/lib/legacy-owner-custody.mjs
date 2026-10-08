@@ -39,7 +39,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, join, posix, win32 } from "node:path";
+import { basename, isAbsolute, join, posix, relative, resolve, sep, win32 } from "node:path";
 
 import { canonical, createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 import { CLEANUP_RECEIPT_SCHEMA } from "./worktree-lifecycle.mjs";
@@ -652,7 +652,7 @@ function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, classific
   }
 }
 
-export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, package: pkg, proof, anchor, archiveRoot } = {}) {
+export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, package: pkg, proof, anchor, archiveRoot, repositoryRoot } = {}) {
   // 1. The proof is verified before a single byte is read or written.
   const verdict = verifyLegacyCustodyProof({ package: pkg, proof, anchor });
   if (verdict.ok !== true) return refusedResult(verdict.code);
@@ -701,7 +701,24 @@ export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, pa
       // No replay preconditions are defined yet, so a replay is never available.
       // RV-4's positive replay lands with RV-5/RV-6.
       return unavailableResult(RV4_CODES.replayPrecondition);
-    default:
+    default: {
+      // The archive root derives from the SIGNED destination resolved against the caller's
+      // absolute repository root (rulings 44, 44a, 53); a caller archiveRoot never substitutes.
+      if (typeof repositoryRoot !== "string" || repositoryRoot === "" || !isAbsolute(repositoryRoot)) {
+        return refusedResult(RV3_CODES.packageInvalid);
+      }
+      const resolvedRepositoryRoot = resolve(repositoryRoot);
+      const signedArchiveRoot = resolve(resolvedRepositoryRoot, String(pkg.archiveDestination));
+      const relativeToRepository = relative(resolvedRepositoryRoot, signedArchiveRoot);
+      if (
+        relativeToRepository === "" || relativeToRepository === ".."
+        || relativeToRepository.startsWith(`..${sep}`) || isAbsolute(relativeToRepository)
+      ) {
+        return refusedResult(RV3_CODES.packageInvalid);
+      }
+      if (typeof archiveRoot !== "string" || !isAbsolute(archiveRoot) || resolve(archiveRoot) !== signedArchiveRoot) {
+        return refusedResult(RV3_CODES.bindingMismatch);
+      }
       return archiveReceipt({
         receiptsDirectory,
         sessionId,
@@ -709,7 +726,8 @@ export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, pa
         sha256,
         classification: authorized.classification,
         proof,
-        archiveRoot,
+        archiveRoot: signedArchiveRoot,
       });
+    }
   }
 }
