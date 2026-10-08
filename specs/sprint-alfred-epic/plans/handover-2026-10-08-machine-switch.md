@@ -27,6 +27,12 @@ below means pins green and dispatcher self-verified or Critic-passed, never acce
   after the `PO APPROVAL CONFIRMATION` block. `quality-package-materializer.mjs … apply|authorize-commit` is PO-run (the
   shell guard refuses any command naming `critical-human-proof.json`). Staged guard files can only be unstaged by the PO
   (PB-GUARD-HOOKS); a verify-suites copy anywhere is TP-13-protected (keep post-images of it in `scratch/`).
+- **How this branch was pushed (repeat it next time):** in `signature` mode even a feature checkpoint needs a
+  commit-bound push signature (`CHECKPOINT-APPROVAL-STALE` otherwise); the installed `push-init --checkpoint` does not
+  say so. Flow: last commit → `push-prepare.mjs … --checkpoint` (repo copy) → PO runs the printed `authorize-critical`
+  (attended terminal, OpenSSL on PATH) → agent runs the printed `approve-push` → agent runs the printed `git -C … push`.
+  The key directory is now registered machine-wide (`set-po-key-directory`, 2026-10-08), so `--directory` is no longer
+  needed on this machine. Documented in `docs/push-release-flow.md` "Feature-branch checkpoint".
 - **Known red, pre-existing, not caused here:** `check-product-capability-inventory` (stale `sourceBaseline`);
   observation governance needed two docs classified (`1cc1d16d9`); install-agy win32 symlink/EPERM cases; AC6 `/var/tmp`
   writer cases on win32 (AC6-F4); MFH002/MFH003 (WINMF host items); EVID 4 win32 redaction cases.

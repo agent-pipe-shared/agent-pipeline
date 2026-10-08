@@ -106,9 +106,29 @@ refs/heads/feat/<branch>:refs/heads/feat/<branch>` form. Run that exact command
 as a separate invocation. The guard independently rechecks the ref binding,
 clean candidate, and committed intent, then appends a local attempted-delivery
 record under the repository's Git common directory. This route does **not**
-require fresh Verify/security evidence, marketplace synchronization,
-`approve-push`, or a release signature; it never permits force, deletion,
-implicit destinations, a source/destination mismatch, or a dirty tree.
+require fresh Verify/security evidence, marketplace synchronization, or a
+release signature; it never permits force, deletion, implicit destinations, a
+source/destination mismatch, or a dirty tree.
+
+**In `signature` mode a checkpoint also needs a commit-bound push signature**
+(PUSHSIG, `lib/checkpoint-push-approval.mjs`): the git pre-push hook refuses it
+with `CHECKPOINT-APPROVAL-STALE` until an approval for this exact commit, remote
+and destination is recorded. An older installed `push-init.mjs` may still report
+`checkpoint-ready` without saying so. Use the slim profile instead, after the
+last commit (the signature binds HEAD; commit nothing afterwards):
+
+```
+node "${PIPELINE_PLUGIN_ROOT}/scripts/push-prepare.mjs" --by <name> --remote origin --destination refs/heads/feat/<branch> --checkpoint
+```
+
+It demands no Verify/security/Critic evidence and prints three steps: the PO's
+one `authorize-critical --kind push` command (attended terminal; OpenSSL must be
+on that terminal's PATH), the agent's `pipeline-state.mjs approve-push`, and the
+exact `git -C <root> push origin <ref>:<ref>`. `approve-push` rewrites the
+tracked state file; the checkpoint clean-tree check exempts exactly that path.
+A missing key directory is repaired once with `po-human-approval.mjs
+set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
+signature).
 
 There is no fallback classification. `main`, configured protected refs,
 release/stable refs, tags, force/deletion forms, unknown destinations, and a
