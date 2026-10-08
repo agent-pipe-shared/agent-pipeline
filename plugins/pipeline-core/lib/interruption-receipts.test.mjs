@@ -68,6 +68,25 @@ test("AC6: elapsed time is not an input", () => {
   const short = ac6Bytes({ window: ac6Window("2026-08-01T00:00:00.000Z", "2026-08-02T00:00:00.000Z") });
   assert.equal(ac6Status(ac6Eval({ baseline: short, poApproval: { baselineSha256: ac6Sha(short) } })), "calibrated-pass");
 });
+// AC6-T2 (ruling 22): calibrated-pass needs exactly {receipts, followup} both measured, a present ordered window, and a matching approval.
+const ac6t2Cases = [
+  ["receipts estimated", { coverage: { receipts: "estimated", followup: "measured" } }],
+  ["receipts unavailable", { coverage: { receipts: "unavailable", followup: "measured" } }],
+  ["followup key missing", { coverage: { receipts: "measured" } }],
+  ["extra coverage key", { coverage: { receipts: "measured", followup: "measured", extra: "measured" } }],
+  ["window start value undefined", { window: { start: { status: "measured" }, end: { value: "2026-08-02T00:00:00.000Z", status: "measured" } } }],
+  ["window start after end", { window: ac6Window("2026-08-03T00:00:00.000Z", "2026-08-02T00:00:00.000Z") }],
+];
+for (const [name, over] of ac6t2Cases) {
+  test(`AC6-T2: matching approval but ${name} is report-only`, () => {
+    const baseline = ac6Bytes(over);
+    assert.equal(ac6Status(ac6Eval({ baseline, poApproval: { baselineSha256: ac6Sha(baseline) } })), "report-only");
+  });
+}
+test("AC6-T2: positive control, both keys measured with a valid window is calibrated-pass", () => {
+  const baseline = ac6Bytes({ coverage: { receipts: "measured", followup: "measured" } });
+  assert.equal(ac6Status(ac6Eval({ baseline, poApproval: { baselineSha256: ac6Sha(baseline) } })), "calibrated-pass");
+});
 const time = (seconds, status = "measured") => ({ value: `2026-08-01T00:00:${String(seconds).padStart(2, "0")}.000Z`, status });
 const absent = (status = "unknown") => ({ value: null, status });
 function input() {

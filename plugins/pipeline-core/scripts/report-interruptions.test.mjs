@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -155,6 +155,39 @@ test("AC6: --write-baseline writes an aggregate-only telemetry/interruption-base
     for (const key of ["window", "coverage", "registrySha256", "limitations", "generatedAt"]) assert.ok(key in baseline, `baseline lacks ${key}`);
     assert.ok(Array.isArray(baseline.limitations));
     for (const key of ["receipts", "snapshot", "sourceEntries", "episodes"]) assert.ok(!(key in baseline), `baseline must carry no receipt content: ${key}`);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+// AC6-T2 (ruling 23). Fixture is /var/tmp-based: on win32 these fail at the fixture (host-only).
+for (const flag of [["--feature", "x"], ["--package", "x"], ["--dispatch", "x"]]) {
+  test(`AC6-T2: --write-baseline with ${flag[0]} is refused with RI-BASELINE-SCOPED and writes no baseline`, () => {
+    const fx = fixture();
+    try {
+      const create = run(observedScript, ["create", "--root", fx.root, "--spec", "specs/sprint-alfred-epic/spec.md"]);
+      assert.equal(create.status, 0, `${create.stdout}${create.stderr}`);
+      const result = run(reportScript, ["--root", fx.root, "--write-baseline", ...flag]);
+      assert.notEqual(result.status, 0, `${result.stdout}${result.stderr}`);
+      assert.equal(JSON.parse(result.stderr).code, "RI-BASELINE-SCOPED");
+      assert.equal(existsSync(join(fx.root, "telemetry/interruption-baseline.json")), false);
+    } finally {
+      rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("AC6-T2: fallback-collection baseline records fallback limitations and a scope", () => {
+  const fx = fixture();
+  try {
+    const create = run(observedScript, ["create", "--root", fx.root, "--spec", "specs/sprint-alfred-epic/spec.md"]);
+    assert.equal(create.status, 0, `${create.stdout}${create.stderr}`);
+    const written = run(reportScript, ["--root", fx.root, "--write-baseline"]);
+    assert.equal(written.status, 0, `${written.stdout}${written.stderr}`);
+    const baseline = JSON.parse(readFileSync(join(fx.root, "telemetry/interruption-baseline.json"), "utf8"));
+    assert.ok(Array.isArray(baseline.limitations) && baseline.limitations.length > 0, "limitations must be non-empty for a fallback collection");
+    assert.ok(baseline.limitations.some((l) => /fallback|unestablished/i.test(JSON.stringify(l))), "a limitation must name the fallback qualification");
+    assert.ok("scope" in baseline, "baseline must record its scope");
   } finally {
     rmSync(fx.root, { recursive: true, force: true });
   }
