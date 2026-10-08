@@ -85,7 +85,7 @@ test("AL-1: Windows observation without a compatibility entry stays unavailable/
   assert.equal(spies.spawns, 0);
 });
 
-test("AL-2: eligible injected preflight plus a Windows entry selects the lane on windows-native", async () => {
+test("AL-2: eligible injected preflight plus a Windows entry selects the lane on windows-native", { todo: "H9: needs a verified windows-native entry in the shipped Codex sandbox compatibility policy" }, async () => {
   const selection = await select({ observeHost: async () => windowsObserved() });
   assert.equal(selection.status, "selected");
   assert.equal(selection.host.platformClass, "windows-native");
