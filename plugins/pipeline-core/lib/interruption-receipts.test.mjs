@@ -1055,7 +1055,7 @@ test("C1 absent reads distinguish a lock and prepared owned material without rem
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test("C1 createOperation initializes only the fixed immutable store layout on the eligible production filesystem", () => {
+test("C1 createOperation initializes only the fixed immutable store layout on the eligible production filesystem", { skip: process.platform !== "linux" && "C1 store requires the Linux ext backend (see report-interruptions.test.mjs:37-40)" }, () => {
   const root = fs.mkdtempSync("scratch/c1-store-create-");
   try {
     const result = createInterruptionStore({ root }).createOperation({ context: c1Context() });
@@ -1133,7 +1133,7 @@ function c1ReadyStore(root, ids = ["create-nonce", "store-1", "operation-1", "wr
   return { store, handle: created.handle };
 }
 
-test("C1 recordPreflight publishes detached exact observation and a valid immutable receipt", () => {
+test("C1 recordPreflight publishes detached exact observation and a valid immutable receipt", { skip: process.platform !== "linux" && "C1 store requires the Linux ext backend (see report-interruptions.test.mjs:37-40)" }, () => {
   const root = fs.mkdtempSync("scratch/c1-store-preflight-");
   try {
     const { store, handle } = c1ReadyStore(root);
@@ -1154,7 +1154,7 @@ test("C1 recordPreflight publishes detached exact observation and a valid immuta
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test("C1 recordPreflight replays only exact bytes and binds the retained operation", () => {
+test("C1 recordPreflight replays only exact bytes and binds the retained operation", { skip: process.platform !== "linux" && "C1 store requires the Linux ext backend (see report-interruptions.test.mjs:37-40)" }, () => {
   const root = fs.mkdtempSync("scratch/c1-store-preflight-replay-");
   const otherRoot = fs.mkdtempSync("scratch/c1-store-preflight-other-");
   try {
@@ -1171,7 +1171,7 @@ test("C1 recordPreflight replays only exact bytes and binds the retained operati
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(otherRoot, { recursive: true, force: true }); }
 });
 
-test("C1 recordPreflight rejects unbound candidate/owner observations and hostile descriptors before publication", () => {
+test("C1 recordPreflight rejects unbound candidate/owner observations and hostile descriptors before publication", { skip: process.platform !== "linux" && "C1 store requires the Linux ext backend (see report-interruptions.test.mjs:37-40)" }, () => {
   const root = fs.mkdtempSync("scratch/c1-store-preflight-binding-");
   try {
     const { store, handle } = c1ReadyStore(root);
@@ -1191,7 +1191,7 @@ test("C1 recordPreflight rejects unbound candidate/owner observations and hostil
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test("C1 recordPreflight preserves locked and incomplete owned material", () => {
+test("C1 recordPreflight preserves locked and incomplete owned material", { skip: process.platform !== "linux" && "C1 store requires the Linux ext backend (see report-interruptions.test.mjs:37-40)" }, () => {
   const lockedRoot = fs.mkdtempSync("scratch/c1-store-preflight-lock-");
   try {
     const { store, handle } = c1ReadyStore(lockedRoot);

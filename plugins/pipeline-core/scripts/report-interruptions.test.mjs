@@ -5,6 +5,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   parseReportInterruptionsArgs,
@@ -15,8 +16,8 @@ import {
 } from "./report-interruptions.mjs";
 
 const here = new URL(".", import.meta.url);
-const reportScript = new URL("report-interruptions.mjs", here).pathname;
-const observedScript = new URL("observe-critic-preflight.mjs", here).pathname;
+const reportScript = fileURLToPath(new URL("report-interruptions.mjs", here));
+const observedScript = fileURLToPath(new URL("observe-critic-preflight.mjs", here));
 const workspace = process.cwd();
 
 function git(root, args) {
