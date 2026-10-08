@@ -178,8 +178,37 @@ function quoteIfNeeded(token) {
   return /\s/u.test(token) ? JSON.stringify(token) : token;
 }
 
-export function formatArtifact({ command, label, exitCode, stdout, stderr }) {
-  return `command: ${command}\nlabel: ${label}\nexitCode: ${exitCode}\n--- stdout ---\n${stdout ?? ""}\n--- stderr ---\n${stderr ?? ""}`;
+function readGit(cwd, args) {
+  try {
+    const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+    if (result.error || result.status !== 0 || typeof result.stdout !== "string") return null;
+    return result.stdout;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort, read-only identity of the checkout the command runs in. Never throws: any Git
+ * failure (including a cwd outside a repository) yields `unavailable` for that field.
+ */
+export function readHeadIdentity(cwd) {
+  const oid = /^[0-9a-f]{40}$/u;
+  const head = (readGit(cwd, ["rev-parse", "HEAD"]) ?? "").trim();
+  const tree = (readGit(cwd, ["rev-parse", "HEAD^{tree}"]) ?? "").trim();
+  const porcelain = readGit(cwd, ["status", "--porcelain"]);
+  return Object.freeze({
+    head: oid.test(head) ? head : "unavailable",
+    tree: oid.test(tree) ? tree : "unavailable",
+    dirty: porcelain === null ? "unavailable" : String(porcelain !== ""),
+  });
+}
+
+export function formatArtifact({ command, label, exitCode, stdout, stderr, identity = null }) {
+  // The identity lines are written only when the caller supplies an identity (captureEvidence
+  // always does); a direct formatArtifact call without one keeps the original three-line header.
+  const identityLines = identity ? `head: ${identity.head}\ntree: ${identity.tree}\ndirty: ${identity.dirty}\n` : "";
+  return `command: ${command}\nlabel: ${label}\nexitCode: ${exitCode}\n${identityLines}--- stdout ---\n${stdout ?? ""}\n--- stderr ---\n${stderr ?? ""}`;
 }
 
 /**
@@ -239,6 +268,7 @@ export function captureEvidence({
 
   const root = repoRoot ?? findRepoRoot(cwd);
   const startedCandidate = format === "json" ? cleanCandidateIdentity(cwd) : null;
+  const identity = readHeadIdentity(cwd);
   const result = spawnSync(command[0], command.slice(1), { cwd, encoding: "utf8", maxBuffer });
   if (result.error) {
     // The wrapped command never produced a real exit code -- a spawn failure (e.g. ENOENT), or a
@@ -259,7 +289,7 @@ export function captureEvidence({
   }
   const assembledArtifact = format === "json"
     ? formatJsonArtifact({ command: commandLine, label, exitCode, stdout, stderr, candidate: startedCandidate })
-    : formatArtifact({ command: commandLine, label, exitCode, stdout, stderr });
+    : formatArtifact({ command: commandLine, label, exitCode, stdout, stderr, identity });
   const artifactText = redactResidualHostPaths(assembledArtifact);
 
   // Fail-closed backstop (sibling of the spawn-failure throw above): both exact-root redaction
