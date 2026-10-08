@@ -11,6 +11,8 @@ import { homedir } from "node:os";
 import { createAntigravityRefreshHost, resolveAntigravityCliPath } from "./lib/antigravity-topology-refresh-host.mjs";
 import { observeAntigravityPluginTopology } from "./lib/antigravity-plugin-topology.mjs";
 import { observeRunnerPublicCoreIdentity } from "./lib/public-core-observation.mjs";
+import { installAgyFromCentralSnapshot as installAgyFromCentralSnapshotDefault } from "./lib/agy-central-refresh.mjs";
+import { spawnSync } from "node:child_process";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const LOCAL_MARKETPLACE = join(process.env.HOME || process.env.USERPROFILE, "agent-pipeline-local-marketplace");
@@ -34,6 +36,7 @@ export function selectPluginSource({ answer = "", scriptDir = SCRIPT_DIR, market
     return { kind: "local-marketplace", pluginRoot: join(marketplaceRoot, "plugins", "pipeline-core") };
   }
   if (selected === "2") throw new Error("Local development marketplace is unavailable; no plugin was registered");
+  if (selected === "3") return { kind: "central-snapshot", pluginRoot: scriptDir };
   throw new Error("Invalid plugin source selection; no plugin was registered");
 }
 
@@ -231,19 +234,69 @@ export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, so
     : { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE" };
 }
 
+/** Choice 3: publish the per-user central agy snapshot and refresh the global agy copy from it. Injectable for tests. */
+export async function runCentralSnapshotInstall({
+  sourcePluginRoot,
+  attestationSourceRoot = sourcePluginRoot,
+  configRoot,
+  workspaceRoot,
+  deps,
+  runCli,
+  installAgyFromCentralSnapshot = installAgyFromCentralSnapshotDefault,
+  writeInstalledReceipt = writeLocalDevelopmentInstalledPluginReceipt,
+} = {}) {
+  return installAgyFromCentralSnapshot({
+    sourcePluginRoot,
+    attestationSourceRoot,
+    configRoot,
+    workspaceRoot,
+    deps,
+    runCli,
+    writeInstalledReceipt: (input) => writeInstalledReceipt({ ...input, sourcePluginRoot: input.attestationSourceRoot }),
+  });
+}
+
+function centralSnapshotRunCli(configRoot) {
+  return (argv) => {
+    if (configRoot !== join(homedir(), ".gemini")) return { status: "unavailable" };
+    const r = spawnSync(resolveAntigravityCliPath(), argv, { encoding: "utf8", timeout: 20000, maxBuffer: 65536 });
+    return r.error || r.signal || r.status !== 0 ? { status: "failed" } : { status: "ok", version: argv[0] === "--version" ? r.stdout.trim() : null };
+  };
+}
+
 export function runInteractiveInstaller() {
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 console.log("\n=== Antigravity Pipeline Installer ===\n");
 if (hasMarketplace) console.log(`Detected local development marketplace: ${LOCAL_MARKETPLACE}`);
 console.log("Source approval is your decision: this installer does not prove GitHub origin or release authenticity.");
 
-rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCAL_MARKETPLACE})? [Default: 1]: `, (sourceAnswer) => {
+rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCAL_MARKETPLACE}) or (3) Central agy snapshot (global, per-user)? [Default: 1]: `, (sourceAnswer) => {
   let selectedSource;
   try { selectedSource = selectPluginSource({ answer: sourceAnswer }); }
   catch (error) {
     console.error(`Installation refused: ${error.message}`);
     rl.close();
     process.exitCode = 1;
+    return;
+  }
+  if (selectedSource.kind === "central-snapshot") {
+    const configRoot = join(homedir(), ".gemini");
+    Promise.resolve()
+      .then(() => {
+        if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
+        return runCentralSnapshotInstall({ sourcePluginRoot: selectedSource.pluginRoot, attestationSourceRoot: selectedSource.pluginRoot, configRoot, workspaceRoot: process.cwd(), runCli: centralSnapshotRunCli(configRoot) });
+      })
+      .then((result) => {
+        console.log(JSON.stringify(result));
+        if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");
+        console.log("\nSuccess! Pipeline installed from the central agy snapshot (global).");
+        for (const line of postInstallGuidanceLines()) console.log(line);
+      })
+      .catch((error) => {
+        console.error(`Installation refused: ${error.message}`);
+        process.exitCode = 1;
+      })
+      .finally(() => rl.close());
     return;
   }
   const useMarketplace = selectedSource.kind === "local-marketplace";
