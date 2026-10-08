@@ -8684,6 +8684,7 @@ test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, an
       transcriptPathSha256: "b".repeat(64), promptSha256: "d".repeat(64), byteLength: 42,
     }),
     "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+    "--answers-file": "scratch/design-answers.json",
     "--plan-sha256": "a".repeat(64),
     "--proof": "scratch/bootstrap-plan-acknowledgement-proof-test.json",
     "--git-author-name": "PO Name",
