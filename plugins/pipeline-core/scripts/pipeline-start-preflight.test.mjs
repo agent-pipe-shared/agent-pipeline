@@ -280,7 +280,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   });
   assert.deepEqual(Object.keys(result).sort(), [
     "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "effectiveDecisions", "executionBoundary", "handoff", "installedPluginAttestation",
-    "installedSource", "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
+    "installedSource", "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
     "version",
   ]);
   assert.equal(result.schema, SCHEMA);
