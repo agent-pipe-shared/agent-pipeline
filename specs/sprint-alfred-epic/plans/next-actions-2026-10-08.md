@@ -1,0 +1,70 @@
+# Next actions for the session on the new machine (ordered; 2026-10-08)
+
+Read first: `handover-2026-10-08-machine-switch.md` (§1 where things live, §2 resume, §4b working rules). Every item
+below names its contract source; build each dispatch from `templates/prompts/goldfish-task.md` /
+`templates/prompts/critic-review.md`, never freehand. "Pins" = test-only dispatch committing RED cases (QG-04); "fix"
+= implementation dispatch that never edits tests. After a package's full Critic plus one delta, the Elephant
+self-verifies. Nothing below is PO-accepted.
+
+## 0. Restore (before any dispatch)
+
+1. `git apply --cached specs/sprint-alfred-epic/signed-package/tranche-1/envdump-staged-2026-10-08.patch` and check out
+   the two files into the worktree (handover §2 step 2). Expected blobs `93aad15d0` (lane), `3c3e447da` (`evaluate.mjs`).
+2. `node specs/sprint-alfred-epic/evidence/transfer-2026-10-08/unpack.mjs` restores `scratch/` and `evidence/`
+   (redacted copies; `<machine-path>` / `<machine-home>` / `<user>` placeholders mark removed machine identifiers).
+3. Run `/pipeline-core:pipeline-start`; the projection must say phase `implementation`, feature `sprint-alfred-epic`.
+
+## 1. Tranche 1 ceremony + stamp (needs the PO; was skipped on 2026-10-08 for time)
+
+1. Make the tree clean, except nothing staged (unstage the ENVDUMP lane again for this step; it is tranche 2).
+2. `node scratch/T1/build.mjs` then `node scratch/T1/check.mjs` (restored by the unpack step):
+   one-file package, `plugins/pipeline-core/scripts/pipeline-state.mjs` → post-image
+   `signed-package/tranche-1/plugins/pipeline-core/scripts/pipeline-state.mjs` (+6/−7, three hunks).
+3. PO: `sign-intent --request scratch/T1/t1-request.json`, materializer `apply`, then `authorize-commit`
+   (`signed-package/ceremony-route.md` §5.3). Agent: `git add` the one path, commit with
+   `Dispatch: quality-package-<intentSha256> (integration)` + `AI-Assisted: true`.
+4. Stamp: `plugins/pipeline-core/.claude-plugin/plugin.json` version `0.7.0+claude.<UTC yyyymmddhhmmss>.<8-char package
+   commit>` as its own `chore(release): stamp intermediate candidate …` commit (precedent `8551faf35`).
+
+## 2. Fix slices whose pins are already committed (RED today)
+
+| Order | Slice | Pins | Contract | Tier |
+|---|---|---|---|---|
+| 1 | T1-F2 (ENVDUMP recursion bound, in the staged lane; no commit — tranche 2) | `e87fd5488` (T1-T3) | ruling 51, `../evidence/critic-2026-10-07/envdump-delta.md` | deep |
+| 2 | WINMF-F (`directoryPathChain` on drive-letter paths) | `f07c41113` | handover §3 AL row; `model-family-runtime-host.mjs` ~42-55 | implementor |
+| 3 | PR-S1-F3 (gh marker across redirections / glued `-c`/`-S`) | `86d9a68de` | ruling 43, `pr-s1-delta.md` | deep |
+| 4 | RV-S5-F2 (signed archive destination, registry texts, orphan code) | `6d5804e8c` | ruling 44, `rv-s5-full.md`; ratify or rename the `repositoryRoot` input the pins introduced | deep |
+| 5 | AC6-F3 (observed vs requested window) | `417d27630` | ruling 45, `ac6-delta.md` | implementor |
+| 6 | AL-F2 (fallback `fallback`/`laneRecord`, `profile-drift` → `CLF-EVIDENCE-STALE`) | `9a317fa56`, `091a6f70e`, `543ad7123` | rulings 35/35a; after WINMF-F | deep |
+
+## 3. Pins then fixes still to write
+
+| Slice | Contract |
+|---|---|
+| RV-S7-T2 → RV-S7-F3 | ruling 49, `rv-s7-full.md` |
+| GITCLS-T2 → GITCLS-F2 | ruling 48, `gitcls-full.md` |
+| AM-T4 → AM fixes D2–D4; AM-W wiring (pins first) | ruling 50, `am-delta.md` |
+| R5-T0 (re-brief: ratify `codeSet: "answers-file"`, `expectedSha256`, `maxBytes` per execution order) → R5-F1…F7 | `../design/answers-file-2026-10-08.md`, PO decision BC |
+| R4-T0 (13 cases) → S1–S5 | `../design/role-route-preflight-r4-2026-10-08.md` incl. §7 S0 findings, PO decision BD |
+| RV-S6, RV-S8…S11 | `../design/recovery-availability-rv-2026-10-08.md` slice plan, PO decision BE |
+| R6 design note (audit index / continuity digest, AC-31) | `unstarted-ac-contracts-2026-10-07.md` §6 |
+| N5/N6/N10/N11 implementation slices | PO decisions AV, AU, AZ, BA and their design notes |
+| AC-6 promotion record reader | PO decision BB, `../design/ac6-promotion-approval-2026-10-08.md` |
+| Backlog items to file: T1-F2 (refusal by effect), EVID win32 redaction (4 failures), AC-6 Windows store backend (AX), `/evidence/` tracking + ADR-0063 amendment (handover §4a) | — |
+
+## 4. Tranche 2 (one signed package)
+
+ENVDUMP lane (after T1-F2, self-verified) + `harness/verify-suites.json` post-image (`dcf6395cd`; re-check that every
+suite it registers is green or carries typed host skips) + any further protected-path fixes ready by then. Ceremony as
+in §1, then stamp.
+
+## 5. Open PO questions
+
+N1–N4 (`po-open-questions-2026-10-07-night.md`): the Elephant recommendation is not yet written — read the option texts in
+`triage-6-po-options-2026-10-07.md`, add a recommendation, present them.
+
+## 6. Before the candidate is offered
+
+Host checklist H1–H12 (`candidate-host-checklist-2026-10-08.md`), spec-AC reconciliation refresh
+(`spec-ac-reconciliation-2026-10-07.md`), final handover with an honest status per AC (implementation complete vs
+PO-accepted).

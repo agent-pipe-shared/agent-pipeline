@@ -5,9 +5,7 @@
 
 **Release state:** version `0.6.3` · tag `v0.6.3` · commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` · tree `6821503f8f4fd72ed31459cb843d97bf8bfaa049` · status `published`
 
-**Current 2026-10-06:** IC-2d stamped (`8551faf35`); install per the execution order. Read next, before any work: [0.7.0 execution order](../specs/sprint-alfred-epic/plans/0.7-execution-order.md).
-
-**Transfer 2026-09-30:** [Alfred 0.7 feature checkpoint and exact resume notes](0.7-alfred-transfer-2026-09-30.md). This branch transfer is not a qualified release.
+**Current 2026-10-08:** START HERE — [machine-switch handover](../specs/sprint-alfred-epic/plans/handover-2026-10-08-machine-switch.md) (where everything lives, status, resume steps), then the [execution order](../specs/sprint-alfred-epic/plans/0.7-execution-order.md). Nothing PO-accepted.
 
 ## Archived history
 

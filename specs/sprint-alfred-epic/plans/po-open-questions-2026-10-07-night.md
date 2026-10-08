@@ -7,6 +7,11 @@ Non-blocking: work continues on everything that does not depend on an answer. An
 
 Q1–Q10 → decisions AI–AR.
 
+## Answered in the morning round (2026-10-08)
+
+N5 → AV, N6 → AU, N7 → BE, N8 → AW, N9 → AX, N10 → AZ, N11 → BA, N12 → BB, N13 → AS, N14 → BC, N15 → BD; tranche-1
+scope → AT, superseded by AY. Still open: N1–N4 (Elephant recommendation not yet written).
+
 ## Open (collected while the PO is away)
 
 Recorded options from [`triage-6-po-options-2026-10-07.md`](triage-6-po-options-2026-10-07.md) that refine an answer
