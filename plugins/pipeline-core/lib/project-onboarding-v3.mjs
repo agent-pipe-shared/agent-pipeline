@@ -2864,9 +2864,13 @@ function intakeDesignQuestionsAction(root, runner) {
     input: { name: "answersJson", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 65_536, singleLine: false, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: `ask the PO the ONE bundled round of design questions this project still needs answered. If there are genuinely no open design questions, ask for an explicit affirmative no-open-questions disposition. Replace exactly ${INTAKE_DESIGN_ANSWERS_PLACEHOLDER} in applyAction.argv with either the JSON array of {question, answer} objects or {"disposition":"no-open-questions"} as one argv data element. Never invent an answer, reconstruct the command, or ask a second round.`,
+    guidance: `ask the PO the ONE bundled round of design questions this project still needs answered. If there are genuinely no open design questions, ask for an explicit affirmative no-open-questions disposition. Replace exactly ${INTAKE_DESIGN_ANSWERS_PLACEHOLDER} in applyAction.argv with either the JSON array of {question, answer} objects or {"disposition":"no-open-questions"} as one argv data element. Never invent an answer, reconstruct the command, or ask a second round. If the answers contain a newline or exceed a few KB, write the same JSON to scratch/design-answers.json and execute fileApplyAction (the --answers-file route) instead of applyAction.`,
     applyAction: commandAction(
       [ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", root, "--answers-json", INTAKE_DESIGN_ANSWERS_PLACEHOLDER, "--activate", "--runner", runner],
+      true, true, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA, ["applied"],
+    ),
+    fileApplyAction: commandAction(
+      [ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", root, "--answers-file", "scratch/design-answers.json", "--activate", "--runner", runner],
       true, true, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA, ["applied"],
     ),
     expected: { schema: SCHEMA, statuses: ["intake-design-questions-required"] },
