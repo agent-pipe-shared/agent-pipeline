@@ -37,6 +37,7 @@ import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, rechec
 import { observeModelFamilyActivation } from "../lib/model-family-runtime-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
+import { LANE_FALLBACK, LANE_NATIVE, buildLaneRecord, decideCriticLaneFallback } from "../lib/critic-lane-fallback.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const OID = /^[a-f0-9]{40,64}$/;
@@ -388,11 +389,52 @@ function validateFailureDiagnostic(value, input, sandboxTransport) {
   return structuredClone(value);
 }
 
-function unavailableResult(code, selected = null, failureDiagnostic = null, preparationCode = null) {
+function unavailableResult(code, selected = null, failureDiagnostic = null, preparationCode = null, preLaunch = null) {
   const result = { ok: false, code, selectionId: selected?.selectionId ?? null, sandboxBinding: null };
   if (failureDiagnostic) result.failureDiagnostic = structuredClone(failureDiagnostic);
   if (preparationCode !== null) result.preparationCode = preparationCode;
+  if (preLaunch !== null) {
+    result.failureClass = preLaunch.fallback.failureClass;
+    result.terminalCode = preLaunch.fallback.terminalCode;
+    result.fallback = structuredClone(preLaunch.fallback);
+    result.laneRecord = structuredClone(preLaunch.laneRecord);
+  }
   return result;
+}
+
+/**
+ * Typed pre-launch fallback (design note codex-critic-lane-2026-10-08.md
+ * section 3 change 3, N2 = B). Applies only to a no-child outcome that names
+ * a persisted selection: the selection is read through the injected
+ * transport.readSelection(selectionId), and a missing or failing reader is
+ * reported as CLF-SELECTION-UNREADABLE rather than hidden. A child that
+ * started never reaches this function (a second review would be verdict
+ * shopping). Returns null when no fallback decision applies, so the caller
+ * keeps its plain result unchanged.
+ */
+async function typedPreLaunchFallback(selected, transport) {
+  if (selected === null || typeof selected !== "object" || Array.isArray(selected)) return null;
+  if (selected.childStarted === true || typeof selected.selectionId !== "string" || selected.selectionId === "") return null;
+  let selection = null;
+  try {
+    selection = typeof transport.readSelection === "function" ? await transport.readSelection(selected.selectionId) : null;
+  } catch {
+    selection = null;
+  }
+  const decision = decideCriticLaneFallback({ selected, selection });
+  if (decision.fallback !== true) return null;
+  const readable = selection !== null && typeof selection === "object" && !Array.isArray(selection) && selection.selectionId === selected.selectionId;
+  const failureClass = (readable ? selection.failureClass : undefined) ?? selected.failureClass;
+  const terminalCode = readable ? selection.preflight?.terminalCode : undefined;
+  const fallback = {
+    code: decision.code,
+    from: decision.from,
+    to: decision.to,
+    selectionId: decision.selectionId,
+    failureClass: typeof failureClass === "string" ? failureClass : null,
+    terminalCode: typeof terminalCode === "string" ? terminalCode : null,
+  };
+  return { fallback, laneRecord: buildLaneRecord({ requested: LANE_NATIVE, used: LANE_FALLBACK, fallback }) };
 }
 
 /**
@@ -487,7 +529,7 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
     return unavailableResult("selected-sandbox-required", null, capturedFailureDiagnostic);
   }
   if (!selected || selected.status === "unavailable" || selected.childStarted !== true) {
-    return unavailableResult("selected-sandbox-required", selected, capturedFailureDiagnostic);
+    return unavailableResult("selected-sandbox-required", selected, capturedFailureDiagnostic, null, await typedPreLaunchFallback(selected, transport));
   }
   if (selected.status === "error") {
     const result = {

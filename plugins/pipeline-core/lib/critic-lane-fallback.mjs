@@ -27,7 +27,7 @@ const FAILURE_CLASS_MAP = Object.freeze({
   "host-unsupported": "CLF-HOST-UNSUPPORTED",
   "evidence-stale": "CLF-EVIDENCE-STALE",
   "preflight-failed": "CLF-PREFLIGHT-FAILED",
-  "profile-drift": "CLF-PROFILE-UNAVAILABLE",
+  "profile-drift": "CLF-EVIDENCE-STALE",
   "host-mode-unavailable": "CLF-PROFILE-UNAVAILABLE",
 });
 
