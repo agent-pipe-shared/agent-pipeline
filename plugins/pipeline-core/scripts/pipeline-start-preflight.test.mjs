@@ -2044,3 +2044,26 @@ test("NVA-B8-11: gitless Claude recovery references survive a skill-only install
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+// AM-W-T2 (Critic AM-D1, dispatcher rulings 50 and 55; design note agy-snapshot-central-2026-10-08 sections 3-4): pins that the
+// start preflight is a caller of observeAgyStartHint. Test-only; the structural pin is expected RED until the AM-W wiring slice
+// lands, and the behaviour cases are todo until that slice exposes an injectable seam (the real agy CLI and the real home are
+// never touched). observeAgyStartHint is defined in lib/agy-start-hint.mjs; the central refresh module is accepted as an
+// equivalent import source in case the wiring slice re-exports it there.
+function amW2CodeOf(url) {
+  return readFileSync(url, "utf8").split(/\r?\n/u).filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line)).join("\n");
+}
+
+test("AM-W-T2: pipeline-start-preflight.mjs imports observeAgyStartHint and calls it (structural stand-in)", () => {
+  const code = amW2CodeOf(new URL("./pipeline-start-preflight.mjs", import.meta.url));
+  assert.match(code, /import\s*\{[^}]*\bobserveAgyStartHint\b[^}]*\}\s*from\s*["']\.\.\/lib\/(?:agy-start-hint|agy-central-refresh)\.mjs["']/u);
+  assert.match(code, /\bobserveAgyStartHint\s*\(/u);
+});
+
+test("AM-W-T2: a governed-but-not-loaded agy workspace surfaces the agy hint in the preflight output", (t) => {
+  t.todo("missing seam: observePipelineStartPreflight() must accept an injectable observeAgyStartHint (or the workspace root, config root and loaded plugin root it reads) before this can be pinned against a fixture governed workspace whose loaded agy plugin root differs from the managed copy, without touching the real home or resolving the real agy CLI. The wiring slice must provide that seam; the case then asserts that the agy hint appears in the preflight output. The output field name is the wiring slice's to choose and is deliberately not pinned here.");
+});
+
+test("AM-W-T2: a governed-and-loaded or an ungoverned agy workspace adds no agy hint to the preflight output", (t) => {
+  t.todo("missing seam: same injectable seam as the case above. The wiring slice must provide it; the case then asserts, for a governed workspace whose loaded agy plugin root is the managed copy and for an ungoverned workspace, that the preflight output carries no agy hint and is otherwise byte-identical to the output of a run without the agy observation.");
+});

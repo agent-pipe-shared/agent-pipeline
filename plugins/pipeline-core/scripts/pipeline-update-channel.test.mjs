@@ -615,3 +615,25 @@ test("unchanged: an invalid pipelineUpdateChannel value still blocks a channel o
   assert.equal(applied.reason, "invalid-channel");
   assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), before);
 });
+
+// AM-W-T2 (Critic AM-D1, dispatcher rulings 50 and 55; design note agy-snapshot-central-2026-10-08 section 3, "the update verb
+// calls publish then refresh at the host boundary (skipped when no agy CLI is found)"): pins that the update verb is a caller
+// of the per-user central agy snapshot. Test-only; the structural pin is expected RED until the AM-W wiring slice lands, and
+// the behaviour cases are todo until that slice exposes an injectable seam (the real agy CLI and the real home are never touched).
+function amW2CodeOf(url) {
+  return readFileSync(url, "utf8").split(/\r?\n/u).filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line)).join("\n");
+}
+
+test("AM-W-T2: pipeline-update-channel.mjs imports applyAgyCentralSnapshotAfterUpdate from the central refresh module and calls it (structural stand-in)", () => {
+  const code = amW2CodeOf(new URL("./pipeline-update-channel.mjs", import.meta.url));
+  assert.match(code, /import\s*\{[^}]*\bapplyAgyCentralSnapshotAfterUpdate\b[^}]*\}\s*from\s*["']\.\.\/lib\/agy-central-refresh\.mjs["']/u);
+  assert.match(code, /\bapplyAgyCentralSnapshotAfterUpdate\s*\(/u);
+});
+
+test("AM-W-T2: applyAgyCentralSnapshotAfterUpdate is called after a successful update", (t) => {
+  t.todo("missing seam: the update entry must accept an injectable applyAgyCentralSnapshotAfterUpdate (or its resolveCliPath and runCli) before this call can be pinned against a fixture project and a fixture config root without resolving the real agy CLI by PATH or touching the real home. The wiring slice must provide that seam; the case then asserts exactly one call, strictly after the update was applied, and no call when the update itself did not apply.");
+});
+
+test("AM-W-T2: a refused agy refresh is reported in the update result and does not fail the update", (t) => {
+  t.todo("missing seam: same injectable seam as the case above, here with a refusing refresh (for example status refused with an ATR- reason). The wiring slice must expose the refusal in the update result and leave the update status, exit code and the already written project calibration unchanged; an absent agy CLI (status skipped, AGY-CLI-ABSENT) must also leave the update untouched.");
+});
