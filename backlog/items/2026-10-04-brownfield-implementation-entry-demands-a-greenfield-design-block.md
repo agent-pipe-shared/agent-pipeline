@@ -100,7 +100,7 @@ an interim unblock, not this target model. Owner: D3/D4.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `21fee38d1`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

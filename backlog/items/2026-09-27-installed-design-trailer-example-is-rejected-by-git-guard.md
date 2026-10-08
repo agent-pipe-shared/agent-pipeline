@@ -65,3 +65,8 @@ the Agent-Pipeline recovery handover `docs/0.7-recovery-2026-10-03.md` (consiste
 patch prepared in `scratch/design-trailer-consistency/`, unqualified).
 
 ## Triage
+
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `2a466fa59`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

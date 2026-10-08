@@ -173,3 +173,10 @@ candidate `6aab6da07234a50c7c501cd3d2edf3ca4a366a77` remains frozen.
 Source commit and canonical ledger/projection reconciliation are pending the
 Root's candidate-freeze sequence. Creating this item changes neither shipped
 code nor HEAD and claims no completed correction or qualification.
+
+## Triage
+
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `8b5dcf4fb`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

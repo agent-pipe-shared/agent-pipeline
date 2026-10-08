@@ -30,7 +30,7 @@ Both guards should read the same (installed) definition, or the binding should r
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `337492443`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

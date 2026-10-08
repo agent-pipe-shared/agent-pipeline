@@ -54,3 +54,10 @@ The Source correction is delivered; this item remains open until criterion4.
 The closed2026-09-04 truncation item concerns a different observed defect and is
 not reopened. This follow-up falls under the PO's approved test-optimization
 and complete-confirmed-findings mandate.
+
+## Triage
+
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `26fef9e7d`, host run needed.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

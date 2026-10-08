@@ -44,3 +44,7 @@ final candidate PASS. Keep this item open until integrated qualification.
 ## Triage
 
 - **2026-10-08 close-out check:** not closable — installed-guard acceptance needs host run; item requires integrated qualification.
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `26fef9e7d`, host run needed.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

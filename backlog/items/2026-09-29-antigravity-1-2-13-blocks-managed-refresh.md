@@ -33,3 +33,10 @@ to the current source through the documented global installer route.
 The shared version check and 1.2.13 regression are implemented. Refresh
 13/13, topology integration 9/9 and installer 14/14 pass. Installed-host
 acceptance on the next stamped candidate remains open.
+
+## Triage
+
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `d1a015ff5`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

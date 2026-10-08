@@ -67,6 +67,11 @@ prepared; no source correction or item closure is claimed.
 
 ## Triage
 
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `8b5dcf4fb`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.
+
 ## Prepared compatibility correction (2026-09-28)
 
 Separate Journal and Advisor-store patches now classify the common/shared

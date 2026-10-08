@@ -37,6 +37,10 @@ no Source delivery, alternate writer or override consumption is claimed.
 ## Triage
 
 - **2026-10-08 close-out check:** not closable — guard CLI/fanout positives and candidate binding need host runs.
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `26fef9e7d`, host run needed.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.
 
 ## Acceptance
 

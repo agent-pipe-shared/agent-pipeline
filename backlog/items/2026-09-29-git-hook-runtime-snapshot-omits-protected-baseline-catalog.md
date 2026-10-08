@@ -75,3 +75,10 @@ pending. The earlier prepared-run statements above are historical. This item is 
 committed or registered yet because the current product commit is held at the
 normal protected-path backstop. Do not mark it closed from the static diagnosis
 or an isolated snapshot test.
+
+## Triage
+
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `26fef9e7d`, host run needed.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.

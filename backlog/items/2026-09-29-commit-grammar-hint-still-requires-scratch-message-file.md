@@ -32,3 +32,10 @@ Keep the closed shell grammar and provenance validation unchanged. Preserve
 - A literal newline inside one shell argument remains refused, with a clear
   file-free remediation.
 - The guard's allow or deny decision does not change as a result of guidance.
+
+## Triage
+
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `15722ce6a`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.
