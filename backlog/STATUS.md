@@ -288,6 +288,7 @@
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | closed | workflow-improvement | pipeline | nova-b | 2026-08-16 | — | — |
 | pipeline.every-small-correction-costs-a-new-human-interaction | open | idea | pipeline | batman | 2026-08-28 | — | — |
 | pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.evidence-artifacts-carry-no-commit-identity | open | workflow-improvement | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.evidence-bound-review-retry-economics | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-09-08 | — |
 | pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked | closed | defect | pipeline | — | 2026-08-17 | 2026-08-24 | — |
 | pipeline.evslotfix-1-broke-verify-fixture-module-lists | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — discovered running the first full verify.mjs gate of this session (last known-green was 7cc0b649, 2026-09-02; many commits landed since across the whole day). Blocks A-C of NVA-B-EVSLOTFIX-1 (commits 61dc7fc5/d30273d3) added a new import to harness/scripts/verify.mjs (harness/scripts/verify-evidence-writer.mjs). Two test fixtures that copy verify.mjs and a hardcoded list of its dependencies into an isolated sandbox to test its behavior were never updated to also copy the new file, so the copied verify.mjs now fails to even load in those sandboxes. |
@@ -321,6 +322,7 @@
 | pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec. |
 | pipeline.gg22-pathspec-fix-lacks-permanent-test | closed | defect | pipeline | nova-b | 2026-09-06 | 2026-10-06 | Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic. |
+| pipeline.gh-delivery-classifier-is-not-wired | open | workflow-improvement | elephant | alfred | 2026-10-08 | before the 0.7.0 candidate is called complete | — |
 | pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.git-apply-bypasses-draft-source-guard | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
@@ -331,6 +333,7 @@
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | — | 2026-08-10 | 2026-08-17 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | — | 2026-08-10 | — | — |
+| pipeline.git-push-classifier-misses-env-s-and-editor-bang | open | workflow-improvement | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.git-stash-list-classified-as-working-tree-write | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
@@ -863,7 +866,7 @@
 
 ## Counts
 
-- open: 178
+- open: 181
 - in_progress: 0
 - closed: 663
 - rejected: 3
