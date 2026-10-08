@@ -45,6 +45,14 @@ boundary verifies with HEAD past the candidate and (b) presentation/approval sti
 `scratch/hotfix-candidate-binding.ps1` (9 anchors in 3 files) is the reference diff; the source fix must replace it and
 the next stamp must carry it.
 
+## Addendum (CANDBIND-T, 2026-10-08)
+
+- A second strict re-read exists on the Codex readiness branch: `codex-readiness-finalization.mjs` ~102
+  (`rereadCurrentReadinessAdvisorObservation`). The PO hotfix and the proposal above cover only the non-Codex branch;
+  the fix slice must cover both (or pin why the Codex branch is out of scope).
+- The existing v2 package fixtures depend on `codex-design-readiness-host-store.mjs` (~66–69: `process.platform ===
+  "linux"`, `process.getuid`), so these pins run under WSL/Linux only; on win32 they need a typed skip.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted — candidate blocker (PO decision BI).
