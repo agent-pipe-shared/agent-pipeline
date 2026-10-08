@@ -54,7 +54,8 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:UserPromptSubmit::node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-intake-prompt-capture.mjs\"",
         "verify-phase:harness/scripts/verify.mjs:claude-native-capture-entry-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-task-output-read-scope-tests",
-        "verify-phase:harness/scripts/verify.mjs:claude-task-output-scope-posttool-tests"
+        "verify-phase:harness/scripts/verify.mjs:claude-task-output-scope-posttool-tests",
+        "verify-phase:harness/scripts/verify.mjs:gh-cmd-tests"
       ],
       "runners": [
         "antigravity",
@@ -405,6 +406,7 @@
         "verify-phase:harness/scripts/verify.mjs:feature-close-audit-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+        "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
@@ -777,6 +779,7 @@
         "verify-phase:harness/scripts/verify.mjs:suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:test-case-completion-tests",
+        "verify-phase:harness/scripts/verify.mjs:test-private-tmp-tests",
         "verify-phase:harness/scripts/verify.mjs:test-tmpdir-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:test-tmpdir-tests",
         "verify-phase:harness/scripts/verify.mjs:threat-model-approval-request-tests",
@@ -1334,10 +1337,12 @@
       "status": "shipped",
       "surfaceIds": [
         "setup:setup.mjs:setup",
+        "verify-phase:harness/scripts/verify.mjs:agy-central-snapshot-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:bound-design-line-endings-tests",
         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-rollback-tests",
         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-tests",
+        "verify-phase:harness/scripts/verify.mjs:hardened-private-directory-install-tests",
         "verify-phase:harness/scripts/verify.mjs:hook-currentness-digest-once-tests"
       ],
       "runners": [
@@ -1636,9 +1641,11 @@
         "duty:pipeline.user.yaml:read",
         "duty:pipeline.user.yaml:readiness",
         "duty:pipeline.user.yaml:test_author",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-selected-host-fallback-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-readiness-app-server-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-lane-fallback-tests",
         "verify-phase:harness/scripts/verify.mjs:design-readiness-course-e2e-tests",
         "verify-phase:harness/scripts/verify.mjs:design-readiness-host-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:design-readiness-runner-host-store-tests",
@@ -2105,7 +2112,8 @@
         "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
         "verify-phase:harness/scripts/verify.mjs:control-execution-lifecycle-event-tests",
         "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
-        "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests"
+        "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:gitleaks-repair-ignore-cli-tests"
       ],
       "runners": [
         "host-only"
@@ -2298,10 +2306,14 @@
         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-approval-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-consistency-check-tests",
         "verify-phase:harness/scripts/verify.mjs:design-course-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-review-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:design-workflow-package-builder-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-signed-integration-tests",
         "verify-phase:harness/scripts/verify.mjs:model-family-approval-request-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-push-anchor-tests",
         "verify-phase:harness/scripts/verify.mjs:quality-package-windows-path-tests",
         "verify-phase:harness/scripts/verify.mjs:signed-quality-package-tests"
       ],
@@ -2359,6 +2371,10 @@
       "benefit": "An operator can explicitly ask the live repair planner which declared refusal route, if any, applies; the command itself grants no override.",
       "status": "optional",
       "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:attended-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-archive-tests",
+        "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-tests",
+        "verify-phase:harness/scripts/verify.mjs:recovery-refusal-registry-tests",
         "verify-phase:harness/scripts/verify.mjs:repair-map-tests"
       ],
       "runners": [
@@ -2431,7 +2447,9 @@
         "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-win-path-tests",
-        "verify-phase:harness/scripts/verify.mjs:runtime-handover-writer-tests"
+        "verify-phase:harness/scripts/verify.mjs:runtime-handover-writer-tests",
+        "verify-phase:harness/scripts/verify.mjs:scratch-retention-tests",
+        "verify-phase:harness/scripts/verify.mjs:scratch-sweep-tests"
       ],
       "runners": [
         "runner-neutral"
