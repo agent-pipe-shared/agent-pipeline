@@ -68,7 +68,47 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
   if (critic.reviewPass !== true) fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
   if (critic.candidate.commit !== sourceCandidate.commit || critic.candidate.tree !== sourceCandidate.tree
     || critic.reviewRange.commit !== sourceCandidate.commit) fail("CVL-CRITIC-STALE", "Private Critic receipt is not bound to the Verify candidate.");
-  return Object.freeze({ packet, critic, criticReceiptSha256: bytesSha256(canonicalJson(critic)) });
+  const criticReceiptSha256 = bytesSha256(canonicalJson(critic));
+  const roleRoute = criticRouteVerdict({ gitCommonDir: common, criticPacketId, critic, criticReceiptSha256 }, deps);
+  return Object.freeze({ packet, critic, criticReceiptSha256, roleRoute });
+}
+
+const CRITIC_HOST_OBSERVATION_SCHEMA = "pipeline.critic-host-observation.v1";
+const ROUTE_RUNNERS = new Set(["claude", "codex", "antigravity"]);
+// Typed `unavailable` verdicts shared by every reader. The reason codes mirror the role-route
+// preflight vocabulary (R4-1); they are restated here because this reader is a separate seam.
+const ROUTE_NO_OBSERVATION = Object.freeze({ state: "unavailable", reasonCode: "RRP-NO-HOST-OBSERVATION", evidence: "" });
+const ROUTE_NOT_REGISTERED = Object.freeze({ state: "unavailable", reasonCode: "RRP-ROLE-NOT-REGISTERED", evidence: "" });
+
+/**
+ * Route verdict for the Critic behind a bound receipt (R4-2 / R4-12). REPORT-ONLY
+ * per PO decision BD: with no host observation (no `deps.readCriticHostObservationFn`,
+ * or one returning null) the verdict is a typed `unavailable` and nothing is refused,
+ * so today's close outcome is unchanged. Only an observation that is SUPPLIED and
+ * fails to prove a native, hook-recorded, per-call read-only Critic bound to this
+ * exact packet and receipt is refused: forged or incomplete evidence never counts as
+ * native. A `fallback-self-dispatch` observation is refused as fallback evidence.
+ * The verdict is returned alongside the receipt and is never folded into the
+ * private receipt bytes.
+ */
+function criticRouteVerdict({ gitCommonDir, criticPacketId, critic, criticReceiptSha256 }, deps) {
+  const readObservation = deps.readCriticHostObservationFn;
+  if (readObservation === undefined || readObservation === null) return ROUTE_NO_OBSERVATION;
+  let observed;
+  try { observed = readObservation({ gitCommonDir, criticPacketId }); }
+  catch { fail("CVL-ROUTE-UNAVAILABLE", "The supplied Critic host observation reader failed."); }
+  if (observed === undefined || observed === null) return ROUTE_NO_OBSERVATION;
+  if (typeof observed !== "object" || Array.isArray(observed)) fail("CVL-ROUTE-UNAVAILABLE", "The supplied Critic host observation is malformed.");
+  if (observed.kind === "fallback-self-dispatch") fail("CVL-FALLBACK-EVIDENCE", "A fallback self-dispatch result is not Critic gate evidence.");
+  const { start, readOnly, terminal } = observed;
+  const native = observed.schema === CRITIC_HOST_OBSERVATION_SCHEMA && observed.kind === "native"
+    && ROUTE_RUNNERS.has(observed.runner) && observed.packetId === criticPacketId
+    && start?.hookRecorded === true && typeof start.subagentId === "string" && start.subagentId.length > 0
+    && readOnly?.perCallEnforced === true && Array.isArray(readOnly.writeToolCalls) && readOnly.writeToolCalls.length === 0
+    && terminal?.hookRecorded === true && terminal.packetDigest === critic.packetDigest
+    && terminal.receiptSha256 === criticReceiptSha256;
+  if (!native) fail("CVL-ROUTE-UNAVAILABLE", "The supplied host observation does not prove a native Critic for this packet and receipt.");
+  return Object.freeze({ state: "native", reasonCode: "RRP-NATIVE-OBSERVED", evidence: sha256(canonicalJson(observed)) });
 }
 
 /**
@@ -239,5 +279,8 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
       fail("CVL-VERIFY-DRIFT", "Verify terminal receipt differs from the private lifecycle binding.");
     }
   }
-  return Object.freeze({ receipt, receiptSha256: bytesSha256(canonicalJson(receipt)), path: target });
+  // Report-only role-route verdicts (R4-12, PO decision BD). Not part of `receipt`, so `receiptSha256` is unchanged.
+  // plan-verifier has no lifecycle slot; readiness has no observation seam in this reader.
+  const roleRoutes = Object.freeze({ critic: bound.roleRoute, "plan-verifier": ROUTE_NOT_REGISTERED, readiness: ROUTE_NO_OBSERVATION });
+  return Object.freeze({ receipt, receiptSha256: bytesSha256(canonicalJson(receipt)), path: target, roleRoutes });
 }
