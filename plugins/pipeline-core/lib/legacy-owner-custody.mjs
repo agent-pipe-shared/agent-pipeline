@@ -398,6 +398,9 @@ export const LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA = "pipeline.legacy-custody-arch
 const RV4_CODES = Object.freeze({
   replayPrecondition: "LOC-REPLAY-PRECONDITION",
   targetUnsafe: CODES.targetUnsafe,
+  // A mismatch found AFTER the exclusive publish: the archived copy already exists, so this is
+  // not the dead-end pre-write LOC-PROOF-BINDING-MISMATCH (RV-D3, ruling 44c).
+  archiveOrphanedCopy: "LOC-ARCHIVE-ORPHANED-COPY",
 });
 
 const ARCHIVE_DIRECTORY_NAME = "archived";
@@ -616,7 +619,9 @@ function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, classific
     // TOCTOU: the original must still be the exact signed bytes right before it is removed.
     const again = readReceiptBytes(receiptPath);
     if (again.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
-    if (!again.bytes.equals(bytes)) return refusedResult(RV3_CODES.bindingMismatch, mutated);
+    // The copy is already published (mutated is true): leave the changed original in place, write no
+    // audit line, and say that an orphaned archived copy exists rather than a dead-end refusal.
+    if (!again.bytes.equals(bytes)) return refusedResult(RV4_CODES.archiveOrphanedCopy, mutated);
 
     const entry = {
       schema: LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA,

@@ -41,21 +41,22 @@ export const RECOVERY_REFUSAL_REGISTRY = Object.freeze({
   }),
 
   // RV-2: classification of a legacy session-cleanup receipt.
+  // A conflicting receipt admits only a signed archive disposition (preserve is forbidden for it).
   "LOC-STATUS-MISMATCH": entry("RV-2", "unavailable", {
     kind: "signed-custody-disposition",
-    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody archive disposition.",
   }),
   "LOC-SCHEMA-MISMATCH": entry("RV-2", "unavailable", {
     kind: "signed-custody-disposition",
-    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody archive disposition.",
   }),
   "LOC-DIGEST-MISMATCH": entry("RV-2", "unavailable", {
     kind: "signed-custody-disposition",
-    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody archive disposition.",
   }),
   "LOC-COMPARE-FLAG-FALSE": entry("RV-2", "unavailable", {
     kind: "signed-custody-disposition",
-    action: "Review the receipt whose comparison failed, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+    action: "Review the receipt whose comparison failed, then act on it only through a human-signed legacy custody archive disposition.",
   }),
   "LOC-COMPARE-FLAG-MISSING": entry("RV-2", "handoff", {
     kind: "attended-diagnostic",
@@ -91,7 +92,15 @@ export const RECOVERY_REFUSAL_REGISTRY = Object.freeze({
   // RV-4: applying a signed disposition.
   "LOC-REPLAY-PRECONDITION": entry("RV-4", "unavailable", {
     kind: "replay-preconditions-defined",
-    action: "Replay has no defined preconditions yet; use a signed preserve or archive disposition instead.",
+    // A matching receipt admits only a signed preserve disposition (archive is forbidden for it).
+    action: "Replay has no defined preconditions yet; use a signed preserve disposition instead.",
+  }),
+  // Raised after the signed archive copy was published and the original no longer matched the
+  // signed bytes: the copy is orphaned (no audit line, original left in place), a bare refuse
+  // would hide it, and a plain retry fails because the archive target now exists.
+  "LOC-ARCHIVE-ORPHANED-COPY": entry("RV-4", "handoff", {
+    kind: "attended-diagnostic",
+    action: "The signed archive copy was already published but the original receipt no longer matches the signed bytes, so the original was left in place and no audit line was written; an attended operator must review the orphaned copy at its archive path (archived/<sessionId>.<sha256>.json under the signed archive destination) against the original before any retry.",
   }),
   "LOC-TARGET-UNSAFE": entry("RV-4", "handoff", {
     kind: "attended-diagnostic",
