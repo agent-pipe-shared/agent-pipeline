@@ -517,3 +517,257 @@ test("RV-8: S7 has no write path - an apply verb is refused with ATR-VERB-UNSUPP
   assertRefused(result, "ATR-VERB-UNSUPPORTED");
   assertTargetsUntouched(fx, before);
 });
+
+// ===========================================================================
+// RV-S7-T2 (appended; nothing above is changed). Pins the forgery-stopping
+// checks and the hardening named by the Critic record
+// specs/sprint-alfred-epic/evidence/critic-2026-10-07/rv-s7-full.md (findings
+// RV7-D1, D2, D4, D5, D6; dispatcher ruling 49). Same fixture builders, fixture
+// keys only, assumptions A1-A12 unchanged. Cases may be RED against the S7
+// implementation; the fix slice (RV-S7-F3) is what turns them green.
+//   T2-a. Check order of attended-recovery.mjs is repository -> anchor ->
+//         signature -> artifact, and intent.kind, intent.decision,
+//         sha256(canonical(intent)) === proof.intentSha256 and
+//         intent.subjectSha256 === sha256(canonical(package)) are all clauses of
+//         the SIGNATURE step, so each of their four refusals is
+//         ATR-SIGNATURE-INVALID (not ATR-ARTIFACT-MISMATCH: the forged package
+//         and the supplied artifact agree with each other, which is the point).
+//   T2-b. A forged authorization is built from honest parts so that exactly ONE
+//         binding is false; a control run on the honest parts proves that
+//         fixture verifies, so the refusal is attributable to that one binding.
+//   T2-c. RV7-D5 is pinned textually: the declaration of `canonical` in the CLI
+//         and in the plugin, whitespace removed, must be identical (the plugin
+//         declaration is one source line, the CLI's is wrapped, so a textual
+//         comparison after whitespace normalisation is possible and chosen).
+//   T2-d. A1 says main() and the process exit code are not exercised by the
+//         RV-S7-T cases; the entry-guard case below exercises main() on purpose
+//         (briefing RV-S7-T2 item 8) and pins only: result JSON on stdout, exit
+//         0 for a verified run, a non-zero exit for a refusal.
+// ===========================================================================
+import { spawnSync } from "node:child_process";
+import { chmodSync, copyFileSync, rmdirSync, symlinkSync, unlinkSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+function honestParts(fx) {
+  const pkg = buildPackage(fx, fx.rootIdentity);
+  const intent = buildIntent(pkg, fx.rootIdentity);
+  return { pkg, intent, proof: buildProof(intent, fx.anchored), artifact: fx.artifactBytes };
+}
+
+// A package whose post-images and artifact digest were rewritten, plus the artifact bytes that match it.
+function buildAlteredPackage(fx) {
+  const honest = buildPackage(fx, fx.rootIdentity);
+  return {
+    ...honest,
+    artifactSha256: sha256(fx.alteredArtifactBytes),
+    entries: honest.entries.map((entry, index) => ({
+      ...entry,
+      postImage: { sha256: sha256(ALTERED_POST_IMAGES[index].text), size: sizeOf(ALTERED_POST_IMAGES[index].text) },
+    })),
+  };
+}
+
+// Each forgery keeps every check but one satisfied. All proofs are validly signed by the ANCHORED key.
+function forgedParts(fx, forgery) {
+  const honest = honestParts(fx);
+  if (forgery === "honest") return honest;
+  if (forgery === "kind" || forgery === "decision") {
+    const intent = { ...honest.intent, ...(forgery === "kind" ? { kind: "release-approval" } : { decision: "reject" }) };
+    return { ...honest, intent, proof: buildProof(intent, fx.anchored) };
+  }
+  const pkg = buildAlteredPackage(fx);
+  const artifact = fx.alteredArtifactBytes;
+  // A genuine approval of the honest intent is replayed under a fresh intent that binds the altered package.
+  if (forgery === "replayed-proof") return { pkg, artifact, intent: buildIntent(pkg, fx.rootIdentity), proof: honest.proof };
+  // The honest, genuinely signed intent and proof are kept, but the package was rewritten after signing.
+  if (forgery === "rewritten-package") return { pkg, artifact, intent: honest.intent, proof: honest.proof };
+  throw new Error(`unknown forgery: ${forgery}`);
+}
+
+// Writes the operator inputs from explicit parts (anchor is the correct one, outside the repository).
+function stageParts(fx, { pkg, intent, proof, artifact }) {
+  const paths = {
+    artifact: join(fx.external, "artifact.json"),
+    anchor: join(fx.external, "anchor.json"),
+    authorization: join(fx.external, "authorization.json"),
+  };
+  writeFileSync(paths.artifact, artifact);
+  writeFileSync(
+    paths.anchor,
+    `${JSON.stringify({ keyReference: KEY_REFERENCE, publicKeySha256: fx.anchored.publicKeySha256 }, null, 2)}\n`,
+    "utf8",
+  );
+  writeFileSync(
+    paths.authorization,
+    `${JSON.stringify({ schema: AUTHORIZATION_SCHEMA, package: pkg, intent, proof }, null, 2)}\n`,
+    "utf8",
+  );
+  return { paths, pkg, intent, proof, artifact };
+}
+
+async function assertSignatureStepRefuses(t, forgery, assertSetup) {
+  const { run } = await loadCli();
+  const fx = buildFixture(t);
+  const control = stageParts(fx, forgedParts(fx, "honest"));
+  assertVerified(await drive(run, argvFor("verify", fx, control)));
+  const forged = stageParts(fx, forgedParts(fx, forgery));
+  assertSetup(forged);
+  const before = snapshot(fx.root);
+  const result = await drive(run, argvFor("verify", fx, forged));
+  assertRefused(result, "ATR-SIGNATURE-INVALID");
+  assertTargetsUntouched(fx, before);
+}
+
+const proofMatchesIntent = (staged) => staged.proof.intentSha256 === sha256(canonical(staged.intent));
+const intentBindsPackage = (staged) => staged.intent.subjectSha256 === sha256(canonical(staged.pkg));
+const artifactMatchesPackage = (staged) => sha256(staged.artifact) === staged.pkg.artifactSha256;
+
+test("RV-S7-T2: RV7-D1 an intent of another kind is refused with ATR-SIGNATURE-INVALID although it is validly signed and package-bound", async (t) => {
+  await assertSignatureStepRefuses(t, "kind", (staged) => {
+    assert.notEqual(staged.intent.kind, "attended-recovery");
+    assert.ok(proofMatchesIntent(staged) && intentBindsPackage(staged) && artifactMatchesPackage(staged), "only intent.kind may be false");
+  });
+});
+
+test("RV-S7-T2: RV7-D1 an intent whose decision is not approve is refused with ATR-SIGNATURE-INVALID although it is validly signed and package-bound", async (t) => {
+  await assertSignatureStepRefuses(t, "decision", (staged) => {
+    assert.notEqual(staged.intent.decision, "approve");
+    assert.ok(proofMatchesIntent(staged) && intentBindsPackage(staged) && artifactMatchesPackage(staged), "only intent.decision may be false");
+  });
+});
+
+test("RV-S7-T2: RV7-D1 a proof signed for a different intent (intentSha256 != sha256(canonical(intent))) is refused with ATR-SIGNATURE-INVALID", async (t) => {
+  await assertSignatureStepRefuses(t, "replayed-proof", (staged) => {
+    assert.equal(proofMatchesIntent(staged), false, "the proof must name another intent's digest");
+    assert.ok(intentBindsPackage(staged) && artifactMatchesPackage(staged), "only the intent/proof digest binding may be false");
+  });
+});
+
+test("RV-S7-T2: RV7-D1 a package rewritten after signing (intent.subjectSha256 != sha256(canonical(package))) is refused with ATR-SIGNATURE-INVALID", async (t) => {
+  // The rewritten package and the supplied artifact agree with each other, so ATR-ARTIFACT-MISMATCH cannot
+  // catch it; the signature step's subject binding is the only check standing between this and `verified`.
+  await assertSignatureStepRefuses(t, "rewritten-package", (staged) => {
+    assert.equal(intentBindsPackage(staged), false, "the signed subject must not match the presented package");
+    assert.ok(proofMatchesIntent(staged) && artifactMatchesPackage(staged), "only the subject binding may be false");
+  });
+});
+
+test("RV-S7-T2: RV7-D4 an --anchor file inside --repo is refused with ATR-ANCHOR-MISMATCH even when it names the signer's key", async (t) => {
+  const { run } = await loadCli();
+  const fx = buildFixture(t);
+  const staged = stageCase(fx);
+  assertVerified(await drive(run, argvFor("verify", fx, staged))); // control: the same anchor, outside the repository
+  const anchorText = readFileSync(staged.paths.anchor, "utf8");
+  put(fx.repo, "operator-anchor.json", anchorText);
+  put(fx.repo, "project/operator-anchor.json", anchorText);
+  const inside = [
+    join(fx.repo, "operator-anchor.json"),
+    join(fx.repo, "project", "operator-anchor.json"),
+    `${fx.repo}/../repo/operator-anchor.json`, // spelled through `..`, resolves into the repository
+  ];
+  const before = snapshot(fx.root);
+  for (const anchor of inside) {
+    assertRefused(await drive(run, argvFor("verify", fx, { paths: { ...staged.paths, anchor } })), "ATR-ANCHOR-MISMATCH");
+  }
+  assertTargetsUntouched(fx, before);
+});
+
+test("RV-S7-T2: RV7-D5 the inlined canonical of the CLI equals the plugin's canonical (whitespace-normalised source text)", () => {
+  const declarationOf = (relativeUrl) => {
+    const source = readFileSync(new URL(relativeUrl, import.meta.url), "utf8");
+    const match = /const canonical = \(value\) =>[\s\S]*?: JSON\.stringify\(value\);/u.exec(source);
+    assert.notEqual(match, null, `${relativeUrl}: the canonical declaration was not found`);
+    return match[0].replace(/\s+/gu, "");
+  };
+  const cli = declarationOf("./attended-recovery.mjs");
+  const plugin = declarationOf("../../plugins/pipeline-core/lib/po-approval-proof.mjs");
+  assert.ok(cli.length > 120, "the extracted declaration must be the whole function, not a stub");
+  assert.equal(cli, plugin, "the CLI's inlined canonical has drifted from plugins/pipeline-core/lib/po-approval-proof.mjs");
+});
+
+// Plants executables named `git` at the repository root that would write `marker` if ever run.
+// Returns the NODE_OPTIONS value the working stub needs (win32 only), or null.
+function plantGitStubs(fx, marker) {
+  if (process.platform === "win32") {
+    writeFileSync(join(fx.repo, "git.cmd"), `@echo off\r\necho ran> "${marker}"\r\nexit /b 3\r\n`, "utf8");
+    // Windows looks a bare executable name up in the child's working directory first, but only with the
+    // .com/.exe extensions, so the stub that can really be found is an .exe: a copy of this node binary
+    // that writes the marker from a preload script handed over through NODE_OPTIONS.
+    copyFileSync(process.execPath, join(fx.repo, "git.exe"));
+    const preload = join(fx.external, "git-stub-preload.cjs");
+    writeFileSync(preload, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran");\nprocess.exit(3);\n`, "utf8");
+    return `--require "${preload.replaceAll("\\", "/")}"`;
+  }
+  const stub = join(fx.repo, "git");
+  writeFileSync(stub, `#!/bin/sh\n: > '${marker}'\nexit 3\n`, "utf8");
+  chmodSync(stub, 0o755);
+  return null;
+}
+
+test("RV-S7-T2: RV7-D2 a stub git executable at the repository root is never run and does not change the verifier result", async (t) => {
+  const { run } = await loadCli();
+  const fx = buildFixture(t);
+  const staged = stageCase(fx);
+  const marker = join(fx.external, "git-stub-ran.marker");
+  const nodeOptions = plantGitStubs(fx, marker); // after buildFixture: the fixture's own git calls must not meet the stub
+  const before = snapshot(fx.root);
+  const savedNodeOptions = process.env.NODE_OPTIONS;
+  if (nodeOptions !== null) process.env.NODE_OPTIONS = nodeOptions;
+  let result;
+  try {
+    result = await drive(run, argvFor("verify", fx, staged));
+  } finally {
+    if (savedNodeOptions === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = savedNodeOptions;
+  }
+  assert.equal(existsSync(marker), false, "the stub git in the repository directory was executed: git must be resolved from PATH only");
+  assertVerified(result);
+  assertTargetsUntouched(fx, before);
+});
+
+test("RV-S7-T2: RV7-D6 the CLI entry guard runs main when the script is invoked through a path that differs only by realpath", async (t) => {
+  const fx = buildFixture(t);
+  const linkRoot = mkdtempSync(join(tmpdir(), "rv-s7-link-"));
+  const linkDir = join(linkRoot, "linked-scripts");
+  t.after(() => {
+    // Remove the link itself, never its target; recurse into the temp dir only once the link is gone.
+    for (const remove of [unlinkSync, rmdirSync]) {
+      try {
+        remove(linkDir);
+      } catch {
+        // try the next removal form
+      }
+    }
+    if (!existsSync(linkDir)) rmSync(linkRoot, { recursive: true, force: true, maxRetries: 5 });
+  });
+  try {
+    symlinkSync(dirname(fileURLToPath(import.meta.url)), linkDir, "junction");
+  } catch (error) {
+    if (error?.code === "EPERM") {
+      t.skip("cannot create a directory link in this environment (EPERM)");
+      return;
+    }
+    throw error;
+  }
+  const linkedCli = join(linkDir, "attended-recovery.mjs");
+  const invoke = (staged) =>
+    spawnSync(process.execPath, [linkedCli, ...argvFor("verify", fx, staged)], {
+      encoding: "utf8",
+      env: process.env,
+      windowsHide: true,
+      timeout: 120000,
+    });
+  const resultOf = (spawned, what) => {
+    assert.equal(spawned.error, undefined, `${what}: the process must start`);
+    assert.notEqual(spawned.stdout.trim(), "", `${what}: main() did not run - nothing on stdout (stderr: ${spawned.stderr.trim()})`);
+    return JSON.parse(spawned.stdout);
+  };
+
+  const verified = invoke(stageCase(fx));
+  assertVerified(resultOf(verified, "valid input"));
+  assert.equal(verified.status, 0, "a verified run exits 0");
+
+  const refused = invoke(stageCase(fx, { corruptSignature: true }));
+  assertRefused(resultOf(refused, "forged input"), "ATR-SIGNATURE-INVALID");
+  assert.notEqual(refused.status, 0, "a refusal must never exit 0");
+});
