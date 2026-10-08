@@ -424,7 +424,11 @@ export function readGovernanceEnrollmentRetirement({rootDir,exec=execFileSync}){
  const output=exec(process.execPath,[ENROLLMENT_WRITER,'inspect-enrollment-retirement','--root',rootDir],{encoding:'utf8',maxBuffer:4194304,stdio:['ignore','pipe','pipe']});
  // A successful child launch with no bytes is a host readback failure, not
  // evidence that the retirement journal is absent or safe to bypass.
- if(typeof output!=='string'||output.trim()==='')fail('GS-RETIREMENT-READBACK-EMPTY');
+ if(typeof output!=='string'||output.trim()===''){
+  // Typed one-shot retry for the host: the same read-only inspection, bounded to one attempt.
+  const nextAction={kind:'command',executable:process.execPath,argv:[ENROLLMENT_WRITER,'inspect-enrollment-retirement','--root',rootDir],mutation:false,requiresConfirmation:false,executionBoundary:'host process boundary that owns the project Git control view; run the identical read-only inspection once',retry:{maxAttempts:1},expected:{schema:'pipeline.enrollment-retirement-inspection.v1'}};
+  try{fail('GS-RETIREMENT-READBACK-EMPTY');}catch(error){error.nextAction=nextAction;throw error;}
+ }
  let result;try{result=JSON.parse(output);}catch{fail('GS-RETIREMENT-READBACK-INVALID');}
  if(result.schema!=='pipeline.enrollment-retirement-inspection.v1')fail('GS-RETIREMENT-INSPECTION');return result.journal;
 }
