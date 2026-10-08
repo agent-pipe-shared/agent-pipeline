@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { isAbsolute, join, resolve, sep } from "node:path";
+import { isAbsolute, join, parse, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseStrictJson } from "./governance-event.mjs";
 import { createModelFamilyHostController } from "./model-family-host-store.mjs";
@@ -41,9 +41,10 @@ function safeExistingPath(path, expectDirectory) {
 
 function directoryPathChain(path) {
   if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) return null;
-  const segments = path.slice(1).split(sep).filter(Boolean);
-  const result = [sep];
-  let current = sep;
+  const root = parse(path).root;
+  const segments = path.slice(root.length).split(sep).filter(Boolean);
+  const result = [root];
+  let current = root;
   for (const segment of segments) { current = join(current, segment); result.push(current); }
   return result;
 }
