@@ -870,6 +870,9 @@ check("the implementation guard verifies the package signature and admits the ex
     };
     const fixture = baseFixture({ selectedCandidate: liveCandidate });
     const packagePath = materializeFixture(root, fixture);
+    // The package path is digest-bound, so a realistic fixture commits it (tracked and clean) before asking for approval.
+    assert.equal(git(["add", "-A"]).status, 0);
+    assert.equal(git(["commit", "--quiet", "-m", "design workflow package"]).status, 0);
     const binding = {
       repoRoot: root,
       packagePath,
