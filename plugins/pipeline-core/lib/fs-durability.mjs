@@ -12,15 +12,16 @@ export function fsyncDirectoryDurable(directoryPath, { fs = nodeFs, platform = p
   try {
     fd = fs.openSync(directoryPath, "r");
   } catch (error) {
-    if (tolerated(error)) return;
+    if (tolerated(error)) return "unsupported";
     throw error;
   }
   try {
     fs.fsyncSync(fd);
   } catch (error) {
-    if (tolerated(error)) return;
+    if (tolerated(error)) return "unsupported";
     throw error;
   } finally {
     fs.closeSync(fd);
   }
+  return "confirmed";
 }

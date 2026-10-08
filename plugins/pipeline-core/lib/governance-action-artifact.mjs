@@ -128,6 +128,7 @@ export function writeGovernanceActionArtifact({ rootDir, eventOutPath, event, al
   }
   const temporary = resolve(dirname(plan.target), `.${randomBytes(16).toString("hex")}.governance-action.tmp`);
   let fd;
+  let directoryDurability;
   try {
     fd = openSync(temporary, "wx", 0o600);
     writeFileSync(fd, artifactBytes(checked));
@@ -136,7 +137,7 @@ export function writeGovernanceActionArtifact({ rootDir, eventOutPath, event, al
     fd = undefined;
     linkSync(temporary, plan.target);
     unlinkSync(temporary);
-    fsyncDirectoryDurable(dirname(plan.target));
+    directoryDurability = fsyncDirectoryDurable(dirname(plan.target));
   } catch {
     if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve primary failure */ } }
     try { unlinkSync(temporary); } catch { /* absent or retained only until cleanup */ }
@@ -146,7 +147,7 @@ export function writeGovernanceActionArtifact({ rootDir, eventOutPath, event, al
     fail("GAA-OUTPUT-WRITE");
   }
   if (!identicalExisting(plan.target, checked)) fail("GAA-OUTPUT-READBACK");
-  return Object.freeze({ status: "written", outPath: plan.target, event: checked });
+  return Object.freeze({ status: "written", outPath: plan.target, event: checked, directoryDurability });
 }
 
 export function retryGovernanceActionArtifact({ rootDir, retry } = {}) {
