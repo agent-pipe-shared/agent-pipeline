@@ -1281,6 +1281,31 @@ const Q12CQ_CONTROL_TABLE = [
 ];
 recordQ12Table("Q12-CQ: CONTROL-NOT-CANDIDATE", false, Q12CQ_CONTROL_TABLE);
 
+// ---- GITCLS-T: env -S strings and editor bang commands ------------------------------------
+// Backlog 2026-10-08-git-push-classifier-misses-env-s-and-editor-bang. DATA only: handed to
+// `commandIsGitPush`, never executed.
+const GITCLS_T_PUSH_TABLE = [
+  ["env -S 'git push origin main'", "env -S splits its single-quoted string into a command; git push runs"],
+  ['env -S "git push origin main"', "env -S splits its double-quoted string into a command; git push runs"],
+  ["env -S'git push origin main'", "attached form of env -S; git push runs"],
+  ["vim -c '!git push origin main'", "vim -c with an ex bang runs git push through the shell"],
+  ["vi -c '!git push origin main'", "vi -c with an ex bang runs git push through the shell"],
+  ["nvim -c ':!git push origin main'", "nvim -c with a colon-prefixed ex bang runs git push through the shell"],
+  ["vim +'!git push origin main'", "vim +cmd with an ex bang runs git push through the shell"],
+];
+for (const [cmd, why] of GITCLS_T_PUSH_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GITCLS-T: ${JSON.stringify(cmd)} is a push  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} out=${out}`);
+}
+const GITCLS_T_NEGATIVE_TABLE = [
+  ["env -S 'git status'", "env -S running git status is not a push"],
+  ["vim -c ':wq' notes.txt", "an ex write-quit command is not a push"],
+];
+for (const [cmd, why] of GITCLS_T_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GITCLS-T: ${JSON.stringify(cmd)} is not a push  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
