@@ -30,7 +30,7 @@ import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
 import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
-import { resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
+import { formatScannerLine, resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
 // NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
 // shared function -- see the pinning test below.
 // NVA-R18-SCANBOOT: also imports checkSecurityCompleteness -- the SAME function guard-push.mjs
@@ -1759,8 +1759,8 @@ gates:
 //       security-scan.mjs v2Coverage() still hardcodes `unsupportedScope: []`.
 //   S3a (green regression pin): the v1 scanner entry carries coverage { status: "degraded",
 //       reason: "partial-parsing", files } merged onto its {subject, exclusions} coverage.
-//   S3b (the console line): WAIVED -- no production seam exists to observe it; deliberately not
-//       tested here and no seam is added by this task.
+//   S3b (the console line): pinned through the exported formatScannerLine seam -- see the
+//       "SEM-T3 S3b" assertions below (partial-parsing block, clean block, literal 3-file case).
 // No real semgrep: a fake emitting warn-level PartialParsing errors (one file twice, to pin
 // "exactly one string per partially parsed file"), no network.
 // ===============================================================================================
@@ -1820,6 +1820,18 @@ security:
     );
     assertEqual("SEM-T3: partial parsing alone does not block the v1 gate (exit 0)", exitCode, 0);
 
+    // S3b -- the console line shows the degraded-coverage note for the real v1 semgrep entry.
+    assertEqual(
+      "SEM-T3 S3b: formatScannerLine appends the degraded-coverage note for the real v1 semgrep entry",
+      entry ? formatScannerLine(entry) : undefined,
+      "semgrep: OK [success] (0 findings) -- coverage: degraded (2 files partially parsed)",
+    );
+    assertEqual(
+      "SEM-T3 S3b: formatScannerLine counts files from coverage.files (literal 3-file entry)",
+      formatScannerLine({ tool: "semgrep", status: "PASS", classification: "success", findingCount: 0, coverage: { status: "degraded", reason: "partial-parsing", files: ["a.js", "b.js", "c.js"] } }),
+      "semgrep: OK [success] (0 findings) -- coverage: degraded (3 files partially parsed)",
+    );
+
     // S1 -- v2 capability record: every partially parsed file is named in unsupportedScope.
     assertTrue("SEM-T3 S1: v2 envelope carries a cap.sast capability record", Boolean(sastRecord(evidenceV2)), "no cap.sast record in evidenceV2");
     const unsupportedScope = sastRecord(evidenceV2)?.coverage?.unsupportedScope;
@@ -1856,6 +1868,11 @@ security:
       "SEM-T3: a clean run's v1 semgrep entry carries no degraded-coverage status",
       evidence.scanners.find((s) => s.tool === "semgrep")?.coverage?.status,
       undefined,
+    );
+    assertEqual(
+      "SEM-T3 S3b: a clean run's console line carries no coverage suffix",
+      formatScannerLine(evidence.scanners.find((s) => s.tool === "semgrep")),
+      "semgrep: OK [success] (0 findings)",
     );
   }
 }
