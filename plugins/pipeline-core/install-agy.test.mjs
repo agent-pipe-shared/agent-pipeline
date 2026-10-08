@@ -340,6 +340,31 @@ test("Agy installer rejects directories without a valid physical Pipeline manife
   assert.equal(readFileSync(registryFile, "utf8"), original);
 });
 
+// AM-W-T (Critic AM-D1, ruling 50; design note agy-snapshot-central-2026-10-08 sections 3-4): pins that the installer is a
+// caller of the per-user central agy snapshot. Test-only; expected RED until the AM-W wiring slice lands.
+import { readFileSync as amWReadFileSync } from "node:fs";
+import amWTest from "node:test";
+import amWAssert from "node:assert/strict";
+
+function amWCodeOf(url) {
+  return amWReadFileSync(url, "utf8").split(/\r?\n/u).filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line)).join("\n");
+}
+
+amWTest("AM-W-T: the installer accepts source kind central-snapshot as choice 3, after approved-directory 1 and local-marketplace 2", () => {
+  const selected = selectPluginSource({ answer: "3", scriptDir: "/approved/plugin", marketplaceRoot: "/local/marketplace", marketplaceAvailable: true });
+  amWAssert.equal(selected.kind, "central-snapshot");
+});
+
+amWTest("AM-W-T: install-agy.mjs calls installAgyFromCentralSnapshot imported from the central refresh module (structural stand-in)", () => {
+  const code = amWCodeOf(new URL("./install-agy.mjs", import.meta.url));
+  amWAssert.match(code, /\binstallAgyFromCentralSnapshot\s*\(/u);
+  amWAssert.match(code, /from\s+["']\.\/lib\/agy-central-refresh\.mjs["']/u);
+});
+
+amWTest("AM-W-T: selecting central-snapshot runs installAgyFromCentralSnapshot with global scope against a fixture-bound config root", (t) => {
+  t.todo("missing seam: runInteractiveInstaller() reads process.stdin, process.cwd() and the user home directly and exposes no way to inject installAgyFromCentralSnapshot, a home function or a CLI runner; a subprocess drive would resolve the real agy CLI by PATH. The wiring slice must export an injectable entry (for example runCentralSnapshotInstall({ deps, runCli, installAgyFromCentralSnapshot })) before this call can be pinned without touching a real home or a real agy installation.");
+});
+
 test("Agy installer never follows registry-file or parent aliases while updating", (t) => {
   const { newRoot, registryFile, root } = fixture(t);
   const unrelatedFile = join(root, "unrelated.json");
