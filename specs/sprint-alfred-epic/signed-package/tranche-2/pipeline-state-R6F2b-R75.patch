@@ -1,0 +1,59 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 7964fd426..7ed3351e9 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -420,11 +420,13 @@ import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+ import {parse} from 'node:path';
+ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs';
+ import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
++import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
+ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
+ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
+ import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
+ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+ import { inspectArchitectureDesign, inspectArchitectureDesignDraft } from "../lib/architecture-design.mjs";
++import { rebindApproval } from "../lib/rebind-approval.mjs";
+ import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
+ import {
+   createDesignWorkflowPackageApprovalRequest,
+@@ -707,7 +709,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+ // that exact command as the way out of a stuck approval.
+ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "materialize-architecture",
+-  "inspect",
++  "inspect", "rebind-approval",
+   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
+@@ -12304,6 +12306,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
+     // read of that file's section would show, without a second read.
+     case "inspect": {
+       const lifecycle = inspectPlanLifecycle(dir, base);
++      const drift = base.continuity == null ? null : projectContinuityAuthorityDrift(base.continuity, (p) => physicalRebindFile(dir, p)?.sha256 ?? null);
+       const payload = {
+         schema: INSPECT_SCHEMA,
+         generatedAt: now(),
+@@ -12325,15 +12328,22 @@ export function run(argv = process.argv.slice(2), deps = {}) {
+         pushApproval: inspectPushApproval(base, () => gitHead(dir)),
+         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
+         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
+-        nextAction: buildInspectNextAction(dir, base, lifecycle, deps),
++        nextAction: buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null,
+         nextActionText: lifecycle.nextAction === "reopen-design"
+           ? "Current Plan/Spec authority is stale or unavailable. Use the returned sanctioned reopen-design action before resubmission or approval."
+           : nextActionSection(base),
++        continuityAuthorityDrift: drift,
+       };
+       console.log(JSON.stringify(payload, null, 2));
+       return 0;
+     }
+
++    case "rebind-approval": {
++      const rebind = rebindApproval({ dir, now, deps });
++      console.log(JSON.stringify(rebind.payload, null, 2));
++      return rebind.exit;
++    }
++
+     // `--help` is a QUESTION, not an error. Both 2026-08-09 greenfield runs asked
+     // it and were told `unknown command "--help"`, which is true and useless: a
+     // reader who does not already know the verbs cannot ask for them without first
