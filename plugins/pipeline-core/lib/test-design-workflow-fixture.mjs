@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Test-only materialization of a complete epic/feature design package. This
 // helper never relaxes the production reader or mints a production PO proof.
+import { execFileSync } from "node:child_process";
 import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -22,6 +23,10 @@ export function materializeTestDesignWorkflowPackage({
   root, featureId, planPath, specPath, candidate = candidateDefault,
   createdAt = "2026-09-27T10:00:00.000Z",
   signerPrivateKey = null, signerKeyReference = "design-workflow-test-key",
+  // Opt-in (R7-3-T2b, ruling 65): commit the package and the artifacts it digests (package file, Advisor
+  // receipt, readiness) in `root`, which must then be a Git work tree. The result gains a `head` key holding
+  // the new HEAD. With the default `false` nothing is committed and the result is exactly as before.
+  commitPackage = false,
 }) {
   const base = dirname(planPath);
   const sourceFiles = {
@@ -83,11 +88,20 @@ export function materializeTestDesignWorkflowPackage({
     createdAt,
   };
   writeRelative(root, packagePath, serialized(designPackage));
+  let head = null;
+  if (commitPackage) {
+    const git = (argv) => execFileSync("git", ["-C", root, "-c", "user.name=design-workflow-test", "-c", "user.email=design-workflow-test@example.invalid",
+      "-c", "commit.gpgsign=false", ...argv], { encoding: "utf8", timeout: 10000 }).trim();
+    git(["add", "--", packagePath, advisorPath, readinessPath]);
+    git(["commit", "-q", "-m", `Commit the design workflow package for ${featureId}`]);
+    head = git(["rev-parse", "HEAD"]);
+  }
   const privateKey = signerPrivateKey ?? generateKeyPairSync("ed25519").privateKey;
   const publicKey = createPublicKey(privateKey).export({ type: "spki", format: "pem" }).toString();
   const trustAnchor = { keyReference: signerKeyReference, publicKeySha256: sha256(Buffer.from(publicKey)) };
   return {
     packagePath, candidate,
+    ...(commitPackage ? { head } : {}),
     deps: {
       gitCandidate: () => ({ ok: true, ...candidate }),
       verifyDesignReadinessHostExecution: ({ hostExecution, readinessReceipt }) =>
