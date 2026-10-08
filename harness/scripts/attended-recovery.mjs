@@ -23,7 +23,10 @@
 // Check order, first failure wins: repository -> anchor -> signature -> artifact.
 //   ATR-REPOSITORY-MISMATCH  the root commit/tree is not the one the package and
 //                            the signed intent name
-//   ATR-ANCHOR-MISMATCH      the presented signer key is not the operator anchor
+//   ATR-ANCHOR-MISMATCH      the presented signer key is not the operator anchor, or
+//                            the anchor file itself lies inside the repository
+//                            (compared by real path, so `..` spellings, links and
+//                            junctions do not hide it)
 //   ATR-SIGNATURE-INVALID    the signature, the intent or the signed package
 //                            binding does not hold
 //   ATR-ARTIFACT-MISMATCH    the artifact bytes differ from the signed digest
@@ -33,9 +36,9 @@
 // authorization/anchor). A refusal is a returned result, never a throw.
 import { execFileSync } from "node:child_process";
 import { createHash, createPublicKey, verify } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const RESULT_SCHEMA = "pipeline.attended-recovery-result.v1";
 const PACKAGE_SCHEMA = "pipeline.attended-recovery-package.v1";
@@ -94,6 +97,45 @@ function readJson(path) {
     return JSON.parse(readFileSync(path, "utf8").replace(/^﻿/u, ""));
   } catch {
     throw new Refusal("ATR-INPUT-INVALID");
+  }
+}
+
+// Real path of an existing file or directory: links and junctions are followed and, on Windows,
+// the on-disk spelling is used, so two spellings of one place compare equal. Throws when it cannot.
+function realPath(path) {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return realpathSync(path);
+  }
+}
+
+// True when `path` is `root` or lies beneath it. Both arguments are real paths.
+function isInside(root, path) {
+  const from = relative(root, path);
+  return from === "" || (from !== ".." && !from.startsWith(`..${sep}`) && !isAbsolute(from));
+}
+
+// Trust comes only from an anchor chosen outside the repository. Fail closed: when either real
+// path cannot be established, the anchor cannot be shown to lie outside, so it counts as inside.
+function anchorIsInsideRepository(repo, anchorPath) {
+  try {
+    return isInside(realPath(repo), realPath(anchorPath));
+  } catch {
+    return true;
+  }
+}
+
+// The entry guard compares real paths: Node resolves the main module's `import.meta.url` through
+// links, while `process.argv[1]` keeps the spelling the operator typed. Falls back to the plain
+// comparison when a real path cannot be resolved.
+function isEntryPoint() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realPath(fileURLToPath(import.meta.url)) === realPath(resolve(entry));
+  } catch {
+    return import.meta.url === pathToFileURL(resolve(entry)).href;
   }
 }
 
@@ -190,6 +232,7 @@ function verifyOnly(argv) {
   }
 
   // 2. anchor: trust comes only from the operator-selected anchor file, never from the repository.
+  if (anchorIsInsideRepository(flags["--repo"], flags["--anchor"])) throw new Refusal("ATR-ANCHOR-MISMATCH");
   if (!isText(proof.keyReference) || proof.keyReference !== anchor.keyReference || !isText(proof.publicKey) || sha256(proof.publicKey) !== anchor.publicKeySha256) {
     throw new Refusal("ATR-ANCHOR-MISMATCH");
   }
@@ -235,4 +278,4 @@ async function main() {
   process.exitCode = result.status === "verified" ? 0 : 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await main();
+if (isEntryPoint()) await main();
