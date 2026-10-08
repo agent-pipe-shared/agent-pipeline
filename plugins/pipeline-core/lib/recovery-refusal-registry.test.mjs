@@ -105,3 +105,38 @@ test("RV-S4-T2: WT-ORPHAN-ARCHIVE-READBACK is an attended handoff with a named p
   assert.ok(nonEmpty(entry.prerequisite.kind), "prerequisite.kind");
   assert.ok(nonEmpty(entry.prerequisite.action), "prerequisite.action");
 });
+
+// RV-S5-T2 (RV-D2, RV-D3 of specs/sprint-alfred-epic/evidence/critic-2026-10-07/rv-s5-full.md;
+// dispatcher ruling 44). Test-only; the registry does not satisfy these yet.
+test("RV-S5-T2: LOC-ARCHIVE-ORPHANED-COPY is registered as an attended handoff with a non-empty prerequisite", () => {
+  // It is raised after the archive copy was published, so a bare refuse (or the unknown-code fallback) would hide the orphan.
+  assert.ok(Object.hasOwn(RECOVERY_REFUSAL_REGISTRY, "LOC-ARCHIVE-ORPHANED-COPY"), "unregistered code LOC-ARCHIVE-ORPHANED-COPY");
+  const entry = lookupRecoveryDisposition("LOC-ARCHIVE-ORPHANED-COPY");
+  assert.equal(entry.disposition, "handoff");
+  assert.ok(entry.prerequisite && typeof entry.prerequisite === "object", "a handoff needs a prerequisite object");
+  assert.ok(nonEmpty(entry.prerequisite.kind), "prerequisite.kind");
+  assert.ok(nonEmpty(entry.prerequisite.action), "prerequisite.action");
+});
+
+// The disposition matrix admits archive (never preserve) for a conflicting receipt and
+// preserve (never archive) for a matching one; the registered recovery text must say the same.
+const recoveryText = (code) => {
+  assert.ok(Object.hasOwn(RECOVERY_REFUSAL_REGISTRY, code), `unregistered code ${code}`);
+  const text = lookupRecoveryDisposition(code).prerequisite?.action;
+  assert.ok(nonEmpty(text), `${code}: the recovery text must exist`);
+  return text;
+};
+
+for (const code of ["LOC-STATUS-MISMATCH", "LOC-SCHEMA-MISMATCH", "LOC-DIGEST-MISMATCH", "LOC-COMPARE-FLAG-FALSE"]) {
+  test(`RV-S5-T2: the recovery text of ${code} offers archive and does not offer preserve (preserve is forbidden for a conflict)`, () => {
+    const text = recoveryText(code);
+    assert.doesNotMatch(text, /preserve/i, `${code}: ${text}`);
+    assert.match(text, /archive/i, `${code}: the only admitted disposition must still be named: ${text}`);
+  });
+}
+
+test("RV-S5-T2: the recovery text of LOC-REPLAY-PRECONDITION offers preserve and does not offer archive (archive is forbidden for a matching receipt)", () => {
+  const text = recoveryText("LOC-REPLAY-PRECONDITION");
+  assert.doesNotMatch(text, /archive/i, `LOC-REPLAY-PRECONDITION: ${text}`);
+  assert.match(text, /preserve/i, `LOC-REPLAY-PRECONDITION: the only admitted disposition must still be named: ${text}`);
+});

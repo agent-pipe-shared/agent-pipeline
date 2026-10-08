@@ -611,4 +611,168 @@ describe("RV-4: legacy custody disposition - preserve, replay, archive, absence"
       "two candidates",
     );
   });
+
+  // -------------------------------------------------------------------------
+  // RV-S5-T2 (Critic record specs/sprint-alfred-epic/evidence/critic-2026-10-07/
+  // rv-s5-full.md findings RV-D1, RV-D3, RV-D4 and the dispatcher's ruling 44).
+  // Test-only RED pins; the fix is RV-S5-F2.
+  //
+  // Contract pinned here beyond the cases above:
+  //   - the signed `archiveDestination` is resolved against the repository root
+  //     and is the ONLY archive root the apply path accepts; a caller
+  //     `archiveRoot` that differs from the resolved destination is refused
+  //     LOC-PROOF-BINDING-MISMATCH before any write (RV-D1);
+  //   - the apply path has no repository-root input today, and the receipts
+  //     directory (a private git dir) does not determine the working root, so
+  //     these cases pass the root explicitly as `repositoryRoot`. In every
+  //     fixture the repository root is the case root (the directory holding
+  //     both `session-cleanup/receipts/` and `archive/`), so the signed
+  //     destination "archive" resolves to the fixture's `archive/` directory;
+  //   - a binding mismatch found AFTER the exclusive publish returns the new
+  //     code LOC-ARCHIVE-ORPHANED-COPY with `mutated: true` (RV-D3);
+  //   - LOC-TARGET-UNSAFE is observed at apply level without a symlink (RV-D4).
+  // -------------------------------------------------------------------------
+  const S5T2_CODES = Object.freeze({
+    ...RV3_CODES,
+    packageInvalid: "LOC-PACKAGE-INVALID",
+    orphanedCopy: "LOC-ARCHIVE-ORPHANED-COPY",
+  });
+
+  /** A conflicting-receipt archive package whose signed archiveDestination is `archiveDestination`. */
+  function archivePackageFor(bytes, archiveDestination) {
+    return { ...presentPackage(bytes, "conflicting", "archive"), archiveDestination };
+  }
+
+  /** Guards the RED cases: the signature itself is valid, so the destination is the only defect. */
+  function assertProofVerifies(pkg, proof) {
+    const verdict = verifyPoApprovalProof({ intent: custodyIntentFor(pkg), trustPolicy: anchor, proof });
+    assert.equal(verdict.verified, true, `fixture proof rejected: ${verdict.code}`);
+  }
+
+  // RV-D1: a caller archiveRoot Y that is not exactly the resolved signed destination X is refused before any write.
+  const DIFFERENT_ARCHIVE_ROOTS = [
+    ["a sibling directory", "archive-other"],
+    ["a sibling whose name only extends the signed destination's name", "archive2"],
+    ["a subdirectory of the signed destination", join("archive", "nested")],
+  ];
+  for (const [label, callerRelative] of DIFFERENT_ARCHIVE_ROOTS) {
+    test(`RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot ${label}, refuses with LOC-PROOF-BINDING-MISMATCH before any write`, async () => {
+      const f = fixture({ [`${SESSION_ID}.json`]: conflictingReceipt() });
+      const callerRoot = join(f.caseRoot, callerRelative);
+      mkdirSync(callerRoot, { recursive: true });
+      const bytes = readFileSync(f.receiptPath);
+      const pkg = archivePackageFor(bytes, ARCHIVE_DESTINATION);
+      const proof = signCustodyPackage(pkg, signer);
+      assertProofVerifies(pkg, proof);
+      assert.notEqual(callerRoot, f.archiveRoot, "fixture guard: Y differs from the resolved signed destination X");
+      assert.deepStrictEqual(readdirSync(callerRoot), [], "fixture guard: Y starts empty");
+      await assertTypedAndUntouched(
+        f,
+        () => apply(f, pkg, proof, { archiveRoot: callerRoot, repositoryRoot: f.caseRoot }),
+        { status: "refused", code: S5T2_CODES.bindingMismatch, closedSet: S5T2_CODES },
+        `archiveRoot ${label}`,
+      );
+      assert.ok(readFileSync(f.receiptPath).equals(bytes), "the original receipt bytes changed");
+      assert.deepStrictEqual(readdirSync(callerRoot), [], "something was created under Y");
+      assert.equal(pathPresent(join(f.archiveRoot, "archived")), false, "something was created under X");
+    });
+  }
+
+  // Positive control (may already pass today: the existing archive cases pass archiveRoot === the signed destination).
+  test("RV-S5-T2: positive control - the same signed archive applied with archiveRoot equal to the resolved signed destination archives under it", async () => {
+    const f = fixture({ [`${SESSION_ID}.json`]: conflictingReceipt() });
+    const bytes = readFileSync(f.receiptPath);
+    const pkg = archivePackageFor(bytes, ARCHIVE_DESTINATION);
+    const proof = signCustodyPackage(pkg, signer);
+    assertProofVerifies(pkg, proof);
+    const before = snapshot(f.caseRoot);
+    const result = await apply(f, pkg, proof, { repositoryRoot: f.caseRoot });
+    assertArchived(f, result, before, bytes);
+  });
+
+  // RV-D1 (shape check): a destination that resolves outside the repository root is a malformed package.
+  test("RV-S5-T2: a validly signed archive whose archiveDestination resolves outside the repository root refuses with LOC-PACKAGE-INVALID and writes nothing", async () => {
+    const f = fixture({ [`${SESSION_ID}.json`]: conflictingReceipt() });
+    const outside = join(f.caseRoot, "..", `outside-${counter}`);
+    mkdirSync(outside, { recursive: true });
+    const bytes = readFileSync(f.receiptPath);
+    const pkg = archivePackageFor(bytes, `../outside-${counter}`);
+    const proof = signCustodyPackage(pkg, signer);
+    assertProofVerifies(pkg, proof);
+    // The caller points archiveRoot straight at the escaped directory, so a missing refusal would archive outside the repository.
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof, { archiveRoot: outside, repositoryRoot: f.caseRoot }),
+      { status: "refused", code: S5T2_CODES.packageInvalid, closedSet: S5T2_CODES },
+      "destination outside the repository root",
+    );
+    assert.deepStrictEqual(readdirSync(outside), [], "something was created outside the repository root");
+  });
+
+  // RV-D3: a mismatch found after the exclusive publish leaves an archived copy behind, so it must say so.
+  //
+  // MISSING SEAM: archiveReceipt() (legacy-owner-custody.mjs 594-648) takes no injected
+  // hook between publishExclusiveCopy() and the final re-read of the original
+  // (readReceiptBytes, ~617), so a test cannot change the original in that window
+  // through the module's own API. The body below interposes the module's live
+  // `lstatSync` binding instead (it is called on the published archive path right
+  // after the publish), which needs no production seam. Drop the todo marker once
+  // RV-S5-F2 returns the new code.
+  test("RV-S5-T2: a binding mismatch detected after the exclusive publish returns LOC-ARCHIVE-ORPHANED-COPY with mutated true and leaves the copy in place", async (t) => {
+    t.todo("MISSING SEAM: no injectable hook between publishExclusiveCopy and the final original re-check; body interposes lstatSync via syncBuiltinESMExports");
+    const f = fixture({ [`${SESSION_ID}.json`]: conflictingReceipt() });
+    const bytes = readFileSync(f.receiptPath);
+    const pkg = archivePackageFor(bytes, ARCHIVE_DESTINATION);
+    const proof = signCustodyPackage(pkg, signer);
+    assertProofVerifies(pkg, proof);
+    const archivedName = `${SESSION_ID}.${sha256Of(bytes)}.json`;
+    const archivedPath = join(f.archiveRoot, "archived", archivedName);
+    const changed = Buffer.from(`${JSON.stringify(validReceipt())}\n`);
+    assert.ok(!changed.equals(bytes), "fixture guard: the replacement bytes differ from the signed bytes");
+    await rv4Export(); // load the module before its fs bindings are interposed
+    const fs = (await import("node:fs")).default;
+    const { syncBuiltinESMExports } = await import("node:module");
+    const realLstat = fs.lstatSync;
+    let fired = false;
+    fs.lstatSync = (path, ...rest) => {
+      const info = realLstat(path, ...rest); // throws ENOENT before the publish, so only the post-publish call gets past here
+      if (!fired && String(path).endsWith(archivedName)) {
+        fired = true;
+        writeFileSync(f.receiptPath, changed);
+      }
+      return info;
+    };
+    syncBuiltinESMExports();
+    let result;
+    try {
+      result = await apply(f, pkg, proof, { repositoryRoot: f.caseRoot });
+    } finally {
+      fs.lstatSync = realLstat;
+      syncBuiltinESMExports();
+    }
+    assert.equal(fired, true, "fixture guard: the original was changed after the publish");
+    assert.equal(result?.code, S5T2_CODES.orphanedCopy, `expected ${S5T2_CODES.orphanedCopy}, got ${JSON.stringify(result)}`);
+    assert.equal(result.mutated, true, "an archived copy exists, so the result must say mutated: true");
+    assert.ok(readFileSync(archivedPath).equals(bytes), "the orphaned copy keeps the signed bytes at its archive path");
+    assert.ok(readFileSync(f.receiptPath).equals(changed), "the changed original must be left in place, never removed");
+  });
+
+  // RV-D4: the portable apply-level observation of LOC-TARGET-UNSAFE (the symlink case above skips on win32 without privilege).
+  test("RV-S5-T2: a receipt path that is a directory named <sessionId>.json returns typed unavailable LOC-TARGET-UNSAFE and mutates nothing", async () => {
+    const f = fixture({});
+    mkdirSync(f.receiptPath);
+    writeFileSync(join(f.receiptPath, "inner.txt"), "not a receipt\n");
+    const info = lstatSync(f.receiptPath);
+    assert.ok(info.isDirectory() && !info.isSymbolicLink(), "fixture guard: the receipt path is a real directory");
+    // Valid signature over the bytes a regular conflicting receipt would have: the directory is the only defect.
+    const pkg = archivePackageFor(Buffer.from(`${JSON.stringify(conflictingReceipt())}\n`), ARCHIVE_DESTINATION);
+    const proof = signCustodyPackage(pkg, signer);
+    assertProofVerifies(pkg, proof);
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof, { repositoryRoot: f.caseRoot }),
+      { status: "unavailable", code: RV4_CODES.targetUnsafe, closedSet: RV4_CODES },
+      "directory at the receipt path",
+    );
+  });
 });
