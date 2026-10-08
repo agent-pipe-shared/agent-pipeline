@@ -7,7 +7,7 @@
 //   <anchor dir>/agy-snapshot/current.json               the pointer ({schema, snapshotSha256, version, publishedAt})
 // snapshotSha256 is the sha256 of the exact bytes of snapshot.json, so every manifest field is part of the digest.
 // Failures are thrown Errors carrying `.code` (AGS-*); agySnapshotRoot and classifyAgySnapshot never throw.
-import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
+import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { machinePlaneFilePath } from './machine-plane.mjs';
@@ -27,6 +27,10 @@ const TEMP_DIR = /^plugin-tmp-[a-f0-9]{16}$/;
 const EXCLUDED_DIRS = new Set(['.git', 'tests', 'fixtures']);
 const MAX_FILES = 8192;
 const DEFAULT_BUDGET_MS = 80000;
+const LOCK_FILE = 'publish.lock';
+const LOCK_SCHEMA = 'pipeline.agy-snapshot-publish-lock.v1';
+const MAX_FILE_BYTES = 1024 * 1024;
+const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 
 function fail(code, detail) {
   return Object.assign(new Error(detail ? `${code}: ${detail}` : code), { code });
@@ -47,8 +51,41 @@ function requireRoot(deps) {
 
 // ---- source inventory -------------------------------------------------------------------------------------------------
 // Whole plugin tree minus .git, tests/, fixtures/ and *.test.mjs. A symlink is refused, never skipped.
+// One source file, read the way git-hook-footprint reads a physical file: refuse a hardlink (nlink !== 1) and anything above
+// 1 MiB (32 MiB across the inventory) BEFORE reading, open without following a symlink where the platform has O_NOFOLLOW,
+// require the fd to be the object the earlier lstat saw (dev/ino/nlink), and detect growth or a swap during the read.
+function readSourceFile(path, relPath, pre, budget) {
+  if (!pre.isFile() || pre.nlink !== 1) throw fail('AGS-SOURCE-UNSAFE', relPath);
+  if (pre.size > MAX_FILE_BYTES || budget.used + pre.size > MAX_TOTAL_BYTES) throw fail('AGS-SOURCE-TOO-LARGE', relPath);
+  let fd;
+  try { fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)); } catch (e) {
+    if (e?.code === 'ELOOP' || e?.code === 'EMLINK') throw fail('AGS-SOURCE-UNSAFE', relPath);
+    throw e;
+  }
+  try {
+    const before = fstatSync(fd);
+    if (!before.isFile() || before.nlink !== 1 || before.dev !== pre.dev || before.ino !== pre.ino) throw fail('AGS-SOURCE-UNSAFE', relPath);
+    if (before.size !== pre.size) throw fail('AGS-SOURCE-DRIFT', relPath);
+    // The fstat length plus one sentinel byte: growth past it is still seen, and no maximum-size buffer is touched per file.
+    const buffer = Buffer.alloc(before.size + 1);
+    let count = 0;
+    while (count < buffer.length) {
+      const n = readSync(fd, buffer, count, buffer.length - count, null);
+      if (n === 0) break;
+      count += n;
+    }
+    if (count !== before.size) throw fail('AGS-SOURCE-DRIFT', relPath);
+    const after = fstatSync(fd);
+    const now = lstatSync(path);
+    if (now.isSymbolicLink() || now.dev !== after.dev || now.ino !== after.ino || now.nlink !== 1) throw fail('AGS-SOURCE-UNSAFE', relPath);
+    if (after.size !== count || now.size !== count || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs) throw fail('AGS-SOURCE-DRIFT', relPath);
+    budget.used += count;
+    return buffer.subarray(0, count);
+  } finally { closeSync(fd); }
+}
 function readSourceInventory(sourceRoot) {
   const items = [];
+  const budget = { used: 0 };
   const walk = (dir, rel) => {
     for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
       const path = join(dir, entry.name);
@@ -59,7 +96,7 @@ function readSourceInventory(sourceRoot) {
         if (!EXCLUDED_DIRS.has(entry.name)) walk(path, relPath);
       } else if (stat.isFile()) {
         if (entry.name.endsWith('.test.mjs')) continue;
-        const bytes = readFileSync(path);
+        const bytes = readSourceFile(path, relPath, stat, budget);
         items.push({ path: relPath, sha256: sha256(bytes), bytes });
         if (items.length > MAX_FILES) throw fail('AGS-SOURCE-TOO-LARGE');
       } else {
@@ -226,6 +263,63 @@ function pruneSnapshots(root, keep) {
   }
 }
 
+// Publish lock: <root>/publish.lock = {schema, pid, startedAt}, created exclusively (wx) when a publish starts and removed
+// when it ends, ok or not. A lock whose owner pid is dead is reclaimed (the temp sweep's liveness rule); a live owner
+// refuses AGS-PUBLISH-BUSY with no change. A lock of uncertain ownership (unreadable, unknown shape) is retained until it
+// is older than twice the publish budget, so a crash between create and write cannot wedge publishing for good.
+function createLockFile(path, bytes) {
+  let fd;
+  try { fd = openSync(path, 'wx', 0o600); } catch (e) {
+    if (e?.code === 'EEXIST') return false;
+    throw e;
+  }
+  try {
+    let offset = 0;
+    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+    fsyncSync(fd);
+  } catch (e) {
+    try { closeSync(fd); } catch { /* nothing to close */ }
+    try { unlinkSync(path); } catch { /* nothing to remove */ }
+    throw e;
+  }
+  closeSync(fd);
+  return true;
+}
+function observeLock(path) {
+  let raw;
+  try { raw = readFileSync(path, 'utf8'); } catch (e) { return e?.code === 'ENOENT' ? null : { raw: null, live: true }; }
+  try {
+    const lock = JSON.parse(raw);
+    if (lock?.schema === LOCK_SCHEMA && Number.isSafeInteger(lock.pid) && lock.pid > 0) return { raw, live: pidAlive(lock.pid) };
+  } catch { /* uncertain ownership: judged by age below */ }
+  try { return { raw, live: Date.now() - lstatSync(path).mtimeMs < 2 * DEFAULT_BUDGET_MS }; } catch { return null; }
+}
+// Park the lock we judged stale under a private name, and only delete it when its bytes are the ones we judged: if a live
+// publisher created a new lock in the meantime, put it back and yield (false).
+function reclaimStaleLock(path, staleRaw) {
+  const parked = `${path}.reclaim-${randomBytes(8).toString('hex')}`;
+  try { renameSync(path, parked); } catch { return true; }
+  let parkedRaw = null;
+  try { parkedRaw = readFileSync(parked, 'utf8'); } catch { /* treated as not the lock we judged */ }
+  const ours = parkedRaw === staleRaw;
+  if (!ours) { try { linkSync(parked, path); } catch { /* a newer lock already exists */ } }
+  try { unlinkSync(parked); } catch { /* retained: harmless */ }
+  return ours;
+}
+function acquirePublishLock(root) {
+  const path = join(root, LOCK_FILE);
+  const raw = `${JSON.stringify({ schema: LOCK_SCHEMA, pid: process.pid, startedAt: new Date().toISOString() })}\n`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (createLockFile(path, Buffer.from(raw))) {
+      return () => { try { if (readFileSync(path, 'utf8') === raw) unlinkSync(path); } catch { /* already gone or taken over: nothing of ours */ } };
+    }
+    const held = observeLock(path);
+    if (held?.live) throw fail('AGS-PUBLISH-BUSY');
+    if (held && !reclaimStaleLock(path, held.raw)) throw fail('AGS-PUBLISH-BUSY');
+  }
+  throw fail('AGS-PUBLISH-BUSY');
+}
+
 export function publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, deps = {}, timeBudgetMs = DEFAULT_BUDGET_MS } = {}) {
   const root = requireRoot(deps);
   if (typeof sourcePluginRoot !== 'string' || sourcePluginRoot === '' || typeof attestationSourceRoot !== 'string' || attestationSourceRoot === '') throw fail('AGS-SOURCE-INVALID', 'roots');
@@ -239,61 +333,86 @@ export function publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, de
   const name = `plugin-${snapshotSha256}`;
   const destination = join(root, name);
 
-  const existing = readPointerState(root).pointer;
-  if (existing && typeof existing.version === 'string' && compareVersions(version, existing.version) < 0) throw fail('AGS-DOWNGRADE-REFUSED', `${version} < ${existing.version}`);
-
   mkdirSync(root, { recursive: true, mode: 0o700 });
-  sweepStaleTemps(root);
-  const assertSourceUnchanged = () => {
-    budget();
-    const second = readSourceInventory(sourcePluginRoot);
-    if (JSON.stringify(publicRows(second)) !== JSON.stringify(publicRows(first))) throw fail('AGS-SOURCE-DRIFT');
-  };
+  const release = acquirePublishLock(root);
+  try {
+    // Everything below runs under the publish lock: the pointer read, the downgrade check and the prune keep-set all come
+    // from reads taken while no lock-respecting publisher can move the pointer.
+    const locked = readPointerState(root).pointer;
+    const refuseDowngrade = (pointer) => {
+      if (pointer && typeof pointer.version === 'string' && compareVersions(version, pointer.version) < 0) throw fail('AGS-DOWNGRADE-REFUSED', `${version} < ${pointer.version}`);
+    };
+    refuseDowngrade(locked);
+    sweepStaleTemps(root);
+    const assertSourceUnchanged = () => {
+      budget();
+      const second = readSourceInventory(sourcePluginRoot);
+      if (JSON.stringify(publicRows(second)) !== JSON.stringify(publicRows(first))) throw fail('AGS-SOURCE-DRIFT');
+    };
 
-  let published = false;
-  try { lstatSync(destination); published = true; } catch { published = false; }
-  if (!published) {
-    const temporary = join(root, `plugin-tmp-${randomBytes(8).toString('hex')}`);
-    mkdirSync(temporary, { mode: 0o700 });
-    try {
-      if (isWin() && hardenWindowsPrivateDirectory(temporary).status !== 'secure') throw fail('AGS-PRIVATE-MODE');
-      writeSyncedFile(join(temporary, OWNER_FILE), Buffer.from(`${JSON.stringify({ schema: OWNER_SCHEMA, pid: process.pid, nonce: randomBytes(16).toString('hex') })}\n`));
-      const directories = new Set([temporary]);
-      for (const item of first) {
-        budget();
-        const target = join(temporary, ...item.path.split('/'));
-        if (!directories.has(dirname(target))) {
-          mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-          let d = dirname(target);
-          while (d.length > temporary.length) { directories.add(d); d = dirname(d); }
+    let published = false;
+    try { lstatSync(destination); published = true; } catch { published = false; }
+    if (!published) {
+      const temporary = join(root, `plugin-tmp-${randomBytes(8).toString('hex')}`);
+      mkdirSync(temporary, { mode: 0o700 });
+      try {
+        if (isWin() && hardenWindowsPrivateDirectory(temporary).status !== 'secure') throw fail('AGS-PRIVATE-MODE');
+        writeSyncedFile(join(temporary, OWNER_FILE), Buffer.from(`${JSON.stringify({ schema: OWNER_SCHEMA, pid: process.pid, nonce: randomBytes(16).toString('hex') })}\n`));
+        const directories = new Set([temporary]);
+        for (const item of first) {
+          budget();
+          const target = join(temporary, ...item.path.split('/'));
+          if (!directories.has(dirname(target))) {
+            mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+            let d = dirname(target);
+            while (d.length > temporary.length) { directories.add(d); d = dirname(d); }
+          }
+          writeSyncedFile(target, item.bytes);
         }
-        writeSyncedFile(target, item.bytes);
+        writeSyncedFile(join(temporary, MANIFEST), manifestBytes);
+        verifyTree(temporary, snapshotSha256, true);
+        if (typeof deps.betweenSourcePasses === 'function') deps.betweenSourcePasses(sourcePluginRoot);
+        assertSourceUnchanged();
+        if (typeof deps.beforeRename === 'function') deps.beforeRename(temporary);
+        for (const dir of [...directories].sort((a, b) => b.length - a.length)) fsyncDirectoryDurable(dir);
+        if (typeof deps.afterDirectoryFsync === 'function') deps.afterDirectoryFsync(temporary);
+        // A same-version publisher that reached the rename first leaves a digest directory with these exact bytes: verify it
+        // and converge on it instead of renaming over it.
+        const converged = () => {
+          try { lstatSync(destination); } catch { return false; }
+          verifyTree(destination, snapshotSha256, false);
+          return true;
+        };
+        let renamed = false;
+        if (!converged()) {
+          // The owner file goes immediately before the rename, so a crash anywhere earlier leaves a temp the sweep can attribute.
+          unlinkSync(join(temporary, OWNER_FILE));
+          try { renameSync(temporary, destination); renamed = true; } catch (e) { if (!converged()) throw e; }
+        }
+        if (!renamed) rmSync(temporary, { recursive: true, force: true });
+      } catch (e) {
+        try { rmSync(temporary, { recursive: true, force: true }); } catch { /* retained for the next sweep */ }
+        throw e;
       }
-      writeSyncedFile(join(temporary, MANIFEST), manifestBytes);
-      verifyTree(temporary, snapshotSha256, true);
-      if (typeof deps.betweenSourcePasses === 'function') deps.betweenSourcePasses(sourcePluginRoot);
+      fsyncDirectoryDurable(root);
+    } else {
+      verifyTree(destination, snapshotSha256, false);
       assertSourceUnchanged();
-      if (typeof deps.beforeRename === 'function') deps.beforeRename(temporary);
-      unlinkSync(join(temporary, OWNER_FILE));
-      for (const dir of [...directories].sort((a, b) => b.length - a.length)) fsyncDirectoryDurable(dir);
-      renameSync(temporary, destination);
-    } catch (e) {
-      try { rmSync(temporary, { recursive: true, force: true }); } catch { /* retained for the next sweep */ }
-      throw e;
     }
-    fsyncDirectoryDurable(root);
-  } else {
-    verifyTree(destination, snapshotSha256, false);
-    assertSourceUnchanged();
-  }
 
-  if (existing?.snapshotSha256 !== snapshotSha256) {
-    setCurrentAgySnapshot({ snapshotSha256 }, deps);
-    const keep = new Set([snapshotSha256]);
-    if (existing) keep.add(existing.snapshotSha256);
-    pruneSnapshots(root, keep);
+    // Re-read once more immediately before moving the pointer: a pointer that now names a newer version is never overwritten.
+    const latest = readPointerState(root).pointer;
+    refuseDowngrade(latest);
+    if (latest?.snapshotSha256 !== snapshotSha256) {
+      setCurrentAgySnapshot({ snapshotSha256 }, deps);
+      const keep = new Set([snapshotSha256]);
+      for (const pointer of [locked, latest]) if (pointer) keep.add(pointer.snapshotSha256);
+      pruneSnapshots(root, keep);
+    }
+    return { root: destination, snapshotSha256, version };
+  } finally {
+    release();
   }
-  return { root: destination, snapshotSha256, version };
 }
 
 // ---- classification ---------------------------------------------------------------------------------------------------
