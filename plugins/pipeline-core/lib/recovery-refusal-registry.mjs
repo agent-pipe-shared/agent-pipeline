@@ -1,10 +1,10 @@
 // Recovery refusal registry (RV-7): maps each typed refusal code to what a
 // recovery caller may do next.
 //
-// These dispositions are the FIRST CUT. They cover only the WT-ORPHAN-* codes
-// that worktree-lifecycle.mjs produces today. The custody module (RV-2..RV-6)
-// and the attended CLI (RV-8..RV-11) register their own codes in this registry
-// when they land.
+// It covers the WT-ORPHAN-* codes that worktree-lifecycle.mjs produces and every
+// LOC-* code that legacy-owner-custody.mjs produces; the registry test scans both
+// producers, so a code added there without an entry here fails the suite. The
+// attended CLI (RV-8..RV-11) registers its own codes here when it lands.
 //
 // Disposition meaning:
 //   refuse      - input or authority is wrong; no attended action makes the same
@@ -33,7 +33,70 @@ export const RECOVERY_REFUSAL_REGISTRY = Object.freeze({
   "WT-ORPHAN-ARCHIVE-AUTHORITY": entry("RV-5", "refuse", null),
   "WT-ORPHAN-ARCHIVE-OWN-SESSION": entry("RV-5", "refuse", null),
   "WT-ORPHAN-ARCHIVE-ARGUMENT": entry("RV-5", "refuse", null),
-  "WT-ORPHAN-ARCHIVE-READBACK": entry("RV-5", "refuse", null),
+  // Raised after the archive copy was written; a retry then fails TARGET-EXISTS,
+  // so a bare refuse would strand the operator. An attended look is required.
+  "WT-ORPHAN-ARCHIVE-READBACK": entry("RV-5", "handoff", {
+    kind: "attended-diagnostic",
+    action: "Inspect the orphan archive copy already written for this descriptor against the original, then resolve the leftover state by hand; a plain retry fails because the archive target now exists.",
+  }),
+
+  // RV-2: classification of a legacy session-cleanup receipt.
+  "LOC-STATUS-MISMATCH": entry("RV-2", "unavailable", {
+    kind: "signed-custody-disposition",
+    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+  }),
+  "LOC-SCHEMA-MISMATCH": entry("RV-2", "unavailable", {
+    kind: "signed-custody-disposition",
+    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+  }),
+  "LOC-DIGEST-MISMATCH": entry("RV-2", "unavailable", {
+    kind: "signed-custody-disposition",
+    action: "Review the conflicting receipt, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+  }),
+  "LOC-COMPARE-FLAG-FALSE": entry("RV-2", "unavailable", {
+    kind: "signed-custody-disposition",
+    action: "Review the receipt whose comparison failed, then act on it only through a human-signed legacy custody disposition (preserve or archive).",
+  }),
+  "LOC-COMPARE-FLAG-MISSING": entry("RV-2", "handoff", {
+    kind: "attended-diagnostic",
+    action: "A required comparison flag was not supplied, so the receipt cannot be classified; an attended operator must re-collect the comparison before any custody action.",
+  }),
+  "LOC-FIELD-MISSING": entry("RV-2", "handoff", {
+    kind: "attended-diagnostic",
+    action: "The receipt is absent or lacks a required field; an attended operator must inspect it, and only a signed bind-absence or archive disposition may act on it.",
+  }),
+  "LOC-RECEIPT-AMBIGUOUS": entry("RV-2", "handoff", {
+    kind: "attended-diagnostic",
+    action: "More than one candidate receipt exists for the session; an attended operator must decide which file is the receipt before any custody action.",
+  }),
+  "LOC-RECEIPT-OVERSIZE": entry("RV-2", "handoff", {
+    kind: "attended-diagnostic",
+    action: "The receipt is larger than the 1 MiB bound and was not read; an attended operator must inspect the file by hand.",
+  }),
+
+  // RV-3: the detached human proof and the package it signs.
+  "LOC-SESSION-NOT-ENDED": entry("RV-3", "unavailable", {
+    kind: "owner-confirmed-ended",
+    action: "Confirm the owning session has ended, then build the authorization again with sessionEnded set to true.",
+  }),
+  "LOC-PACKAGE-INVALID": entry("RV-3", "refuse", null),
+  "LOC-PROOF-INVALID": entry("RV-3", "refuse", null),
+  "LOC-PROOF-SIGNER-MISMATCH": entry("RV-3", "refuse", null),
+  "LOC-PROOF-BINDING-MISMATCH": entry("RV-3", "refuse", null),
+  "LOC-PROOF-EXPIRED": entry("RV-3", "unavailable", {
+    kind: "fresh-signed-authorization",
+    action: "Build a new custody authorization with a later expiry and obtain a fresh detached human proof over it.",
+  }),
+
+  // RV-4: applying a signed disposition.
+  "LOC-REPLAY-PRECONDITION": entry("RV-4", "unavailable", {
+    kind: "replay-preconditions-defined",
+    action: "Replay has no defined preconditions yet; use a signed preserve or archive disposition instead.",
+  }),
+  "LOC-TARGET-UNSAFE": entry("RV-4", "handoff", {
+    kind: "attended-diagnostic",
+    action: "The receipt or archive destination is a symlink, a non-regular file or otherwise unsafe, and a step may have already written; an attended operator must inspect it before any retry.",
+  }),
 });
 
 const UNKNOWN = Object.freeze({

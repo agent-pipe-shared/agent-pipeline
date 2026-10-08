@@ -1,27 +1,27 @@
 // RV-2 (specs/sprint-alfred-epic/spec.md lines 1201-1203): CAS-conflict
 // classification of a legacy session-cleanup receipt. classifyLegacyReceipt()
 // is classify-only and read-only: it never creates, writes, renames or deletes
-// anything.
+// anything. It lstat-checks the target before reading (ruling 26): a symlink or
+// a non-regular entry is a typed unavailable result, and so is a file above the
+// 1 MiB receipt bound, which is judged by size before any byte is parsed.
 //
 // RV-3 (spec lines 1204-1206): the detached human proof binds the legacy
 // custody authorization. buildLegacyCustodyAuthorization() builds the signed
 // package (receipt as sha256 + size or explicit absence, never bytes);
 // verifyLegacyCustodyProof() checks a po-approval-proof envelope against an
 // externally supplied anchor. The signed intent is a pure function of the
-// package. Both functions are synchronous and touch no filesystem.
+// package. Both functions are synchronous and touch no filesystem. Ruling 25
+// adds sessionId, expiresAt and archiveDestination to the package: the builder
+// validates the shape of every key, and the verifier re-checks that shape,
+// then the proof, then expiry, in that order.
 //
 // RV-4 (spec lines 1207-1211): applyLegacyCustodyDisposition() is the ONLY
 // function in this module that can mutate the filesystem, and only for a signed
 // "archive" disposition (receipt moved under archiveRoot). Every other outcome
 // - preserved, absence-bound, refused, unavailable - writes nothing.
 //
-// RV-7 wiring TODO: the LOC- codes below (LOC-STATUS-MISMATCH,
-// LOC-SCHEMA-MISMATCH, LOC-DIGEST-MISMATCH, LOC-COMPARE-FLAG-FALSE,
-// LOC-COMPARE-FLAG-MISSING, LOC-FIELD-MISSING, LOC-RECEIPT-AMBIGUOUS, the
-// RV-3 codes LOC-SESSION-NOT-ENDED, LOC-PROOF-INVALID,
-// LOC-PROOF-SIGNER-MISMATCH, LOC-PROOF-BINDING-MISMATCH, and the RV-4 codes
-// LOC-REPLAY-PRECONDITION, LOC-TARGET-UNSAFE) must be registered in
-// lib/recovery-refusal-registry.mjs when RV-7 wiring lands.
+// Every LOC- code this module produces is registered in
+// lib/recovery-refusal-registry.mjs; the registry test scans this file for them.
 
 import { createHash, randomBytes } from "node:crypto";
 import {
@@ -39,7 +39,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, posix, win32 } from "node:path";
 
 import { canonical, createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 import { CLEANUP_RECEIPT_SCHEMA } from "./worktree-lifecycle.mjs";
@@ -52,10 +52,18 @@ const CODES = Object.freeze({
   compareFlagMissing: "LOC-COMPARE-FLAG-MISSING",
   fieldMissing: "LOC-FIELD-MISSING",
   receiptAmbiguous: "LOC-RECEIPT-AMBIGUOUS",
+  // Ruling 26: classification never reads a target it has not lstat-checked.
+  targetUnsafe: "LOC-TARGET-UNSAFE",
+  receiptOversize: "LOC-RECEIPT-OVERSIZE",
 });
 
 const COMPARE_FLAGS = Object.freeze(["statusMatches", "schemaMatches", "digestMatches"]);
 const EXPECTED_STATUS = "complete";
+
+// A receipt is a small sanitized JSON document; a larger file is not a receipt we
+// are willing to read whole, classify, hash or copy.
+const MAX_RECEIPT_BYTES = 1024 * 1024;
+const SHA256_HEX = /^[0-9a-f]{64}$/u;
 
 function unavailable(code) {
   return { status: "unavailable", code, mutated: false };
@@ -79,14 +87,44 @@ function candidateNames(receiptsDirectory, sessionId) {
   return names.filter((name) => name === exact || name.startsWith(`${sessionId}.`)).sort();
 }
 
+/**
+ * Bounded read of one regular, non-symlinked file. The entry is lstat-checked
+ * before it is opened, so a FIFO or a directory is never opened. An oversized
+ * file is reported (`oversize`) without being read; every other failure is
+ * `unsafe`.
+ */
+function readReceiptBytes(path) {
+  try {
+    const info = lstatSync(path);
+    if (info.isSymbolicLink() || !info.isFile()) return { unsafe: true };
+    if (info.size > MAX_RECEIPT_BYTES) return { unsafe: true, oversize: true };
+    const fd = openSync(path, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+    try {
+      const opened = fstatSync(fd);
+      if (!opened.isFile()) return { unsafe: true };
+      if (opened.size > MAX_RECEIPT_BYTES) return { unsafe: true, oversize: true };
+      const bytes = readFileSync(fd);
+      return bytes.length > MAX_RECEIPT_BYTES ? { unsafe: true, oversize: true } : { bytes };
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return { unsafe: true };
+  }
+}
+
 export function classifyLegacyReceipt({ receiptsDirectory, sessionId, compare } = {}) {
   const names = candidateNames(receiptsDirectory, sessionId);
   if (names.length > 1) return unavailable(CODES.receiptAmbiguous);
   if (names.length === 0) return unavailable(CODES.fieldMissing);
 
+  const read = readReceiptBytes(join(receiptsDirectory, names[0]));
+  if (read.oversize === true) return unavailable(CODES.receiptOversize);
+  if (read.unsafe === true) return unavailable(CODES.targetUnsafe);
+
   let receipt;
   try {
-    receipt = JSON.parse(readFileSync(join(receiptsDirectory, names[0]), "utf8"));
+    receipt = JSON.parse(read.bytes.toString("utf8"));
   } catch {
     return unavailable(CODES.fieldMissing);
   }
@@ -120,11 +158,40 @@ const RV3_CODES = Object.freeze({
   proofInvalid: "LOC-PROOF-INVALID",
   signerMismatch: "LOC-PROOF-SIGNER-MISMATCH",
   bindingMismatch: "LOC-PROOF-BINDING-MISMATCH",
+  // Ruling 25: a package whose own keys are malformed, and a proof whose
+  // package is past its signed expiry.
+  packageInvalid: "LOC-PACKAGE-INVALID",
+  proofExpired: "LOC-PROOF-EXPIRED",
 });
 
 const PROOF_KEYS = Object.freeze(["intentSha256", "keyReference", "publicKey", "schema", "signatureBase64"]);
 const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
 const DOMAIN_SHA256 = createHash("sha256").update(LEGACY_CUSTODY_AUTHORIZATION_SCHEMA).digest("hex");
+
+// Which on-disk classification each signed disposition may act on.
+const DISPOSITION_CLASSIFICATIONS = Object.freeze({
+  preserve: ["matching"],
+  replay: ["matching"],
+  archive: ["conflicting", "malformed"],
+  "bind-absence": ["absent"],
+});
+
+const DISPOSITIONS = Object.freeze(Object.keys(DISPOSITION_CLASSIFICATIONS));
+const CLASSIFICATION_VOCABULARY = Object.freeze(["matching", "conflicting", "malformed", "absent"]);
+const PACKAGE_KEYS = Object.freeze([
+  "archiveDestination",
+  "casPrecondition",
+  "classification",
+  "disposition",
+  "expiresAt",
+  "receipt",
+  "repository",
+  "schema",
+  "sessionEnded",
+  "sessionId",
+]);
+const GIT_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u;
 
 function refusal(code) {
   return { ok: false, code };
@@ -144,9 +211,106 @@ function custodyIntent(pkg) {
   });
 }
 
-export function buildLegacyCustodyAuthorization({ repository, receipt, classification, disposition, sessionEnded, casPrecondition } = {}) {
+// Package shape (ruling 25). Each key is judged on its own; no check below
+// reads one key to judge another, so a combination such as sessionEnded or an
+// absent receipt with a non-absent classification is never a shape defect here -
+// it stays a binding mismatch against the proof (ruling 32). The single
+// combination rule, archiveDestination iff disposition is "archive", is a
+// separate step (archiveDestinationFollowsDisposition) that the verifier
+// applies only once the proof has verified.
+
+function isPlainObject(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function hasExactKeys(value, expectedSorted) {
+  const keys = Object.keys(value).sort();
+  return keys.length === expectedSorted.length && keys.every((key, index) => key === expectedSorted[index]);
+}
+
+/** Exactly { sha256: 64 lowercase hex, size: non-negative integer } or exactly { absent: true }. */
+function validReceiptBinding(receipt) {
+  if (!isPlainObject(receipt)) return false;
+  if (hasExactKeys(receipt, ["absent"])) return receipt.absent === true;
+  return (
+    hasExactKeys(receipt, ["sha256", "size"])
+    && typeof receipt.sha256 === "string" && SHA256_HEX.test(receipt.sha256)
+    && Number.isSafeInteger(receipt.size) && receipt.size >= 0
+  );
+}
+
+/** Exactly { commit, tree }, each a 40- or 64-hex object id. */
+function validRepository(repository) {
+  return (
+    isPlainObject(repository)
+    && hasExactKeys(repository, ["commit", "tree"])
+    && typeof repository.commit === "string" && GIT_OBJECT_ID.test(repository.commit)
+    && typeof repository.tree === "string" && GIT_OBJECT_ID.test(repository.tree)
+  );
+}
+
+function validClassification(classification) {
+  return (
+    isPlainObject(classification)
+    && typeof classification.classification === "string"
+    && CLASSIFICATION_VOCABULARY.includes(classification.classification)
+  );
+}
+
+function validCasPrecondition(cas) {
+  return isPlainObject(cas) && typeof cas.receiptPath === "string" && cas.receiptPath !== "";
+}
+
+function validExpiry(value) {
+  return typeof value === "string" && ISO_UTC.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+/** A non-empty path that is neither absolute (either platform) nor able to leave the repository. */
+function validRelativePath(value) {
+  if (typeof value !== "string" || value === "" || value.includes("\u0000")) return false;
+  if (posix.isAbsolute(value) || win32.isAbsolute(value) || /^[A-Za-z]:/u.test(value)) return false;
+  const segments = value.split(/[\\/]+/u);
+  if (segments.includes("..")) return false;
+  return segments.some((segment) => segment !== "" && segment !== ".");
+}
+
+function packageKeysAreWellFormed(pkg) {
+  return (
+    isPlainObject(pkg)
+    && hasExactKeys(pkg, PACKAGE_KEYS)
+    && pkg.schema === LEGACY_CUSTODY_AUTHORIZATION_SCHEMA
+    && validReceiptBinding(pkg.receipt)
+    && validRepository(pkg.repository)
+    && validClassification(pkg.classification)
+    && DISPOSITIONS.includes(pkg.disposition)
+    && typeof pkg.sessionEnded === "boolean"
+    && validCasPrecondition(pkg.casPrecondition)
+    && typeof pkg.sessionId === "string" && pkg.sessionId !== ""
+    && validExpiry(pkg.expiresAt)
+    && (pkg.archiveDestination === null || validRelativePath(pkg.archiveDestination))
+  );
+}
+
+/** Ruling 25: archiveDestination is a path iff the disposition is "archive", null otherwise. */
+function archiveDestinationFollowsDisposition(pkg) {
+  return (pkg.disposition === "archive") === (pkg.archiveDestination !== null);
+}
+
+export function buildLegacyCustodyAuthorization({
+  repository,
+  receipt,
+  classification,
+  disposition,
+  sessionEnded,
+  casPrecondition,
+  sessionId,
+  expiresAt,
+  archiveDestination,
+} = {}) {
   if (sessionEnded !== true) return refusal(RV3_CODES.sessionNotEnded);
-  return structuredClone({
+  const candidate = {
     schema: LEGACY_CUSTODY_AUTHORIZATION_SCHEMA,
     repository,
     receipt,
@@ -154,7 +318,19 @@ export function buildLegacyCustodyAuthorization({ repository, receipt, classific
     disposition,
     sessionEnded: true,
     casPrecondition,
-  });
+    sessionId,
+    expiresAt,
+    archiveDestination,
+  };
+  if (!packageKeysAreWellFormed(candidate) || !archiveDestinationFollowsDisposition(candidate)) {
+    return refusal(RV3_CODES.packageInvalid);
+  }
+  try {
+    return structuredClone(candidate);
+  } catch {
+    // A value the structured clone cannot copy (a function nested in classification) is not a package.
+    return refusal(RV3_CODES.packageInvalid);
+  }
 }
 
 function wellFormedEnvelope(proof) {
@@ -167,7 +343,13 @@ function wellFormedEnvelope(proof) {
   );
 }
 
+/**
+ * Order is fixed (ruling 32): package shape -> proof (envelope, signer,
+ * binding) -> expiry. Expiry is judged only for an otherwise valid proof.
+ */
 export function verifyLegacyCustodyProof({ package: pkg, proof, anchor } = {}) {
+  if (!packageKeysAreWellFormed(pkg)) return refusal(RV3_CODES.packageInvalid);
+
   if (!wellFormedEnvelope(proof)) return refusal(RV3_CODES.proofInvalid);
   if (anchor === null || typeof anchor !== "object" || typeof anchor.keyReference !== "string" || typeof anchor.publicKeySha256 !== "string") {
     return refusal(RV3_CODES.proofInvalid);
@@ -187,6 +369,12 @@ export function verifyLegacyCustodyProof({ package: pkg, proof, anchor } = {}) {
   if (result.verified !== true) {
     return refusal(result.code === "PO-APPROVAL-TRUST-MISMATCH" ? RV3_CODES.signerMismatch : RV3_CODES.proofInvalid);
   }
+
+  // The one cross-key rule runs here, not with the per-key shape above: a package
+  // that was changed after signing is a binding mismatch, and only a package that
+  // was signed as it stands can be inconsistent in itself.
+  if (!archiveDestinationFollowsDisposition(pkg)) return refusal(RV3_CODES.packageInvalid);
+  if (Date.parse(pkg.expiresAt) <= Date.now()) return refusal(RV3_CODES.proofExpired);
   return { ok: true };
 }
 
@@ -209,24 +397,12 @@ export const LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA = "pipeline.legacy-custody-arch
 
 const RV4_CODES = Object.freeze({
   replayPrecondition: "LOC-REPLAY-PRECONDITION",
-  targetUnsafe: "LOC-TARGET-UNSAFE",
+  targetUnsafe: CODES.targetUnsafe,
 });
 
 const ARCHIVE_DIRECTORY_NAME = "archived";
 const ARCHIVE_AUDIT_NAME = "legacy-custody-archive-audit.jsonl";
-// A receipt is a small sanitized JSON document; a larger file is not a receipt we
-// are willing to read whole, hash and copy.
-const MAX_RECEIPT_BYTES = 1024 * 1024;
 const SAFE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
-const SHA256_HEX = /^[0-9a-f]{64}$/u;
-
-// Which on-disk classification each signed disposition may act on.
-const DISPOSITION_CLASSIFICATIONS = Object.freeze({
-  preserve: ["matching"],
-  replay: ["matching"],
-  archive: ["conflicting", "malformed"],
-  "bind-absence": ["absent"],
-});
 
 function refusedResult(code, mutated = false) {
   return { status: "refused", code, mutated };
@@ -278,7 +454,9 @@ function readAuthorizedPackage(pkg, sessionId) {
   const cas = pkg.casPrecondition;
   if (cas === null || typeof cas !== "object" || Array.isArray(cas)) return invalid;
   if (cas.expectedState !== (absent ? "absent" : "present")) return invalid;
-  // Signed for another session's receipt path: the signature does not bind this target.
+  // Signed for another session, or for another session's receipt path: the
+  // signature does not bind this target. The receipt name stem is the session id.
+  if (pkg.sessionId !== sessionId) return { refusal: RV3_CODES.bindingMismatch };
   if (cas.receiptPath !== receiptFileName(sessionId)) return { refusal: RV3_CODES.bindingMismatch };
   return {
     disposition: pkg.disposition,
@@ -299,25 +477,6 @@ function listCandidateNames(receiptsDirectory, sessionId) {
     const exact = receiptFileName(sessionId);
     const names = readdirSync(receiptsDirectory).filter((name) => name === exact || name.startsWith(`${sessionId}.`));
     return { names: names.sort() };
-  } catch {
-    return { unsafe: true };
-  }
-}
-
-/** Bounded read of one regular, non-symlinked file; anything else is unsafe. */
-function readReceiptBytes(path) {
-  try {
-    const info = lstatSync(path);
-    if (info.isSymbolicLink() || !info.isFile() || info.size > MAX_RECEIPT_BYTES) return { unsafe: true };
-    const fd = openSync(path, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
-    try {
-      const opened = fstatSync(fd);
-      if (!opened.isFile() || opened.size > MAX_RECEIPT_BYTES) return { unsafe: true };
-      const bytes = readFileSync(fd);
-      return bytes.length > MAX_RECEIPT_BYTES ? { unsafe: true } : { bytes };
-    } finally {
-      closeSync(fd);
-    }
   } catch {
     return { unsafe: true };
   }
@@ -493,7 +652,8 @@ export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, pa
   const verdict = verifyLegacyCustodyProof({ package: pkg, proof, anchor });
   if (verdict.ok !== true) return refusedResult(verdict.code);
 
-  // 2. A signed package must still make sense for this session.
+  // 2. A signed package must still make sense for this session: it must name the
+  //    session whose receipt this call classifies (the receipt name stem).
   const authorized = readAuthorizedPackage(pkg, sessionId);
   if (authorized.refusal !== undefined) return refusedResult(authorized.refusal);
 
