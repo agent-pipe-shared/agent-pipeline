@@ -546,3 +546,259 @@ test('AM-17: ungoverned directory - the managed copy loads and is current there,
   assert.deepEqual(entries(ungoverned), [], 'the ungoverned directory stays empty: no .git, no .agent-pipeline');
   cleanup(home, agy.configRoot, seedWs, ungoverned, git);
 });
+
+// ================================================================================================
+// AM-T3: pins for the Critic findings AM-F1, AM-F3..F7 (specs/sprint-alfred-epic/evidence/critic-2026-10-07/am-full.md)
+// and the dispatcher ruling 34 in its disposition. Test-only: the module is not touched, so every case that pins
+// behavior the module does not have yet (F1 serialisation, F3 source hardening, F5 owner-file ordering) is RED by
+// design (QG-04). F4, F6 and F7 close TEST gaps over behavior that already exists and are expected GREEN; F6 is a
+// recorded skip on a host that cannot create a symlink. AM-1..AM-17 and their helpers are not edited.
+//
+// AM-T3 assumptions (for ratification) - the ruling fixes behavior, not these names; smallest shape chosen:
+//  C1. Publish lock: ruling 34 names no file. Assumed `<anchor dir>/agy-snapshot/publish.lock`, a JSON file
+//      { schema: 'pipeline.agy-snapshot-publish-lock.v1', pid, startedAt (ISO start time of the owner) }. Only the
+//      live-owner and dead-owner cases pre-create it, so only they depend on the name and shape. Every other case
+//      reads no lock name: it asserts only that nothing matching /lock/i (and no plugin-tmp-*) is left behind.
+//      A live owner is written with the current pid and the current process start time; a dead one with a pid that
+//      is asserted not alive (2147483646) first. The lock is released (file removed) when a publish ends, ok or not.
+//  C2. F5 hook: no hook sits between the directory fsyncs and the rename (`beforeRename` fires before them).
+//      Assumed `deps.afterDirectoryFsync(tempDir)`, called synchronously after the LAST directory fsync of the temp
+//      tree and BEFORE the owner file is removed and the rename runs; it may throw or crash the process. The module's
+//      own catch removes the temp on a thrown error, so the crash is a real one: a child process calls process.exit
+//      from the hook. If the module never calls the hook the child completes (exit 0) and the case is RED.
+//  C3. F1 moved pointer: the stale-read window is simulated by a writer outside the lock (copy of another home's
+//      newer digest directory plus a pointer write) inside `betweenSourcePasses`, which fires after the copy. The
+//      typed refusal is AGS-DOWNGRADE-REFUSED (ruling 34: the downgrade check uses the locked, re-read pointer).
+//  C4. F1 same-version race: a racing publisher is simulated by copying an identical digest directory (same source,
+//      other home) into place inside `beforeRename`. Converging means success: the result names the existing digest
+//      directory, which verifies, the pointer names it and nothing is left behind.
+//  C5. F3: a source file with nlink > 1 is AGS-SOURCE-UNSAFE; a single file strictly above 1 MiB is
+//      AGS-SOURCE-TOO-LARGE. Both refuse before anything is published (no digest directory, no pointer). The exact
+//      1 MiB boundary and the 32 MiB total are not pinned.
+// ================================================================================================
+import { linkSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { relative } from 'node:path';
+
+const T3_LOCK = 'publish.lock';
+const T3_LOCK_SCHEMA = 'pipeline.agy-snapshot-publish-lock.v1';
+const T3_OWNER_FILE = '.snapshot-temp-owner.json';
+const T3_OWNER_SCHEMA = 'pipeline.agy-snapshot-temp-owner.v1';
+const T3_DIGEST_DIR = /^plugin-[a-f0-9]{64}$/;
+const T3_TEMP_DIR = /^plugin-tmp-[a-f0-9]{16}$/;
+const T3_CRASH_STATUS = 86;
+const T3_CHILD = [
+  'const m = await import(process.env.AGS_MOD);',
+  'm.publishAgySnapshot({ sourcePluginRoot: process.env.AGS_SRC, attestationSourceRoot: process.env.AGS_SRC,',
+  `deps: { homedirFn: () => process.env.AGS_HOME, afterDirectoryFsync: () => process.exit(${T3_CRASH_STATUS}) } });`,
+  'process.exit(0);',
+].join(' ');
+
+function t3DeadPid() {
+  const pid = 2147483646;
+  let alive = true;
+  try { process.kill(pid, 0); } catch (e) { alive = e?.code !== 'ESRCH'; }
+  assert.equal(alive, false, `pid ${pid} must not be alive for this fixture`);
+  return pid;
+}
+function t3WriteLock(root, pid, startedAtMs) {
+  mkdirSync(root, { recursive: true });
+  writeFileSync(join(root, T3_LOCK), `${JSON.stringify({ schema: T3_LOCK_SCHEMA, pid, startedAt: new Date(startedAtMs).toISOString() })}\n`);
+}
+function t3WriteTemp(root, name, pid) {
+  mkdirSync(join(root, name, 'lib'), { recursive: true });
+  writeFileSync(join(root, name, 'lib', 'partial.mjs'), 'partial\n');
+  writeFileSync(join(root, name, T3_OWNER_FILE), `${JSON.stringify({ schema: T3_OWNER_SCHEMA, pid, nonce: 'a'.repeat(32) })}\n`);
+}
+const t3Leftovers = (root) => entries(root).filter((n) => T3_TEMP_DIR.test(n) || /lock/i.test(n));
+const t3Published = (root) => entries(root).filter((n) => T3_DIGEST_DIR.test(n) || n === 'current.json');
+// Publishes `source` into its own fixture home: the source of "another publisher" state (same source, same digest).
+function t3Elsewhere(mod, source) {
+  const home = makeHome();
+  const result = mod.publishAgySnapshot({ sourcePluginRoot: source, attestationSourceRoot: source, deps: { homedirFn: () => home } });
+  return { home, result };
+}
+
+test('AM-T3: F1 lock held by a live owner - a second publish refuses AGS-PUBLISH-BUSY and changes nothing', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  const src2 = makePlugin('1.1.0');
+  try {
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    t3WriteLock(root, process.pid, Date.now() - process.uptime() * 1000);
+    const before = listTree(root);
+    assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src2, attestationSourceRoot: src2, deps }), fail('AGS-PUBLISH-BUSY'));
+    assert.deepEqual(listTree(root), before, 'nothing changed: no temp, no new digest directory, pointer and the foreign lock untouched');
+    assert.equal(pointer(root).snapshotSha256, v1.snapshotSha256);
+  } finally { cleanup(home, src, src2); }
+});
+
+test('AM-T3: F1 lock held by a dead owner - reclaimed, the publish succeeds and releases the lock', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    t3WriteLock(root, t3DeadPid(), Date.now() - 3600000);
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    assert.equal(pointer(root).snapshotSha256, v1.snapshotSha256);
+    mod.verifyAgySnapshot({ root: v1.root, snapshotSha256: v1.snapshotSha256 });
+    assert.deepEqual(t3Leftovers(root), [], 'the stale lock was reclaimed and the new one released: no lock file, no temp');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T3: F1 a publish in flight holds the lock - a nested publish refuses AGS-PUBLISH-BUSY, and the lock is released afterwards', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  const src2 = makePlugin('1.1.0');
+  try {
+    const nested = { ...deps, betweenSourcePasses: () => {
+      assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src2, attestationSourceRoot: src2, deps }), fail('AGS-PUBLISH-BUSY'));
+    } };
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps: nested });
+    assert.equal(pointer(root).snapshotSha256, v1.snapshotSha256, 'the outer publish was not disturbed by the refused one');
+    assert.deepEqual(t3Leftovers(root), [], 'lock released');
+    const v2 = mod.publishAgySnapshot({ sourcePluginRoot: src2, attestationSourceRoot: src2, deps });
+    assert.equal(pointer(root).snapshotSha256, v2.snapshotSha256, 'a later publish is not blocked');
+  } finally { cleanup(home, src, src2); }
+});
+
+test('AM-T3: F1 pointer moved to a newer version after the first read - downgrade refused, the newer snapshot and its pointer survive', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  const src2 = makePlugin('1.1.0');
+  const src3 = makePlugin('3.0.0');
+  const elsewhere = t3Elsewhere(mod, src3);
+  try {
+    mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    const newest = elsewhere.result;
+    const newerDir = join(root, `plugin-${newest.snapshotSha256}`);
+    const racing = { ...deps, betweenSourcePasses: () => {
+      cpSync(newest.root, newerDir, { recursive: true });
+      writeFileSync(join(root, 'current.json'), `${JSON.stringify({ schema: 'pipeline.agy-snapshot-current.v1', snapshotSha256: newest.snapshotSha256, version: '3.0.0', publishedAt: new Date().toISOString() }, null, 2)}\n`);
+    } };
+    assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src2, attestationSourceRoot: src2, deps: racing }), fail('AGS-DOWNGRADE-REFUSED'));
+    assert.ok(existsSync(newerDir), 'the newer snapshot directory was not pruned');
+    mod.verifyAgySnapshot({ root: newerDir, snapshotSha256: newest.snapshotSha256 });
+    assert.equal(pointer(root).snapshotSha256, newest.snapshotSha256, 'the pointer still names the newer snapshot');
+    assert.equal(pointer(root).version, '3.0.0');
+    assert.deepEqual(t3Leftovers(root), [], 'no temp, lock released');
+  } finally { cleanup(home, elsewhere.home, src, src2, src3); }
+});
+
+test('AM-T3: F1 same-version publish racing to the rename converges on the existing digest directory', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  const elsewhere = t3Elsewhere(mod, src);
+  try {
+    const existing = elsewhere.result;
+    const racing = { ...deps, beforeRename: () => cpSync(existing.root, join(root, `plugin-${existing.snapshotSha256}`), { recursive: true }) };
+    let result;
+    try { result = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps: racing }); } catch (e) {
+      assert.fail(`a same-version publisher racing to the rename must converge, got ${e?.code ?? 'an untyped error'}: ${e?.message}`);
+    }
+    assert.equal(result.snapshotSha256, existing.snapshotSha256, 'the result equals the existing digest');
+    assert.equal(result.root, join(root, `plugin-${existing.snapshotSha256}`));
+    mod.verifyAgySnapshot({ root: result.root, snapshotSha256: result.snapshotSha256 });
+    assert.equal(pointer(root).snapshotSha256, existing.snapshotSha256);
+    assert.deepEqual(t3Leftovers(root), [], 'no temp, lock released');
+  } finally { cleanup(home, elsewhere.home, src); }
+});
+
+test('AM-T3: F3 hardlinked source file - AGS-SOURCE-UNSAFE and nothing published', async (t) => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    try { linkSync(join(src, 'lib/l.mjs'), join(src, 'lib/hardlinked.mjs')); } catch (e) {
+      if (e?.code === 'EPERM') { t.skip('hardlink EPERM on this host'); return; }
+      throw e;
+    }
+    assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps }), fail('AGS-SOURCE-UNSAFE'));
+    assert.deepEqual(t3Published(root), [], 'no digest directory, no pointer');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T3: F3 source file above 1 MiB - AGS-SOURCE-TOO-LARGE and nothing published', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    writeFileSync(join(src, 'lib/big.bin'), Buffer.alloc(1024 * 1024 + 1, 97));
+    assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps }), fail('AGS-SOURCE-TOO-LARGE'));
+    assert.deepEqual(t3Published(root), [], 'no digest directory, no pointer');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T3: F4 real stale temp - a plugin-tmp directory whose owner file names a dead pid is swept by the next publish; a live owner is retained', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const dead = t3DeadPid();
+    const stale = 'plugin-tmp-0123456789abcdef';
+    const live = 'plugin-tmp-fedcba9876543210';
+    t3WriteTemp(root, stale, dead);
+    t3WriteTemp(root, live, process.pid);
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    assert.equal(existsSync(join(root, stale)), false, 'the dead owner temp is swept (the publisher never created it, so only the sweep can have removed it)');
+    assert.equal(existsSync(join(root, live)), true, 'a temp whose owner is alive is retained');
+    assert.deepEqual(entries(root).filter((n) => T3_TEMP_DIR.test(n)), [live]);
+    assert.equal(pointer(root).snapshotSha256, v1.snapshotSha256);
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T3: F5 crash after the directory fsyncs, before the rename - the temp still carries its owner file, so the next publish sweeps it', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e', T3_CHILD], {
+      env: { ...process.env, AGS_MOD: pathToFileURL(MODULE_PATH).href, AGS_HOME: home, AGS_SRC: src },
+      encoding: 'utf8',
+      timeout: 120000,
+    });
+    assert.equal(child.status, T3_CRASH_STATUS, `deps.afterDirectoryFsync must fire after the last directory fsync and crash the child (exit ${child.status}; stderr: ${String(child.stderr).slice(0, 300)})`);
+    const temps = entries(root).filter((n) => T3_TEMP_DIR.test(n));
+    assert.equal(temps.length, 1, 'the crashed publisher left exactly one temp');
+    assert.deepEqual(entries(root).filter((n) => T3_DIGEST_DIR.test(n)), [], 'no digest directory became visible');
+    const ownerPath = join(root, temps[0], T3_OWNER_FILE);
+    assert.ok(existsSync(ownerPath), 'the owner file is still present, so the temp is not an unsweepable ownerless leak');
+    assert.equal(JSON.parse(readFileSync(ownerPath, 'utf8')).pid, child.pid, 'the owner file names the crashed publisher');
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    assert.deepEqual(entries(root).filter((n) => T3_TEMP_DIR.test(n)), [], 'the next publish swept the crashed temp');
+    assert.equal(pointer(root).snapshotSha256, v1.snapshotSha256);
+    assert.deepEqual(t3Leftovers(root), [], 'a crashed publisher lock (dead owner) is reclaimed too');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T3: F6 foreign - a symlink planted in a snapshot is refused (a recorded skip where the host cannot create one)', async (t) => {
+  const { mod, home, src, deps } = await setup('1.0.0');
+  try {
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    try { symlinkSync(join(v1.root, 'plugin.json'), join(v1.root, 'lib/link.mjs')); } catch (e) {
+      if (e?.code === 'EPERM') { t.skip('symlink EPERM on this host'); return; }
+      throw e;
+    }
+    assert.throws(() => mod.verifyAgySnapshot({ root: v1.root, snapshotSha256: v1.snapshotSha256 }), fail('AGS-SNAPSHOT-FOREIGN'));
+    const verdict = mod.classifyAgySnapshot({ observation: { attestedSourceSnapshotSha256: v1.snapshotSha256 }, deps });
+    assert.equal(verdict.status, 'foreign');
+    assert.equal(verdict.code, 'AGS-SNAPSHOT-FOREIGN');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T3: F7 unresolved anchor - nothing is created in the working directory, the fixture home or the source', async () => {
+  const mod = await load();
+  const home = makeHome();
+  const src = makePlugin();
+  const cwdBefore = process.cwd();
+  const scratchCwd = physicalTmp('ags-cwd-');
+  try {
+    process.chdir(scratchCwd);
+    const unresolved = {
+      empty: () => '',
+      relative: () => 'relative/home',
+      'relative path into the fixture home': () => relative(scratchCwd, home),
+      throwing: () => { throw new Error('no home'); },
+    };
+    const watched = () => ({ cwd: listTree(scratchCwd), home: listTree(home), src: listTree(src) });
+    for (const [label, homedirFn] of Object.entries(unresolved)) {
+      const deps = { homedirFn };
+      const before = watched();
+      assert.equal(mod.agySnapshotRoot(deps), null, label);
+      assert.equal(mod.readCurrentAgySnapshot(deps), null, label);
+      assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps }), fail('AGS-ANCHOR-UNRESOLVED'), label);
+      assert.throws(() => mod.setCurrentAgySnapshot({ snapshotSha256: 'a'.repeat(64) }, deps), fail('AGS-ANCHOR-UNRESOLVED'), label);
+      assert.equal(mod.classifyAgySnapshot({ observation: {}, deps }).code, 'AGS-ANCHOR-UNRESOLVED', label);
+      assert.deepEqual(watched(), before, `${label}: nothing created in the working directory, the fixture home or the source`);
+    }
+  } finally {
+    process.chdir(cwdBefore);
+    cleanup(home, src, scratchCwd);
+  }
+});
