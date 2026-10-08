@@ -145,7 +145,10 @@ test("captureEvidence: a command that writes nothing still produces a well-forme
     });
     assert.equal(exitCode, 0);
     const written = readFileSync(outPath, "utf8");
-    assert.equal(written, "command: node -e process.exit(0);\nlabel: silent\nexitCode: 0\n--- stdout ---\n\n--- stderr ---\n");
+    assert.match(
+      written,
+      /^command: node -e process\.exit\(0\);\nlabel: silent\nexitCode: 0\nhead: (?:[0-9a-f]{40}|unavailable)\ntree: (?:[0-9a-f]{40}|unavailable)\ndirty: (?:true|false|unavailable)\n--- stdout ---\n\n--- stderr ---\n$/,
+    );
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
