@@ -51,7 +51,7 @@ shape is `MUTATING_ONBOARDING_ARGV_SHAPES` in
 | --- | --- | --- |
 | `intake-required` | absent, or consent not recorded | `intake-consent-apply --root <root> [--git-author-name <name>] [--git-author-email <email>] [--language <de\|en>] [--profile <epic\|feature\|mini>] --granted --activate` (fields already known may be omitted; filled on a later call) |
 | `intake-required` | `collecting` | `intake-capture-apply --root <root> --text <verbatim PO message> \| --text-file <repo-relative path> --activate` — once per PO message, repeated until the PO signals they are done describing the project |
-| `intake-design-questions-required` | `design-questions-pending` | `intake-design-questions-apply --root <root> --answers-json <JSON array of {question, answer}> --activate` — exactly ONE bundled round; a second round with different answers is refused |
+| `intake-design-questions-required` | `design-questions-pending` | `intake-design-questions-apply --root <root> --answers-json <JSON array of {question, answer}> \| --answers-file <repo-relative path> [--answers-file-sha256 <sha256>] --activate` — exactly ONE bundled round; a second round with different answers is refused |
 | `intake-design-questions-required` | `ready-to-generate` | `intake-generate-plan --root <root>`, then digest-bound `intake-generate-apply --root <root> --plan-sha256 <sha256> --activate` |
 | `bootstrap-binding-required` | `generated` | `bootstrap-bind-plan --root <root>`, then digest-bound `bootstrap-bind-apply --root <root> --plan-sha256 <sha256> --activate` |
 
@@ -60,6 +60,15 @@ Pipeline shell grammar refuses any command carrying one, so a real multi-line
 design document cannot be passed through `--text` in any quoting — write it to a
 file under `scratch/` first and pass that path. The file must resolve inside the
 project root. Exactly one of `--text` / `--text-file` is accepted per call.
+
+**Answers from a file.** `intake-design-questions-apply` and its `-replace`
+variant take the bundled answers either inline (`--answers-json`) or from a
+file (`--answers-file <repo-relative path>`), never both. Write a long or
+multi-line answers array to a file under `scratch/` first and pass that path,
+for the same reason as `--text-file`. The optional `--answers-file-sha256
+<64 lowercase hex>` refuses the call unless it equals the SHA-256 of the file's
+raw bytes; it is accepted only together with `--answers-file`. The file route
+follows the same rules as the inline one, including "exactly ONE bundled round".
 
 The consent step asks for the same PO inputs `kickoff-design.md` requires
 before any artifact is written — operator-facing language and PO profile —

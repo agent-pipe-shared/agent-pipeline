@@ -83,14 +83,15 @@ works, at the cost of a still-English document scaffold underneath either
 way. Recommendation: match the language you would already write the PRD
 in."* Bind the answer into `<!-- po-language: (de|en) -->` before drafting.
 
-For a hosted (non-Pipeline) project, that operator-facing choice is not the
-last language question this flow asks. Before drafting the real, promoted
-PRD/Spec — not the provisional kickoff scaffold above, which always stays
-bound to the operator-facing answer — ask a second, separate question: *"Which
-language should the PRD/Spec document itself be written in? The default is
-the same as your operator-facing choice above; if your team, PO, or target
-audience needs the document in a different language — French, Chinese, any
-language — name it, and that is what gets written."* Bind that answer's
+A language already recorded at the onboarding consent step is not asked again
+here: do not re-ask it, reuse the recorded value for the `po-language` binding.
+
+For a hosted (non-Pipeline) project, the document language defaults to that
+recorded consent language and is not a separate default question. It is asked
+only on request: when the PO says the team, PO, or target audience needs the
+PRD/Spec in a different language — French, Chinese, any language — name it, and
+that is what gets written; the provisional kickoff scaffold above always stays
+bound to the operator-facing answer. Bind that language's
 lowercase two-letter code directly into the same `<!-- po-language: ... -->`
 marker while drafting the promoted document — exactly the binding instruction
 above, just no longer restricted to `(de|en)` in wording. Whatever language is
