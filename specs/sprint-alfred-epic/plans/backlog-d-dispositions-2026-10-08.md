@@ -89,3 +89,34 @@ question. The original proposal is kept below for the record.
 - **Security, flagged for the PO rather than silently deferred:** 2026-08-28-verify-evidence-is-trusted-on-read-and-was-forged-by-hand —
   recommendation: 0.7.0 keeps the current trust (Verify evidence is advisory to the Critic, not a gate input it re-executes);
   the signed/bound verify receipt is an 0.8 item. PO decision requested.
+
+## A-live. PROBE-A re-verification (read-only Explore, 2026-10-09) and slice plan
+
+Each item's own status was re-read live; group A + in-scope D (BN). "Tranche" = protected path, signed package.
+
+| Item (short) | Live verdict | Fix site | Slice plan |
+|---|---|---|---|
+| GREP-PUSH | open; trigger is a `^(…)` group/caret in a quoted `git grep` pattern, not `--no-index` | `lib/git-cmd.mjs:1236-1259` (classifyPush); `hooks/guard-push.mjs:417` | probe → test-first fix in `git-cmd.mjs`; guard-push test (TP-5) → tranche |
+| FANOUT-WIN | open; SF22 pins 4 win32 spawns | `lib/fanout-ledger.mjs:185`; `lib/governance-scope.mjs:256-258` | fix first (cache + explicit `requiresEnforcement`), then SF22 flip in the tranche (hooks/) |
+| WIN-SKIPS | open; `codex-design-readiness-host-store.mjs:66` linux-only | `lib/design-workflow-package-v2.test.mjs:39,101` | test-only: typed win32 skip naming the WSL route |
+| TEMP-SEAM | open; `privateTempRoot()` takes no options | `lib/test-private-tmp.mjs:54-78` | seam slice, then the NOT_SECURE pin |
+| HGO-STALE-T | **fixed and pinned** in 26fef9e7d (`human-guard-override.mjs:4228-4231`; `human-guard-override-capability-scan.test.mjs`) | — | triage "fixed in source"; close |
+| PROCSTART | source fixed (26fef9e7d, `worktree-lifecycle.mjs:550-556`), unpinned | `lib/worktree-lifecycle.mjs:550` | test-only pin (spaced/parenthesised comm) |
+| GREENFIELD-TARGETS | partly (d1a015ff5 `enabledRunners`); Claude-only plan unverified | `lib/runner-profile-migration-v3.mjs:378` | probe/test-only first |
+| SCANNER-PROV | partly; delivered files not located | `scripts/security-scan*.mjs` | probe, then doc close |
+| SEMGREP-NOTE-T | open; console suffix untested | `scripts/security-scan.test.mjs` (~1762) | test-only |
+| CLOSURE-ALL | partly; edges collected, per-file throws at `:336`/`:342` still stop early | `lib/guard-maintenance-window-kernel-closure.test.mjs:336-349` | probe → small test change or close |
+| SIGN-PROMPT | open (not code-checked) | `scripts/po-human-approval.mjs` sign-intent rendering | test-first; serialize after TR-S1 (same script) |
+| HGO-DISJOINT | open; whole-repository compare at `:4207` | `lib/human-guard-override.mjs:4195-4207` | new request/capability version; tests first; GUARDRAIL class, Opus Critic |
+| ADR-0085 removal | open | — | in flight (ADR0085-D3b, then T0a–c) |
+| codex-worker-supervisor sandbox | PO-deferred 2026-09-11 (`tracking:`) to the native-Windows Codex package | — | stays deferred (PO's own deferral); confirm in PO list |
+| hooks-enforce-available-parallel-dispatch | open (PO choice FANOUT) | hooks | design/probe first; tranche |
+| shell-grammar kernel placement | open | kernel package | probe first; tranche |
+| elephant-main-context wake-ups | open | instructions | doc-only |
+| scratch retention/durability | open | scratch sweep + handover check | doc/probe first |
+| onboarding-init greenfield matrix slow | open | its tests | test-only (parallelise fixtures) |
+| critic-round-cap enforcement | open; accepted for 0.7.0 | guard/dispatch hook | test-first; tranche |
+
+Excluded by front matter (`sprint: batman|nightwing`), stay deferred per BN: every-small-correction (batman); 14
+nightwing items listed in PROBE-A, including verify-evidence-trusted-on-read (so the security flag above needs no 0.7.0
+action — it remains a PO note).
