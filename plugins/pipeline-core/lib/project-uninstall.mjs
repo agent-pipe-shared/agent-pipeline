@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Source target: plugins/pipeline-core/lib/project-uninstall.mjs
 import {closeSync,fsyncSync,mkdirSync,openSync,readdirSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
-import {dirname,join,resolve} from 'node:path';
+import {dirname,join,relative,resolve,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {randomBytes} from 'node:crypto';
 import {validateUninstallContract} from './project-uninstall-contract.mjs';
@@ -61,7 +61,7 @@ export function createProjectUninstallController({hostStateRoot=join(homedir(),'
   requireRemovedShims();requireUninstallPostconditions(journal,{rootDir:root,scope});
   return result(journal);
  }
- function apply(publicPlan,{activate=false,planSha256,...options}={}){const known=plans.get(publicPlan);if(!activate||!known||planSha256!==publicPlan.planSha256)footprintFail('PU-PLAN');if(publicPlan.conflicts.length)footprintFail('PU-OWNERSHIP-CONFLICT');const current=derive(publicPlan.root);if(canonical(current)!==canonical(known.actual))footprintFail('PU-PREIMAGE-DRIFT');const controls=join(publicPlan.controls,planSha256);ensurePrivate(controls);const path=join(controls,'journal.json');if(readPhysicalFootprint(path))footprintFail('PU-JOURNAL-EXISTS');const journal={schema:JOURNAL_SCHEMA,plan:publicPlan,planSha256,controls,actions:known.actual.content.actions,completed:[]},raw=save(path,journal);plans.delete(publicPlan);if(options.crashAt==='journal')throw Object.assign(new Error('PU-SIMULATED-journal'),{code:'PU-SIMULATED-FAULT'});return run(journal,path,raw,options);}
+ function apply(publicPlan,{activate=false,planSha256,...options}={}){const known=plans.get(publicPlan);if(!activate||!known||planSha256!==publicPlan.planSha256)footprintFail('PU-PLAN');if(publicPlan.conflicts.length){const foreign=publicPlan.conflicts.find(c=>c.code==='PU-FOREIGN-HOOK-CONFLICT');if(foreign)throw Object.assign(new Error('PU-FOREIGN-HOOK-CONFLICT'),{code:'PU-FOREIGN-HOOK-CONFLICT',instructions:{hook:relative(publicPlan.root,foreign.path).split(sep).join('/'),removed:false,attendedStep:'The repository owner removes or relocates the foreign hook, then re-runs the uninstall.'}});footprintFail('PU-OWNERSHIP-CONFLICT');}const current=derive(publicPlan.root);if(canonical(current)!==canonical(known.actual))footprintFail('PU-PREIMAGE-DRIFT');const controls=join(publicPlan.controls,planSha256);ensurePrivate(controls);const path=join(controls,'journal.json');if(readPhysicalFootprint(path))footprintFail('PU-JOURNAL-EXISTS');const journal={schema:JOURNAL_SCHEMA,plan:publicPlan,planSha256,controls,actions:known.actual.content.actions,completed:[]},raw=save(path,journal);plans.delete(publicPlan);if(options.crashAt==='journal')throw Object.assign(new Error('PU-SIMULATED-journal'),{code:'PU-SIMULATED-FAULT'});return run(journal,path,raw,options);}
  function resume({rootDir,planSha256,activate=false,...options}={}){
   if(!activate||typeof planSha256!=='string'||!/^[a-f0-9]{64}$/.test(planSha256))footprintFail('PU-RESUME');
   const observed=scope.observe({rootDir});if(!observed.root||!observed.scopeKey)footprintFail('PU-ROOT-UNAVAILABLE');
