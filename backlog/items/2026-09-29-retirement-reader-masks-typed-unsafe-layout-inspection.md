@@ -48,3 +48,7 @@ its distinct receipt remains retained. No overall onboarding PASS is claimed.
 - Preserve the original callback and assertions, qualify the complete original
   onboarding controller and fixed candidate's broader gates.
 - Keep this item open until combined candidate acceptance.
+
+## Triage
+
+- **2026-10-08 close-out check:** not closable — named test exceeded 600s, needs host run; combined gates unmet
