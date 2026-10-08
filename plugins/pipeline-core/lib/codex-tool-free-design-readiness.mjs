@@ -166,7 +166,7 @@ export function verifyCodexToolFreeBinding({ hostExecution, report, candidate, s
 /** Public package verification reconstructs the request, never trusts a
  * coordinator's returned "expected" object as its authority. */
 export function verifyCodexToolFreeBindingFromSources({ hostExecution, report, candidate, sources,
-  route, sourceBytes, store, repoFingerprint, repoRoot = null, advisorObservationRefs = null, advisorObservation = null, trustedAdvisorExecutablePath = null } = {}) {
+  route, sourceBytes, store, repoFingerprint, repoRoot = null, advisorObservationRefs = null, advisorObservation = null, trustedAdvisorExecutablePath = null, requireCurrentCandidate = true } = {}) {
   try {
     if (!exact(sourceBytes, names) || !exact(sources, names)) return { ok: false, code: 'CTFR-SOURCE-BINDING' };
     const content = Object.fromEntries(names.map(name => {
@@ -177,7 +177,7 @@ export function verifyCodexToolFreeBindingFromSources({ hostExecution, report, c
         content: new TextDecoder('utf-8', { fatal: true }).decode(entry.bytes) }];
     }));
     if(advisorObservation!==null&&(advisorObservationRefs!==null||!same(advisorObservation.candidate,candidate)))throw hostFault('CTFR-ADVISOR-OBSERVATION-BINDING');
-    const request = buildCodexToolFreeReadinessRequest({ dispatchId: report.dispatchId, candidate, sources, route, sourceContent: content, advisorObservation: advisorObservation!==null ? rereadCurrentReadinessAdvisorObservation(repoRoot,advisorObservation,sources,trustedAdvisorExecutablePath) : advisorObservationRefs === null ? null : readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,...advisorObservationRefs}) });
+    const request = buildCodexToolFreeReadinessRequest({ dispatchId: report.dispatchId, candidate, sources, route, sourceContent: content, advisorObservation: advisorObservation!==null ? rereadCurrentReadinessAdvisorObservation(repoRoot,advisorObservation,sources,trustedAdvisorExecutablePath,requireCurrentCandidate) : advisorObservationRefs === null ? null : readCurrentReadinessAdvisorObservation({repoRoot,candidate,sources,...advisorObservationRefs}) });
     const context = { repoFingerprint, dispatchId: report.dispatchId, candidate, sources, route,
       requestSha256: request.requestSha256, reportSha256: designReadinessReportSha256(report) };
     const first = store.readForBinding(hostExecution.selectionId, context);

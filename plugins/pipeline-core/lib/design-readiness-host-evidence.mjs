@@ -148,7 +148,7 @@ export function verifyDesignReadinessHostExecution({
       if (!lstatSync(trustedExecutablePath).isFile()) return fail('DWP-READINESS-HOST-EXECUTABLE-UNAVAILABLE');
       const store = codexHostStoreFactory({gitCommonDir:topology.gitCommonDir,repoFingerprint:hostExecution.repoFingerprint,trustedExecutablePath});
       const checked = verifyCodexToolFreeBindingFromSources({hostExecution,report:readinessReceipt,candidate,sources,sourceBytes,
-        route,store,repoFingerprint:hostExecution.repoFingerprint,repoRoot,advisorObservationRefs,advisorObservation,trustedAdvisorExecutablePath:trustedExecutablePath});
+        route,store,repoFingerprint:hostExecution.repoFingerprint,repoRoot,advisorObservationRefs,advisorObservation,trustedAdvisorExecutablePath:trustedExecutablePath,requireCurrentCandidate});
       return checked.ok ? checked : fail('DWP-READINESS-HOST-RECEIPT-MISMATCH');
     } catch {return fail('DWP-READINESS-HOST-RECEIPT-UNAVAILABLE');}
   }
