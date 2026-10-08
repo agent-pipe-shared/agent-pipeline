@@ -492,6 +492,11 @@ export function validateDesignWorkflowPackage({
       : advisorReceipt.observed.status === "permission-denied" ? "permission-denied"
         : advisorReceipt.observed.status === "unavailable" ? "capacity-unavailable" : "invalid-output";
     if (advisor.exception.failureCode !== failureClass) return fail("DWP-ADVISOR-FAILURE-CODE");
+    // The proposed rationale may state only facts the receipt and trail contain:
+    // the single admitted text is the deterministic one generated from them.
+    if (advisor.exception.rationale !== designWorkflowAdvisorExceptionRationale({ advisorReceipt, attemptTrail })) {
+      return fail("DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED");
+    }
   }
 
   if (candidate !== undefined && (!validCandidate(candidate)
@@ -525,6 +530,8 @@ export function readDesignWorkflowPackageFromRepository({
   requireReadinessExecution = true,
   verifyReadinessExecution = verifyDesignReadinessHostExecution,
   trustedAdvisorExecutablePath,
+  roleRoutePreflight = null,
+  evidenceBindings = null,
 } = {}) {
   if (typeof readCandidate !== "function" || !safeRepoPath(packagePath)) {
     return fail("DWP-READER-INPUT");
@@ -573,6 +580,8 @@ export function readDesignWorkflowPackageFromRepository({
     repoRoot,
     verifyReadinessExecution,
     requireReadinessExecution,
+    roleRoutePreflight,
+    evidenceBindings,
     // At package creation/presentation the exact Git candidate must match.
     // After an approval, consumers may re-read the same immutable package
     // following unrelated commits; the observed HEAD is still sampled twice

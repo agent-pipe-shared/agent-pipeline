@@ -50,11 +50,12 @@ function candidateReader(readCandidate) {
  */
 export function createDesignWorkflowPackageApprovalRequest({
   repoRoot, packagePath, featureId, planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath,
+  roleRoutePreflight, evidenceBindings,
 } = {}) {
   if (!ID.test(featureId ?? "") || !SAFE_PATH.test(planPath ?? "") || !SHA256.test(planSha256 ?? "")
     || !SAFE_PATH.test(specPath ?? "") || !SHA256.test(specSha256 ?? "")) return { ok: false, code: "DWP-APPROVAL-BINDING" };
   const packageRead = readDesignWorkflowPackageFromRepository({ repoRoot, packagePath, readCandidate: candidateReader(readCandidate),
-    ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath });
+    ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath, roleRoutePreflight, evidenceBindings });
   if (!packageRead.ok) return packageRead;
   const pkg = packageRead.workflowPackage;
   if (pkg.featureId !== featureId) return { ok: false, code: "DWP-APPROVAL-FEATURE-MISMATCH" };
@@ -83,6 +84,8 @@ export function validateDesignWorkflowPackageApprovalRequest({
   verifyReadinessExecution,
   trustedAdvisorExecutablePath,
   allowUnrelatedCommits = false,
+  roleRoutePreflight,
+  evidenceBindings,
 } = {}) {
   if (!exact(request, ["schema", "packagePath", "packageSha256", "approvalIntent", ...(Object.hasOwn(request ?? {}, "advisorException") ? ["advisorException"] : [])])
     || request.schema !== DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA
@@ -96,7 +99,8 @@ export function validateDesignWorkflowPackageApprovalRequest({
       trustedAdvisorExecutablePath, advisorExceptionBinding: request.advisorException ?? null,
     })
     : readDesignWorkflowPackageFromRepository({ repoRoot, packagePath: request.packagePath,
-      readCandidate: candidateReader(readCandidate), ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath });
+      readCandidate: candidateReader(readCandidate), ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath,
+      roleRoutePreflight, evidenceBindings });
   if (!packageRead.ok) return packageRead;
   const pkg = packageRead.workflowPackage;
   if (canonical(designWorkflowAdvisorExceptionBinding(packageRead)) !== canonical(request.advisorException ?? null)) return { ok: false, code: "DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING" };
@@ -116,9 +120,11 @@ export function validateDesignWorkflowPackageApprovalRequest({
 export function verifyDesignWorkflowPackageApproval({
   repoRoot, request, proof, anchors, packagePath, featureId, planPath, planSha256, specPath, specSha256,
   readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits = false,
+  roleRoutePreflight, evidenceBindings,
 } = {}) {
   const checked = validateDesignWorkflowPackageApprovalRequest({ repoRoot, request, packagePath, featureId,
-    planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits });
+    planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits,
+    roleRoutePreflight, evidenceBindings });
   if (!checked.ok) return checked;
   const verified = verifyAgainstTrustAnchors({ intent: request.approvalIntent, anchors, proof });
   if (!verified.verified) return { ok: false, code: verified.code ?? "DWP-APPROVAL-PROOF-INVALID" };
