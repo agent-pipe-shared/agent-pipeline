@@ -6,10 +6,29 @@ below names its contract source; build each dispatch from `templates/prompts/gol
 = implementation dispatch that never edits tests. After a package's full Critic plus one delta, the Elephant
 self-verifies. Nothing below is PO-accepted.
 
-## 0. Restore (before any dispatch)
+## 0. Queue after the 2026-10-08 evening tranche (this section wins over §1–§4 below)
 
-1. `git apply --cached specs/sprint-alfred-epic/signed-package/tranche-1/envdump-staged-2026-10-08.patch` and check out
-   the two files into the worktree (handover §2 step 2). Expected blobs `93aad15d0` (lane), `3c3e447da` (`evaluate.mjs`).
+Done since the first version of this file: §1 (tranche signed and committed as `da20519dd`, stamped afterwards), all
+of §2, and the pins + fixes of RV-S7, GITCLS and AM in §3 (details: handover §0, execution order wave BF-1/BF-2).
+Ordered next steps:
+
+1. **AM-W wiring** — AM-W-F2 was stopped uncommitted (PO decision BG). Re-dispatch it from ruling 57 (execution
+   order); pins `45fc5ed3b`, `21aeb82fd` are RED until then. Afterwards remove the `t.todo` of the AM-W behaviour
+   cases once seams exist (test-change ruling). Also re-run `codex-critic-host.test.mjs` fully (after AL-F2 it was
+   stopped at ~135 cases with some red, not yet classified as pre-existing or new).
+2. **Signing-ceremony defects first in the next package** (protected path): backlog
+   `2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md`, `…-signing-toolchain-readiness.md`,
+   `…-machine-wide-key-directory-resolution.md`.
+3. Follow-ups found in wave BF: AL-F2 null-`selectionId` paths (role-dispatch-rejected, catch, Gitless) still return
+   plain results; RV-S7 `--repo` given as a subdirectory is not widened to the toplevel; GITCLS 8-deep `env -S` chain
+   costs ~1 s; AC6-F4 (`/var/tmp` writer on win32); `check-product-capability-inventory` baseline refresh; AL-2 needs
+   H9 (todo marker in `critic-lane-fallback.test.mjs`).
+4. Then §3 below from "R5-T0" onward (R5, R4, RV-S6/S8–S11, R6, N5/N6/N10/N11, AC-6 promotion reader) and §5/§6.
+5. Before any `.gitignore` change: handover §4a (`/evidence/` should be tracked; ADR-0063 amendment first).
+
+## 0a. Restore (before any dispatch)
+
+1. ~~Re-stage the ENVDUMP patch~~ — obsolete: the lane landed in the signed package `da20519dd`.
 2. `node specs/sprint-alfred-epic/evidence/transfer-2026-10-08/unpack.mjs` restores `scratch/` and `evidence/`
    (redacted copies; `<machine-path>` / `<machine-home>` / `<user>` placeholders mark removed machine identifiers).
 3. Run `/pipeline-core:pipeline-start`; the projection must say phase `implementation`, feature `sprint-alfred-epic`.

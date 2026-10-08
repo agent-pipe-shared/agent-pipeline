@@ -5,7 +5,7 @@
 
 **Release state:** version `0.6.3` · tag `v0.6.3` · commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` · tree `6821503f8f4fd72ed31459cb843d97bf8bfaa049` · status `published`
 
-**Current 2026-10-08:** START HERE — [machine-switch handover](../specs/sprint-alfred-epic/plans/handover-2026-10-08-machine-switch.md) (where everything lives, status, resume steps), then the [execution order](../specs/sprint-alfred-epic/plans/0.7-execution-order.md). Nothing PO-accepted.
+**Current 2026-10-08 eve:** START HERE — [handover](../specs/sprint-alfred-epic/plans/handover-2026-10-08-machine-switch.md) §0 (signed tranche `da20519dd`, stamp), then [next actions](../specs/sprint-alfred-epic/plans/next-actions-2026-10-08.md) §0. Nothing PO-accepted.
 
 ## Archived history
 

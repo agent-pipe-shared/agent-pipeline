@@ -4,6 +4,33 @@ Purpose: continue the 0.7.0 candidate work on another machine without losing the
 and without falling back to the design phase. **Nothing in this handover is PO-accepted.** "Implementation complete"
 below means pins green and dispatcher self-verified or Critic-passed, never accepted.
 
+## 0. Update 2026-10-08 evening — START HERE (supersedes §2 step 2, §3 and §4 where they differ)
+
+- **Signed tranche landed:** package commit `da20519dd` (intent `882476b7…`, base `47d70533f`): the ENVDUMP lane
+  (`lib/guard/env-dump-lane.mjs`, new), its fail-closed `evaluate.mjs` call site, the R7-6-P push-anchor post-image of
+  `scripts/pipeline-state.mjs`, and `harness/verify-suites.json` with all 18 previously unregistered suites
+  (`check-verify-suite-registration`: 788 registered, 0 unregistered). Capability assignment `392dfab78`. Stamp commit
+  `392dfab78`; **stamp `46065da9a` = local candidate `0.7.0+claude.20261008194106.da20519d`** (install it from this
+  branch per the memory note on the local marketplace). **§2 step 2 is obsolete**: nothing is staged any more; do not apply the old
+  `envdump-staged-2026-10-08.patch`.
+- **Fix wave BF (all implementation complete, self-verified, NOT PO-accepted):** see the execution order "Results
+  (wave BF-1)", "Results (wave BF-2)" and rulings 52–57. Committed fixes: AC6-F3, PR-S1-F3, RV-S5-F2/F3, RV-S7-F3,
+  AM-F4, GITCLS-F2, AL-F2, WINMF-F (partial), T1-F2 (in the package); pins T1-T4, RV-S5-T3, RV-S7-T2, AM-T4, AM-W-T,
+  AM-W-T2, AL-T5. **Not done (PO decision BG: nothing new, push now):** AM-W-F2, the wiring of installer / update
+  verb / start hint (ruling 57) was stopped before any commit; its pins (`45fc5ed3b`, `21aeb82fd`) stay RED and are the
+  first item of next-actions §0. `codex-critic-host.test.mjs` was not re-run to completion after AL-F2 (stopped at ~135
+  cases with a few red ones, unclassified) — re-run it first on a POSIX host.
+- **Signing on this Windows host (for the next ceremony):** OpenSSL is not on the default PowerShell PATH; prefix it
+  with `$env:Path = "<Git root>\ucrt64\bin;" + $env:Path` (Git root = the folder above `cmd\git.exe`). `sign-intent`
+  needs `--directory <PO key dir>` until `set-po-key-directory` is run once. Expect ~10 min of silence before the
+  passphrase prompt (backlog `2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md`); type the passphrase only
+  after the `PO APPROVAL CONFIRMATION` block. `quality-package-materializer.mjs … apply|authorize-commit` is PO-run (the
+  shell guard refuses any command naming `critical-human-proof.json`). Staged guard files can only be unstaged by the PO
+  (PB-GUARD-HOOKS); a verify-suites copy anywhere is TP-13-protected (keep post-images of it in `scratch/`).
+- **Known red, pre-existing, not caused here:** `check-product-capability-inventory` (stale `sourceBaseline`);
+  observation governance needed two docs classified (`1cc1d16d9`); install-agy win32 symlink/EPERM cases; AC6 `/var/tmp`
+  writer cases on win32 (AC6-F4); MFH002/MFH003 (WINMF host items); EVID 4 win32 redaction cases.
+
 ## 1. Where the state lives (and what a push carries)
 
 | Kind | Location | Carried by a push |

@@ -24,6 +24,12 @@ PO terminal) is classified automatable: the Pipeline checks and resolves the too
 Toil rows T15/T16 (toil log:21-22): signing fails or needs manual PATH work when openssl is not at the default
 Git install root.
 
+Recurrence 2026-10-08 evening (tranche ceremony): `openssl` was not on the PO's PowerShell PATH at all (Git under a
+non-default root, OpenSSL in its `ucrt64\bin`). `sign-intent` still ran ~10 min of disclosure lookups and then failed
+with only `openssl failed; the human terminal must complete the local prompt` — no word that OpenSSL was missing. The
+readiness probe has to run before any lookup and name the missing executable (see
+`pipeline.sign-intent-disclosure-scan-blocks-for-minutes`).
+
 ## Affected artifact
 
 The readiness report in `plugins/pipeline-core` and the signing helpers that invoke openssl.

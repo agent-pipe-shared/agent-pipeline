@@ -20,6 +20,10 @@ Admin-step inventory row C6 ("Make the key directory known to the tool", via `PI
 typed setup action. Source: `docs/admin-steps-inventory.md` row C6, candidate 2; `docs/push-release-flow.md:218-227`;
 toil log:20 (T14).
 
+Recurrence 2026-10-08 evening: on the new machine `sign-intent` without `--directory` failed (no repository-remembered
+directory, no `poKeyDirectory` in the machine plane, no environment variable). The PO expected it to resolve
+automatically. `set-po-key-directory` exists in the newer CLI usage text but was not offered as the typed repair.
+
 ## Triggering situation
 
 Toil row T14 (toil log:20): the PO has to tell the tool where the signing key directory lives on each host.
