@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
@@ -116,6 +117,25 @@ test("current identity is returned only by the trusted source and has independen
         key: { ...value.key, sessionId: input.invocationId } }) } }).resolveCurrentInvocationIdentity(request);
     assert.equal(forgedEcho.code, "MODEL-FAMILY-IDENTITY-UNAVAILABLE");
   } finally { rmSync(commonDir, { recursive: true, force: true }); }
+});
+
+// WINMF-T case 1 (directoryPathChain on path.win32 inputs) is skipped: the function is not exported
+// and takes no injected path module, so it cannot be exercised directly from this file.
+
+test("WINMF-T: activation observation on a real git repository does not report the git common dir unavailable", () => {
+  const created = mkdtempSync(join(tmpdir(), "winmf-t-"));
+  try {
+    const repoRoot = realpathSync.native(created);
+    const git = (...args) => execFileSync("git", args, { cwd: repoRoot, stdio: "ignore" });
+    git("init", "-q");
+    writeFileSync(join(repoRoot, "f.txt"), "fixture\n");
+    git("add", "f.txt");
+    git("-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "fixture");
+    const result = observeModelFamilyActivation({ cwd: repoRoot });
+    assert.notEqual(result.code, "MODEL-FAMILY-GIT-COMMON-DIR-UNAVAILABLE");
+    assert.equal(result.ok, true, result.code);
+    assert.equal(result.status, "inactive");
+  } finally { rmSync(created, { recursive: true, force: true }); }
 });
 
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
