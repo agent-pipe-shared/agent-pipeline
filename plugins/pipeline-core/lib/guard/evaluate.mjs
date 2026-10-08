@@ -30,6 +30,7 @@ import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./
 import { devPlanShellBlocked, devPlanShellFaultBlocked, devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
 import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
 import { powerShellScopeVerdict, sanctionedPowerShellNodeCall } from "./powershell-dialect.mjs";
+import { envDumpClassifierErrorRefusal, envDumpShellRefusal } from "./env-dump-lane.mjs";
 
 /**
  * NVA-B-REBWIRE-1 / Requirement 5, the half that is not a relief: EVERY refusal this guard
@@ -79,6 +80,18 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   } else if (SHELL_TOOLS.includes(toolName)) {
     const command = (input?.tool_input?.command ?? input?.tool_input?.CommandLine);
     if (typeof command !== "string" || command.trim() === "" || command.includes("\0")) return blocked();
+    // ENVDUMP-F: decided on the raw command text BEFORE every other Bash/PowerShell admission or denial (bootstrap, grammar,
+    // operator, read-scope, parse), so a command that prints the process environment can neither be admitted nor be mislabelled
+    // by a different refusal. No override route and no retry action: the code is deliberately outside the override lanes.
+    // Fail closed (ruling 51): a classifier that throws cannot say the command is safe, and an uncaught exception here would
+    // end the hook without a verdict, which does not block. Any exception is therefore the same GUARD-ENV-DUMP refusal.
+    let envDump;
+    try {
+      envDump = envDumpShellRefusal(command, toolName);
+    } catch {
+      envDump = envDumpClassifierErrorRefusal();
+    }
+    if (envDump !== null) return envDump;
   }
 
   let root;

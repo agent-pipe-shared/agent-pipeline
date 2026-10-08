@@ -1641,6 +1641,130 @@
       },
       "invariantPinned": "A Verify run records its cleanup duty in a run record and never in a session descriptor or session-cleanup state, the record carries PID and start evidence, an abort settles it and drains the unsealed run directory, and a stale record of a dead PID is swept without a signature while live and sealed runs are respected",
       "nonOverlapNote": "Pins the run-record cleanup contract only; session-descriptor and worktree behavior stay pinned by worktree-lifecycle-tests"
+    },
+    {
+      "name": "test-private-tmp-tests",
+      "file": "plugins/pipeline-core/lib/test-private-tmp.test.mjs",
+      "invariantPinned": "One owner-only, non-inheriting private temp root is the single placement for test fixtures, so private-state assurance never has to be loosened for tests",
+      "nonOverlapNote": "Unique API contract suite for test-private-tmp.mjs"
+    },
+    {
+      "name": "scratch-retention-tests",
+      "file": "plugins/pipeline-core/lib/scratch-retention.test.mjs",
+      "invariantPinned": "Read-only scratch durability assessment and sweep plan never delete anything and keep referenced scratch content",
+      "nonOverlapNote": "Pure planning contract (sprint-alfred slice C-S1); applying a plan is covered by scratch-sweep-tests"
+    },
+    {
+      "name": "scratch-sweep-tests",
+      "file": "plugins/pipeline-core/scripts/scratch-sweep.test.mjs",
+      "invariantPinned": "The scratch-sweep CLI check mode emits one exact JSON report and its explicit sweep mode applies only the planned deletions",
+      "nonOverlapNote": "CLI front-end coverage (sprint-alfred slice C-S2) distinct from the pure planning suite scratch-retention-tests"
+    },
+    {
+      "name": "design-consistency-check-tests",
+      "file": "plugins/pipeline-core/lib/design-consistency-check.test.mjs",
+      "invariantPinned": "ADR-0085 U1 design consistency check is pure, deterministic and reports every review-chain inconsistency under its code",
+      "nonOverlapNote": "Unique pure in-memory U1 contract suite; receipt creation and approval binding are separate suites"
+    },
+    {
+      "name": "design-review-receipt-tests",
+      "file": "plugins/pipeline-core/lib/design-review-receipt.test.mjs",
+      "invariantPinned": "ADR-0085 U2 design review receipts are created and summarized deterministically from canonical bytes with the import rule respected",
+      "nonOverlapNote": "Unique U2 receipt contract suite, distinct from the U1 consistency check and the U3 approval binding"
+    },
+    {
+      "name": "design-approval-binding-tests",
+      "file": "plugins/pipeline-core/lib/design-approval-binding.test.mjs",
+      "invariantPinned": "ADR-0085 U3 approval binding verifies real U2 receipts against the real U1 chain check and refuses with typed codes",
+      "nonOverlapNote": "Unique U3 binding contract suite; it composes the real U1 and U2 modules rather than duplicating their suites"
+    },
+    {
+      "name": "recovery-refusal-registry-tests",
+      "file": "plugins/pipeline-core/lib/recovery-refusal-registry.test.mjs",
+      "invariantPinned": "Every refusal code has a registered recovery disposition and unregistered codes are found",
+      "nonOverlapNote": "Unique registry completeness and lookup suite for recovery-refusal-registry.mjs"
+    },
+    {
+      "name": "attended-recovery-tests",
+      "file": "harness/scripts/attended-recovery.test.mjs",
+      "invariantPinned": "The attended-recovery verifier accepts only a package whose repository identity, out-of-repository anchor, signature binding and artifact bytes all hold, and refuses every forgery with a typed ATR code",
+      "nonOverlapNote": "Unique suite for harness/scripts/attended-recovery.mjs (RV-S7)"
+    },
+    {
+      "name": "agy-central-snapshot-tests",
+      "file": "plugins/pipeline-core/lib/agy-central-snapshot.test.mjs",
+      "invariantPinned": "The central agy snapshot is published under an exclusive publish lock that is reclaimed only when aged or owner-dead, and a workspace entry is retired only after the global surface is verified",
+      "nonOverlapNote": "Central snapshot and refresh contract (AM); per-repository git-hook runtime snapshots keep their own suites"
+    },
+    {
+      "name": "critic-lane-fallback-tests",
+      "file": "plugins/pipeline-core/lib/critic-lane-fallback.test.mjs",
+      "invariantPinned": "Every unavailable Critic lane maps to exactly one typed fallback decision carrying a failure class and a terminal code",
+      "nonOverlapNote": "Pure decision-table suite for critic-lane-fallback.mjs; the selected-host route integration is codex-critic-selected-host-fallback-tests"
+    },
+    {
+      "name": "codex-critic-selected-host-fallback-tests",
+      "file": "plugins/pipeline-core/scripts/codex-critic-selected-host-fallback.test.mjs",
+      "invariantPinned": "A selected-host Codex Critic pre-launch failure keeps its code and carries the typed lane fallback with its lane record, failure class and terminal code",
+      "nonOverlapNote": "Selected-host route integration of the fallback table, distinct from critic-lane-fallback-tests and the host producer suites"
+    },
+    {
+      "name": "fs-durability-tests",
+      "file": "plugins/pipeline-core/lib/fs-durability.test.mjs",
+      "invariantPinned": "File and directory durability helpers report confirmed, unsupported or failed flush outcomes and never claim a durability they did not observe",
+      "nonOverlapNote": "Unique suite for fs-durability.mjs (FSYNC)"
+    },
+    {
+      "name": "gh-cmd-tests",
+      "file": "plugins/pipeline-core/lib/gh-cmd.test.mjs",
+      "invariantPinned": "The gh command classifier refuses every delivery-capable gh shape it cannot prove read-only, including wrapped, redirected and glued command strings",
+      "nonOverlapNote": "Unique classifier suite for gh-cmd.mjs; git command classification keeps its own suite"
+    },
+    {
+      "name": "gitleaks-repair-ignore-cli-tests",
+      "file": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GLCLI001"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Invoked as a process, including on native Windows, gitleaks-repair-ignore runs main and never exits 0 silently",
+      "nonOverlapNote": "CLI entry coverage only; the repair logic keeps its in-process suite"
+    },
+    {
+      "name": "hardened-private-directory-install-tests",
+      "file": "plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "HPDI001",
+          "HPDI002",
+          "HPDI003"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "The real applyInstall of every hook installer, run in a fresh repository, leaves every private directory it created secure under the real platform assessment",
+      "nonOverlapNote": "Installer integration coverage (WINACLFIX-F), distinct from the hardened-private-directory unit contract"
+    },
+    {
+      "name": "legacy-owner-custody-tests",
+      "file": "plugins/pipeline-core/lib/legacy-owner-custody.test.mjs",
+      "invariantPinned": "Legacy session-cleanup receipts are classified into matching, conflicting or unavailable custody states with typed LOC codes and never guessed",
+      "nonOverlapNote": "Classification half of legacy custody (RV-2/RV-3); applying a signed disposition is legacy-owner-custody-archive-tests"
+    },
+    {
+      "name": "legacy-owner-custody-archive-tests",
+      "file": "plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs",
+      "invariantPinned": "A signed archive disposition moves exactly the signed receipt to the root derived from the signed destination, refuses a caller mismatch or missing repository root before any write, and reports an orphaned copy as a handoff",
+      "nonOverlapNote": "Apply half of legacy custody (RV-4/RV-S5), distinct from the classification suite legacy-owner-custody-tests"
+    },
+    {
+      "name": "pipeline-state-push-anchor-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs",
+      "invariantPinned": "approve-push anchors the push proof in the machine-plane key directory first and refuses an authority whose key pair disagrees with it",
+      "nonOverlapNote": "Push-approval anchor resolution (R7-6-P); other pipeline-state verbs keep their own suites"
     }
   ]
 }

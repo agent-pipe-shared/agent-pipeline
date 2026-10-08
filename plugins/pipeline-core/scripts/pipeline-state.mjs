@@ -510,9 +510,8 @@ import {
   readCriticalHumanProofPolicy,
   readHumanApprovalMode,
 } from "../lib/critical-human-proof-policy.mjs";
-import { readRepoKeyDirectory } from "../lib/po-key-directory.mjs";
 import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
-import { criticalPushScratchArtifactPaths } from "./po-human-approval.mjs";
+import { criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -4510,11 +4509,11 @@ function localPushScratchJson(dir, value, expectedPath) {
   } catch { return { ok: false, code: "CRITICAL-PROOF-SCRATCH-FILE" }; }
 }
 
-function repoScopedPushKeyAnchor(gitCommonDir) {
-  const pointer = readRepoKeyDirectory(gitCommonDir);
-  if (pointer.status !== "valid") return null;
+function repoScopedPushKeyAnchor(dir, gitCommonDir) {
   try {
-    const authority = JSON.parse(readFileSync(join(pointer.directory, "trust-policy.json"), "utf8"));
+    const resolved = resolvePoKeyDirectory({ repoRoot: resolve(dir), dependencies: { gitCommonDirFn: () => gitCommonDir } });
+    if (resolved.status !== "resolved" || typeof resolved.directory !== "string" || !isAbsolute(resolved.directory)) return null;
+    const authority = JSON.parse(readFileSync(join(resolved.directory, "trust-policy.json"), "utf8"));
     if (typeof authority?.keyReference !== "string" || authority.keyReference.length === 0
       || typeof authority?.publicKeySha256 !== "string" || !/^[a-f0-9]{64}$/u.test(authority.publicKeySha256)) return null;
     return { keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 };
@@ -4528,7 +4527,7 @@ function localPushScratchArtifacts(dir, flags) {
   if (flags["proof-request"] !== expected.request
     || flags["proof-authority"] !== expected.authority
     || flags.proof !== expected.proof) return null;
-  const anchor = repoScopedPushKeyAnchor(common.path);
+  const anchor = repoScopedPushKeyAnchor(dir, common.path);
   if (anchor === null) return { ok: false, code: "CRITICAL-PROOF-LOCAL-ANCHOR-UNAVAILABLE" };
   const request = localPushScratchJson(dir, flags["proof-request"], expected.request);
   const authority = localPushScratchJson(dir, flags["proof-authority"], expected.authority);
