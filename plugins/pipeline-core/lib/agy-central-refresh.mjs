@@ -25,18 +25,13 @@ export async function installAgyFromCentralSnapshot({
   writeInstalledReceipt,
 } = {}) {
   const snapshot = publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, deps });
-  // Retire any workspace Pipeline entry first so the host never rebinds one (global entry is intended).
-  const bindings = observeAntigravityWorkspaceBindings({ workspaceRoot });
-  if (bindings.ownedIndexes.length > 0) {
-    const removed = removeAntigravityWorkspaceRegistration({ workspaceRoot, expectedSha256: bindings.sha256 });
-    if (removed.status === 'refused') return { status: 'refused', reason: removed.reason, snapshot, refresh: null };
-  }
   const receiptWriter = typeof writeInstalledReceipt === 'function'
     ? (receipt) => writeInstalledReceipt({ ...receipt, attestationSourceRoot })
     : undefined;
-  let refresh;
+  // The host check comes first and mutates nothing: a broken global surface refuses here, with the workspace entry untouched.
+  let host;
   try {
-    const host = createAntigravityRefreshHost({
+    host = createAntigravityRefreshHost({
       configRoot,
       workspaceRoot,
       approvedSourceRoot: snapshot.root,
@@ -45,6 +40,23 @@ export async function installAgyFromCentralSnapshot({
       runCli,
       writeInstalledReceipt: receiptWriter,
     });
+    const plan = host.prepare();
+    if (plan.status !== 'prepared') {
+      const refusal = { status: 'refused', reason: plan.reason ?? 'ATR-UNAVAILABLE' };
+      return { status: refusal.status, reason: refusal.reason, snapshot, refresh: refusal };
+    }
+  } catch (error) {
+    const refusal = { status: 'refused', reason: hostCode(error) };
+    return { status: refusal.status, reason: refusal.reason, snapshot, refresh: refusal };
+  }
+  // Only after the host check succeeded: retire any workspace Pipeline entry so the host never rebinds one (global entry is intended).
+  const bindings = observeAntigravityWorkspaceBindings({ workspaceRoot });
+  if (bindings.ownedIndexes.length > 0) {
+    const removed = removeAntigravityWorkspaceRegistration({ workspaceRoot, expectedSha256: bindings.sha256 });
+    if (removed.status === 'refused') return { status: 'refused', reason: removed.reason, snapshot, refresh: null };
+  }
+  let refresh;
+  try {
     refresh = host.refresh();
   } catch (error) {
     refresh = { status: 'refused', reason: hostCode(error) };
