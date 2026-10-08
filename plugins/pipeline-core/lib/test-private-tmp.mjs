@@ -51,10 +51,10 @@ function enclosingGitEntry(start) {
   }
 }
 
-function secureRoot(root) {
+function secureRoot(root, harden, assess) {
   if (process.platform === "win32") {
-    hardenWindowsPrivateDirectory(root);
-    const state = assessWindowsPrivatePath(root);
+    harden(root);
+    const state = assess(root);
     if (state?.status !== "secure") {
       throw fail("PRIVATE_TMP_ROOT_NOT_SECURE", `the Windows private temp root is not secure (status=${state?.status ?? "unknown"}, reason=${state?.reason ?? "none"})`);
     }
@@ -70,12 +70,18 @@ function secureRoot(root) {
 /**
  * The per-process private temp root: created and hardened on first use, then
  * the same path on every later call.
+ *
+ * `options.harden` / `options.assess` are test seams that default to the
+ * Windows private-state adapter functions; they are only consulted on win32.
  */
-export function privateTempRoot() {
+export function privateTempRoot(options) {
   if (memoizedRoot !== null) return memoizedRoot;
+  const seams = options !== null && typeof options === "object" ? options : {};
+  const harden = typeof seams.harden === "function" ? seams.harden : hardenWindowsPrivateDirectory;
+  const assess = typeof seams.assess === "function" ? seams.assess : assessWindowsPrivatePath;
   const root = mkdtempSync(join(tmpdir(), ROOT_PREFIX));
   try {
-    secureRoot(root);
+    secureRoot(root, harden, assess);
   } catch (error) {
     discard(root);
     throw error;
