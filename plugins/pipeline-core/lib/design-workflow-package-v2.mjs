@@ -31,10 +31,10 @@ export function readDesignReadinessPreparationFromRepository(options={}){return 
 /** Closed supplemental snapshot admission. The same private course, host and
  * committed source checks apply as for a physical preparation manifest. No
  * caller option can skip current-candidate, provenance or host verification. */
-export function verifyReadinessAdvisorObservationV2({repoRoot,observation,sources,trustedAdvisorExecutablePath}={}){
+export function verifyReadinessAdvisorObservationV2({repoRoot,observation,sources,trustedAdvisorExecutablePath,requireCurrentCandidate=true}={}){
  try{
   if(!exact(observation,['schema','candidate','sources','featureId','authoringDispatchId','advisor','initialContext','receipt','report','failure'])||observation.schema!=='pipeline.readiness-advisor-observation.v2'||!same(observation.sources,sources)||observation.initialContext?.featureId!==observation.featureId||observation.initialContext?.authoringDispatchId!==observation.authoringDispatchId)return fail('DWP2-INLINE-OBSERVATION');
-  const result=readDesignWorkflowPackageV2FromRepository({repoRoot,trustedAdvisorExecutablePath,[PREPARE]:true,[INLINE]:detached(observation)});
+  const result=readDesignWorkflowPackageV2FromRepository({repoRoot,trustedAdvisorExecutablePath,requireCurrentCandidate,[PREPARE]:true,[INLINE]:detached(observation)});
   return result.ok&&same(result.advisorObservation,observation)?result:fail(result.code??'DWP2-INLINE-OBSERVATION');
  }catch{return fail('DWP2-INLINE-OBSERVATION');}
 }
@@ -54,7 +54,7 @@ function verifyUnavailableRevisionChain(repoRoot,initial,courseId,revisions,fina
   if(!same(previous.candidate,final.candidate)||!same(previous.sources,final.sources))return fail('DAC-FINAL-ENDPOINT');const bytes=committed(final.candidate,final.sources);for(const n of SOURCE_NAMES)if(!bytes[n].equals(finalSourceBytes[n]))return fail('DWP2-UNAVAILABLE-FINAL-SOURCE');return {ok:true};
  }catch(e){return fail(e?.message?.startsWith('DWP2-')?e.message:'DWP2-UNAVAILABLE-PROVENANCE');}
 }
-function readUnavailablePackage({repoRoot,packagePath,pkg,packageBytes,beforeCandidate,trustedAdvisorExecutablePath,requireReadinessExecution,verifyReadinessExecution,prepare}){
+function readUnavailablePackage({repoRoot,packagePath,pkg,packageBytes,beforeCandidate,trustedAdvisorExecutablePath,requireReadinessExecution,verifyReadinessExecution,prepare,requireCurrentCandidate}){
  const packageFiles=packagePath===null?[]:[{path:packagePath,bytes:packageBytes}];
  const advisor=pkg.advisor,binding=advisor?.courseBinding,exception=advisor?.proposedException,route=advisor?.route;
  const native=['claude','antigravity'].includes(advisor?.runner);
@@ -87,7 +87,7 @@ function readUnavailablePackage({repoRoot,packagePath,pkg,packageBytes,beforeCan
  const readinessFile=jsonFile(repoRoot,{path:pkg.readiness.path,sha256:pkg.readiness.sha256},131072);files.push(readinessFile);const readiness=readinessFile.value;
  const readyCheck=validateDesignReadinessReceipt(readiness);if(!readyCheck.ok)return readyCheck;
  if(readiness.outcome!=='ready-for-po-review'||readiness.findings.some(f=>f.severity==='blocking')||readiness.dispatchId!==pkg.readiness.dispatchId||[pkg.authoringDispatchId,receipt?.dispatch.dispatchId,initial.authoringDispatchId].includes(readiness.dispatchId)||!same(readiness.candidate,pkg.candidate)||!same(readiness.sources,pkg.sources)||readiness.hostExecution.dutyReceiptSha256!==designReadinessReportSha256(readiness))return fail('DWP2-READINESS-BINDING');
- if(requireReadinessExecution){const checked=verifyReadinessExecution({repoRoot,hostExecution:readiness.hostExecution,readinessReceipt:readiness,candidate:pkg.candidate,sources:pkg.sources,sourceBytes:sourceEntries,advisorObservation});if(!checked?.ok||typeof checked?.then==='function')return fail(checked?.code??'DWP2-READINESS-HOST-UNVERIFIED');}
+ if(requireReadinessExecution){const checked=verifyReadinessExecution({repoRoot,hostExecution:readiness.hostExecution,readinessReceipt:readiness,candidate:pkg.candidate,sources:pkg.sources,sourceBytes:sourceEntries,advisorObservation,requireCurrentCandidate});if(!checked?.ok||typeof checked?.then==='function')return fail(checked?.code??'DWP2-READINESS-HOST-UNVERIFIED');}
  for(const file of [{path:packagePath,bytes:packageBytes},...files])if(!readAdvisorPhysicalBytes(repoRoot,file.path,file.bytes.length||1).equals(file.bytes))return fail('DWP2-PHYSICAL-DRIFT');
  if(!same(verifyCourse(),course)||(verifyHost&&!same(verifyHost(),host))||!same(observeAdvisorCandidate(repoRoot),beforeCandidate))return fail('DWP2-FAILURE-DRIFT');
  return {ok:true,code:'DWP2-UNAVAILABLE-INITIAL-FINAL-VERIFIED',schema:pkg.schema,workflowPackage:detached(pkg),packagePath,packageSha256:sha(packageBytes),candidate:detached(pkg.candidate),readinessDispatchId:readiness.dispatchId,advisorDispatchId:receipt?.dispatch.dispatchId??null,advisorStatus:'unavailable',advisorExceptionRequired:true,approvalReview:{schema:'pipeline.design-workflow-approval-review.v2',featureId:pkg.featureId,candidate:detached(pkg.candidate),packageSha256:sha(packageBytes),sources:SOURCE_NAMES.map(name=>({name,...pkg.sources[name],content:finalSourceBytes[name].toString('utf8')})),initialConsultation:{initialContext:detached(initial),consultation:null,report:null,disposition:null,revisions:detached(a.revisions)},advisorFailure:detached(failure),proposedException:detached(a.proposedException),advisorExceptionRequired:true,readiness:detached(readiness),approvalStatus:'pending-po-approval',implementationAuthority:false},implementationAuthority:false};
@@ -106,7 +106,7 @@ export function readDesignWorkflowPackageV2FromRepository(options={}){
   if(prepare){pkg.schema=DESIGN_WORKFLOW_PACKAGE_V2_SCHEMA;pkg.readiness=validationPackage.readiness;}
   if(!exact(pkg,['schema','featureId','authoringDispatchId','candidate','sources','advisor','readiness','createdAt'])||pkg.schema!==DESIGN_WORKFLOW_PACKAGE_V2_SCHEMA||!ID.test(pkg.featureId)||!ID.test(pkg.authoringDispatchId)||new Date(pkg.createdAt).toISOString()!==pkg.createdAt)return fail('DWP2-PACKAGE-SHAPE');
   if(requireCurrentCandidate&&!same(beforeCandidate,pkg.candidate))return fail('DWP2-CURRENT-CANDIDATE');
-  if(pkg.advisor.status==='unavailable')return readUnavailablePackage({repoRoot,packagePath,pkg,packageBytes,beforeCandidate,trustedAdvisorExecutablePath,requireReadinessExecution,verifyReadinessExecution,prepare});
+  if(pkg.advisor.status==='unavailable')return readUnavailablePackage({repoRoot,packagePath,pkg,packageBytes,beforeCandidate,trustedAdvisorExecutablePath,requireReadinessExecution,verifyReadinessExecution,prepare,requireCurrentCandidate});
   const a=pkg.advisor;if(!exact(a,['status','runner','profile','route','initialContext','courseBinding','consultation','hostReceipt','receipt','report','disposition','revisions'])||a.status!=='answered'||a.runner!=='codex'||!['epic','feature'].includes(a.profile)||!exact(a.hostReceipt,['id','sha256'])||!ID.test(a.hostReceipt.id)||!SHA.test(a.hostReceipt.sha256))return fail('DWP2-ADVISOR-SHAPE');
   if(!exact(pkg.readiness,['path','sha256','dispatchId'])||!ID.test(pkg.readiness.dispatchId))return fail('DWP2-READINESS-REFERENCE');
   const paths=[...packageFiles.map(f=>f.path),...SOURCE_NAMES.map(n=>pkg.sources?.[n]?.path),a.initialContext?.path,a.receipt?.path,a.report?.path,...(prepare?[]:[pkg.readiness.path])];if(paths.some(p=>typeof p!=='string')||new Set(paths).size!==paths.length)return fail('DWP2-PATH-COLLISION');
@@ -132,7 +132,7 @@ export function readDesignWorkflowPackageV2FromRepository(options={}){
   const readinessFile=jsonFile(repoRoot,{path:pkg.readiness.path,sha256:pkg.readiness.sha256},131072),readiness=readinessFile.value;
   const readyCheck=validateDesignReadinessReceipt(readiness);if(!readyCheck.ok)return readyCheck;
   if(readiness.outcome!=='ready-for-po-review'||readiness.findings.some(f=>f.severity==='blocking')||readiness.dispatchId!==pkg.readiness.dispatchId||[pkg.authoringDispatchId,a.consultation.dispatch.dispatchId,initial.authoringDispatchId].includes(readiness.dispatchId)||!same(readiness.candidate,pkg.candidate)||!same(readiness.sources,pkg.sources)||readiness.hostExecution.dutyReceiptSha256!==designReadinessReportSha256(readiness))return fail('DWP2-READINESS-BINDING');
-  if(requireReadinessExecution){const checked=verifyReadinessExecution({repoRoot,hostExecution:readiness.hostExecution,readinessReceipt:readiness,candidate:pkg.candidate,sources:pkg.sources,sourceBytes:sourceEntries,advisorObservation});if(!checked?.ok||typeof checked?.then==='function')return fail(checked?.code??'DWP2-READINESS-HOST-UNVERIFIED');}
+  if(requireReadinessExecution){const checked=verifyReadinessExecution({repoRoot,hostExecution:readiness.hostExecution,readinessReceipt:readiness,candidate:pkg.candidate,sources:pkg.sources,sourceBytes:sourceEntries,advisorObservation,requireCurrentCandidate});if(!checked?.ok||typeof checked?.then==='function')return fail(checked?.code??'DWP2-READINESS-HOST-UNVERIFIED');}
   const original=[{path:packagePath,bytes:packageBytes},contextFile,receiptFile,reportFile,readinessFile,...SOURCE_NAMES.map(n=>({path:pkg.sources[n].path,bytes:finalSourceBytes[n]}))];
   for(const file of original)if(!readAdvisorPhysicalBytes(repoRoot,file.path,file.bytes.length||1).equals(file.bytes))return fail('DWP2-PHYSICAL-DRIFT');
   const hostAgain=verifyHost();if(!hostAgain?.ok||typeof hostAgain?.then==='function'||!same(hostAgain.projection,host.projection))return fail('DWP2-INITIAL-HOST-DRIFT');

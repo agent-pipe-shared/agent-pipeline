@@ -113,7 +113,7 @@ export function verifyDesignReadinessHostExecution({
   sources,
   sourceBytes,
   advisorObservationRefs = null,
-  advisorObservation = null,
+  advisorObservation = null, requireCurrentCandidate = true,
   storeFactory = createRepositorySandboxSelectionStore,
   runnerStoreFactory = ({ gitCommonDir, repoFingerprint }) => createDesignReadinessRunnerHostStore({ gitCommonDir, repoFingerprint }),
   codexHostStoreFactory = createCodexDesignReadinessHostStore,
@@ -170,7 +170,7 @@ export function verifyDesignReadinessHostExecution({
       expectedReferenceSetSha256(sources, sourceBytes);
       if(advisorObservation!==null){
         if(advisorObservationRefs!==null||canonicalJson(advisorObservation.candidate)!==canonicalJson(candidate))return fail('DWP2-READINESS-SUPPLEMENTAL-BINDING');
-        const context=rereadReadinessAdvisorContextV2(repoRoot,advisorObservation,sources);
+        const context=rereadReadinessAdvisorContextV2(repoRoot,advisorObservation,sources,null,requireCurrentCandidate);
         const prompt=buildRunnerDesignReadinessPrompt({runner:hostExecution.runner,dispatchId:readinessReceipt.dispatchId,candidate,sources,route:hostExecution.route,evidenceBundle:expectedReferenceBundle(sources,sourceBytes),advisorObservation:context});
         if(!receipt||receipt.requestSha256!==sha(Buffer.from(prompt,'utf8')))return fail('DWP2-READINESS-SUPPLEMENTAL-REQUEST-MISMATCH');
       }
