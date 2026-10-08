@@ -29,8 +29,11 @@ function readinessObservation(pkg,initial,receipt,report,failure){return detache
 // material Advisor evidence. Every Advisor/disposition/failure field does.
 export function readDesignReadinessPreparationFromRepository(options={}){return readDesignWorkflowPackageV2FromRepository({...options,[PREPARE]:true});}
 /** Closed supplemental snapshot admission. The same private course, host and
- * committed source checks apply as for a physical preparation manifest. No
- * caller option can skip current-candidate, provenance or host verification. */
+ * committed source checks apply as for a physical preparation manifest. The
+ * caller decides whether the current candidate is required (default: required);
+ * a full package read decides that once, for itself (the candidate, or an
+ * evidence-only descendant of it), and forwards the outcome here. No caller
+ * option can skip provenance or host verification. */
 export function verifyReadinessAdvisorObservationV2({repoRoot,observation,sources,trustedAdvisorExecutablePath,requireCurrentCandidate=true}={}){
  try{
   if(!exact(observation,['schema','candidate','sources','featureId','authoringDispatchId','advisor','initialContext','receipt','report','failure'])||observation.schema!=='pipeline.readiness-advisor-observation.v2'||!same(observation.sources,sources)||observation.initialContext?.featureId!==observation.featureId||observation.initialContext?.authoringDispatchId!==observation.authoringDispatchId)return fail('DWP2-INLINE-OBSERVATION');
@@ -42,6 +45,29 @@ function ref(v){return exact(v,['path','sha256'])&&typeof v.path==='string'&&SHA
 function jsonFile(root,reference,bound){if(!ref(reference))throw Error('DWP2-REFERENCE');const bytes=readAdvisorPhysicalBytes(root,reference.path,bound);if(sha(bytes)!==reference.sha256)throw Error('DWP2-EVIDENCE-DIGEST');return {path:reference.path,bytes,value:parseStrictJson(bytes)};}
 function detached(value){return JSON.parse(canonicalizeJson(value));}
 function safeSnapshot(options){const names=['repoRoot','packagePath','requireCurrentCandidate','requireReadinessExecution','trustedAdvisorExecutablePath'];const out={};for(const n of names)if(Object.hasOwn(options,n))out[n]=options[n];return out;}
+const COMMIT_ID=/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+function gitText(root,args){return execFileSync('git',['-C',root,...args],{timeout:10000,maxBuffer:1048577,stdio:['ignore','pipe','pipe']}).toString();}
+// The package's own bound set: the package file plus the course/readiness artifacts it digests.
+// Derived from the package object, never from a directory glob; the digest-bound sources are excluded.
+function boundEvidencePaths(pkg,packagePath){
+ const a=pkg.advisor,sourcePaths=new Set(SOURCE_NAMES.map(n=>pkg.sources?.[n]?.path));
+ return new Set([packagePath,pkg.readiness?.path,a?.initialContext?.path,a?.failureEvidence?.path,a?.receipt?.path,a?.report?.path].filter(p=>typeof p==='string'&&p.length>0&&!sourcePaths.has(p)));
+}
+// "Candidate or an evidence-only descendant": HEAD descends from the package candidate and every
+// path that differs between the two commits was added or modified and belongs to the bound set.
+// Only an affirmative proof admits; any git failure, deletion, rename, type change or other path refuses.
+function isEvidenceOnlyDescendant(repoRoot,head,pkg,packagePath){
+ try{
+  const candidate=pkg.candidate?.commit;
+  if(typeof candidate!=='string'||!COMMIT_ID.test(candidate)||typeof head?.commit!=='string'||!COMMIT_ID.test(head.commit))return false;
+  try{gitText(repoRoot,['merge-base','--is-ancestor',candidate,head.commit]);}catch(e){if(e?.status===1)return false;throw e;}
+  const bound=boundEvidencePaths(pkg,packagePath),tokens=gitText(repoRoot,['diff-tree','-r','--name-status','-z','--no-renames',candidate,head.commit]).split('\0');
+  if(tokens[tokens.length-1]==='')tokens.pop();
+  if(tokens.length%2!==0)return false;
+  for(let i=0;i<tokens.length;i+=2)if((tokens[i]!=='A'&&tokens[i]!=='M')||!bound.has(tokens[i+1]))return false;
+  return true;
+ }catch{return false;}
+}
 function verifyUnavailableRevisionChain(repoRoot,initial,courseId,revisions,final,finalSourceBytes){
  try{
   const git=args=>execFileSync('git',['-C',repoRoot,...args],{timeout:10000,maxBuffer:1048577,stdio:['ignore','pipe','pipe']});
@@ -94,7 +120,8 @@ function readUnavailablePackage({repoRoot,packagePath,pkg,packageBytes,beforeCan
 }
 export function readDesignWorkflowPackageV2FromRepository(options={}){
  const prepare=options[PREPARE]===true;
- const input=safeSnapshot(options),{repoRoot,trustedAdvisorExecutablePath}=input,packagePath=options[INLINE]===undefined?input.packagePath:null,requireCurrentCandidate=input.requireCurrentCandidate!==false,requireReadinessExecution=input.requireReadinessExecution!==false;
+ const input=safeSnapshot(options),{repoRoot,trustedAdvisorExecutablePath}=input,packagePath=options[INLINE]===undefined?input.packagePath:null,requireReadinessExecution=input.requireReadinessExecution!==false;
+ let requireCurrentCandidate=input.requireCurrentCandidate!==false;
  const verifyReadinessExecution=typeof options.verifyReadinessExecution==='function'?options.verifyReadinessExecution:verifyDesignReadinessHostExecution;
  try{
   const beforeCandidate=observeAdvisorCandidate(repoRoot),inline=options[INLINE],packageBytes=inline===undefined?readAdvisorPhysicalBytes(repoRoot,packagePath,262144):null;
@@ -105,7 +132,7 @@ export function readDesignWorkflowPackageV2FromRepository(options={}){
   if(!validateAgainstSchema(validationPackage,packageV2Schema).valid)return fail('DWP2-PACKAGE-SCHEMA');
   if(prepare){pkg.schema=DESIGN_WORKFLOW_PACKAGE_V2_SCHEMA;pkg.readiness=validationPackage.readiness;}
   if(!exact(pkg,['schema','featureId','authoringDispatchId','candidate','sources','advisor','readiness','createdAt'])||pkg.schema!==DESIGN_WORKFLOW_PACKAGE_V2_SCHEMA||!ID.test(pkg.featureId)||!ID.test(pkg.authoringDispatchId)||new Date(pkg.createdAt).toISOString()!==pkg.createdAt)return fail('DWP2-PACKAGE-SHAPE');
-  if(requireCurrentCandidate&&!same(beforeCandidate,pkg.candidate))return fail('DWP2-CURRENT-CANDIDATE');
+  if(requireCurrentCandidate&&!same(beforeCandidate,pkg.candidate)){if(prepare||packagePath===null||!isEvidenceOnlyDescendant(repoRoot,beforeCandidate,pkg,packagePath))return fail('DWP2-CURRENT-CANDIDATE');requireCurrentCandidate=false;}
   if(pkg.advisor.status==='unavailable')return readUnavailablePackage({repoRoot,packagePath,pkg,packageBytes,beforeCandidate,trustedAdvisorExecutablePath,requireReadinessExecution,verifyReadinessExecution,prepare,requireCurrentCandidate});
   const a=pkg.advisor;if(!exact(a,['status','runner','profile','route','initialContext','courseBinding','consultation','hostReceipt','receipt','report','disposition','revisions'])||a.status!=='answered'||a.runner!=='codex'||!['epic','feature'].includes(a.profile)||!exact(a.hostReceipt,['id','sha256'])||!ID.test(a.hostReceipt.id)||!SHA.test(a.hostReceipt.sha256))return fail('DWP2-ADVISOR-SHAPE');
   if(!exact(pkg.readiness,['path','sha256','dispatchId'])||!ID.test(pkg.readiness.dispatchId))return fail('DWP2-READINESS-REFERENCE');
