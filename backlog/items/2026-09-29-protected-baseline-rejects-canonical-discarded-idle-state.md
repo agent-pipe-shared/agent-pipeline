@@ -34,6 +34,10 @@ The exact inert proposal is under
 `scratch/0.7-canonical-idle-protected-baseline-compatibility-20260929/`;
 no Source delivery, alternate writer or override consumption is claimed.
 
+## Triage
+
+- **2026-10-08 close-out check:** not closable — guard CLI/fanout positives and candidate binding need host runs.
+
 ## Acceptance
 
 - Canonical valid idle/discarded State without close history resolves dynamic
