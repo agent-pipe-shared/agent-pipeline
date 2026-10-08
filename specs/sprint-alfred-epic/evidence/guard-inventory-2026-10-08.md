@@ -3,7 +3,9 @@
 Source: `plugins/pipeline-core/hooks/hooks.json` at `f2df2f742` (TP-4 protected → a change needs the signed package).
 Criterion: KEEP only what protects a critical feature — push/signature, secrets/env dump, protected tests (QG-04),
 destructive git, consumer onboarding consent. Everything else → advisory (exit 0/1, never blocks) or removed. Toil
-references are rows of `toil-log-2026-10-06-07.md`. **Status: proposal, awaiting PO confirmation (BI).**
+references are rows of `toil-log-2026-10-06-07.md`. **Status: superseded — rejected by the PO as too far-reaching (BI
+amendment, 2026-10-08 late); replaced by the per-toil-row design note `../design/toil-resolution-2026-10-08.md`. Kept
+only as an index of the hooks.**
 
 | # | Hook (event/matcher) | Protects | Live toil | Proposal |
 |---|---|---|---|---|
