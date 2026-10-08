@@ -46,7 +46,9 @@
  *      `strace`, `flock`, `op run --`, `coproc`, or a program that takes a command in an argument, such as
  *      `git -c alias.x='!gh pr merge 1'` or `vim -c '!gh pr merge 1'`) is DELIVERY-GH-UNCLASSIFIED, never `none`, when
  *      any word of the segment, or any whitespace-separated token inside a dequoted word, is a gh word (basename `gh` or
- *      `gh.exe`, case-insensitive, optional leading `!`) immediately followed by `pr`, `api`, `release`, `repo` or
+ *      `gh.exe`, case-insensitive, optional leading `!`) immediately followed (redirection tokens between the two skipped,
+ *      and a glued `-c<payload>` / `-S<payload>` option split into option and payload first) by `pr`, `api`, `release`,
+ *      `repo` or
  *      `gist`. The one exemption is a command that only prints its arguments (echo, printf, write-output,
  *      write-host): its gh words are data.
  *   4. ALLOWLIST. Only the read-only subcommands in READ_ONLY_SUBCOMMANDS are `read-only`; every other `gh` shape is
@@ -176,6 +178,14 @@ function lex(cmd, regions, reading) {
     }
     if (ch === "$" || ch === "`") mark("a shell expansion or command substitution");
     if (ch === "(" || ch === ")" || ch === "{") mark("a subshell, group or brace expansion");
+    // The `&` of `>&` / `<&` (`2>&1`, `>&2`) and of `&>` / `&>>` belongs to a redirection operator: it separates nothing, so
+    // it must not cut the gh word off from the subcommand that follows the redirection (`winpty gh 2>&1 pr create`).
+    // An escaped `\>` is not an operator, so there the `&` still separates.
+    if (ch === "&" && (/(?:^|[^\\])[<>]$/u.test(current) || cmd[i + 1] === ">")) {
+      current += ch;
+      i += 1;
+      continue;
+    }
     if (";&|\n\r".includes(ch)) {
       segments.push(current);
       current = "";
@@ -407,10 +417,39 @@ const CROSS_REPO_ASSIGNMENT_RE = /(?:^|[^A-Za-z0-9_])GH_(?:REPO|HOST)\+?=/iu;
 
 const wordTokens = (words) => words.flatMap((word) => word.split(/\s+/u)).filter((token) => token !== "");
 
-/** True when any word, or any whitespace-separated token inside a word, is a gh word followed by pr/api/release/repo/gist. */
+// A short option of a command-string wrapper glued to its value: `flock /tmp/l -c'gh pr merge 1'` and `env -S'gh pr merge 1'`
+// read as ONE word (`-cgh pr merge 1`), so no token is a gh word. Split the option (`-c`, `-S`, also inside a cluster such
+// as `-iS`) from its payload, so the payload is scanned exactly like the spaced `-c 'gh pr merge 1'`. Lazy: the first
+// `c` / `S` of the cluster is the option.
+const GLUED_COMMAND_OPTION_RE = /^-[A-Za-z]*?[cS]/u;
+const splitGluedCommandOption = (word) => {
+  const glued = GLUED_COMMAND_OPTION_RE.exec(word);
+  return glued !== null && glued[0].length < word.length ? [glued[0], word.slice(glued[0].length)] : [word];
+};
+
+/** Index of the first token at or after `from` that is not part of a redirection (same operator rule as skipPrefix). */
+function skipRedirections(tokens, from) {
+  let index = from;
+  while (index < tokens.length) {
+    const redirection = REDIRECTION_RE.exec(tokens[index]);
+    if (redirection === null) break;
+    index += redirection[0].length === tokens[index].length ? 2 : 1;
+  }
+  return index;
+}
+
+/**
+ * True when any word, or any whitespace-separated token inside a word, is a gh word followed by pr/api/release/repo/gist,
+ * redirections (`2>/dev/null`, `2>&1`, `>out`, `&>out`, `< in` and the like) between the two skipped as they are when the
+ * command word is located, and a glued `-c<payload>` / `-S<payload>` option split first.
+ */
 function hasGhMarker(words) {
-  const tokens = wordTokens(words);
-  return tokens.some((token, k) => k + 1 < tokens.length && GH_TOKEN_RE.test(token) && GH_SUBCOMMAND_RE.test(tokens[k + 1]));
+  const tokens = wordTokens(words.flatMap(splitGluedCommandOption));
+  return tokens.some((token, k) => {
+    if (!GH_TOKEN_RE.test(token)) return false;
+    const next = skipRedirections(tokens, k + 1);
+    return next < tokens.length && GH_SUBCOMMAND_RE.test(tokens[next]);
+  });
 }
 
 const hasCrossRepoAssignment = (words) => wordTokens(words).some((token) => CROSS_REPO_ASSIGNMENT_RE.test(token));
