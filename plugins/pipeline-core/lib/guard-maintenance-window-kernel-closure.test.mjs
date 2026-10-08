@@ -85,8 +85,10 @@
  * FAILS CLOSED on a shape it cannot classify: an UNDECLARED dynamic `import(` call in a
  * kernel file's source, a stale `DYNAMIC_IMPORT_EDGES` entry, an identifier passed to
  * `spawnSync(process.execPath, [...])` that cannot be statically traced to a script-path
- * constant, or any other unclassifiable first array element in that same call shape, aborts
- * this check with a named-file diagnostic instead of silently proceeding -- a
+ * constant, or any other unclassifiable first array element in that same call shape, is
+ * reported with a named-file diagnostic instead of silently proceeding (GMWKC08: the scanner
+ * COLLECTS every such violation and GMWKC01 lists them all in ONE failure, so the first one
+ * never masks the rest; a caller that passes no collector still throws at the first) -- a
  * silently-skipped file would defeat the entire point of this test (a missed dynamic
  * import, or a missed spawn edge, is exactly the kind of hole a hand-maintained
  * enumeration already produced once).
@@ -275,8 +277,23 @@ function resolveScriptPathIdentifier(map, name, depth = 0) {
   return resolveScriptPathIdentifier(map, entry.ref, depth + 1);
 }
 
+/**
+ * Report ONE scanner violation (an undeclared or stale dynamic import(), an unclassifiable
+ * spawn edge). With a `violations` array the message is COLLECTED and the scan carries on, so
+ * a single run can list every violation (GMWKC08) instead of stopping at the first and
+ * masking the rest; with no array it throws at the first one, exactly as the original
+ * fail-closed helper did -- GMWKC04/05/06 call the helpers that way and stay unchanged.
+ */
+function reportViolation(violations, message) {
+  if (Array.isArray(violations)) {
+    violations.push(message);
+    return;
+  }
+  throw new Error(message);
+}
+
 /** Every `spawnSync(process.execPath, [<script>, ...])` edge ONE kernel file's source declares. */
-function spawnEdgeSpecifiers(source, repoRelativePath) {
+function spawnEdgeSpecifiers(source, repoRelativePath, violations = null) {
   const identifierMap = scriptPathIdentifierMap(source);
   const specs = [];
   SPAWN_EXEC_PATH_RE.lastIndex = 0;
@@ -286,12 +303,14 @@ function spawnEdgeSpecifiers(source, repoRelativePath) {
     if (IDENTIFIER_RE.test(token)) {
       const resolved = resolveScriptPathIdentifier(identifierMap, token);
       if (resolved === null) {
-        throw new Error(
+        reportViolation(
+          violations,
           `${repoRelativePath} calls spawnSync(process.execPath, [${token}, ...]) but "${token}" cannot be ` +
           "statically traced to a fileURLToPath(new URL(...)) script-path constant -- this spawn-edge shape " +
           "must be resolved by hand (name the spawned script and add it to NEVER_LIFTABLE_KERNEL_PATHS if " +
           "first-party), not silently skipped.",
         );
+        continue;
       }
       specs.push(resolved);
       continue;
@@ -304,7 +323,8 @@ function spawnEdgeSpecifiers(source, repoRelativePath) {
       if (literal[1].startsWith("./") || literal[1].startsWith("../")) specs.push(literal[1]);
       continue;
     }
-    throw new Error(
+    reportViolation(
+      violations,
       `${repoRelativePath} calls spawnSync(process.execPath, [${token}, ...]) with a first array element the ` +
       "static scanner cannot classify (neither a traceable identifier nor a string literal) -- this spawn-edge " +
       "shape must be resolved by hand (name the spawned script and add it to NEVER_LIFTABLE_KERNEL_PATHS if " +
@@ -323,24 +343,37 @@ function countDynamicImports(source) {
 }
 
 /** Every first-party (relative-specifier) import/spawn-edge/declared-dynamic-import-edge
- * ONE kernel file's source declares. Scans `stripCodeComments(source)`, never the raw file
- * text, so prose inside a `//`/`/* *\/` comment can never be misread as a real import,
- * export, dynamic-import, or spawn-edge call site -- see the "COMMENT-BLANKED SCAN" section
- * of the file header. */
-function relativeImportSpecifiers(absPath, repoRelativePath) {
-  const rawSource = readFileSync(absPath, "utf8");
+ * ONE kernel file declares: reads the file and delegates to
+ * `relativeImportSpecifiersFromSource` (see it for the `violations` collector contract). */
+function relativeImportSpecifiers(absPath, repoRelativePath, violations = null) {
+  return relativeImportSpecifiersFromSource(readFileSync(absPath, "utf8"), repoRelativePath, violations);
+}
+
+/** The same scan over an already-loaded source string, so GMWKC08 can drive it with in-memory
+ * fixtures. Scans `stripCodeComments(rawSource)`, never the raw text, so prose inside a
+ * `//`/`/* *\/` comment can never be misread as a real import, export, dynamic-import, or
+ * spawn-edge call site -- see the "COMMENT-BLANKED SCAN" section of the file header.
+ *
+ * `violations`: when an array is passed, every violation this scan finds (an undeclared
+ * dynamic import(), a stale DYNAMIC_IMPORT_EDGES count, an unclassifiable spawn edge) is
+ * PUSHED to it and the scan carries on -- the declared dynamic edges are still folded into the
+ * result, so one violation never hides the next. With no array the first violation throws.
+ * `dynamicEdges` defaults to the real table; an in-memory pin passes its own. */
+function relativeImportSpecifiersFromSource(rawSource, repoRelativePath, violations = null, dynamicEdges = DYNAMIC_IMPORT_EDGES) {
   const source = stripCodeComments(rawSource);
   const dynamicImportCount = countDynamicImports(source);
-  const declaredDynamicTargets = DYNAMIC_IMPORT_EDGES[repoRelativePath];
+  const declaredDynamicTargets = dynamicEdges[repoRelativePath];
   if (dynamicImportCount > 0 && !declaredDynamicTargets) {
-    throw new Error(
+    reportViolation(
+      violations,
       `${repoRelativePath} contains a dynamic import() the static scanner cannot classify -- ` +
       "this shape must be resolved by hand (name the target module and add it to " +
       "DYNAMIC_IMPORT_EDGES, and to NEVER_LIFTABLE_KERNEL_PATHS if first-party), not silently skipped.",
     );
   }
   if (declaredDynamicTargets && declaredDynamicTargets.length !== dynamicImportCount) {
-    throw new Error(
+    reportViolation(
+      violations,
       `${repoRelativePath} declares ${declaredDynamicTargets.length} dynamic-import edge(s) in ` +
       `DYNAMIC_IMPORT_EDGES but its source actually contains ${dynamicImportCount} dynamic-import ` +
       "call site(s) -- a stale declaration (an edge added, removed, or changed in the source " +
@@ -354,7 +387,7 @@ function relativeImportSpecifiers(absPath, repoRelativePath) {
   while ((match = IMPORT_FROM_RE.exec(source)) !== null) specs.add(match[1]);
   SIDE_EFFECT_IMPORT_RE.lastIndex = 0;
   while ((match = SIDE_EFFECT_IMPORT_RE.exec(source)) !== null) specs.add(match[1]);
-  for (const spec of spawnEdgeSpecifiers(source, repoRelativePath)) specs.add(spec);
+  for (const spec of spawnEdgeSpecifiers(source, repoRelativePath, violations)) specs.add(spec);
   if (declaredDynamicTargets) for (const spec of declaredDynamicTargets) specs.add(spec);
   const relativeSpecs = [];
   for (const spec of specs) {
@@ -382,25 +415,35 @@ function check(name, callback) {
   }
 }
 
-check("GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports", () => {
-  const kernelSet = new Set(NEVER_LIFTABLE_KERNEL_PATHS);
-  const missing = [];
+/**
+ * Walk the closure from `roots` and return EVERY violation it finds, never stopping at the
+ * first (pipeline.kernel-closure-check-masks-violations-after-the-first: a red GMWKC01 once
+ * hid 12 further kernel-to-liftable edges behind the one that failed). Violations: an edge to
+ * a module that is not in `kernelSet`; a listed or imported file `loadSource` cannot load
+ * (returns null); and every scanner violation `relativeImportSpecifiersFromSource` collects
+ * (an undeclared or stale dynamic import(), an unclassifiable spawn edge). `loadSource` is
+ * injected so GMWKC08 walks in-memory fixtures with the very code GMWKC01 walks the real
+ * repository with.
+ */
+function kernelClosureViolations({ roots, kernelSet, loadSource, dynamicEdges = DYNAMIC_IMPORT_EDGES }) {
+  const violations = [];
   const visited = new Set();
-  const queue = [...NEVER_LIFTABLE_KERNEL_PATHS];
+  const queue = [...roots];
   while (queue.length > 0) {
     const relPath = queue.shift();
     if (visited.has(relPath)) continue;
     visited.add(relPath);
     // hooks.json / project/critical-human-proof.json: not JS, no imports to walk.
     if (!relPath.endsWith(".mjs") && !relPath.endsWith(".js")) continue;
-    const absPath = join(REPO_ROOT, relPath);
-    if (!existsSync(absPath)) {
-      throw new Error(`${relPath} is listed in NEVER_LIFTABLE_KERNEL_PATHS but does not exist on disk.`);
+    const rawSource = loadSource(relPath);
+    if (rawSource === null) {
+      violations.push(`${relPath} is listed in NEVER_LIFTABLE_KERNEL_PATHS but does not exist on disk.`);
+      continue;
     }
-    for (const spec of relativeImportSpecifiers(absPath, relPath)) {
+    for (const spec of relativeImportSpecifiersFromSource(rawSource, relPath, violations, dynamicEdges)) {
       const resolved = resolveRepoRelative(relPath, spec);
       if (!kernelSet.has(resolved)) {
-        missing.push(`${relPath} imports "${spec}" -> ${resolved}, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS`);
+        violations.push(`${relPath} imports "${spec}" -> ${resolved}, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS`);
       }
       // Recurse regardless of membership: a missing transitive dependency of a missing
       // transitive dependency must ALSO surface as its own failure line, not just the
@@ -408,10 +451,86 @@ check("GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-pa
       if (!visited.has(resolved)) queue.push(resolved);
     }
   }
+  return violations;
+}
+
+/** The ONE report of a closure run: every violation, listed together in a single failure. */
+function assertKernelClosed(violations) {
   assert.equal(
-    missing.length,
+    violations.length,
     0,
-    `NEVER_LIFTABLE_KERNEL_PATHS is not transitively closed (${missing.length} missing edge(s)):\n${missing.join("\n")}`,
+    `NEVER_LIFTABLE_KERNEL_PATHS is not transitively closed (${violations.length} violation(s)):\n${violations.join("\n")}`,
+  );
+}
+
+check("GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports", () => {
+  assertKernelClosed(kernelClosureViolations({
+    roots: NEVER_LIFTABLE_KERNEL_PATHS,
+    kernelSet: new Set(NEVER_LIFTABLE_KERNEL_PATHS),
+    loadSource: (relPath) => {
+      const absPath = join(REPO_ROOT, relPath);
+      return existsSync(absPath) ? readFileSync(absPath, "utf8") : null;
+    },
+  }));
+});
+
+check("GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)", () => {
+  const sources = new Map([
+    // (1) an edge to a module outside the kernel set; ./helper.mjs is kernel and must stay quiet.
+    ["kernel/entry.mjs", ["import { a } from \"./helper.mjs\";", "import { b } from \"./stray.mjs\";"].join("\n")],
+    // (2) a runtime-computed dynamic import with NO DYNAMIC_IMPORT_EDGES entry.
+    ["kernel/helper.mjs", ["export async function load(name) {", "  return import(name);", "}"].join("\n")],
+    // (3) a stale declaration: the table below declares 2 edges, the source has 1 call site.
+    ["kernel/stale.mjs", "export const lazy = () => import(\"./helper.mjs\");"],
+    // (4) a spawn edge whose first array element the scanner cannot classify.
+    ["kernel/spawner.mjs", ["import { spawnSync } from \"node:child_process\";", "spawnSync(process.execPath, [computeScript(), \"--run\"]);"].join("\n")],
+    // ./stray.mjs is reachable but clean; (5) kernel/ghost.mjs is listed but has no source at all.
+    ["kernel/stray.mjs", "export const b = 1;"],
+  ]);
+  const roots = ["kernel/entry.mjs", "kernel/helper.mjs", "kernel/stale.mjs", "kernel/spawner.mjs", "kernel/ghost.mjs"];
+  const violations = kernelClosureViolations({
+    roots,
+    kernelSet: new Set(roots),
+    loadSource: (relPath) => sources.get(relPath) ?? null,
+    dynamicEdges: { "kernel/stale.mjs": ["./helper.mjs", "./spawner.mjs"] },
+  });
+  const expected = [
+    ["kernel/entry.mjs", /imports "\.\/stray\.mjs" -> kernel\/stray\.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS/],
+    ["kernel/helper.mjs", /contains a dynamic import\(\) the static scanner cannot classify/],
+    ["kernel/stale.mjs", /declares 2 dynamic-import edge\(s\).*actually contains 1 dynamic-import/],
+    ["kernel/spawner.mjs", /with a first array element the static scanner cannot classify/],
+    ["kernel/ghost.mjs", /is listed in NEVER_LIFTABLE_KERNEL_PATHS but does not exist on disk/],
+  ];
+  assert.equal(violations.length, expected.length, `every bad fixture is listed, none twice:\n${violations.join("\n")}`);
+  for (const [file, pattern] of expected) {
+    const hits = violations.filter((violation) => violation.startsWith(`${file} `));
+    assert.equal(hits.length, 1, `${file} appears exactly once in the violation list`);
+    assert.match(hits[0], pattern, `${file} is reported for its own reason`);
+  }
+  // The shared reporter lists all of them together in ONE failure message.
+  assert.throws(
+    () => assertKernelClosed(violations),
+    (error) => {
+      assert.match(error.message, /\(5 violation\(s\)\)/);
+      for (const [file] of expected) assert.ok(error.message.includes(file), `the single report names ${file}`);
+      return true;
+    },
+  );
+  // Fail-closed preserved: with no collector the helper still throws at the first violation.
+  assert.throws(
+    () => relativeImportSpecifiersFromSource(sources.get("kernel/helper.mjs"), "kernel/helper.mjs", null, {}),
+    /contains a dynamic import\(\) the static scanner cannot classify/,
+  );
+  // Control: a clean in-memory closure reports nothing, so the list above is not vacuous.
+  const clean = new Map([["kernel/a.mjs", "import \"./b.mjs\";"], ["kernel/b.mjs", "export const b = 1;"]]);
+  assert.deepEqual(
+    kernelClosureViolations({
+      roots: ["kernel/a.mjs", "kernel/b.mjs"],
+      kernelSet: new Set(["kernel/a.mjs", "kernel/b.mjs"]),
+      loadSource: (relPath) => clean.get(relPath) ?? null,
+      dynamicEdges: {},
+    }),
+    [],
   );
 });
 
