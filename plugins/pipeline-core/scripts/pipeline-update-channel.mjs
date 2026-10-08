@@ -21,9 +21,13 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { applyAgyCentralSnapshotAfterUpdate } from "../lib/agy-central-refresh.mjs";
+import { resolveAntigravityCliPath } from "../lib/antigravity-topology-refresh-host.mjs";
 import {
   NEUTRAL_CALIBRATION,
   readProjectAuthority,
@@ -783,10 +787,11 @@ export function applyPipelineUpdateAlphaRef(_repoPath, options = {}) {
 function parseCli(argv) {
   const operation = argv[0];
   if (!["plan", "apply", "readback"].includes(operation)) return null;
-  const parsed = { operation, repo: process.cwd(), activate: false };
+  const parsed = { operation, repo: process.cwd(), activate: false, agyCentralSnapshot: false };
   for (let index = 1; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--activate" && operation === "apply") parsed.activate = true;
+    else if (token === "--agy-central-snapshot" && operation === "apply") parsed.agyCentralSnapshot = true;
     else if (token === "--repo" && argv[index + 1]) parsed.repo = argv[++index];
     else if (token === "--channel" && argv[index + 1] && operation !== "readback") parsed.channel = argv[++index];
     else if (token === "--expected-calibration-sha256" && argv[index + 1] && operation === "apply") parsed.expectedCalibrationSha256 = argv[++index];
@@ -806,6 +811,38 @@ function readbackResult(repoPath) {
   };
 }
 
+/**
+ * Opt-in agy central snapshot after an applied update (ruling 57). The `runCli`
+ * mirrors the host default of createAntigravityRefreshHost: it only ever drives
+ * the real CLI against the per-user `.gemini` config root.
+ */
+async function agyCentralSnapshotOutcome(parsed, result) {
+  if (!parsed.agyCentralSnapshot) return { status: "skipped", reason: "not-requested" };
+  if (result.status !== "applied") return { status: "skipped", reason: "update-not-applied" };
+  try {
+    const pluginRoot = resolve(dirname(SCRIPT_PATH), "..");
+    const configRoot = join(homedir(), ".gemini");
+    const cliPath = resolveAntigravityCliPath();
+    const runCli = (argv) => {
+      if (!cliPath) return { status: "unavailable" };
+      const run = spawnSync(cliPath, argv, { encoding: "utf8", timeout: 20000, maxBuffer: 65536 });
+      return run.error || run.signal || run.status !== 0
+        ? { status: "failed" }
+        : { status: "ok", version: argv[0] === "--version" ? run.stdout.trim() : null };
+    };
+    return await applyAgyCentralSnapshotAfterUpdate({
+      resolveCliPath: () => cliPath,
+      sourcePluginRoot: pluginRoot,
+      attestationSourceRoot: pluginRoot,
+      configRoot,
+      workspaceRoot: resolve(parsed.repo),
+      runCli,
+    });
+  } catch {
+    return { status: "refused", reason: "ATR-UNAVAILABLE" };
+  }
+}
+
 const isCli = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 if (isCli) {
   const parsed = parseCli(process.argv.slice(2));
@@ -818,7 +855,13 @@ if (isCli) {
     : (parsed.operation === "plan"
       ? planPipelineUpdateChannel(parsed.repo, parsed.channel)
       : applyPipelineUpdateChannel(parsed.repo, parsed));
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  let output = result;
+  if (parsed.operation === "apply") {
+    // Ruling 57 (AM-W-F): the central agy snapshot is explicit opt-in, strictly after an applied update;
+    // a refusal is reported here and never changes the update status, exit code or written calibration.
+    output = { ...result, agyCentralSnapshot: await agyCentralSnapshotOutcome(parsed, result) };
+  }
+  process.stdout.write(`${JSON.stringify(output)}\n`);
   // `readback` carries two independently-typed statuses in one JSON payload
   // -- channel at top level, alphaRef nested -- but the exit code used to
   // read only the top-level channel status, so a broken alpha-ref field
