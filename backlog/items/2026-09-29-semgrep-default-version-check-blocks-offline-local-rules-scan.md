@@ -38,6 +38,10 @@ callback after the Source repair is frozen.
 Evidence: `scratch/0.7-native-semgrep-bounded-diagnosis-20260929/manifest.json`
 and `version-check-control.manifest.json` (control SHA
 `7bc0847b24fb7b11ef3e9a4342a0750dd042fd36450d9ea90bfe5b93648a1a28`).
+## Triage
+
+- **2026-10-08 close-out check:** not closable — security-scan.test.mjs fails 4 of 156 cases on this host.
+
 ## Progress — Source qualification
 
 Source delivery/qualification: `scratch/0.7-semgrep-offline-version-check-fix-20260929/`.
