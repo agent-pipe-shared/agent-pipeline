@@ -78,3 +78,7 @@ These receipts do not close full onboarding, Verify or installed acceptance.
 - Rollback preserves foreign concurrent Git bytes and removes only owned data.
 - The complete committed suite includes OBC298 and FRB001–FRB004; qualify the
   installed candidate separately. Keep the item open until combined acceptance.
+
+## Triage
+
+- **2026-10-08 close-out check:** not closable — OBC298 label absent; installed-candidate qualification needs host run.

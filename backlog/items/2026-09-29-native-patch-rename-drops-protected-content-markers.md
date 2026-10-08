@@ -40,3 +40,7 @@ scope. Both syntax and exact inverse checks pass 2/2. Evidence:
 The earlier full suite remains 18 pass/5 fail: four held-writer dependencies
 and one readiness-wording assertion. It predates this correction and is not a
 final candidate PASS. Keep this item open until integrated qualification.
+
+## Triage
+
+- **2026-10-08 close-out check:** not closable — installed-guard acceptance needs host run; item requires integrated qualification.
