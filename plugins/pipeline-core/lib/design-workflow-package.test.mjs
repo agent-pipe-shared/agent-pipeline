@@ -428,6 +428,10 @@ check("no-child Codex route selection is a narrow PO exception input, never an i
   fixture.workflowPackage.advisor.receipt.sha256 = sha(fixture.advisorReceiptBytes);
   fixture.workflowPackage.advisor.attemptTrail.sha256 = sha(fixture.attemptTrailBytes);
   fixture.workflowPackage.advisor.exception.failureCode = "route-unavailable";
+  fixture.workflowPackage.advisor.exception.rationale = designWorkflowAdvisorExceptionRationale({
+    advisorReceipt: fixture.advisorReceipt,
+    attemptTrail: fixture.attemptTrail,
+  });
   fixture.packageBytes = serialized(fixture.workflowPackage);
   const validated = validateDesignWorkflowPackage(fixture);
   assert.equal(validated.ok, true, JSON.stringify(validated));
