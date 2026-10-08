@@ -20,7 +20,9 @@
 // Contract pinned here (the function may be sync or async; the cases await it;
 // it returns a typed result for every outcome below and never throws for one):
 //   applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, package,
-//       proof, anchor, archiveRoot }) -> result
+//       proof, anchor, archiveRoot, repositoryRoot }) -> result
+//       (`repositoryRoot`: absolute; required for an archive disposition, else
+//       refused LOC-PACKAGE-INVALID; ignored for the others - rulings 44a/53)
 //   - package/proof/anchor are exactly the RV-3 values: the
 //     `pipeline.legacy-custody-authorization.v1` package and the real
 //     `pipeline.po-approval-proof.v1` envelope over it, and the external
@@ -85,7 +87,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { after, before, describe, test } from "node:test";
 
 import { CLEANUP_RECEIPT_SCHEMA } from "./worktree-lifecycle.mjs";
@@ -344,6 +346,10 @@ describe("RV-4: legacy custody disposition - preserve, replay, archive, absence"
     return { caseRoot, receiptsDirectory, archiveRoot, receiptPath: join(receiptsDirectory, `${SESSION_ID}.json`) };
   }
 
+  // `repositoryRoot` is the caller-supplied ABSOLUTE repository root that a signed archiveDestination resolves
+  // against (dispatcher rulings 44a and 53): required for an archive disposition, ignored for the others, with no
+  // fallback to `archiveRoot`. In every fixture it is the case root, so the signed destination "archive" is the
+  // fixture's `archive/` directory; a case that withholds or corrupts it passes an explicit override.
   async function apply(f, pkg, proof, overrides = {}) {
     const applyDisposition = await rv4Export();
     return applyDisposition({
@@ -353,6 +359,7 @@ describe("RV-4: legacy custody disposition - preserve, replay, archive, absence"
       proof,
       anchor,
       archiveRoot: f.archiveRoot,
+      repositoryRoot: f.caseRoot,
       ...overrides,
     });
   }
@@ -709,6 +716,35 @@ describe("RV-4: legacy custody disposition - preserve, replay, archive, absence"
     assert.deepStrictEqual(readdirSync(outside), [], "something was created outside the repository root");
   });
 
+  // Rulings 44a and 53 (RV-S5-T3): an archive disposition needs an ABSOLUTE caller-supplied `repositoryRoot`; a
+  // missing or relative one is a malformed call, refused LOC-PACKAGE-INVALID before any write. There is no fallback
+  // to the caller's `archiveRoot`: here `archiveRoot` is the correct, existing, empty destination, so a fallback
+  // would archive into it and turn the case red.
+  const UNUSABLE_REPOSITORY_ROOTS = [
+    ["is missing", () => undefined],
+    ["is relative", () => join("..", "relative-repository-root")],
+  ];
+  for (const [label, makeRepositoryRoot] of UNUSABLE_REPOSITORY_ROOTS) {
+    test(`RV-S5-T3: a validly signed archive whose repositoryRoot ${label} refuses with LOC-PACKAGE-INVALID, writes nothing and keeps the receipt`, async () => {
+      const f = fixture({ [`${SESSION_ID}.json`]: conflictingReceipt() });
+      const bytes = readFileSync(f.receiptPath);
+      const pkg = archivePackageFor(bytes, ARCHIVE_DESTINATION);
+      const proof = signCustodyPackage(pkg, signer);
+      assertProofVerifies(pkg, proof);
+      const repositoryRoot = makeRepositoryRoot();
+      if (repositoryRoot !== undefined) assert.equal(isAbsolute(repositoryRoot), false, "fixture guard: the supplied repositoryRoot is relative");
+      assert.deepStrictEqual(readdirSync(f.archiveRoot), [], "fixture guard: the archive destination starts empty");
+      await assertTypedAndUntouched(
+        f,
+        () => apply(f, pkg, proof, { repositoryRoot }),
+        { status: "refused", code: S5T2_CODES.packageInvalid, closedSet: S5T2_CODES },
+        `repositoryRoot ${label}`,
+      );
+      assert.ok(readFileSync(f.receiptPath).equals(bytes), "the original receipt bytes changed");
+      assert.deepStrictEqual(readdirSync(f.archiveRoot), [], "something was created under the archive destination");
+    });
+  }
+
   // RV-D3: a mismatch found after the exclusive publish leaves an archived copy behind, so it must say so.
   //
   // MISSING SEAM: archiveReceipt() (legacy-owner-custody.mjs 594-648) takes no injected
@@ -716,10 +752,9 @@ describe("RV-4: legacy custody disposition - preserve, replay, archive, absence"
   // (readReceiptBytes, ~617), so a test cannot change the original in that window
   // through the module's own API. The body below interposes the module's live
   // `lstatSync` binding instead (it is called on the published archive path right
-  // after the publish), which needs no production seam. Drop the todo marker once
-  // RV-S5-F2 returns the new code.
-  test("RV-S5-T2: a binding mismatch detected after the exclusive publish returns LOC-ARCHIVE-ORPHANED-COPY with mutated true and leaves the copy in place", async (t) => {
-    t.todo("MISSING SEAM: no injectable hook between publishExclusiveCopy and the final original re-check; body interposes lstatSync via syncBuiltinESMExports");
+  // after the publish), which needs no production seam. The module returns the new
+  // code since commit 9e9a23e15 (RV-D3), so the todo marker is gone (RV-S5-T3).
+  test("RV-S5-T2: a binding mismatch detected after the exclusive publish returns LOC-ARCHIVE-ORPHANED-COPY with mutated true and leaves the copy in place", async () => {
     const f = fixture({ [`${SESSION_ID}.json`]: conflictingReceipt() });
     const bytes = readFileSync(f.receiptPath);
     const pkg = archivePackageFor(bytes, ARCHIVE_DESTINATION);
