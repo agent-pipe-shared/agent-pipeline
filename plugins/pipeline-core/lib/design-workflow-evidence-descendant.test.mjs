@@ -21,6 +21,11 @@
 //      -> refused (green control; also pins that the fix must test ancestry, not tree equality)
 //   E  HEAD = candidate + one commit adding the bound set AND modifying a digest-bound SOURCE
 //      -> refused (green control)
+//   F, G (R7-3-T2b-20261009): see assumption 5.
+//   H  (R7-3-T3-20261009, Critic R7-3-CB F1) HEAD == package.candidate.commit, but package.candidate.tree is a
+//      different, valid tree id -> refused with DWP2-CURRENT-CANDIDATE (see assumption 8)
+//   I  (R7-3-T3-20261009, ruling 68) a bound artifact already tracked AT the candidate is deleted in a descendant
+//      commit, so candidate..HEAD carries a true D entry for a bound path -> refused with DWP2-CURRENT-CANDIDATE
 //
 // ASSUMPTIONS stated for dispatcher ratification (not silently decided):
 //   1. Entry points: every case drives BOTH createDesignWorkflowPackageApprovalRequest (the approval
@@ -45,14 +50,24 @@
 //      artifact exists at the candidate, so add-then-delete leaves NO D entry for the deleted path: the
 //      D-status branch of ruling 68 is not reachable for a bound path with this fixture. G therefore pins
 //      the observable outcome of that shape (see its assertion), not the D branch itself.
-//      Merge commits, renames, type changes and a true D entry for a bound path (needs a bound artifact
-//      that is already tracked at the candidate) are NOT pinned here.
+//      Merge commits, renames and type changes are NOT pinned here. A true D entry for a bound path is
+//      pinned by case I (assumption 8).
 //   6. The nested supplemental Advisor re-read inside the readiness verifier is exercised end to end by
 //      case B (the same stack as the real gate). If the reader fix lands but the nested re-read still
 //      demands equality, B stays red with the same code; that is intended coverage, not a fixture fault.
 //   7. Linux only, like the sibling candidate-binding suite (the Codex readiness host store refuses any
 //      other platform). The file needs registration in the verify suites manifest; this dispatch does
 //      not edit that manifest.
+//   8. (R7-3-T3-20261009.) H rewrites ONLY candidate.tree inside the on-disk package file (HEAD does not move, so
+//      the empty candidate..HEAD diff is the whole point): the course, readiness and host receipt keep binding the
+//      real candidate, so a refusal OTHER than DWP2-CURRENT-CANDIDATE means the candidate rule admitted the
+//      package and a downstream binding caught it; the code printed by the assertion is that observation.
+//      I needs a bound path that exists in the candidate's tree, which the shared fixture cannot give (it
+//      commits the five sources only). The fixture builder takes an opt-in trackedAtCandidate map; when given,
+//      the fixture's root candidate commit is amended to carry those files BEFORE the Advisor course is created, so
+//      the course, the dispatch and the route all bind the amended commit. I first commits the bound set (the
+//      tracked artifact is then an M entry, asserted to be admitted so the fixture is proven sound) and then
+//      deletes that artifact in a second commit.
 //
 // Every import below is a RELATIVE import of the repository SOURCE, never the installed plugin.
 // The fixture builder is a copy of the one in design-workflow-candidate-binding.test.mjs (a test file
@@ -61,7 +76,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import nodeTest from 'node:test';
 
 import { advisorHostFixture } from './codex-advisor-host.fixture.mjs';
@@ -104,13 +119,29 @@ const changedPaths = (root, from, to) => git(root, ['diff', '--name-only', `${fr
  * Readiness is bound to a real local runner host receipt. Nothing is committed past the candidate:
  * the package and its artifacts exist in the working tree at HEAD == candidate. The cases decide
  * what, if anything, is committed afterwards.
+ *
+ * Opt-in `trackedAtCandidate` (path -> content, default none; assumption 8): the fixture's root candidate commit is
+ * amended to carry those files BEFORE the Advisor course is created, so the course, the dispatch and the route all bind
+ * the amended commit. With the default the helper is value-identical to what cases A..G always used.
  */
-async function unavailableAdvisorPackage(t) {
+async function unavailableAdvisorPackage(t, { trackedAtCandidate = {} } = {}) {
   const failed = advisorHostFixture(t, 'cross-citation');
-  const advisorRoute = { model: null, effort: null, sourceSha256: designAdvisorValueSha256(loadRunnerProfilesV3Registry()), candidateCommit: failed.candidate.commit };
+  let base = failed.candidate;
+  if (Object.keys(trackedAtCandidate).length > 0) {
+    for (const [path, content] of Object.entries(trackedAtCandidate)) {
+      mkdirSync(dirname(join(failed.root, path)), { recursive: true });
+      writeFileSync(join(failed.root, path), content);
+    }
+    git(failed.root, ['add', '--', ...Object.keys(trackedAtCandidate)]);
+    git(failed.root, ['commit', '-q', '--amend', '--no-edit']);
+    base = observeAdvisorCandidate(failed.root);
+    assert.notEqual(base.commit, failed.candidate.commit, 'fixture precondition: the amend produced a new candidate commit');
+  }
+  const advisorRoute = { model: null, effort: null, sourceSha256: designAdvisorValueSha256(loadRunnerProfilesV3Registry()), candidateCommit: base.commit };
   const failure = await coordinateInitialDesignAdvisory({
     repoRoot: failed.root, runner: RUNNER, featureId: FEATURE_ID, authoringDispatchId: 'elephant-author',
-    sources: failed.sources, reason: 'risk-review', profile: 'feature', dispatch: failed.args.dispatch,
+    sources: failed.sources, reason: 'risk-review', profile: 'feature',
+    dispatch: { ...failed.args.dispatch, candidateCommit: base.commit, candidateTree: base.tree },
     route: advisorRoute, hostExecution: createNativeInitialAdvisorExecution({ runner: RUNNER }),
   });
   assert.equal(failure.status, 'unavailable-pending-final-approval', JSON.stringify(failure));
@@ -118,7 +149,7 @@ async function unavailableAdvisorPackage(t) {
   const candidate = observeAdvisorCandidate(root);
   const sources = observeInitialAdvisorSources({ repoRoot: root, candidate,
     sourcePaths: Object.fromEntries(Object.entries(failed.sources).map(([name, source]) => [name, source.path])) }).sources;
-  mkdirSync(join(root, 'evidence'));
+  mkdirSync(join(root, 'evidence'), { recursive: true });
   const artifacts = exportCodexDesignAdvisorArtifacts(root, 'evidence/failure', failure);
   const preparation = {
     schema: 'pipeline.design-readiness-preparation.v2', featureId: FEATURE_ID, authoringDispatchId: 'elephant-author', candidate, sources,
@@ -278,4 +309,50 @@ test('EVDESC-g a chain that adds the bound set and then deletes a bound artifact
   const refusedDownstream = 'refused:DWP2-PHYSICAL-OR-GIT';
   assert.deepEqual(attempt(fixture), { reader: refusedDownstream, approval: refusedDownstream },
     'rulings 66 and 68: a deleted bound artifact must never be accepted (observed refusal: the artifact is missing, not the candidate rule)');
+});
+
+// R7-3-T3-20261009 (Critic R7-3-CB minor F1; assumption 8). HEAD is the candidate COMMIT, but the package records a different,
+// valid tree id. The candidate..HEAD diff is empty, so the descendant check has nothing to object to and admits; only a
+// downstream binding refuses. Pinned: the candidate rule itself refuses, at both entry points. When this is red, the pair in
+// the failure message is the observation (the code each entry point actually returns today).
+test('EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule', async (t) => {
+  const fixture = await unavailableAdvisorPackage(t);
+  // A real second tree without moving HEAD: stage the bound set, write the tree, restore the index.
+  git(fixture.root, ['add', '--', ...fixture.boundPaths]);
+  const otherTree = git(fixture.root, ['write-tree']);
+  git(fixture.root, ['reset', '-q']);
+  assert.equal(git(fixture.root, ['status', '--porcelain', '--untracked-files=no']), '', 'precondition: the index is restored, nothing is staged');
+  assert.equal(git(fixture.root, ['cat-file', '-t', otherTree]), 'tree', 'precondition: the substitute tree id is a real tree object');
+  assert.notEqual(otherTree, fixture.candidate.tree, 'precondition: the substitute differs from the candidate tree');
+  assert.deepEqual(observeAdvisorCandidate(fixture.root), fixture.candidate, 'precondition: HEAD did not move and is still the candidate');
+  const packageFile = join(fixture.root, PACKAGE_PATH);
+  const workflowPackage = JSON.parse(readFileSync(packageFile, 'utf8'));
+  assert.deepEqual(workflowPackage.candidate, fixture.candidate, 'precondition: the package recorded the real candidate before the rewrite');
+  writeFileSync(packageFile, canonicalJson({ ...workflowPackage, candidate: { ...workflowPackage.candidate, tree: otherTree } }));
+  assert.deepEqual(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD'), [], 'precondition: candidate..HEAD is empty (the empty diff is the whole point)');
+  assert.equal(JSON.parse(readFileSync(packageFile, 'utf8')).candidate.tree, otherTree, 'precondition: only candidate.tree was rewritten on disk');
+  assert.deepEqual(attempt(fixture), { reader: REFUSED, approval: REFUSED },
+    'ruling 65: a package whose candidate.tree is not the tree of HEAD is not the candidate, whatever the (empty) diff says');
+});
+
+// R7-3-T3-20261009 (ruling 68). The one shape that produces a TRUE D entry for a bound path: the artifact already exists at the
+// candidate (opt-in trackedAtCandidate, assumption 8) and a descendant deletes it. Case G cannot reach this branch.
+test('EVDESC-i a bound artifact tracked AT the candidate and deleted in a descendant (true D entry) is refused (green control)', async (t) => {
+  const deleted = 'evidence/readiness.json';
+  const fixture = await unavailableAdvisorPackage(t, { trackedAtCandidate: { [deleted]: 'A stale readiness artifact tracked at the design candidate.\n' } });
+  assert.ok(fixture.boundPaths.includes(deleted), 'precondition: the tracked path is in the bound set');
+  assert.equal(git(fixture.root, ['ls-tree', '--name-only', fixture.candidate.commit, '--', deleted]), deleted,
+    'precondition: the artifact is tracked at the candidate, so deleting it later is a true D entry (unlike case G)');
+  const nameStatus = () => git(fixture.root, ['diff-tree', '-r', '--name-status', '--no-renames', fixture.candidate.commit, 'HEAD']).split('\n').filter(Boolean).sort();
+  const expected = (status) => fixture.boundPaths.map((path) => `${path === deleted ? status : 'A'}\t${path}`).sort();
+  fixture.commit(fixture.boundPaths, 'commit the design package and the artifacts it digests (one artifact was already tracked)');
+  assert.equal(git(fixture.root, ['rev-parse', 'HEAD^']), fixture.candidate.commit, 'precondition: exactly one commit past the candidate');
+  assert.deepEqual(nameStatus(), expected('M'), 'precondition: the tracked artifact is an M entry, every other bound path an A entry');
+  assert.deepEqual(attempt(fixture), { reader: 'ok', approval: 'ok' }, 'control: the fixture is sound, the M-status bound set is accepted');
+  git(fixture.root, ['rm', '-q', '--', deleted]);
+  git(fixture.root, ['commit', '-q', '-m', 'delete a bound artifact that was tracked at the design candidate']);
+  assert.equal(git(fixture.root, ['rev-parse', 'HEAD~2']), fixture.candidate.commit, 'precondition: exactly two commits past the candidate');
+  assert.equal(isAncestor(fixture.root, fixture.candidate.commit, 'HEAD'), true, 'precondition: HEAD descends from the candidate');
+  assert.deepEqual(nameStatus(), expected('D'), 'precondition: candidate..HEAD carries a true D entry for the bound artifact, every other bound path an A entry');
+  assert.deepEqual(attempt(fixture), { reader: REFUSED, approval: REFUSED }, 'rulings 66 and 68: a D entry for a bound path keeps DWP2-CURRENT-CANDIDATE');
 });
