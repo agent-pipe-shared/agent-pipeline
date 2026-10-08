@@ -103,6 +103,16 @@ check("malformed payload refuses before creating output parents", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 8);
+check("FSYNC-T4: written result reports directoryDurability", () => {
+  const root = mkdtempSync(join(tmpdir(), "gaa-durability-"));
+  try {
+    const result = writeGovernanceActionArtifact({ rootDir: root, eventOutPath: "evidence/gate.json", event: event("gate", "DEPLOY_APPROVED") });
+    assert.equal(result.status, "written");
+    assert.ok(["confirmed", "unsupported"].includes(result.directoryDurability), `directoryDurability is ${String(result.directoryDurability)}`);
+    assert.equal(result.directoryDurability, process.platform === "win32" ? "unsupported" : "confirmed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 9);
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases: cases, fd: fd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
