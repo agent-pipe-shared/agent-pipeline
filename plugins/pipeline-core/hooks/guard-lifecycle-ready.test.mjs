@@ -11952,10 +11952,14 @@ for (const shape of ENVDUMP_SHAPES) {
 // ENVDUMP-T1-T3 (ruling 51): bounded `env` recursion. An adversarial chain must not exhaust the classifier (a crashed
 // PreToolUse hook does not block); beyond the nesting bound the lane fails closed. Same data-only safety contract: strings are
 // built in-process, inspected, never executed. RED (crash or wrong verdict) until the lane fix lands.
+// The command is LINEAR in `levels` (7 characters a level). The first form of this helper wrapped each level in `env -S '...'` and
+// re-escaped every `'` at every level, so the command grew about 3x per level: level 18 already passed Node's maximum string length
+// and the test process died of heap exhaustion before the lane was ever called. Here each level is the pair `env -S` and the levels
+// are chained by the -S splice itself (a `-S` takes the next word as its value and re-parses it as env arguments) instead of by
+// re-quoting; the outer quote makes the first splice a quoted value like the rest. The lane counts one splice and one operand hop
+// a level on its shared counter, exactly as it does for a re-quoted chain, so `levels` levels are `levels` real nesting levels.
 function envdumpNestedEnvS(levels, tail) {
-  let command = tail;
-  for (let level = 0; level < levels; level += 1) command = `env -S '${command.replace(/'/gu, "'\\''")}'`;
-  return command;
+  return `env -S '${"env -S ".repeat(levels - 1)}${tail}'`;
 }
 const ENVDUMP_DEEP_DUMP_CASES = [
   ["5000 env words then printenv", () => `${Array(5000).fill("env").join(" ")} printenv`],
