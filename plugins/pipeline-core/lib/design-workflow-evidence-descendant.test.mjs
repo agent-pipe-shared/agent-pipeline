@@ -38,8 +38,15 @@
 //   4. Refusal code: C1, C2, D and E assert code DWP2-CURRENT-CANDIDATE, as the ruling says any other
 //      changed path keeps it. For E this is the least certain: a reordered fix could surface
 //      DWP2-FINAL-SOURCE instead (the modified source no longer matches its digest). Ratify or relax.
-//   5. Only the "one commit past the candidate" shape is pinned. Multi-commit chains, merge commits,
-//      deletions and renames inside candidate..HEAD are NOT pinned here.
+//   5. (R7-3-T2b-20261009, rulings 66 and 68.) Cases A..E pin the "one commit past the candidate" shape.
+//      F pins a two-commit evidence-only chain (together exactly the bound set) -> accepted, like B.
+//      G pins the natural deletion shape: the bound set is committed, then one bound artifact is removed
+//      in a second commit. The gate compares the TREES of candidate and HEAD (git diff-tree), and no bound
+//      artifact exists at the candidate, so add-then-delete leaves NO D entry for the deleted path: the
+//      D-status branch of ruling 68 is not reachable for a bound path with this fixture. G therefore pins
+//      the observable outcome of that shape (see its assertion), not the D branch itself.
+//      Merge commits, renames, type changes and a true D entry for a bound path (needs a bound artifact
+//      that is already tracked at the candidate) are NOT pinned here.
 //   6. The nested supplemental Advisor re-read inside the readiness verifier is exercised end to end by
 //      case B (the same stack as the real gate). If the reader fix lands but the nested re-read still
 //      demands equality, B stays red with the same code; that is intended coverage, not a fixture fault.
@@ -233,4 +240,42 @@ test('EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is re
   assert.equal(git(fixture.root, ['rev-parse', 'HEAD^']), fixture.candidate.commit, 'precondition: exactly one commit past the candidate');
   assert.ok(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD').includes(fixture.sourcePath), 'precondition: a bound source changed');
   assert.deepEqual(attempt(fixture), { reader: REFUSED, approval: REFUSED });
+});
+
+test('EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain)', async (t) => {
+  const fixture = await unavailableAdvisorPackage(t);
+  const artifacts = fixture.boundPaths.filter((path) => path !== PACKAGE_PATH);
+  assert.ok(artifacts.length > 0 && artifacts.length < fixture.boundPaths.length, 'precondition: the bound set splits into artifacts and the package file');
+  fixture.commit(artifacts, 'commit the artifacts the design package digests');
+  fixture.commit([PACKAGE_PATH], 'commit the design package');
+  // Fixture preconditions: a real two-commit chain, each commit evidence-only, together exactly the bound set.
+  assert.equal(git(fixture.root, ['rev-parse', 'HEAD~2']), fixture.candidate.commit, 'precondition: exactly two commits past the candidate');
+  assert.equal(isAncestor(fixture.root, fixture.candidate.commit, 'HEAD'), true, 'precondition: HEAD descends from the candidate');
+  assert.deepEqual(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD~1'), artifacts, 'precondition: the first commit adds only the artifacts');
+  assert.deepEqual(changedPaths(fixture.root, 'HEAD~1', 'HEAD'), [PACKAGE_PATH], 'precondition: the second commit adds only the package file');
+  assert.deepEqual(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD'), fixture.boundPaths, 'precondition: candidate..HEAD is exactly the package bound set');
+  assert.deepEqual(attempt(fixture), { reader: 'ok', approval: 'ok' }, 'rulings 65 and 66: an evidence-only chain of several commits must be accepted like case B');
+});
+
+// R7-3-T2b-20261009 finding: the briefed code DWP2-CURRENT-CANDIDATE is unreachable for this shape. Ruling 68's gate
+// compares the trees of candidate and HEAD; the bound artifacts do not exist at the candidate, so add-then-delete leaves
+// no D entry (the net diff is the bound set minus the deleted path, all A) and the descendant is admitted at the
+// candidate rule. The package then fails downstream on the missing artifact, with DWP2-PHYSICAL-OR-GIT at both entry
+// points (observed). What matters and is pinned: the shape is never accepted.
+test('EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused (net diff has no D entry; refused downstream)', async (t) => {
+  const fixture = await unavailableAdvisorPackage(t);
+  const deleted = 'evidence/readiness.json';
+  assert.ok(fixture.boundPaths.includes(deleted), 'precondition: the deleted path is in the bound set');
+  fixture.commit(fixture.boundPaths, 'commit the design package and the artifacts it digests');
+  git(fixture.root, ['rm', '-q', '--', deleted]);
+  git(fixture.root, ['commit', '-q', '-m', 'delete a bound artifact after the design package was committed']);
+  assert.equal(git(fixture.root, ['rev-parse', 'HEAD~2']), fixture.candidate.commit, 'precondition: exactly two commits past the candidate');
+  assert.equal(isAncestor(fixture.root, fixture.candidate.commit, 'HEAD'), true, 'precondition: HEAD descends from the candidate');
+  assert.deepEqual(git(fixture.root, ['log', '--diff-filter=D', '--name-only', '--format=', `${fixture.candidate.commit}..HEAD`]).split('\n').filter(Boolean), [deleted],
+    'precondition: the chain deletes the bound artifact');
+  assert.deepEqual(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD'), fixture.boundPaths.filter((path) => path !== deleted),
+    'precondition: the tree diff carries no entry for the deleted path (it never existed at the candidate)');
+  const refusedDownstream = 'refused:DWP2-PHYSICAL-OR-GIT';
+  assert.deepEqual(attempt(fixture), { reader: refusedDownstream, approval: refusedDownstream },
+    'rulings 66 and 68: a deleted bound artifact must never be accepted (observed refusal: the artifact is missing, not the candidate rule)');
 });
