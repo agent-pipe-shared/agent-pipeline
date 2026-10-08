@@ -1028,6 +1028,99 @@ function hasFailClosedMarker(cmd) {
   );
 }
 
+// ---- GITCLS-F: a command line handed to a shell by `env -S` or by the ex bang of an editor --------------------------
+// Two shapes run a command that is a QUOTED word of the text, so the detection view blanks it as prose (`env -S ''`) and no
+// rule above sees a push spelled inside it:
+//   - `env -S <string>`, `env -S<string>`, `env -iS <string>`, `env --split-string[=]<string>` (and every unambiguous
+//     abbreviation of the long option): env splits its single argument into the argv of the command it runs;
+//   - `vi|vim|nvim|view|ex` with `-c <cmd>`, `-c<cmd>`, a cluster ending in `c` (`-nc <cmd>`), `--cmd <cmd>` or `+<cmd>`: the
+//     editor runs `<cmd>` as an ex command, and a `!` in it hands the rest to the shell (`:!git push`, `:silent !git push`).
+// The payload (for the editor: the text after the first `!`, which for a payload that starts with `!` or `:!` is the shell
+// command and for `:set x | !git push` or `:r !git push` still holds it) is classified by this file's own rule, recursively,
+// so it keeps every marker and fail-closed check: a payload with an unterminated quote, a `$`, a backslash or a nested
+// `bash -c` next to a git word is a candidate. A payload nested deeper than INNER_COMMAND_MAX_DEPTH is a candidate too.
+// The `env` and editor words are found at ANY word position (a wrapper word such as `sudo` may stand before them), and
+// every option-looking word after an `env` word is read, not only the options env itself knows: stopping at a guessed end
+// of env's options would turn a wrong guess into a missed push, whereas reading on only costs a spurious classification
+// of a word that follows an `-S` of some other command (`env git log -S 'git push'`), the safe direction.
+const INNER_COMMAND_MAX_DEPTH = 8;
+const BANG_EDITOR_NAMES = new Set(["vi", "vim", "nvim", "view", "ex"]);
+const ENV_SPLIT_STRING_OPTION = "--split-string";
+// A short option word of env holding `S`: `-S`, `-iS`, `-S<string>`; group 1 is the text after the first `S`.
+const ENV_SPLIT_SHORT_RE = /^-[A-Za-z0-9]*?S([\s\S]*)$/u;
+const BANG_EDITOR_CMD_CLUSTER_RE = /^-[A-Za-z]*c$/u;
+const BANG_EDITOR_CMD_ATTACHED_RE = /^-c([\s\S]+)$/u;
+
+/** A word of `scanShell` with a glued leading command (`echo;vim`, `x&&env`) cut off: operators stay glued to words there. */
+function wordAfterOperator(word) {
+  return word.replace(/^[\s\S]*[;&|(`]/u, "");
+}
+
+/** The string arguments of every `env -S` / `--split-string` found among `words` (see the block comment above). */
+function envSplitStringPayloads(words) {
+  const payloads = [];
+  for (let i = 0; i < words.length; i += 1) {
+    if (heredocWordBase(wordAfterOperator(words[i])) !== "env") continue;
+    for (let j = i + 1; j < words.length; j += 1) {
+      const word = words[j];
+      if (word.startsWith("--")) {
+        const equals = word.indexOf("=");
+        const name = equals === -1 ? word : word.slice(0, equals);
+        if (name.length < 3 || !ENV_SPLIT_STRING_OPTION.startsWith(name)) continue;
+        if (equals !== -1) payloads.push(word.slice(equals + 1));
+        else if (j + 1 < words.length) payloads.push(words[j + 1]);
+        continue;
+      }
+      const cluster = ENV_SPLIT_SHORT_RE.exec(word);
+      if (cluster === null) continue;
+      if (cluster[1] !== "") payloads.push(cluster[1]);
+      else if (j + 1 < words.length) payloads.push(words[j + 1]);
+    }
+  }
+  return payloads;
+}
+
+/** The ex command of every `-c` / `--cmd` / `+` argument that follows a vi-family editor word among `words`. */
+function bangEditorPayloads(words) {
+  const payloads = [];
+  for (let i = 0; i < words.length; i += 1) {
+    if (!baseIsNamed(heredocWordBase(wordAfterOperator(words[i])), BANG_EDITOR_NAMES)) continue;
+    for (let j = i + 1; j < words.length; j += 1) {
+      const word = words[j];
+      if (word.startsWith("+")) payloads.push(word.slice(1));
+      else if (word === "--cmd" || BANG_EDITOR_CMD_CLUSTER_RE.test(word)) {
+        if (j + 1 < words.length) payloads.push(words[j + 1]);
+      } else if (word.startsWith("--cmd=")) payloads.push(word.slice("--cmd=".length));
+      else {
+        const attached = BANG_EDITOR_CMD_ATTACHED_RE.exec(word);
+        if (attached !== null) payloads.push(attached[1]);
+      }
+    }
+  }
+  return payloads;
+}
+
+/** The shell command an ex command hands over: the text after its first `!`, or null when it holds no `!`. */
+function exBangCommand(exCommand) {
+  const bang = exCommand.indexOf("!");
+  return bang === -1 ? null : exCommand.slice(bang + 1);
+}
+
+/** True when a command line handed to a shell by `env -S` or by an editor's ex bang (see the block comment above) is a push candidate. */
+function innerCommandIsPush(cmd, depth) {
+  for (const reading of [READING_POSIX, READING_WINDOWS_PATH, READING_POWERSHELL]) {
+    const { words } = scanShell(cmd, reading);
+    const inner = [
+      ...envSplitStringPayloads(words),
+      ...bangEditorPayloads(words).map(exBangCommand).filter((text) => text !== null),
+    ];
+    for (const text of inner) {
+      if (depth >= INNER_COMMAND_MAX_DEPTH || commandIsGitPushAt(text, depth + 1)) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * commandIsGitPush(cmd) -- the ONE source of truth for "is this command a git push CANDIDATE", the question every
  * caller needs answered before it decides whether guard-push.mjs runs at all (codex-pretool-guard.mjs's prefilter;
@@ -1116,14 +1209,27 @@ function hasFailClosedMarker(cmd) {
  * opener line is command text, so `cat <<EOF && git push origin main` / body / `EOF` is a candidate (`classifyPush` keeps
  * that rest when it removes the body).
  *
+ * GITCLS-F (a rule after the marker rule, see `innerCommandIsPush`): the string of `env -S` / `--split-string` and the ex
+ * command of a vi-family editor's `-c` / `--cmd` / `+` argument that holds a `!` are command lines in a quoted word, which the
+ * view blanks. Each is classified by this function recursively (so its own markers and fail-closed checks apply), and the text
+ * is a candidate when ANY of them is. A nested `bash -c` is not re-tokenized anywhere in this file: it is a marker, so the
+ * unparseable and the nested direction is always the candidate (`true`), and the payload rule above chooses the same direction.
+ *
  * Returns `true` for a candidate, `false` for a command the rule proves plain.
  */
 export function commandIsGitPush(cmd) {
+  return commandIsGitPushAt(cmd, 0);
+}
+
+/** `commandIsGitPush` at a recursion `depth` (0 for the caller's text, +1 per `env -S` string or ex bang payload). */
+function commandIsGitPushAt(cmd, depth) {
   if (typeof cmd !== "string" || cmd === "") return false;
   if (hasGitWord(cmd) && hasFailClosedMarker(cmd)) return true;
   // Decision AF: a here-document fed to a command runner is a program the runner executes, so it is treated like one fed to a
   // shell. The git word it needs is read more loosely than the marker rule's (see `hasRunnerGitWord`): `ed` runs `!git push`.
   if (hasRunnerHeredocReceiver(cmd) && hasRunnerGitWord(cmd)) return true;
+  // GITCLS-F: the command line that `env -S` or an editor's ex bang hands to a shell is a quoted word of this text.
+  if (innerCommandIsPush(cmd, depth)) return true;
   // No marker. A backslash has three readings: a POSIX escape (`p\ush` is `push`), a Windows path separator
   // (`C:\Git\bin\git.exe push`) and the ordinary character PowerShell takes it for (`\"` closes a double-quoted span,
   // `\ ` ends a word). Which shell a runner applies is not known here, so classify under all three and fail closed
