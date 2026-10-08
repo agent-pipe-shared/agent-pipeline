@@ -26,6 +26,22 @@ Ordered next steps:
 4. Then §3 below from "R5-T0" onward (R5, R4, RV-S6/S8–S11, R6, N5/N6/N10/N11, AC-6 promotion reader) and §5/§6.
 5. Before any `.gitignore` change: handover §4a (`/evidence/` should be tracked; ADR-0063 amendment first).
 
+## 0b. Final content candidate (PO decisions BH, BI — 2026-10-08 late; wins over §0 where they differ)
+
+Scope: all open Alfred ACs and backlog items; autonomous fan-out; PO items in one list. Ordered:
+
+1. **Wave 1 — device portability and approval binding (candidate blockers):** pins + fix for
+   `backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md` (replaces the PO's install hotfix);
+   R7-3 remainder (bound set incl. private readiness receipt + Advisor course must verify on a fresh clone, spec §22.3
+   R7-3b) and R7-5 `rebind-approval` (§22.5); R7-4 (§22.4) write admission with an unverifiable approval → advisory.
+2. **Wave 1 parallel:** §0 item 1 (AM-W-F2 wiring, ruling 57; `codex-critic-host.test.mjs` classification), §0 item 3
+   follow-ups.
+3. **Toil reduction (BI):** guard inventory `../evidence/guard-inventory-2026-10-08.md`; after PO confirmation of the
+   KEEP/ADVISORY/REMOVE column, one package for the protected hook/guard changes.
+4. **Wave 2:** §3 rows from R5-T0 on (R5, R4, RV-S6/S8–S11, R6, N5/N6/N10/N11, AC-6 promotion reader); open backlog sweep.
+5. **Wave 3:** signing-ceremony defects + protected-path fixes in one signed tranche → stamp → host checklist H1–H12 →
+   spec-AC reconciliation → final handover with an honest per-AC status.
+
 ## 0a. Restore (before any dispatch)
 
 1. ~~Re-stage the ENVDUMP patch~~ — obsolete: the lane landed in the signed package `da20519dd`.
