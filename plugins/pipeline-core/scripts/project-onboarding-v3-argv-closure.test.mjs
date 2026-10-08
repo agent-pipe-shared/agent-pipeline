@@ -90,6 +90,294 @@ test("project-onboarding-v3 refuses an unrecognized flag value for a closed enum
   }
 });
 
+// ---------------------------------------------------------------------------------------------
+// R5 (AC-30 / R5-3): the `--answers-file` route of the two design-question commands. These are
+// the committed RED pins of the answers-file design note's cases 8-11 and 16 (case 17 is a plain
+// run of the consumer-safe-paths check); fix slices F2-F7 turn them green. Cases that are marked
+// "regression pin" pass today on purpose and must stay green. Fixtures are temp repos only.
+import { relative } from "node:path";
+import { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv, mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
+
+const DESIGN_COMMANDS = ["intake-design-questions-apply", "intake-design-questions-replace"];
+
+function designQuestionsPendingFixture(prefix) {
+  const dir = neutralGitFixture(prefix);
+  const consent = invoke(["intake-consent-apply", "--root", dir, "--granted",
+    "--git-author-name", "Answers Fixture", "--git-author-email", "answers@example.invalid",
+    "--language", "en", "--profile", "feature", "--activate", "--runner", "claude"]);
+  assert.equal(consent.status, 0, consent.output);
+  const capture = invoke(["intake-capture-apply", "--root", dir, "--text", "Build a local keyboard game.",
+    "--activate", "--runner", "claude"]);
+  assert.equal(capture.status, 0, capture.output);
+  mkdirSync(join(dir, "scratch"), { recursive: true });
+  return dir;
+}
+
+function checkpointBytes(dir) {
+  return readFileSync(readOnboardingIntakeCheckpoint({ rootDir: dir }).paths.checkpoint);
+}
+
+function answerPairs(result) {
+  return result.checkpoint.designQuestions.map(({ question, answer }) => ({ question, answer }));
+}
+
+function smallAnswers(answer) {
+  return Buffer.from(JSON.stringify([{ question: "What is the goal?", answer }]), "utf8");
+}
+
+// A pretty-printed, multi-line, non-ASCII answers file of EXACTLY `targetBytes` raw bytes (sized by
+// Buffer.byteLength, never string length), in the requested line-ending flavour.
+function buildAnswersFile(eol, targetBytes) {
+  const entries = [
+    { question: "Welches Ziel hat das Projekt?", answer: "Eine kleine Tastatur-Spielwelt für Größe, Übung und 日本語 — mit Umlauten." },
+    { question: "How is it verified?", answer: "Run the repository verify script.\nSecond line of the same answer." },
+    { question: "Padding", answer: "p" },
+  ];
+  const render = (padLength) => {
+    entries[2].answer = "p".repeat(padLength);
+    return Buffer.from(`${JSON.stringify(entries, null, 2).replace(/\n/gu, eol)}${eol}`, "utf8");
+  };
+  const base = render(1);
+  const bytes = render(1 + targetBytes - base.length);
+  assert.equal(bytes.length, targetBytes);
+  return { bytes, entries: structuredClone(entries) };
+}
+
+for (const command of DESIGN_COMMANDS) {
+  test(`R5-8 ${command} accepts --answers-file (a valid in-root file applies, exit 0)`, () => {
+    const dir = designQuestionsPendingFixture(`r5-8-accept-${command}`);
+    try {
+      writeFileSync(join(dir, "scratch", "a.json"), smallAnswers("Ship it."));
+      const result = invoke([command, "--root", dir, "--answers-file", "scratch/a.json", "--activate", "--runner", "claude"]);
+      assert.doesNotMatch(result.output, /unknown argument/u, result.output);
+      assert.equal(result.status, 0, result.output);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`R5-8 ${command} refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS`, () => {
+    const dir = neutralGitFixture(`r5-8-ambiguous-${command}`);
+    try {
+      const result = invoke([command, "--root", dir, "--answers-json", JSON.stringify([{ question: "Q?", answer: "A" }]),
+        "--answers-file", "scratch/does-not-exist.json", "--activate", "--runner", "claude"]);
+      assert.equal(result.status, 2, result.output);
+      assert.match(result.output, /INTAKE-DESIGN-ANSWERS-AMBIGUOUS/u, result.output);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`R5-8 ${command} refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE`, () => {
+    const dir = neutralGitFixture(`r5-8-digest-alone-${command}`);
+    try {
+      const result = invoke([command, "--root", dir, "--answers-json", JSON.stringify([{ question: "Q?", answer: "A" }]),
+        "--answers-file-sha256", "a".repeat(64), "--activate", "--runner", "claude"]);
+      assert.equal(result.status, 2, result.output);
+      assert.match(result.output, /INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE/u, result.output);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`R5-8 ${command} rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time`, () => {
+    const dir = neutralGitFixture(`r5-8-bad-values-${command}`);
+    try {
+      // Message prefixes mirror the sibling `--text-file requires one file path` parse refusals.
+      for (const argv of [
+        [command, "--root", dir, "--answers-file", "", "--activate"],
+        [command, "--root", dir, "--answers-file", "--activate"],
+      ]) {
+        const result = invoke(argv);
+        assert.equal(result.status, 2, result.output);
+        assert.match(result.output, /--answers-file requires/u, result.output);
+      }
+      const digest = invoke([command, "--root", dir, "--answers-file", "scratch/a.json", "--answers-file-sha256", "NOT-HEX", "--activate"]);
+      assert.equal(digest.status, 2, digest.output);
+      assert.match(digest.output, /--answers-file-sha256 requires/u, digest.output);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`R5-8 ${command} with neither --answers-json nor --answers-file is a usage error naming both options`, () => {
+    const dir = neutralGitFixture(`r5-8-neither-${command}`);
+    try {
+      const result = invoke([command, "--root", dir, "--activate", "--runner", "claude"]);
+      assert.equal(result.status, 2, result.output);
+      assert.match(result.output, /--answers-json/u, result.output);
+      assert.match(result.output, /--answers-file/u, result.output);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+}
+
+test("R5-8 the usage text lists --answers-file and --answers-file-sha256 for the design-question commands", () => {
+  const help = invoke(["--help"]);
+  assert.match(help.output, /--answers-file\b/u, help.output);
+  assert.match(help.output, /--answers-file-sha256/u, help.output);
+});
+
+test("R5-9 both design-question shapes carry the exactly-one-of answers pair and the optional digest", () => {
+  for (const name of DESIGN_COMMANDS) {
+    const shape = MUTATING_ONBOARDING_ARGV_SHAPES[name];
+    assert.deepEqual([...shape.required], ["--activate"], name);
+    assert.deepEqual([...shape.requiredValue], ["--root"], name);
+    assert.deepEqual([...shape.requiredValueOneOf], ["--answers-json", "--answers-file"], name);
+    assert.deepEqual([...shape.optionalValue], ["--answers-file-sha256"], name);
+  }
+});
+
+test("R5-9 the shared emission and hint helpers carry the file route, and refuse both or neither of the pair", () => {
+  const digest = "a".repeat(64);
+  for (const name of DESIGN_COMMANDS) {
+    assert.deepEqual(
+      automatedMutatingApplyArgv(name, "ROOT", { "--answers-file": "scratch/a.json", "--answers-file-sha256": digest }),
+      [name, "--root", "ROOT", "--answers-file", "scratch/a.json", "--answers-file-sha256", digest, "--activate"], name);
+    assert.throws(() => automatedMutatingApplyArgv(name, "ROOT", {
+      "--answers-json": "[]", "--answers-file": "scratch/a.json",
+    }), TypeError, `${name}: both of the pair`);
+    assert.throws(() => automatedMutatingApplyArgv(name, "ROOT", {}), TypeError, `${name}: neither of the pair`);
+    const hint = mutatingApplyCommandHint(name);
+    assert.match(hint, /--answers-json <answers-json> \| --answers-file <answers-file>/u, hint);
+    assert.match(hint, /\[--answers-file-sha256 <answers-file-sha256>\]/u, hint);
+  }
+});
+
+// Regression pin (green today, on purpose): the guard builds its flag SET from the shape table but
+// keeps the per-flag VALUE validators in a separate literal map, so a flag added to the table
+// without a validator entry would be admitted or refused by accident. The map is a function-local
+// constant (not exported), so this reads the guard source: every flag any shape names must have a
+// `"--flag":` entry. It forces the order validators first (F3), shape table second (F2).
+test("R5-9 every flag named by any mutating onboarding shape has an entry in the guard's validator map", () => {
+  const source = readFileSync(fileURLToPath(new URL("../lib/guard/sanctioned-args-onboarding.mjs", import.meta.url)), "utf8");
+  const start = source.indexOf("const MUTATING_ONBOARDING_FLAG_VALIDATORS = {");
+  assert.notEqual(start, -1, "the validator map declaration moved; update this consistency pin");
+  const block = source.slice(start, source.indexOf("\n  };", start));
+  for (const [name, shape] of Object.entries(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+    for (const flag of [...shape.requiredValue, ...(shape.requiredValueOneOf ?? []), ...shape.optionalValue]) {
+      assert.ok(block.includes(`"${flag}":`), `${name}: ${flag} has no validator entry in the guard map`);
+    }
+  }
+});
+
+for (const [label, eol] of [["LF", "\n"], ["CRLF", "\r\n"]]) {
+  test(`R5-10 a 30,720-byte multi-line non-ASCII ${label} answers file applies via --answers-file and matches the inline route`, () => {
+    const dir = designQuestionsPendingFixture(`r5-10-${label}`);
+    const inlineDir = designQuestionsPendingFixture(`r5-10-inline-${label}`);
+    try {
+      const { bytes, entries } = buildAnswersFile(eol, 30_720);
+      writeFileSync(join(dir, "scratch", "answers.json"), bytes);
+      const digest = createHash("sha256").update(bytes).digest("hex");
+      const applied = invoke(["intake-design-questions-apply", "--root", dir, "--answers-file", "scratch/answers.json",
+        "--answers-file-sha256", digest, "--activate", "--runner", "claude"]);
+      assert.equal(applied.status, 0, applied.output);
+      const result = JSON.parse(applied.output);
+      assert.deepEqual(result.answersFile, { sha256: digest, byteLength: 30_720 });
+      assert.equal(result.checkpoint.transactionState, "ready-to-generate");
+      assert.deepEqual(answerPairs(result), entries);
+      const inline = invoke(["intake-design-questions-apply", "--root", inlineDir, "--answers-json", JSON.stringify(entries),
+        "--activate", "--runner", "claude"]);
+      assert.equal(inline.status, 0, inline.output);
+      assert.deepEqual(answerPairs(JSON.parse(inline.output)), answerPairs(result),
+        "the file route records exactly what the inline route records");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(inlineDir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("R5-10 -replace over --answers-file follows the inline rules: a different second round needs replace, replace is applied", () => {
+  const dir = designQuestionsPendingFixture("r5-10-replace");
+  try {
+    writeFileSync(join(dir, "scratch", "a.json"), smallAnswers("First round."));
+    writeFileSync(join(dir, "scratch", "b.json"), smallAnswers("Corrected round."));
+    const first = invoke(["intake-design-questions-apply", "--root", dir, "--answers-file", "scratch/a.json", "--activate", "--runner", "claude"]);
+    assert.equal(first.status, 0, first.output);
+    const different = invoke(["intake-design-questions-apply", "--root", dir, "--answers-file", "scratch/b.json", "--activate", "--runner", "claude"]);
+    assert.equal(different.status, 2, different.output);
+    assert.match(different.output, /INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED/u, different.output);
+    const replaced = invoke(["intake-design-questions-replace", "--root", dir, "--answers-file", "scratch/b.json", "--activate", "--runner", "claude"]);
+    assert.equal(replaced.status, 0, replaced.output);
+    assert.deepEqual(answerPairs(JSON.parse(replaced.output)), [{ question: "What is the goal?", answer: "Corrected round." }]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("R5-11 every answers-file refusal through the real CLI exits non-zero with its typed code and leaves the checkpoint bytes unchanged", () => {
+  const dir = designQuestionsPendingFixture("r5-11");
+  const outsideDir = mkdtempSync(join(tmpdir(), "project-onboarding-argv-r5-11-outside-"));
+  try {
+    mkdirSync(join(dir, "scratch", "a-directory"));
+    writeFileSync(join(dir, "scratch", "nul-content.json"), Buffer.concat([
+      Buffer.from('[{"question":"q","answer":"a'), Buffer.from([0]), Buffer.from('b"}]')]));
+    writeFileSync(join(dir, "scratch", "bad-utf8.json"), Buffer.from([0x5b, 0xff, 0x5d]));
+    writeFileSync(join(dir, "scratch", "too-large.json"), Buffer.alloc(65_537, 0x20));
+    writeFileSync(join(dir, "scratch", "valid.json"), smallAnswers("Ship it."));
+    const outsideFile = join(outsideDir, "outside.json");
+    writeFileSync(outsideFile, smallAnswers("Outside the root."));
+    const cases = [
+      ["INTAKE-ANSWERS-FILE-MISSING", ["--answers-file", "scratch/does-not-exist.json"]],
+      ["INTAKE-ANSWERS-FILE-UNREADABLE", ["--answers-file", "scratch/a-directory"]],
+      ["INTAKE-ANSWERS-FILE-OUTSIDE-ROOT", ["--answers-file", outsideFile]],
+      ["INTAKE-ANSWERS-FILE-OUTSIDE-ROOT", ["--answers-file", relative(dir, outsideFile)]],
+      ["INTAKE-ANSWERS-FILE-TOO-LARGE", ["--answers-file", "scratch/too-large.json"]],
+      ["INTAKE-ANSWERS-FILE-INVALID-UTF8", ["--answers-file", "scratch/bad-utf8.json"]],
+      ["INTAKE-ANSWERS-FILE-INVALID", ["--answers-file", "scratch/nul-content.json"]],
+      ["INTAKE-ANSWERS-FILE-DIGEST-MISMATCH", ["--answers-file", "scratch/valid.json", "--answers-file-sha256", "0".repeat(64)]],
+    ];
+    const before = checkpointBytes(dir);
+    for (const [code, flags] of cases) {
+      const result = invoke(["intake-design-questions-apply", "--root", dir, ...flags, "--activate", "--runner", "claude"]);
+      assert.equal(result.status, 2, `${code}: ${result.output}`);
+      assert.match(result.output, new RegExp(code, "u"), result.output);
+      assert.deepEqual(checkpointBytes(dir), before, `${code}: the checkpoint must stay byte-identical`);
+    }
+  } finally {
+    rmSync(outsideDir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("R5-11 malformed JSON in the file is the apply function's own refusal, identical to the inline route", () => {
+  const dir = designQuestionsPendingFixture("r5-11-malformed");
+  try {
+    writeFileSync(join(dir, "scratch", "malformed.json"), "{not json");
+    const before = checkpointBytes(dir);
+    const inline = invoke(["intake-design-questions-apply", "--root", dir, "--answers-json", "{not json", "--activate", "--runner", "claude"]);
+    const viaFile = invoke(["intake-design-questions-apply", "--root", dir, "--answers-file", "scratch/malformed.json", "--activate", "--runner", "claude"]);
+    assert.equal(inline.status, 2, inline.output);
+    assert.equal(viaFile.status, 2, viaFile.output);
+    const codeOf = (output) => output.match(/INTAKE-[A-Z-]+/u)?.[0];
+    assert.equal(codeOf(viaFile.output), codeOf(inline.output), "no second parser verdict for the file route");
+    assert.doesNotMatch(viaFile.output, /ANSWERS-FILE/u, viaFile.output);
+    assert.deepEqual(checkpointBytes(dir), before);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// Case 16 (doc/emitter consistency). The expected flag literals are pinned here as the ratified
+// names rather than derived from the shape table, so the check cannot pass vacuously before the
+// table changes. The "language is not re-asked" rule is matched at paragraph level with a tolerant
+// wording so the doc slice may phrase it freely.
+const REFERENCES = new URL("../skills/pipeline-start/references/", import.meta.url);
+const readReference = (name) => readFileSync(new URL(name, REFERENCES), "utf8");
+
+test("R5-16 the intake-generate-design reference documents the file route with the exact flag names the shape table emits", () => {
+  const doc = readReference("intake-generate-design.md");
+  assert.match(doc, /--answers-file(?![-\w])/u, "the --answers-file route is documented");
+  assert.match(doc, /--answers-file-sha256/u, "the optional digest flag is documented");
+  const allowed = new Set(["--answers-json", "--answers-file", "--answers-file-sha256"]);
+  for (const name of DESIGN_COMMANDS) {
+    const shape = MUTATING_ONBOARDING_ARGV_SHAPES[name];
+    for (const flag of [...(shape.requiredValueOneOf ?? []), ...shape.optionalValue].filter((entry) => entry.startsWith("--answers-"))) {
+      assert.ok(allowed.has(flag), `${name} emits ${flag}, which this pin does not know`);
+      assert.ok(doc.includes(flag), `${flag} is emitted by ${name} but absent from the reference`);
+    }
+  }
+  for (const mention of doc.match(/--answers-[a-z0-9-]+/gu) ?? []) {
+    assert.ok(allowed.has(mention), `the reference names an --answers-* flag the CLI does not emit: ${mention}`);
+  }
+});
+
+test("R5-16 the kickoff-design reference says a recorded consent language is not asked again", () => {
+  const doc = readReference("kickoff-design.md");
+  const notReAsked = /(?:do(?:es)? not|don't|never|must not|should not|not)\s+(?:re-?)?ask|not\s+(?:be\s+)?(?:re-?asked|asked again)|asked once/iu;
+  const rule = doc.split(/\r?\n\s*\r?\n/u).filter((paragraph) =>
+    /consent/iu.test(paragraph) && /language/iu.test(paragraph) && notReAsked.test(paragraph));
+  assert.ok(rule.length > 0, "no paragraph says that a language already recorded at consent is not asked again");
+});
+
 // Wave 4 onboarding coordinator, step 5 (NVA-W5-COORD-STEP5-2, design.md SSa.5 point 5). This
 // file otherwise only proves the CLI's own closed argv grammar; this test proves the wiring
 // itself, driving the FULL intake -> generate -> bootstrap-bind chain through the real CLI entry

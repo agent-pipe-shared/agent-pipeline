@@ -3768,6 +3768,57 @@ test("NVA-W5-GUARDADMIT-1: intake-design-questions-apply admits exactly the --an
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// R5 (AC-30 / R5-3, answers-file design note case 13): the guard must admit the file route of the
+// two design-question commands -- `--answers-file <repo-relative path>` with an optional
+// `--answers-file-sha256 <64 lowercase hex>` -- and nothing wider. RED until the validators and the
+// shape table carry the two flags; the refusal pin carries a positive control so it cannot pass
+// merely because the unknown flag is refused today.
+for (const subcommand of ["intake-design-questions-apply", "intake-design-questions-replace"]) {
+  test(`R5-13 ${subcommand} admits --answers-file with and without --answers-file-sha256, in any argument order`, () => {
+    const path = root();
+    try {
+      markGovernedFixture(path);
+      writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+      const sha = "a".repeat(64);
+      const base = `node '${ONBOARDING_SCRIPT}' ${subcommand} --root '${path}'`;
+      for (const command of [
+        `${base} --answers-file 'scratch/a.json' --activate`,
+        `${base} --answers-file 'scratch/a.json' --answers-file-sha256 ${sha} --activate`,
+        `${base} --answers-file-sha256 ${sha} --answers-file 'scratch/a.json' --activate`,
+        `${base} --activate --answers-file 'scratch/a.json' --answers-file-sha256 ${sha}`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      }
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  });
+
+  test(`R5-13 ${subcommand} refuses a malformed, duplicated, conflicting or incomplete answers-file argv`, () => {
+    const path = root();
+    try {
+      markGovernedFixture(path);
+      writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+      const sha = "a".repeat(64);
+      const base = `node '${ONBOARDING_SCRIPT}' ${subcommand} --root '${path}'`;
+      const control = `${base} --answers-file 'scratch/a.json' --answers-file-sha256 ${sha} --activate`;
+      assert.equal(isSanctionedLifecycleCommand(control, path), true, `positive control: ${control}`);
+      for (const bad of [
+        `${base} --answers-file 'scratch/a.json' --answers-file-sha256 ${"A".repeat(64)} --activate`,
+        `${base} --answers-file 'scratch/a.json' --answers-file-sha256 abc123 --activate`,
+        `${base} --answers-file --bogus --activate`,
+        `${base} --answers-file '' --activate`,
+        `${base} --answers-file 'scratch/a.json' --answers-file 'scratch/b.json' --activate`,
+        `${base} --answers-json '[]' --answers-file 'scratch/a.json' --activate`,
+        `${base} --answers-file-sha256 ${sha} --activate`,
+        `${base} --answers-file 'scratch/a.json'`,
+        `${base} --answers-file 'scratch/a.json' --activate --extra flag`,
+        `node '${ONBOARDING_SCRIPT}' ${subcommand} --root /tmp/other --answers-file 'scratch/a.json' --activate`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+      }
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  });
+}
+
 test("NVA-W5-GUARDADMIT-1: intake-generate-apply admits exactly the --plan-sha256/--activate shape and no wider one", () => {
   const path = root();
   try {
