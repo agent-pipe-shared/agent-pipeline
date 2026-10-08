@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1c34ceec480023ac6310e86ccb8a1e5b01d2b8572c6b19974117a55db3f114ad"
+    "transitionHead": "07bcb900a34ef98da250255ac959d21ac18029e9f0ae4e099729e2e7f18730d3"
   },
   "counts": {
-    "open": 172,
+    "open": 178,
     "in_progress": 0,
     "closed": 663,
     "rejected": 3,
@@ -1278,6 +1278,17 @@
       "closureEvidence": "backlog/items/2026-08-06-authority-signing-terminal-contract.md"
     },
     {
+      "id": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy",
       "status": "closed",
       "type": "defect",
@@ -1754,6 +1765,17 @@
       "closureEvidence": "backlog/items/2026-09-06-the-evidence-capture-tool-refuses-a-fixture-literal-as-if-it-were-a-host-path.md"
     },
     {
+      "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.chat-gate-non-ascii-name-windows",
       "status": "closed",
       "type": "defect",
@@ -2045,6 +2067,17 @@
       "source": "Controlled ordinary Git Fresh-Start reproduction against the canonical sanctioned identity writer and prepared Codex Advisor namespace helper; source 7a2dcfe7, aggregate 563fbe7b. No operator namespace or model was accessed.",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.codex-compact-sessionstart-json-rejects-measurement-fields",
@@ -5981,6 +6014,17 @@
       "closureEvidence": "backlog/items/2026-08-18-lossless-pre-restart-checkpoint.md"
     },
     {
+      "id": "pipeline.machine-wide-key-directory-resolution",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.maintenance-window-selectivity-is-untested-at-both-levels",
       "status": "closed",
       "type": "defect",
@@ -9569,6 +9613,17 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.signing-toolchain-readiness",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
       "status": "closed",
       "type": "defect",
@@ -10449,6 +10504,17 @@
       "closureRepository": "self",
       "closureCommit": "e62b1dc7df556cc55fa8ba63da932ef1e5f6dfed",
       "closureEvidence": "plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md"
+    },
+    {
+      "id": "pipeline.typed-plugin-update-next-action",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.unasked-advisor-export-consent-in-fresh-seed",

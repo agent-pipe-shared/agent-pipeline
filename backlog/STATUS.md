@@ -101,6 +101,7 @@
 | pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps | closed | defect | pipeline | — | 2026-08-11 | 2026-09-10 | — |
 | pipeline.authority-signing-terminal-contract | closed | workflow-improvement | pipeline | — | 2026-08-06 | — | — |
+| pipeline.auto-install-pre-push-hook-with-the-plugin | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.backlog-closure-metadata-missing-across-historical-items | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.backlog-delivery-status-reconciliation | closed | workflow-improvement | pipeline | — | 2026-07-25 | — | Nova A / issue #57 |
@@ -137,6 +138,7 @@
 | pipeline.capability-inventory-checker-is-red-at-head | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.capture-evidence-refuses-fixture-literal-as-host-path | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\Users\Foo\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time. |
+| pipeline.catalogue-admit-prescribed-lifecycle-verbs | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | — | 2026-08-25 | — | — |
 | pipeline.ci-failure-reporter-has-no-recorded-requirement | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
@@ -160,6 +162,7 @@
 | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-advisor-evidence-fails-after-host-update | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity | open | defect | pipeline | none | 2026-09-28 | — | — |
+| pipeline.codex-bootstrap-in-the-typed-next-action | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.codex-compact-sessionstart-json-rejects-measurement-fields | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
@@ -464,6 +467,7 @@
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.long-dispatches-truncate-before-emitting-their-report | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
 | pipeline.lossless-pre-restart-checkpoint | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
+| pipeline.machine-wide-key-directory-resolution | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.maintenance-window-selectivity-is-untested-at-both-levels | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -737,6 +741,7 @@
 | pipeline.signing-default-test-fixture-root-escapes-the-repository | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.signing-prompt-prints-the-whole-review-package | open | defect | pipeline | alfred | 2026-10-04 | — | — |
+| pipeline.signing-toolchain-readiness | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.skill-arguments-and-bootstrap-length | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.source-agent-definition-change-locks-that-agent-until-install | open | defect | pipeline | alfred | 2026-10-05 | — | — |
@@ -803,6 +808,7 @@
 | pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.two-signature-ceremonies-overwrite-each-others-proof | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.two-v3-scripts-admitted-but-unnamed | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository |
+| pipeline.typed-plugin-update-next-action | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.unasked-advisor-export-consent-in-fresh-seed | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.unenforced-process-rules-vary-by-runner | closed | defect | pipeline | nova-b | 2026-08-28 | 2026-09-30 | Nova B |
@@ -857,7 +863,7 @@
 
 ## Counts
 
-- open: 172
+- open: 178
 - in_progress: 0
 - closed: 663
 - rejected: 3
