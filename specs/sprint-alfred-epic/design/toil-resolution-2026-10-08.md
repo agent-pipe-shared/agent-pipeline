@@ -1,192 +1,300 @@
-# Toil resolution design note (TOILRES-D, 2026-10-08)
+# Toil resolution design note (TOILRES-D2b, 2026-10-08)
 
-Status: proposal for independent Critic review, then a PO decision on the fix list (PO decision BI, amended).
-Supersedes as the proposal: `../evidence/guard-inventory-2026-10-08.md` (kept only as an index of hooks).
-Scope: toil rows T1-T76 of `../evidence/toil-log-2026-10-06-07.md`. No row is marked resolved in its own text, so all 76 are covered. T17, T28 and T50 sit out of numeric order in the log; they are covered below in numeric order.
+Status: corrected proposal for an independent Critic review (Opus, MP-07: security and guardrail design), then a PO decision on the fix list. This text replaces revision `a78507b41` of this file (TOILRES-D, Critic verdict FAIL: `../evidence/critic-TOILRES-a1-2026-10-08.md:5`). It closes Critic findings F1 (`:10`), F2 (`:11`) and F3 (`:12`), covers the rows the registry names as added later (`:14`), integrates PO decisions BJ, BK and BN (`../plans/po-decisions-2026-10-07.md:67`, `:68`, `:71`), and cross-references BI (`:66`), BL (`:69`) and BM (`:70`).
 
-## 0. What this note is, and how far its evidence reaches
+Scope: toil rows T1-T86 of `../evidence/toil-log-2026-10-06-07.md` (data rows at lines 7-92).
 
-The PO rejected a blanket guard reduction as too far-reaching ("nicht zu krass machen"; "es gibt die toil liste und wir sollten die sachen lösen"; the read question: "kann dann der agent ggf den signierschlüssel selber auslesen und doch signieren?"). So every row below keeps the requirement its refusing check protects and removes only the toil. Guards are not downgraded.
+**Count check.** The log has 86 data rows, one per line from L7 to L92. Each of T1-T86 occurs there exactly once. Four rows are out of numeric order: T17 (L26, after T20), T50 (L58, after T53), T81 (L91, after T86) and T28 (L92, last). Section 2 lists all 86 in numeric order, with each row's log line. Disposition count: 20 Owned (T1-T20) + 11 Tracked + 1 Note + 54 in slices (TR-A 5, TR-B 2, TR-C 6, TR-D 3, TR-E 3, TR-F 6, TR-G 3, TR-I 3, TR-J 3, TR-K 18, TR-L 1, TR-M 1) = 86. Section 5 repeats the per-slice lists.
 
-Evidence levels, so the Critic knows what to re-check:
+Citation conventions:
 
-- `code`: a function or line I read in this dispatch (cited file and line).
-- `log`: the refusing check is named only by the toil row's own text (denial code or script); I did not re-read that code.
-- `spec`: ownership taken from `specs/sprint-alfred-epic/spec.md` section 22.0 (lines 2074-2095), read in this dispatch.
+- Plugin paths are relative to `plugins/pipeline-core/` unless they start with another top-level directory.
+- `verified`: read in this dispatch (TOILRES-D2b).
+- `D2-A` … `D2-E`: findings of the prior research dispatch TOILRES-D2 (`evidence/dispatch-record-TOILRES-D2-20261008.json`, `report.text`). That record lives in the ignored `evidence/` root (toil-log L60), so its `file:line` citations are copied inline here. Only finding A's open point was re-checked in this dispatch (section 3.3).
+- `carried`: copied unchanged from revision `a78507b41` and not re-read in this dispatch.
+- `log`: supported only by the toil row's own text.
+- [C]: conjecture or design proposal, not verified.
 
-Not verified in this dispatch (open for the Critic, none hidden):
+## 0. Yardstick, and what changed
 
-1. Exact membership of the protected baseline `pipeline.protected-baseline.v1` (searches for `PB-GUARD-HOOKS` under `project/` and `plugins/pipeline-core/lib` found nothing). Column "Protected path?" therefore says `P` when the fix edits guard source (`plugins/pipeline-core/hooks/guard-*.mjs`, `plugins/pipeline-core/lib/guard/*`, `git-dangerous-policy.mjs`) or a protected test or config (TP-1..TP-13, `templates/prompts/agent-obligations.md` section 2). Treat `P` as "assume signed quality package (spec 22.0, signature class 4) until the baseline manifest says otherwise".
-2. The specific test case that pins I4 (`guard-testpath.test.mjs`) and I5 (`guard-push.test.mjs`); only the files are known.
-3. ADR-0061, ADR-0080 and ADR-0085: I read their headings and, for ADR-0085, nothing below the heading. They are cited as "Decision section" only where a row's text already names them, never paraphrased.
-4. Whether `setup --existing-key` refuses an unencrypted private key (`plugins/pipeline-core/scripts/po-human-approval.mjs` lines 1797-1811 were located, not read).
-5. What the ready-state execution lane admits for `node -e` or arbitrary scripts. Toil row T61 shows a Critic used `node -e writeFileSync`, so execution is not ruled out by the read grammar.
+**BJ** (`po-decisions:67`) sets the yardstick. Keep the enforcement layer: no broad rebuild and no removal of protection paths. Simplify and consolidate blocking states, paths and repair routes. Add strong preflights. Limit the work to the four toil-heavy families: (a) approval-chain re-derivation, (b) read and shell grammar refusals, (c) dispatch orientation tax, (d) device-switch drift. Section 5 names the family of every slice. Slices outside the four are marked "hygiene" and kept small.
 
-## 1. Classification used for the table
+**BK** (`:68`) requires two gating security slices in 0.7.0. TR-S1 is an encrypted-key gate covering `--existing-key` and the recover branch. TR-S2 refuses execution lanes that name a key, credential or machine-plane path, implemented as a new pure seam. BK also requires a residual register with owner and expiry (section 3.4).
 
-- **Owned**: spec section 22.0 already assigns the row to a contract (R7-n, R1, R3, R4, R5). I cite it and do not redesign it (briefing field 2).
-- **Slice**: a new fix slice, always in three steps: the test-only pins slice `<id>-T` first (RED, committed on purpose, sweeping older assertions that contradict the new contract in the same RED commit, per T36), then the fix slice `<id>-F` (never edits its own tests, QG-04, `guardrails/quality-gates.md` line 69), then an independent Critic. Pins in a protected test file (TP-*) need the signed pin flip (T42 shows the cost).
-- **Process**: no code. The row names the template line to change.
+**BN** (`:71`): nothing is deferred to 0.8 by default. Every slice and every Tracked row here belongs to the next local candidate. Only items assigned to sprint `batman` or `nightwing` are deferred. The toil log has no sprint column (header at L5: `#`, Hurdle, Cost, Should be), so this note defers no row.
 
-New slices (ids are mine; the Elephant renames freely):
+Changes against `a78507b41`:
 
-| Slice | Purpose | Rows |
-|---|---|---|
-| TR-A | Lifecycle admission by resolved script identity, not by argv spelling | T21, T24, T72, T73 (T18 owned by R1) |
-| TR-B | Read grammar spellings, target check untouched | T38, T74 (T2 owned by R7-1) |
-| TR-C | git-guard and push-classifier scoping (commit flags, heredoc) | T38 (classifier half), T42, T51 |
-| TR-D | Design-advisory admission: drift flake and once-per-commit evaluation | T35, T64 |
-| TR-E | Approval verification at a later HEAD, and digest-safe transfer | T76, T71 (T70, T75 owned by R7-3/R7-4/R7-5) |
-| TR-F | Dispatch record lane | T31, T39, T41, T43, T50, T55 |
-| TR-G | Dispatch-budget guard behaviour | T34, T37, T49, T56 |
-| TR-H | Signing readiness: one new finding (private key passphrase-protected) | none new from the log; closes the residual in 3.2 |
-| TR-I | Evidence and scan tooling | T32, T33, T60 |
-| TR-J | Shared-tree and win32 test hygiene | T44, T45, T48, T58 (T30 owned by R7-11-W) |
-| TR-K | Briefing and template text only | T26 (part), T36, T40, T47, T48, T52, T54, T57, T59, T61, T62, T63, T69 |
+- **F1.** Added rows T77-T86 (section 2). TR-E now names its WSL route (section 5).
+- **F2.** Split I1 into passive, execution and signing lanes, each with an enforcement point and a gap (section 3.2). Re-checked finding A's open point: the execution lane is open (section 3.3). Added BK slices TR-S1 and TR-S2. The gating TR-S1 replaces the non-gating TR-H readiness finding.
+- **F3.** "Owned" now applies only to T1-T20, the rows section 22.0 assigns (`specs/sprint-alfred-epic/spec.md:2071-2101` per D2-D; the Critic cites `:2006-2010, 2097-2101`). Rows assigned by their own text, a PO decision or a backlog item are now "Tracked", with the source named. The `specs/` half of T75 is its own slice, TR-M: R7-4 admits only `backlog/`, `docs/` and `scratch/` (`spec.md:2280-2287, 2304-2308` per D2-D).
+- **English only.** PO wording is referenced by its decision row, not quoted.
 
-## 2. Per-row resolution (T1-T76)
+## 1. Dispositions and columns
 
-Columns: refusing check (evidence level) / protected requirement (citation) / smallest fix that keeps the requirement / protected path? / slice.
+- **Owned (22.0)**: spec section 22.0 assigns the row to a contract. The row cites that contract and is not redesigned here.
+- **Tracked**: an owner is named outside section 22.0, by the row's own text, a PO decision row or a backlog item. That owner confirms. The row is not redesigned here, and under BN it stays in the next local candidate.
+- **TR-x**: a slice built in three steps: (1) `-T` commits RED pins and, in the same commit, sweeps older assertions that contradict the new contract (T36, L41); (2) `-F` never edits its own tests (QG-04, `guardrails/quality-gates.md:69`, carried); (3) an independent Critic reviews. A pin in a TP-listed file takes the signed route (`templates/prompts/agent-obligations.md:77-87`, verified); T42 (L47) shows the cost.
+- **Note**: no repository fix exists.
 
-| T# | Refusing check | Protected requirement | Minimal fix | Protected path? | Slice |
-|---|---|---|---|---|---|
-| T1 | Preflight `GS-GIT-UNAVAILABLE`, hardened git spawn env `GIT_CONFIG_GLOBAL=NUL` (log, spec) | spec 22.1 R7-1; governing requirement 22.0 (PO #17) | Owned. `/dev/null` constant; cause and typed probe in the envelope. No redesign | P (R7-1 states protected sites change via the signed package) | R7-1 (owned) |
-| T2 | Pre-ready closed grammar, codes such as `GUARD-READ-COMMAND-UNSUPPORTED` (code: refusal text seen live in this dispatch) | spec 22.1 R7-1; `docs/adr/draft-read-scope-containment-boundary.md` lines 16-28 (PO correction: classification, not repo-root containment); `guardrails/security.md` SEC-11 | Owned. R7-1 sanctioned diagnostic set. Do not widen past it; the credential target check stays (I1) | P | R7-1 (owned) |
-| T3 | Orphan session descriptors need a PO decision plus `--by` (spec) | spec 22.2 R7-2 (zero-authority descriptors archived, authority-holding ones stay on the attended 20.2 route) | Owned. No redesign | per owner | R7-2 (owned) |
-| T4 | Pre-push hook absent or stale. Live: this session's preflight reports `prePushHook: installed-but-stale` and `refresh` for all three hooks (code) | spec 22.0 maps T4 to R3 (K6-2, R3-2); ADR-0013 (guard lives in the plugin); T53 acceptance | Owned. Acceptance case is the T53 one: a fresh host installs or refreshes all three hooks through the bootstrap typed nextAction | per owner | R3-2 (owned) |
-| T5 | Approval-bound package in ignored root `evidence/` (spec) | spec 22.3 R7-3 | Owned | per owner | R7-3 (owned) |
-| T6 | Backlog and docs writes refused while the package is unverifiable (spec) | spec 22.4 R7-4 | Owned. Note `templates/prompts/agent-obligations.md` section 3 already lists `docs/`, `specs/`, `.claude/`, `backlog/`, `scratch/` as draft-phase exempt; T75 shows the blocked state bypasses that, so R7-4's case must include `specs/` writes | P | R7-4 (owned) |
-| T7 | Only `reopen-design` offered (spec) | spec 22.5 R7-5 (rebind of an unchanged approval; lost-artifact sub-case fails closed, PO #25) | Owned | per owner | R7-5 (owned) |
-| T8 | `submit-plan` needs idle continuity, `continuity-cas` needs a signed override (spec) | spec 22.10 R7-10 | Owned | P | R7-10 (owned) |
-| T9 | Re-registering an authoring dispatch needs a signed override (spec) | spec 22.0 maps to R5 (R5-6) | Owned | per owner | R5-6 (owned) |
-| T10 | Agent cannot write course outputs under `evidence/` in design phase (spec) | spec 22.0 maps to R1 (K5-8, R1-1) | Owned | P | R1-1 (owned) |
-| T11 | `project/pipeline-state.json` commit refused, `GUARD-DEVPLAN-LIFECYCLE` (spec) | spec 22.4 R7-4 | Owned | P | R7-4 (owned) |
-| T12 | Handover omits device-bound artifacts (spec) | spec 22.3 R7-3 | Owned | per owner | R7-3 (owned) |
-| T13 | No wired Advisor route (spec) | spec 22.0 maps to R4 (K3-2, R4-1, R4-2) | Owned | per owner | R4 (owned) |
-| T14 | `sign-intent` without a remembered key directory (spec) | spec 22.6 R7-6 | Owned. Must keep the resolved directory inside the protected roots of I1 (`passive-read-policy.mjs` lines 129-137) | per owner | R7-6 (owned) |
-| T15 | Bare `openssl` from PATH (spec, code: `po-human-approval.mjs` line 935 message) | spec 22.6 R7-6 | Owned | per owner | R7-6 (owned) |
-| T16 | Bootstrap omits later-blocking preconditions (spec; live preflight `environmentReadiness` still shows 3 findings `unknown`) | spec 22.7 R7-7 | Owned. Add one finding in TR-H (section 3.2): private key passphrase-protected | per owner | R7-7 (owned) plus TR-H |
-| T17 | `continuity-cas` from PowerShell: `GUARD-POWERSHELL-GRAMMAR` (spec) | spec 22.8 R7-8 | Owned | P | R7-8 (owned) |
-| T18 | Prescribed scripts refused as opaque script execution in draft (spec) | spec 22.0 maps to R1 (21.1 catalogue, R1-1); typed repair rule 22.0 | Owned. TR-A reuses the same mechanism for the newer rows below | P | R1-1 (owned) |
-| T19 | Parallel tool calls of one agent race its budget counter lock (spec; corrected in the row) | spec 22.11 R7-11; PO #26 | Owned | P | R7-11 (owned) |
-| T20 | Subagent bootstrap receipt only via one preflight spelling (spec) | spec 22.11 R7-11; PO #28 (SubagentStart receipt) | Owned | P | R7-11 (owned) |
-| T21 | `design-course-session.mjs --run-v2` refused as opaque script execution in `awaiting-approval` (log) | spec 22.0 typed repair rule (an argv admitted in every phase that emits it); 21.1 catalogue; PO 2026-10-07 "fix in the candidate" | Admit the course verbs by resolved script identity plus a closed verb list (same mechanism as the catalogue), never by free argv; course inputs agent-writable (T10) | P | TR-A |
-| T22 | `DAC2-REEXPORT-SOURCE-DRIFT` on the same authoring dispatch id (log) | Digest binding of the course; spec 21.5 and R5-6 revision cycle (named in the row) | Typed action in the failure: "register a new authoring dispatch id", per the 22.0 typed repair rule. No weakening of the drift check | per owner (R5-6) | R5-6 (owned) |
-| T23 | Not-ready readiness forces reopen, clear, submit, register, new course (log) | R5-6 / R7-10 (named in the row) | Owned: one agent-executable revision-cycle action | P | R7-10 / R5-6 (owned) |
-| T24 | `present-plan` refused as opaque script execution in `awaiting-approval` (log) | spec 22.0 typed repair rule; 21.1 catalogue | Same as T21: admit by script identity and verb list. Must not touch the signing verbs (I2 layer a) | P | TR-A |
-| T25 | `present-plan` prints a template and 321 KB of JSON (log) | SEC-10 (`guardrails/security.md` lines 165-189: signing friction already at the accepted ceiling); pin `guard-lifecycle-ready.test.mjs` line 5382 ("resolves the configured key directory without disclosing its private path") | Print one ready command with absolute repo and node path, review JSON to a file. Do NOT print `--directory`; let `sign-intent` resolve it machine-wide (T14/T66). That keeps the line-5382 pin | no (output formatting; the pin file is not TP-listed) | TR-K |
-| T26 | Readiness reviewer re-hunts content each run (log) | PO decisions E/F named in the row. ADR-0085 (`docs/adr/0085-one-review-one-signature-design-approval.md`, Decision section from line 47) is the design-approval simplification; I did not read it, so no further claim | Readiness stays a mechanical consistency check (digests, counts, references); one content review. Briefing-side: say so in the readiness prompt. Whether code changes is for the ADR-0085 owner | no | TR-K (part) |
-| T27 | Every not-ready round repeats the whole loop with a hand-invented dispatch id (log) | See T22, T23; PO decision F (named in the row) | Owned by R5-6 / R7-10. Process note: id generated by the coordinator, not invented | per owner | R5-6 / R7-10 (owned) |
-| T28 | Stop-hook `/goal` re-fires on every idle turn (log) | No written requirement found. `plugins/pipeline-core/hooks/stop-suggest.mjs` is a Stop hook in `hooks.json` line 184; whether the `/goal` evaluator is host or plugin code was not checked | Process: do not set a `/goal` while blocked on PO input. If the evaluator is host code there is no repo fix | no | none (note) |
-| T29 | Producer returns a multi-line `copyCommand.posix` the guard refuses (`GUARD-PARSE-UNSUPPORTED`) (log) | `templates/prompts/agent-obligations.md` section 1 (one simple command per call); `goldfish-task.md` final-report text says "plain command field is POSIX-only" | Producer emits only spellings the guard admits (`-m` plus `--trailer`). T36 says COMMITFLOW-F touched this: re-verify live before dispatching (stale-claim rule) | no (script) | TR-K (verify first) |
-| T30 | `guard-dispatch-budget.test.mjs` unrunnable on win32 (log) | Spec 22.11 R7-11-W | Owned | TP: no; suite file not in TP list | R7-11-W (owned) |
-| T31 | `GUARD-DISPATCH-RECORD-COLLISION` freezes a terminal record; the commit-msg check wants a terminal record first (log; obligations section 6 confirms the check) | Record immutability protects evidence (`roles/goldfish.md` section 6 GF-09-D as cited in `goldfish-task.md`); PO decision K (named in rows T43, T50) | Admit exactly one append-only transition `stopped-without-commit` or `committed-pending-report` to a later state by the record's own owner, appending `commits` only. Immutability of every other field stays | P (record guard) | TR-F |
-| T32 | `security-scan.mjs` refuses a dirty tree, `working-tree-not-clean` (log) | SEC-06 (`guardrails/security.md` line 41: SKIPPED is never PASS) | Scan a snapshot of an exact commit (`git archive`) and write the scanned tree id into the evidence, so a later dirty tree is never claimed as scanned. Dirty-tree refusal stays for the shared-tree mode | no (script not in TP list) | TR-I |
-| T33 | `TCC-FD-WRITE` under plain `node --test` (log) | GF-08 evidence must be machine-written (`goldfish-task.md` field 3) | Ship one single-suite runner script that supplies the fd. Do not edit `harness/scripts/verify.mjs` (TP-3) | new script only; TP-3 untouched | TR-I |
-| T34 | `observeGovernanceScope` costs 161-245 ms per hook call (log) | None (performance). Risk: a stale cache would let a stale governance scope decide admission | Cache per session keyed by the digest of the governance state file; any digest change or read error recomputes (fail closed, GL-09 `guardrails/global.md` line 77 for authority-bearing hooks) | P | TR-G |
-| T35 | Transient `DAA-DWP2-FAILURE-DRIFT` / `DAA-DWP2-PHYSICAL-OR-GIT` on Edit/Write and commit; identical retry passes (log) | PO decision 2026-10-06 recorded in the row (narrower Advisor ancestor predicate). GL-09 line 79: a hook's category is declared, not inferred | First pin the declared category of this admission. If advisory: GL-09 forbids a terminal block from a flake. If authority-bearing: keep blocking and fix the predicate. Either way a nondeterministic refusal is a defect | P | TR-D |
-| T36 | Older tests pin behaviour the approved contract replaces (log) | QG-04 (`guardrails/quality-gates.md` line 69) | Briefing checklist: the test-only RED dispatch also sweeps and aligns contradicting existing assertions. Template line: `goldfish-task.md` BUGFIX module, Dispatch 1, field 3 | no | TR-K |
-| T37 | `DBB-PENDING-BINDING-MISSING` after concurrent launches (log) | Dispatch binding integrity (TB-09 text in `goldfish-task.md` field 6) | Key the pending binding per dispatch instead of one slot, or name the re-dispatch action in the refusal | P | TR-G |
-| T38 | `git grep -l -E "^status: \"?open" -- backlog/items` refused by guard-push as ambiguous push target (log; backlog `2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target`) | ADR-0027 Decision 2 (`docs/adr/0027-gate-philosophy.md` line 12: ambiguity fails closed once the push gate is active) | The push classifier engages only when the git subcommand is `push`. The fail-closed rule for real pushes is unchanged | P (guard-push, pins in TP-5) | TR-B / TR-C |
-| T39 | Invented terminal `outcome` values (log) | Record schema `pipeline.dispatch-record.v4` (`goldfish-task.md` field 6) | Record validator rejects values outside the enum. Template already spells the enum | no (validator script) | TR-F |
-| T40 | Whole budget spent on orientation (log) | TB-09 (`goldfish-task.md` field 6: base cap plus allowance) | Process: one briefing per file, dispatcher supplies line ranges, reserve 8 calls for record, commit, report | no | TR-K |
-| T41 | Critic-input stripper rejects `{sha, subject}` commits (log) | Strict hex SHA identity of commits in the record | Normalise `{sha}` objects and leading-SHA strings to bare hex; keep rejecting anything else | no (script) | TR-F |
-| T42 | Fail-closed `<<` marker makes `git commit -F - <<EOF` a push candidate; pin PG-HD1 expects allow (log) | ADR-0027 Decision 2 (ambiguity fails closed for a push); TP-5 pins are protected | Hypothesis to pin first: scoping the classifier to the `push` subcommand (T38) makes PG-HD1's allow consistent, so no pin flip is needed. If the pins slice shows otherwise, the PO decides PG-HD1 (a PO decision, not an ADR amendment). Process fallback already exists: agents commit with `-m` plus `--trailer` or `-F <file>` (obligations section 6) | P (TP-5 `guard-push.test.mjs`) | TR-C |
-| T43 | Orchestrator commit left a Goldfish authorship ungrounded (log) | `goldfish-task.md` `Commit-Act: orchestrator` trailer; EL-13a | Resume the same dispatch with a procedural message; record lane per T31 | P (record lane) | TR-F |
-| T44 | Hook-install tests inventory the live plugin tree, `GHS-SOURCE-DRIFT` (log) | Integrity of the published hook runtime snapshot (`publishGitHookRuntimeSnapshot`, named in T58); no ADR located | Run those suites against a frozen copy or in a quiet window; worktree-per-Goldfish (N10) removes the race. Do not weaken the drift refusal | no (test hygiene) | TR-J |
-| T45 | win32 failures in `pipeline-start-preflight.test.mjs` from POSIX fixture roots (log) | Cross-platform matrix (memory: every fix must hold on win32, WSL, macOS) | Platform-native fixture roots | no | TR-J |
-| T46 | No guard refused an environment dump (log) | SEC-01 (`guardrails/security.md` line 12), SEC-03 (line 26) | Guard side exists: `plugins/pipeline-core/lib/guard/env-dump-lane.mjs` line 21 `GUARD-ENV-DUMP`, fail-closed at `evaluate.mjs` line 87, pinned at `guard-lifecycle-ready.test.mjs` lines 11843-11937 (code). Remaining: Critic template forbids executing probe command strings | no further code | TR-K |
-| T47 | ENVDUMP-T spent budget on orientation, parallel Read batch collided on the counter (log) | TB-09; spec 22.11 R7-11 (one agent's parallel calls) | Briefing says "one call at a time, never a batch" and names fixture line ranges. Counter tolerance is owned by R7-11 | no | TR-K plus R7-11 |
-| T48 | Test-only briefing sent into files not baseline-run on this host (log) | QG-04 / baseline discipline | Elephant runs one existing case of the target file and reads its verify pin (`harness/verify-suites.json`, TP-13) before briefing | no | TR-K |
-| T49 | Commit-flow producer refused after the working cap (log) | TB-09 closing allowance (`goldfish-task.md` field 6: allowance covers record write, commit) | Admit the named closing acts (commit-flow producer, `git rev-parse HEAD`, record write) after the cap and nothing else. Re-verify against the current hook first: the template already defines the allowance | P | TR-G |
-| T50 | Stopped record immutable, so the later commit cannot be named (log) | See T31 | Same single transition as T31 | P | TR-F |
-| T51 | GG-22 pathspec fast path rejects `--trailer`, so the whole shared index is staged (log) | `templates/prompts/agent-obligations.md` section 6 (explicit pathspec, no wildcard add in a shared tree); GIT-03 trailers | Treat `--trailer <value>` as message metadata (safe flag). The explicit pathspec after `--` stays required. Do not add `--no-verify`, `-n` or `-c` to any flag list (I3) | P (`guard-git.mjs`; pin in TP-1) | TR-C |
-| T52 | Close-out costs about 25 calls per item (log) | Backlog closure evidence under `backlog/evidence/` (row) | Briefing carries item to test mapping; evidence written to `backlog/evidence/` from the start | no | TR-K |
-| T53 | Hook install by hand per host (log) | PO decision M HOOKREFRESH (named in the row) | Owned by the HOOKREFRESH acceptance check; same as T4 | per owner | R3-2 (owned) |
-| T54 | Hard Goldfish cap of 35 counted calls (log) | TB-09 | Resolved in text: `goldfish-task.md` field 6 now names the clamp (`min(base, maxTurns - 15)`, 35 for implementor, at most 65 for `goldfish-deep`) (code, read in this dispatch). Residual: guard reports effective cap at dispatch start | no | TR-K (verify) |
-| T55 | Record carries an abbreviated SHA (log) | Authorship link needs the full SHA | Commit-flow producer writes the full SHA into the record as part of the commit act (record lane, T31) | P | TR-F |
-| T56 | Procedural SendMessage budget grant ignored (log) | TB-09: "only an orchestrator-written grant can raise the working cap" (`goldfish-task.md` field 6) | The grant mechanism already exists in the template text; the failure is using SendMessage. Process: use the grant, else adopt under a new task id. Any new typed extension must be writable only by the main session (never by a subagent) | P if guard changes | TR-K, TR-G if code |
-| T57 | Orientation spend, refused shell variants (log) | TB-09; closed grammar | Briefing names exact files and line ranges and forbids searching | no | TR-K |
-| T58 | `GHS-SOURCE-DRIFT` on a live source copy (log) | See T44 | Quiet tree or frozen copy; worktree-per-Goldfish (N10) | no | TR-J |
-| T59 | Critic runtime cap 25 with checkpoint at 20 (log) | TB-09 analogue for the Critic | `critic-review.md` names the enforced cap next to the budget field; Critic briefings cite the acceptance line | no | TR-K |
-| T60 | `capture-evidence.mjs` artifacts carry no commit or tree identity (log) | GF-08 evidence binding (`goldfish-task.md` field 3) | Header records `git rev-parse HEAD`, the tree id and a dirty flag. Briefings that copy a protected file name the exact copy command | no (script) | TR-I |
-| T61 | Template says Write/Edit, the Critic agent has none (log) | `roles/critic.md` read-only design (not read in this dispatch); granting Write widens authority | Do not grant Write. Either name the admitted Bash form in `critic-review.md` or ship a catalogue-admitted writer script restricted to `scratch/dispatch/` (TR-A mechanism). PO picks | no for the template, P for any permission change | TR-K |
-| T62 | Elephant shortened the Critic hunt list, guessed a spec path (log) | CLAUDE.md "Dispatch from the template, never freehand"; `critic-review.md` section 2 | Process: copy Phase A verbatim; spec paths from `git ls-files` | no | TR-K |
-| T63 | `GUARD-GATE-STRENGTH-SHELL` refuses any shell command naming the calibration file (log) | Gate-strength lane protects calibration against weakening (name only; rule text not read) | Keep. Briefing line: read calibration with Read only | no | TR-K |
-| T64 | Staged-lifecycle policy runs the design-advisory admission once per staged path (log) | None for per-path repetition; flake as T35 | Evaluate once per commit and memoise per hook invocation; semantics unchanged. Bulk material goes in few files meanwhile | P | TR-D |
-| T65 | HGO resolver scans 111 requests for 563 s before `sign-intent` (log) | ADR-0059 signed override, ADR-0061 ceremony (not read beyond headings) | Backlog `2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes`: digest-keyed lookup, readiness first. Scan result must never change what is signed | per backlog | backlog item (owned) |
-| T66 | `sign-intent` without `--directory` on a new machine (log) | spec 22.6 R7-6 | Owned; machine-wide `poKeyDirectory` stays inside I1 protected roots | per owner | R7-6 (owned) |
-| T67 | `openssl` not on the PowerShell PATH (log) | spec 22.6, 22.7 | Owned; readiness probe names the missing executable | per owner | R7-6 / R7-7 (owned) |
-| T68 | Host crash, six dispatches lost their process (log) | Recovery rule: resume via SendMessage | Process standard recovery. Bootstrap F6 should name the classification repair directly | no | TR-K |
-| T69 | Unstaging a staged guard file and restoring a TP-13 copy refused for the agent (log) | I4 (protected paths protected); TP-13 | Keep the refusal. Package builder takes post-images from `scratch/` only; ceremony text says nothing protected may be staged before the build | no | TR-K |
-| T70 | Approval binds ignored, device-local paths; device switch locks all work (log) | PO BI (1): an approved phase is never lost by a device switch or an upgrade; spec 22.3 R7-3, 22.5 R7-5; backlog `2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory` | Owned: track the bound paths and verify from tracked content. Candidate blocker per BI. Do not make the write guard advisory | P | R7-3 / R7-5 (owned) |
-| T71 | Transfer redaction changes digest-bound bytes (log) | Digest binding of the approval; CLAUDE.md "no machine-specific absolute paths" | Bundle copies digest-bound files byte-exact and fails loudly if a redaction would change one; tighten the false-positive pattern. Backlog `2026-10-08-transfer-redaction-alters-digest-bound-files` | no (script) | TR-E |
-| T72 | Same preflight refused with a forward-slash plugin path, admitted with backslash (log; the briefing of this dispatch carries the same warning) | `templates/prompts/agent-obligations.md` section 5: the guard admits the exact script path and nothing else; a copy in the project tree stays refused | Compare resolved real paths of the script, not raw strings; a same-named script elsewhere stays refused | P | TR-A |
-| T73 | `GUARD-DEVPLAN-SHELL` names `design-advisory-admission.mjs inspect` as diagnosis and refuses it (log) | spec 22.0 typed repair rule (an action named in a refusal must be admitted) | Admit the read-only `inspect` verb by identity (TR-A) or change the text to name an admitted action; never name a refused action | P | TR-A |
-| T74 | `git grep -n -o`, `git grep -n "a\|b"`, `rg -o`, `--max-columns`, Grep on a directory refused (log). Live this dispatch: `rg ... --glob "!*.test.mjs"` and `rg -c <pattern> <file>` both refused `GUARD-READ-COMMAND-UNSUPPORTED` (code: refusal text), while `rg -l` and `rg --max-count N` were admitted | `docs/adr/draft-read-scope-containment-boundary.md` lines 16-28 (classification is the boundary); SEC-11 (`guardrails/security.md` lines 191-207). SEC-11 line 196: native Grep requires an exact file; `read-scope.mjs` line 609 keeps that | Admit `-o`, `--max-columns` and quoted `\|` alternation per flag, each with a pin. Grep on a directory stays refused. Every admitted spelling still routes operands through `isAllowedPassiveReadTarget` (I1) | P | TR-B |
-| T75 | Even `specs/` and `backlog/` writes refused in the blocked state (log) | spec 22.4 R7-4; obligations section 3 (exempt prefixes) | Owned. R7-4 case must include a `specs/` toil-log write in the blocked state; recurrence on backlog `2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes` | P | R7-4 (owned) |
-| T76 | `verifyDesignReadinessHostExecution` to `rereadReadinessAdvisorContextV2` to `verifyReadinessAdvisorObservationV2` re-enters the v2 reader with `requireCurrentCandidate` defaulting to true; `DWP2-CURRENT-CANDIDATE` once HEAD differs from the approved candidate (log; `verifyFinalDesignWorkflowApproval` passes `false`) | Approval binds digests, not HEAD: spec 22.5 R7-5 (rebind of an unchanged approval); GL-09 `guardrails/global.md` lines 77-82 (approval gate is authority-bearing, fail closed) | Pins first: approval with an unavailable Advisor verifies at a later HEAD, and still fails when a bound digest differs. Then forward `requireCurrentCandidate:false` through the chain. Binding to the approved digests is untouched; fault injection keeps blocking. Backlog `2026-10-08-approval-verification-demands-head-equals-candidate` | P (approval verification, authority-bearing; assume signed package) | TR-E |
+"Protected?" column:
 
-Row count check: T1-T76 each appear exactly once above (T17, T28, T50, T53 as separate rows).
+- `TP-n`: a file matching that id (`agent-obligations.md:89-103`, verified).
+- `G`: guard source (`hooks/guard-*.mjs`, `lib/guard/*`). Assume a signed quality package until the protected-baseline manifest says otherwise. T84 (L88) shows `PB-GUARD-HOOKS` covering `lib/guard/sanctioned-args-onboarding.mjs`.
+- `owner`: the owning contract decides.
+- `no`: not protected.
 
-## 3. Security invariants (must hold after every fix)
+## 2. Per-row resolution (T1-T86, numeric order)
 
-The adversary is the agent acting on its own or manipulated authority, not a human with machine access (SEC-10, `guardrails/security.md` lines 165-189). No fix below adds a human ceremony. Each invariant lists the enforcing function, its preconditions for the slices above, and the pin (or the gap that becomes a pins slice).
+| T# | Log | Refusing check (evidence) | Protected requirement | Minimal fix that keeps it | Protected? | Disposition |
+|---|---|---|---|---|---|---|
+| T1 | L7 | Preflight `GS-GIT-UNAVAILABLE`, hardened git spawn env (log) | spec 22.1 R7-1 | `/dev/null` constant; cause and typed probe in the envelope | G | Owned (22.0): R7-1 |
+| T2 | L8 | Pre-ready closed grammar, `GUARD-READ-COMMAND-UNSUPPORTED` (carried) | R7-1; `docs/adr/draft-read-scope-containment-boundary.md:16-28` (carried); SEC-11 | R7-1 sanctioned diagnostic set; the credential target check is untouched (I1-P) | G | Owned (22.0): R7-1 |
+| T3 | L9 | Orphan session descriptors need a PO decision plus `--by` (log) | spec 22.2 R7-2 | Archive zero-authority descriptors; authority-holding ones stay attended | owner | Owned (22.0): R7-2 |
+| T4 | L10 | Pre-push hook absent or stale (log) | 22.0 maps T4 to R3 (R3-2); ADR-0013 | Bootstrap typed nextAction installs or refreshes all three hooks (acceptance with T53, T79) | owner | Owned (22.0): R3-2 |
+| T5 | L11 | Approval-bound package in ignored `evidence/` (log) | spec 22.3 R7-3 | Track the bound paths | owner | Owned (22.0): R7-3 |
+| T6 | L12 | Backlog and docs writes refused while the package is unverifiable (log) | spec 22.4 R7-4 | R7-4 admitted set `backlog/`, `docs/`, `scratch/` (`spec.md:2280-2287`, D2-D); `specs/` is not in it, see TR-M | G | Owned (22.0): R7-4 |
+| T7 | L13 | Only `reopen-design` offered (log) | spec 22.5 R7-5 (rebind; lost-artifact sub-case fails closed, PO #25) | Rebind route; BL (`po-decisions:69`) ratifies `rebind-approval` with `requireReadinessExecution: false` | owner | Owned (22.0): R7-5 |
+| T8 | L14 | `submit-plan` and `continuity-cas` need a signed override (log) | spec 22.10 R7-10 | Sanctioned supersede verb | G | Owned (22.0): R7-10 |
+| T9 | L15 | Re-registering an authoring dispatch needs a signed override (log) | 22.0 maps to R5-6 | Course registers its own dispatch | owner | Owned (22.0): R5-6 |
+| T10 | L16 | Course outputs under `evidence/` not agent-writable in design (log) | 22.0 maps to R1-1 | Course outputs writable in design phases | G | Owned (22.0): R1-1 |
+| T11 | L17 | `project/pipeline-state.json` commit refused, `GUARD-DEVPLAN-LIFECYCLE` (log) | spec 22.4 R7-4 | Lifecycle writer commits its own state | G | Owned (22.0): R7-4 |
+| T12 | L18 | Handover omits device-bound artifacts (log) | spec 22.3 R7-3 | Handover lists every digest-bound path | owner | Owned (22.0): R7-3 |
+| T13 | L19 | No wired Advisor route (log) | 22.0 maps to R4 (R4-1, R4-2) | Wired route | owner | Owned (22.0): R4 |
+| T14 | L20 | `sign-intent` without a remembered key directory (log) | spec 22.6 R7-6 | Machine-wide `poKeyDirectory`; the resolved directory stays an I1 excluded root (`lib/passive-read-policy.mjs:125-137`, carried) | owner | Owned (22.0): R7-6 |
+| T15 | L21 | Bare `openssl` from PATH (log) | spec 22.6 R7-6 | Pipeline resolves openssl itself | owner | Owned (22.0): R7-6 |
+| T16 | L22 | Bootstrap omits later-blocking preconditions (log) | spec 22.7 R7-7 | One readiness report. TR-S1 adds "PO key passphrase-protected" as an up-front finding next to its gate (BJ: strong preflights) | owner | Owned (22.0): R7-7 |
+| T17 | L26 | `continuity-cas` from PowerShell, `GUARD-POWERSHELL-GRAMMAR` (log) | spec 22.8 R7-8 | Same route on both shell lanes | G | Owned (22.0): R7-8 |
+| T18 | L23 | Prescribed scripts refused as opaque script execution in draft (log) | 22.0 maps to R1-1 (21.1 catalogue); 22.0 typed repair rule | Catalogue admission; TR-A reuses the mechanism | G | Owned (22.0): R1-1 |
+| T19 | L24 | One agent's parallel tool calls race the budget counter lock (log) | spec 22.11 R7-11; PO #26 | Bounded lock wait | G | Owned (22.0): R7-11 |
+| T20 | L25 | Subagent bootstrap receipt only via one preflight spelling (log) | spec 22.11 R7-11; PO #28 | SubagentStart receipt. Recurred in this dispatch: the first Write was refused `GUARD-BOOTSTRAP-RECEIPT-MISSING` until the preflight ran (verified: refusal text) | G | Owned (22.0): R7-11 |
+| T21 | L27 | `design-course-session.mjs --run-v2` refused as opaque script execution in `awaiting-approval` (log) | 22.0 typed repair rule; 21.1 catalogue | Admit course verbs by resolved script identity plus a closed verb list, never by free argv | G | TR-A |
+| T22 | L28 | `DAC2-REEXPORT-SOURCE-DRIFT` on the same authoring dispatch id (log) | Course digest binding; R5-6 named in the row | Typed action "register a new authoring dispatch id"; drift check unchanged | owner | Tracked: R5-6 (row text L28) |
+| T23 | L29 | Not-ready readiness forces the whole loop (log) | R5-6 / R7-10 named in the row | One agent-executable revision-cycle action | G | Tracked: R5-6 / R7-10 (row text L29) |
+| T24 | L30 | `present-plan` refused as opaque script execution (log) | 22.0 typed repair rule | As T21; signing verbs are never admitted (I2) | G | TR-A |
+| T25 | L31 | `present-plan` prints a template and 321 KB of JSON (log) | SEC-10 (`guardrails/security.md:165-189`, carried); pin `hooks/guard-lifecycle-ready.test.mjs:5382` (carried) | One ready command with absolute repo and node path, review JSON to a file, no `--directory` (T14/T66), so the 5382 pin holds | no | TR-K |
+| T26 | L32 | Readiness reviewer re-hunts content each run (log) | PO decisions E/F named in the row; ADR-0085 | BM (`po-decisions:70`) moves the ADR-0085 removal of the design-phase readiness stack into 0.7.0; briefing text meanwhile in TR-K | no | Tracked: ADR-0085 removal (BM) |
+| T27 | L33 | Every not-ready round repeats the loop with an invented id (log) | As T22, T23; PO F | Id generated by the coordinator | owner | Tracked: R5-6 / R7-10 (row text L33) |
+| T28 | L92 | Stop-hook `/goal` re-fires on every idle turn (log) | None found. The only Stop hook is `stop-suggest.mjs` (`hooks/hooks.json:179-188`, verified), which emits no decision and dedupes (`hooks.json:2`, verified) | Do not set a `/goal` while blocked on PO input; if the evaluator is host code there is no repository fix [C] | no | Note |
+| T29 | L34 | Producer emits a multi-line `copyCommand.posix`, `GUARD-PARSE-UNSUPPORTED` (log) | One simple command per call (`agent-obligations.md:26-31`, verified) | Producer emits only admitted spellings (with T82); verify live first | no | TR-K |
+| T30 | L35 | `guard-dispatch-budget.test.mjs` unrunnable on win32 (log) | R7-11-W named in the row | Windows-runnable suite | no | Tracked: R7-11-W (row text L35, not a 22.0 assignment) |
+| T31 | L36 | `GUARD-DISPATCH-RECORD-COLLISION` freezes a terminal record (log) | Record immutability (GF-09-D); decision K | One append-only transition by the record's owner, appending `commits` only | G | TR-F |
+| T32 | L37 | `security-scan.mjs` refuses a dirty tree (log) | SEC-06 (SKIPPED is never PASS) | Scan a `git archive` snapshot and record the tree id; dirty-tree refusal kept for shared-tree mode | no | TR-I |
+| T33 | L38 | `TCC-FD-WRITE` under plain `node --test` (log) | GF-08 machine-written evidence | Shipped single-suite runner; `harness/scripts/verify.mjs` (TP-3) untouched | no | TR-I |
+| T34 | L39 | `observeGovernanceScope` costs 161-245 ms per hook call (log) | None (performance); GL-09 fail closed for authority-bearing hooks | Cache per session keyed by the governance state digest; any change or read error recomputes | G | TR-G |
+| T35 | L40 | Transient `DAA-DWP2-FAILURE-DRIFT` / `DAA-DWP2-PHYSICAL-OR-GIT` (log) | PO decision 2026-10-06 in the row; GL-09 (`guardrails/global.md:77-82`, carried) | Declare the admission's category first; a nondeterministic refusal is a defect either way | G | TR-D |
+| T36 | L41 | Older tests pin replaced behaviour (log) | QG-04 | RED commit sweeps contradicting assertions (briefing checklist) | no | TR-K |
+| T37 | L42 | `DBB-PENDING-BINDING-MISSING` after concurrent launches (log) | Dispatch binding integrity | Key the pending binding per dispatch, or name the re-dispatch action | G | TR-G |
+| T38 | L43 | Read-only `git grep` refused by guard-push as ambiguous push target (log) | ADR-0027 Decision 2 (`docs/adr/0027-gate-philosophy.md:12`, carried) | Push classification only for an actual `push` subcommand after global options | G, TP-5 | TR-C |
+| T39 | L44 | Invented terminal `outcome` values (log) | Record schema v4 enum | Validator rejects non-enum values | no | TR-F |
+| T40 | L45 | Whole budget spent on orientation (log) | TB-09 | One briefing per file, line ranges, closing calls reserved | no | TR-K |
+| T41 | L46 | Critic-input stripper rejects `{sha, subject}` commits (log) | Strict hex SHA identity | Normalise `{sha}` objects and leading-SHA strings; reject anything else | no | TR-F |
+| T42 | L47 | Fail-closed heredoc marker makes `git commit -F -` a push candidate; pin PG-HD1 expects allow (log) | ADR-0027 Decision 2; TP-5 | Hypothesis: TR-C scoping makes PG-HD1's allow consistent, so no flip; else PO decision 1 | G, TP-5 | TR-C |
+| T43 | L48 | Orchestrator commit left a Goldfish authorship ungrounded (log) | EL-13a | Resume the same dispatch; record lane per T31 | G | TR-F |
+| T44 | L49 | Hook-install tests inventory the live plugin tree, `GHS-SOURCE-DRIFT` (log) | Hook runtime snapshot integrity | Frozen copy or quiet window; drift refusal kept | no | TR-J |
+| T45 | L50 | 39 win32 failures in `pipeline-start-preflight.test.mjs` (log) | Cross-platform matrix | Platform-native fixture roots | no | TR-J |
+| T46 | L51 | No guard refused an environment dump (log) | SEC-01, SEC-03 | Guard side exists: env-dump lane imported at `lib/guard/evaluate.mjs:33`, called and failing closed on a classifier error at `:88-94` (verified). Remaining: the Critic template forbids executing probe strings | no | TR-K |
+| T47 | L52 | ENVDUMP-T orientation spend; parallel batch collided on the counter (log) | TB-09; R7-11 (via T19) | "One call at a time"; fixture line ranges up front | no | TR-K |
+| T48 | L53 | Test-only briefing into files not baseline-run on this host (log) | QG-04 baseline discipline | Elephant runs one case and reads the verify pin (TP-13, read only) before briefing | no | TR-K |
+| T49 | L54 | Commit-flow producer refused after the working cap (log) | TB-09 closing allowance | Admit the named closing acts after the cap and nothing else | G | TR-G |
+| T50 | L58 | Stopped record immutable, later commit unnamed (log) | As T31 | Same single transition | G | TR-F |
+| T51 | L55 | GG-22 pathspec fast path rejects `--trailer` (log) | Exact pathspec in a shared tree (`agent-obligations.md:155-162`, verified); GIT-03 | `--trailer <value>` is a safe flag; `--no-verify`, `-n`, `-c` are never added (I3) | G, TP-1 | TR-C |
+| T52 | L56 | Close-out costs about 25 calls per item (log) | Backlog closure evidence | Item-to-test mapping up front | no | TR-K |
+| T53 | L57 | Hook install by hand per host (log) | PO decision M HOOKREFRESH named in the row | Bootstrap typed next action | G | Tracked: HOOKREFRESH (row text L57; RED pins in commit `83083a070`) |
+| T54 | L59 | Hard Goldfish cap of 35 (log) | TB-09 | Template names the clamp (carried); the guard reports the effective cap at start (TR-G follow-up) | no | TR-K |
+| T55 | L60 | Record carries an abbreviated SHA (log) | Authorship link needs the full SHA | Producer writes the full SHA as part of the commit act | G | TR-F |
+| T56 | L61 | SendMessage budget grant ignored (log) | TB-09: only an orchestrator-written grant raises the cap | Use the grant; any typed extension is writable by the main session only | G if the guard changes | TR-K |
+| T57 | L62 | Orientation spend, refused shell variants (log) | TB-09; closed grammar | Exact files and line ranges; denial shows the budget charge | no | TR-K |
+| T58 | L63 | `GHS-SOURCE-DRIFT` on a live source copy (log) | As T44 | Quiet tree or frozen copy | no | TR-J |
+| T59 | L64 | Critic runtime cap 25 with checkpoint at 20 (log) | TB-09 analogue | `critic-review.md` names the enforced cap | no | TR-K |
+| T60 | L65 | `capture-evidence.mjs` artifacts carry no commit identity (log) | GF-08 | Header records HEAD, tree id, dirty flag | no | TR-I |
+| T61 | L66 | Critic template says Write, the agent has none; Critics used `node -e writeFileSync` (log) | Read-only Critic; no new authority | No Write grant; admitted Bash form or a catalogue-admitted writer for `scratch/dispatch/` (PO decision 2). The `node -e` use is the execution-lane evidence behind TR-S2 | no; G for a permission change | TR-K |
+| T62 | L67 | Hand-shortened Critic hunt list (log) | CLAUDE.md "dispatch from the template" | Copy Phase A verbatim; spec paths from `git ls-files` | no | TR-K |
+| T63 | L68 | `GUARD-GATE-STRENGTH-SHELL` refuses commands naming the calibration file (log) | Gate-strength lane | Keep; read calibration with Read only | no | TR-K |
+| T64 | L69 | Design-advisory admission runs once per staged path (log) | None for repetition; flake as T35 | Once per commit, memoised | G | TR-D |
+| T65 | L70 | HGO resolver scans 111 requests for 563 s (log) | ADR-0059, ADR-0061 | Digest-keyed lookup | owner | Tracked: backlog `2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes` (row text L70) |
+| T66 | L71 | `sign-intent` without `--directory` on a new machine (log) | spec 22.6 R7-6 (22.0 assigns R7-6 to T14, not T66) | Machine-wide `poKeyDirectory` inside I1 excluded roots | owner | Tracked: backlog `2026-10-08-machine-wide-key-directory-resolution` (row text L71) |
+| T67 | L72 | `openssl` not on the PowerShell PATH (log) | spec 22.6, 22.7 | Readiness probe names the missing executable | owner | Tracked: backlog `2026-10-08-signing-toolchain-readiness` (row text L72) |
+| T68 | L73 | Host crash; six dispatches lost their process (log) | Recovery rule | SendMessage resume is standard; bootstrap F6 names the repair | no | TR-K |
+| T69 | L74 | Unstaging a guard file and restoring a TP-13 copy refused (log) | I4; TP-13 | Keep the refusal; builder takes post-images from `scratch/` | no | TR-K |
+| T70 | L75 | Lifecycle drift by device switch (log) | BI (1) (`po-decisions:66`); spec 22.3 R7-3, 22.5 R7-5 | Track bound paths; write guard stays blocking | G | Tracked: R7-3 / R7-5 (named by BI, not a 22.0 assignment of T70) |
+| T71 | L76 | Transfer redaction changes digest-bound bytes (log) | Digest binding; no machine paths in tracked files | Byte-exact copy of digest-bound files; fail loudly if a redaction would change one | no | TR-E |
+| T72 | L77 | Preflight refused with a forward-slash plugin path (log) | Exact script path (`agent-obligations.md:139-142`, verified) | Compare resolved real paths; a same-named copy elsewhere stays refused | G | TR-A |
+| T73 | L78 | `GUARD-DEVPLAN-SHELL` names a diagnosis it refuses (log) | 22.0 typed repair rule | Admit the read-only `inspect` verb by identity, or name an admitted action | G | TR-A |
+| T74 | L79 | `-o`, `--max-columns`, quoted alternation, directory Grep refused (log) | Draft read-scope ADR `:16-28`; SEC-11 (`guardrails/security.md:191-207`, carried) | Admit per flag, each with a pin; directory Grep stays refused; operands still go to `isAllowedPassiveReadTarget` (I1-P). The `git grep` half is TR-C | G | TR-B |
+| T75 | L80 | `specs/` and `backlog/` writes refused in the blocked state (log) | R7-4 admitted set (`spec.md:2280-2287, 2304-2308`, D2-D); exempt prefixes incl. `specs/` (`agent-obligations.md:110-117`, verified) | `backlog/` half: R7-4's admitted set (not a 22.0 assignment of T75). `specs/` half: TR-M | G | TR-M |
+| T76 | L81 | `requireCurrentCandidate` defaults to true in the re-read chain, `DWP2-CURRENT-CANDIDATE` (log) | R7-5 rebind; GL-09 | Pins first, then forward `false`; digest binding untouched. Adjacent to BL / R7-5-F2 (`po-decisions:69`); no duplication | G [C] | TR-E |
+| T77 | L82 | Orientation tax: first Write refused until a child preflight runs; Grep/Glob `GUARD-READ-TARGET`; `rg -g` and a piped `git` into `rg` refused; file-pointer briefing refused `DISPATCH-INCOMPLETE-BRIEFING` / `DBB-BASE-CAP-MISSING` (log) | Child receipt: R7-11 / PO #28 (via T20); SEC-11 exact-file Grep (carried); inline six-field briefing | Receipt: Owned via T20. The bounded rg grammar already admits glob filters for project searches (`hooks/guard-command-grammar.mjs:381-386`, verified), so which lane refused `rg -g` is open [C]: TR-B-T reproduces and pins it. Piped git: TR-C. File-pointer refusal kept; briefings stay inline (TR-K) | G | TR-B |
+| T78 | L83 | Design-workflow v2 fixtures need a Linux-only host store (log) | Cross-platform matrix | TR-E names its WSL route up front; fixtures gain typed win32 skips (TR-J follow-up) | no | TR-E |
+| T79 | L84 | Stale hooks left preflight `ready`; model-role bootstrap skipped (log) | HOOKREFRESH; backlog `2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated` (row text) | Stale mandatory hook makes the preflight non-ready with the refresh as `nextAction`; model-role result is a required readback | G [C] | Tracked: HOOKREFRESH (RED pins in commit `83083a070`) |
+| T80 | L85 | `git grep` with a quoted BRE alternation refused by guard-push (log) | ADR-0027 Decision 2 applies to a real push only | Route `git grep` to the read classifier before any push check; pin "never handled by guard-push" | G, TP-5 | TR-C |
+| T81 | L91 | `node --test` of a `hooks/` test refused `GUARD-DEVPLAN-SHELL` while admitted for `lib/`, `scripts/` (log) | Read-only node lane admits `node --check <file>` and `node <*.test.mjs>` (`lib/guard/shell-grammar.mjs:901-914`, D2-A) | Admit `node --test <tracked test file>` uniformly; TR-S2 still applies to that file's content (RS-1) | G | TR-A |
+| T82 | L86 | Producer prints `git commit -m … --trailer …`, guard-push refuses it (log) | Obligations recommend exactly that form (`agent-obligations.md:35-39`, verified), so obligations, producer and guard disagree | Consolidate (BJ): TR-C scoping admits the printed form; one pin that it is admitted. Fallback: producer emits `-F scratch/commit-msg/<id>.txt` | G, TP-5 | TR-C |
+| T83 | L87 | `DWP2-FAILURE-DRIFT` from the time-of-check drift test (`design-workflow-package-v2.mjs:92`, row text) (log) | GL-09 | Typed transient `…-CANDIDATE-MOVED` ("retry the same call"); implementation-boundary read uses the ancestry rule, not HEAD equality | G | TR-D |
+| T84 | L88 | guard-testpath (`PB-GUARD-HOOKS`) admitted one hunk, refused the next and both reverts (log) | I4 | One protection decision per file across hunks; `git restore -- <file>` to its committed bytes admitted, since a revert only reduces risk [C: bound to HEAD bytes, never an arbitrary ref] | G, TP-2, TP-7 [C] | TR-L |
+| T85 | L89 | guard-push refuses `git --version` and WSL command text containing `git` (log) | ADR-0027 Decision 2 | Only an actual `push` subcommand after global options is a push; `--version`, `version` and nested non-push verbs never reach it; pin both | G, TP-5 | TR-C |
+| T86 | L90 | Budgets sized for the edit, not the closing ceremony (log) | TB-09 | Template adds a fixed closing allowance; long suites in the foreground; producer retries `index.lock` once (TR-F follow-up). Recurred in this dispatch: the 80 % checkpoint fired at counted call 20 of 25, before the deliverable was written (verified: hook notice text) | no | TR-K |
 
-### 3.1 The seven invariants
+## 3. Security invariants
 
-| Id | Invariant | Enforcing code | Must stay true in every fix | Pin |
+The adversary is the agent, acting on its own or on manipulated authority, not a human with machine access (SEC-10, `guardrails/security.md:165-189`, carried). No fix adds a human ceremony.
+
+### 3.1 Invariants I2-I7 (carried, condensed)
+
+| Id | Invariant | Enforcing code (carried) | Must stay true in every slice | Pin / gap |
 |---|---|---|---|---|
-| I1 | No agent reads PO signing key material, the machine plane or credential stores, even when the read grammar is relaxed | `plugins/pipeline-core/lib/passive-read-policy.mjs` line 97 `isAllowedPassiveReadTarget` (code). Excludes: `SECRET_BASENAME` incl. `po-private.pem`, `id_*`, `.env*`, `*.pem`, `*.key` (line 10); home credential roots `.ssh .aws .gnupg .kube .docker .azure .config/gcloud .config/gh` and tool credential files, plus `APPDATA` and `LOCALAPPDATA` on win32 (lines 115-124); the machine-plane `poKeyDirectory` (lines 125-131); the repo-scoped key directory (lines 132-137); system pseudo-paths (lines 29-35); physical symlink aliases (lines 139-150); recursive trees containing any of these (lines 48-90). It fails closed on any unreadable pointer (lines 127-128, 133-137) | The check is called from two independent places: the shell grammar (`lib/guard/shell-grammar.mjs` lines 244, 686, 705, 728, 736, 959; `hooks/guard-command-grammar.mjs` line 13 import) and the Read, Grep, Glob tools (`lib/guard/read-scope.mjs` lines 403, 421, 471, 506, 592, 602, verdict `GUARD-READ-TARGET` at line 613). So relaxing a grammar spelling does not touch the target restriction, provided every new spelling passes its path operands to the function. Do not edit this file in TR-B | `lib/passive-read-policy.test.mjs` line 87 ("an external user report remains readable while key material and aliases are excluded"). **Gap:** no pin that each newly admitted spelling (`-o`, `--max-columns`, quoted alternation) refuses a key-directory operand. That corpus is the first test of TR-B-T |
-| I2 | No agent produces a valid signature or approval proof | Three layers. (a) `lib/guard/po-commands.mjs` lines 59-62 `isHumanPoSigningCommand`, verdict `externalPoSigningOnly` (lines 14-20); the list is imported from `scripts/po-human-approval.mjs` lines 661-669 (`setup`, `approve`, `approve-all`, `approve-critical`, `authorize-critical`, `sign-intent`, `approve-fork-disposition`). (b) The read lane executable set is closed (rg, grep, cat, head, tail, wc, stat, file, sed non-mutating, find non-mutating, pwd, selected printf, read-only git); no openssl-specific rule exists (searches of `lib/guard` and the two grammar files for `openssl` and `po-private` returned nothing). (c) `signIntentIntoProof` (`po-human-approval.mjs` line 1639) calls `assertAttendedTerminalWhenPassphraseKey` (line 1649) which opens the controlling terminal (`isAttendedTerminal`, lines 1615-1631: `/dev/tty` or `CONIN$`); key generation is `openssl genpkey -algorithm ED25519 -aes-256-cbc` (line 1337); the private key stays outside the repository (`--directory` is rejected when inside the root, `po-commands.mjs` lines 28-33) | TR-A must never admit a signing verb: `isHumanPoSigningCommand` keeps precedence over any identity-based admission. TR-H adds the passphrase finding (3.2) | (a) `guard-lifecycle-ready.test.mjs` line 4022. (c) `po-human-approval.test.mjs` line 1242 (`NVA-W5-TTYSIGN`). **Gaps:** (1) recognition is by exact resolved script path (`po-commands.mjs` lines 22-26); the installed-plugin absolute spelling was not verified; (2) no pin for a raw `openssl pkeyutl -sign -inkey` or `node -e` signing attempt |
-| I3 | Hook bypass stays impossible (ADR-0079) | `hooks/guard-git.mjs` and `hooks/git-dangerous-policy.mjs`, rules GG-17..GG-20; ADR-0079 Decision (`docs/adr/0079-hook-bypass-is-never-agent-overridable.md` lines 62-70): no override route for the agent, for commit and for push (lines 94-118) | TR-C adds `--trailer` only. `--no-verify`, `-n`, `-c core.hooksPath`, `git config core.hooksPath` stay refused with no `OVERRIDE` route | `hooks/guard-git.test.mjs` lines 683-684 (R17: commit and push `--no-verify` blocked, `GG-17`). TP-1 protected |
-| I4 | Protected tests stay protected (QG-04) | `hooks/guard-testpath.mjs`, config `project/guard-config.json` with 13 patterns TP-1..TP-13 (`templates/prompts/agent-obligations.md` section 2); no in-session override for plugin source; QG-04 `guardrails/quality-gates.md` line 69 | No slice edits a TP file without the signed pin flip. T69's refusal stays | `hooks/guard-testpath.test.mjs` (TP-2). **Gap:** the specific case was not located in this dispatch |
-| I5 | Push requires the configured approval (ADR-0056) | `hooks/guard-push.mjs`, `authorizeRecordedPush` as named in `guardrails/quality-gates.md` line 119; ADR-0056 Decision (`docs/adr/0056-push-approval-mode.md` line 30 onward: `gates.push_approval` default `signature`, unrecognised value resolves to `signature`); ADR-0027 Decision 2 (line 12: ambiguity fails closed once the gate is active) | TR-B and TR-C narrow the classifier to `git push` only; a real or ambiguous push stays fail-closed. No change to approval modes | `hooks/guard-push.test.mjs` (TP-5). **Gap:** case names not located; PG-HD1 is named in T42 |
-| I6 | Environment dumps stay refused | `lib/guard/env-dump-lane.mjs` line 21 `ENV_DUMP_DENIAL_CODE` (header line 6: no override route, no retry action); `lib/guard/evaluate.mjs` line 87 turns any classifier exception into the same refusal (fail closed) | TR-B spellings must not make `env`, `printenv`, `set` or `Get-ChildItem env:` admissible | `guard-lifecycle-ready.test.mjs` lines 11843-11937 (ENVDUMP-T, `GUARD-ENV-DUMP` asserted at line 11937) |
-| I7 | Authority-bearing gates fail closed, advisory ones fail open (GL-09) | `guardrails/global.md` lines 75-82: push, approval and testpath gates fail closed on any fault; verification is a fault-injection test per gate (line 82) | TR-D, TR-E and TR-G each keep a fault-injection pin that asserts the block exit code, not a `catch` | Per-gate fault-injection tests (not located; each slice's `-T` step confirms or adds). **Gap** until confirmed |
+| I2 | No agent produces a valid signature or approval proof | (a) `lib/guard/po-commands.mjs:59-62` `isHumanPoSigningCommand` (imported at `lib/guard/evaluate.mjs:27`, verified), verb list from `scripts/po-human-approval.mjs:661-669`; (b) closed read-lane executable set; (c) attended terminal `po-human-approval.mjs:1615-1649`; `--directory` inside the root rejected (`po-commands.mjs:28-33`) | TR-A never admits a signing verb; `isHumanPoSigningCommand` keeps precedence | `guard-lifecycle-ready.test.mjs:4022`; `po-human-approval.test.mjs:1242`. Gap: no pin for raw `openssl pkeyutl -sign` or `node -e` signing; the TR-S2 corpus covers the `node -e` half |
+| I3 | Hook bypass stays impossible (ADR-0079) | `hooks/guard-git.mjs`, GG-17..GG-20; ADR-0079 `:62-70`, `:94-118` | TR-C adds `--trailer` only | `hooks/guard-git.test.mjs:683-684` (TP-1) |
+| I4 | Protected tests stay protected (QG-04) | `hooks/guard-testpath.mjs`, 13 patterns (`agent-obligations.md:79-103`, verified) | TR-L makes the decision consistent, never weaker | TP-2; specific case not located |
+| I5 | Push requires the configured approval (ADR-0056) | `hooks/guard-push.mjs`; ADR-0056 `:30` onward; ADR-0027 Decision 2 `:12` | TR-C narrows classification to an actual push; a real or ambiguous push stays fail-closed | TP-5; case names not located |
+| I6 | Environment dumps stay refused | `lib/guard/env-dump-lane.mjs:21`; `evaluate.mjs:88-94` (verified) | No new spelling admits `env`, `printenv`, `set`, `Get-ChildItem env:` | `guard-lifecycle-ready.test.mjs:11843-11937` |
+| I7 | Authority-bearing gates fail closed (GL-09) | `guardrails/global.md:75-82` | TR-D, TR-E, TR-G and TR-S2 each keep a fault-injection pin asserting the block | Not located; each `-T` confirms or adds |
 
-### 3.2 The PO's question, answered
+### 3.2 I1 split into three lanes (F2)
 
-**"If every read-only shell command is admitted, can an agent read the signing key and sign?"**
+I1: no agent reads PO signing key material, the machine plane or credential stores, on any lane.
 
-Answer: not through the read lane, as long as the target check is kept; and the target check is not part of the grammar.
+| Lane | What reaches a target | Enforcement point | Gap | Closing slice |
+|---|---|---|---|---|
+| I1-P passive | Path operands of admitted read commands; Read, Grep, Glob | `isAllowedPassiveReadTarget`, `lib/passive-read-policy.mjs:92-97` ("passive path operands only", D2-A); exclusion lists `:10`, `:115-137` (carried). Call sites: `hooks/guard-command-grammar.mjs:13` import, `:314-315` `approvedReadPath`, `:388` every rg operand and pattern file (verified); `lib/guard/shell-grammar.mjs:244` and `lib/guard/read-scope.mjs` (D2-A) | No pin that each newly admitted spelling routes its operand to the check; static credential list (RS-2); renamed key without a pointer (RS-3) | TR-B (`-T` key-operand corpus); R7-6 for the pointer |
+| I1-E execution | argv and inline source of `node -e/-p`, `python -c`, `bash -c`, an interpreter plus script file, and anything that process opens | **None for credential targets** (re-verified, 3.3). Route: `lib/guard/devplan-shell-lane.mjs:122-149` maps them to the sentinel `.pipeline-opaque-execution` (`:132`, `:134`, `:145-148`), pushes the lane with `forceLifecycleGate: true` (`:67-72`), calls `devPlanGateVerdict` (`:113`); `lib/guard-devplan-policy.mjs:409-417` allows in `implementing` whatever the path, and also allows with no manifest (`:329`), gate off (`:342`), no state file (`:356`) or no active feature (`:374`) (all D2-A) | The whole lane, in every state where the devplan verdict allows | TR-S2, with residual RS-1 |
+| I1-S signing | Key bytes obtained on either lane, then used to sign | (a) signing verbs refused to the agent (I2a); (b) attended terminal `po-human-approval.mjs:1615-1649` (carried), inert for an unencrypted key (comment `:1644-1645`, carried); (c) `setup` generates an encrypted key (`:1337`, carried); detector `isPrivateKeyPassphraseProtected` `:1344-1349` returns false for an unreadable key (D2-B) | `setup --existing-key` (`:1797-1825`) copies the PEM verbatim (`:1811-1812`) without an encryption check; the recover branch (`:1826-1838`) registers whatever key is in the directory, also unchecked; keys registered before a fix (all D2-B) | TR-S1 |
 
-1. **Reading.** The read target restriction is `isAllowedPassiveReadTarget` (I1). It is applied to the path operand regardless of which command spelling carried it, at two independent call sites (shell grammar and the Read, Grep, Glob tools). Widening the grammar (`-o`, `--max-columns`, quoted alternation, more git forms) does not change which paths are admissible. SEC-11 (`guardrails/security.md` lines 198-200) states exactly this split: both key-directory pointers, known credential stores, system pseudo-files and their symlink aliases stay excluded, and "invalid authority readback does not broaden the read lane". The PO correction in the draft read-scope ADR (lines 16-28) removed repo-root containment, not credential-root exclusion.
-   If "every read-only command" would also mean dropping the target check, then yes, the PEM becomes readable. So the target check must never be part of what a grammar change touches.
-2. **Signing after a read.** A read of the key file alone does not sign. For a key made by `setup` it is `ENCRYPTED PRIVATE KEY` (line 1337 generation, line 1348 detection), and signing needs OpenSSL's own interactive prompt on a controlling terminal (lines 1615-1649). An agent session has no passphrase and no attended terminal, and the pipeline fails closed before spawning OpenSSL.
-3. **Residual risks (not zero):**
-   - **R1 unencrypted key.** The attended-terminal check is "byte-for-byte inert" for an unencrypted key (comment at lines 1644-1645). `setup --existing-key` imports an existing PEM (lines 1797-1811); whether it refuses an unencrypted one was not verified. For such a key the target check is the only barrier on the read lane. Fix: TR-H, a readiness finding "private key is passphrase-protected" with a typed attended-prerequisite repair (spec 22.0 typed repair rule), no new ceremony (SEC-10).
-   - **R2 no key-directory pointer.** With no machine-plane `poKeyDirectory` and no repo pointer (the T14/T66 state), only the basename list protects (`po-private.pem`, `*.pem`, `*.key`); a renamed key would pass. T14/T66 fixes make the pointer exist on every machine; that also strengthens I1.
-   - **R3 execution lanes.** Execution is outside the passive read target check. If a ready-state lane admits `node` or another interpreter (T61 shows `node -e` was used), a script can open any file the OS user can read. Then the only barrier is the passphrase on an encrypted key (offline brute force of the passphrase remains theoretically open) plus OS permissions. I did not verify what the implementation-phase execution lane admits (open item 5).
-   - **R4 static credential list.** The home exclusions are an enumeration (lines 115-124). Other secrets in the home directory are readable by SEC-11's design. T46 (a messaging token in an environment dump) is the live precedent. Extending the list is a one-line change inside I1's file and needs its own pin.
-4. **Conclusion for the PO.** Relaxing the grammar is safe for key material only together with: (a) the target check untouched and pinned per new spelling, (b) no new executable and no output redirect admitted (`-o` and `--max-columns` are flags of existing read commands), (c) the passphrase readiness finding (TR-H). Without (a) the answer is yes.
+### 3.3 Finding A's open point, re-verified (stop condition 5 not triggered)
 
-## 4. Not proposed
+1. `lib/guard/evaluate.mjs:31` imports `evaluateAfterGrammarAdmission` from `./lifecycle-gate.mjs`, and `:482` calls it for every command the grammar accepted. A search of `evaluate.mjs` for `isAllowedPassiveReadTarget`, `credential`, `KeyDirectory` or `opaque` found no line. The only hits were the imports `:4-33`, the env-dump lane `:88-94`, `:179`, `:369` and `:482` (verified).
+2. `lib/guard/lifecycle-gate.mjs` exports the function at `:19`. Its imports (`:4-17`) contain no passive-read policy. A search for `isAllowedPassiveReadTarget`, `passive-read`, `credential`, `KeyDirectory`, `po-private`, `SECRET` or `opaque` found nothing, and its last return is `verdict(0)` at `:337` (verified). It is an onboarding and lifecycle readiness gate, not a target check.
+3. Bash-matched hooks: dispatch budget (`hooks/hooks.json:29-36`), worktree isolation (`:40-47`), `guard-lifecycle-ready` (`:50-56`, the evaluator above), and `guard-git` plus `guard-push` (`:77-89`). By their stated purpose (`hooks.json:2`) they count calls, compare worktrees, deny destructive git and gate pushes (verified). D2-A's search for `po-private` across hooks found no hit. The `guard-git` and `guard-push` sources were not re-read here [C: no credential-path check, consistent with their purpose].
+4. The grammar hook applies the passive target check to rg operands inside the closed rg grammar (`hooks/guard-command-grammar.mjs:388`, `:392-396`), not to interpreter argv (verified).
 
-The earlier inventory wanted these five rows downgraded (rows 5, 7, 10, 12, 13 are the only ADVISORY or REMOVE entries). This note does not propose any of them:
+Result: in the implementation phase, the argv and inline source of an execution-lane command reach no credential-target check. The BK(2) seam stays.
 
-| Inventory row | Check | Why it stays | Toil rows it would have solved |
-|---|---|---|---|
-| 5 | `guard-lifecycle-ready` (Edit/Write) plus `guard-devplan` made ADVISORY for an approved feature | ADR-0027 Decision 1 (line 11): the Dev-Plan Gate is hook-enforced, deterministic; GL-09 line 77 lists the approval and testpath gates as authority-bearing, fail closed. The toil (T70, T73, T75, T76) is that verification is device-local and demands HEAD equals candidate; those are fixed at the cause by R7-3, R7-4, R7-5 and TR-E, with the write guard still blocking on a real digest mismatch | T70, T73, T75, T76 |
-| 7 | `guard-dispatch` structure check ADVISORY | CLAUDE.md "Dispatch from the template, never freehand" is written as a hard rule; no toil row cites this guard. No requirement was found that asks for the downgrade | none |
-| 10 | `guard-worktree-isolation` REMOVE | The toil is the per-call cost (T34), fixed by caching the governance scope (TR-G), not by removing detection. CLAUDE.md worktree section treats isolation detection as load-bearing | T34 |
-| 12 | `guard-el01-tripwire` ADVISORY | `guardrails/quality-gates.md` line 173 extends QG-04 to tripwires that check work from outside its own authorship (the specific tripwire named there was not read). No toil row cites it | none |
-| 13 | `guard-handover-size` ADVISORY | No toil row cites it; no requirement found that asks for the downgrade. Left unchanged | none |
+### 3.4 BK slices and the residual register
 
-Also not proposed, because a requirement says blocking: the push gate and its approval mode (ADR-0056, ADR-0027 Decision 2), hook-bypass refusals (ADR-0079), protected test paths and in-session overrides (QG-04, obligations section 2), env-dump refusal (I6, SEC-01), destructive-git rules (GIT-04, `guardrails/git.md` line 47), and consumer onboarding consent (BI's own list). Every row above that touches a neighbour of these is written as a narrowing of the classifier, never a downgrade.
+**TR-S1: encrypted-key gate (BK 1, gating). Class SECURITY.**
 
-## 5. Sequence and decisions for the PO
+- Placement (D2-B lines):
+  - `--existing-key` branch: refuse after the existence check (`po-human-approval.mjs:1801-1803`) and before the copy (`:1811`).
+  - Recover branch (`:1826-1838`): refuse before registering the key.
+  - `sign-intent`: refuse before any OpenSSL spawn [C: near `:1639-1649`], so keys registered before the fix are covered.
+- Detector: reuse `isPrivateKeyPassphraseProtected` (`:1344-1349`). It returns false for an unreadable key, so the gate fails closed.
+- Refusal: a typed code [C: name such as `PO-KEY-UNENCRYPTED`] with a typed attended repair, "encrypt the existing key with a passphrase" [C: `openssl pkcs8 -topk8 -v2 aes-256-cbc`]. No new ceremony (SEC-10).
+- Preflight: the same detector is reported up front by readiness (R7-7, T16). The setup and sign refusals remain the gate.
+- `-T` pins (RED):
+  - An unencrypted `--existing-key` is refused and nothing is copied.
+  - An encrypted `--existing-key` is accepted (regression guard).
+  - Recover with an unencrypted key is refused.
+  - `sign-intent` with a registered unencrypted key is refused before any spawn.
+  - An unreadable key is refused.
 
-Order (cheapest and most blocking first): TR-E (T76, a live product defect) pins then fix; TR-A (admission by identity); TR-B (read grammar, key-operand corpus first); TR-C (needs the signed TP-1 and TP-5 pins, so it is the long pole); TR-F and TR-G; TR-D after its category is declared; TR-H with R7-7; TR-I, TR-J and TR-K in parallel (no guard edits, except as noted).
+**TR-S2: execution-lane credential refusal (BK 2, gating, new pure seam). Class GUARDRAIL + SECURITY.**
 
-Decisions the PO takes after the Critic:
+- Module [C name]: `lib/guard/execution-lane-credential.mjs`, pure, with no `fs` and no `child_process`.
+  - Inputs: the parsed command (tool, argv); inline source (`-e`, `-p`, `-c`); for an in-root script file, its bounded content, supplied by the caller (`devplan-shell-lane.mjs:145-148` already resolves that path, D2-A); the resolved protected targets (both key-directory pointers, credential roots, secret basenames).
+  - Output: a refusal or `null`.
+- Matching [C design choice]: extract path literals (quotes, both separators, `~`, `%APPDATA%`/`$HOME` spellings), then test them against the key, credential and machine-plane subset of the passive policy (`passive-read-policy.mjs:10`, `:115-137`, carried). Not the full passive admission: that would also refuse ordinary paths an execution may legitimately name.
+- Wiring:
+  - In `evaluate.mjs`, before `devPlanShellRefusalHit` (`:179`) and independent of the lifecycle phase.
+  - Same shape as the env-dump lane (`:88-94`): pure classifier, and a classifier exception becomes a refusal.
+  - Covers both Bash and PowerShell. The PowerShell dialect is imported at `:32`; whether a PowerShell `node -e` reaches `:179` is [C], so `-T` pins both.
+  - No new hook, so `hooks.json` (TP-4) is unchanged.
+  - No override route, like the env-dump lane [C: PO decision 6].
+- `-T` pins:
+  - New test file for the pure module. Positive corpus: `node -e` naming `po-private.pem`; a key-directory pointer path; `~/.ssh/id_ed25519`; an `APPDATA` credential file; `python -c`; `bash -c 'cat …'`; a `scratch/` script whose content names the key. Negative corpus: `node -e` naming a repository file; `node --test` on a tracked test file.
+  - Wiring pins in `hooks/guard-lifecycle-ready.test.mjs`, WSL-only (T81, L91).
 
-1. T42: after TR-C-T, keep PG-HD1 (allow) or flip it (signed pin). Default: keep.
-2. T61: template wording or a shipped Critic-notes writer script (no permission change either way).
-3. T56: confirm that the orchestrator-written grant is the only budget extension; no subagent-writable path.
-4. TR-H: accept the passphrase readiness finding as the answer to residual R1.
-5. TR-D: declare the design-advisory admission advisory or authority-bearing (GL-09 line 79).
-6. I1 residual R4: whether to extend the credential list (for example other tool credential files in the home directory).
-7. Whether the findings in section 0 (items 1-5) must be closed by the Elephant before the Critic review or left as Critic scope.
+**Residual register (BK requires owner and expiry; both are proposals for the PO to confirm).**
+
+| Id | Residual | Barrier after TR-S1 and TR-S2 | Owner [C] | Expiry [C] |
+|---|---|---|---|---|
+| RS-1 | Computed or obfuscated paths in an execution lane: string building, encodings, environment variables, a pointer read at runtime, a child process of an admitted script, a tracked test file run under T81's admission | Encrypted key plus attended terminal (I1-S) | PO accepts the risk; the Elephant tracks it as a backlog item | Review at the stamp of the first local candidate that contains TR-S2 |
+| RS-2 | Static credential enumeration (`passive-read-policy.mjs:115-124`, carried); other secrets in the home directory (T46 precedent) | OS permissions only | PO (decision 5) | Same review |
+| RS-3 | No key-directory pointer on a machine, so only the basename list protects (`:10`, carried) | TR-S1 (key encrypted) | R7-6 (Owned via T14) | With R7-6 |
+| RS-4 | Offline brute force of a read, encrypted key's passphrase | Passphrase strength | PO | Standing; not closable in code |
+
+### 3.5 The PO's question: can an agent read the signing key and still sign?
+
+After TR-S1 and TR-S2:
+
+- Literal key paths are refused on the passive lane (I1-P) and on the execution lane (I1-E).
+- A key obtained anyway (RS-1) is encrypted, and signing needs the passphrase at an attended terminal (I1-S b).
+- Signing verbs are refused to the agent (I2a).
+
+"No agent-made signature" then holds except for RS-1 combined with RS-4, or a human typing the passphrase into a terminal the agent can observe [C].
+
+Before TR-S1 this was not shown. An unencrypted imported key made the attended check inert (comment `:1644-1645`, carried; branch `:1797-1825`, D2-B). That is the gap F2 named.
+
+## 4. Not proposed (carried; BJ keeps the enforcement layer)
+
+The earlier guard inventory's ADVISORY and REMOVE rows 5, 7, 10, 12 and 13 stay rejected. Their toil is fixed at the cause instead:
+
+- T70, T73, T75, T76: R7-3, R7-4, R7-5, TR-A, TR-E, TR-M.
+- T34: TR-G.
+
+The following stay blocking, and this note only narrows classifiers next to them:
+
+- The push gate and its approval mode (ADR-0056, ADR-0027 Decision 2).
+- Hook-bypass refusals (ADR-0079).
+- Protected test paths (QG-04).
+- The env-dump refusal (I6).
+- Destructive-git rules (GIT-04).
+- Consumer onboarding consent.
+- The `guard-dispatch` structure check: T77 is fixed by briefing text, not by relaxing it.
+
+## 5. Ordered test-first slice plan
+
+Each slice runs `-T` (RED pins, committed), then `-F`, then the Critic. The order puts the BK security slices first (PO decision, gating in 0.7.0). Next comes the live approval-chain defect, then the cheapest grammar toil. TR-C, the long pole, needs signed TP-5 and TP-1 pins, so its package starts early [C]. Hygiene and text slices run in parallel.
+
+| # | Slice | Rows (primary) | BJ family | `-T` pins | TP-1..TP-13 check | Guard source | Class | Critic |
+|---|---|---|---|---|---|---|---|---|
+| 1 | TR-S1 encrypted-key gate | none (F2, BK 1) | security (BK) | existing `po-human-approval.test.mjs` (case at `:1242`, carried; directory [C]) | none matches (`agent-obligations.md:89-103`) | no (script) | SECURITY | Opus |
+| 2 | TR-S2 execution-lane credential refusal | none (F2, BK 2); evidence T61 | security (BK) | new pure-module test; `hooks/guard-lifecycle-ready.test.mjs` via WSL | none; TP-13 only if suite registration is required [C]; TP-4 untouched | G (`evaluate.mjs`) | GUARDRAIL + SECURITY | Opus |
+| 3 | TR-E approval at a later HEAD; byte-exact transfer | T71, T76, T78 | (a) approval chain | design-workflow v2 suites, run as `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test <file>"` (route per T78, L83); transfer bundle test | none | [C] approval verifier, authority-bearing | GUARDRAIL | Opus |
+| 4 | TR-A admission by resolved script identity | T21, T24, T72, T73, T81 | (b) shell grammar | `hooks/guard-lifecycle-ready.test.mjs` via WSL | none | G | GUARDRAIL | Opus |
+| 5 | TR-B read grammar spellings | T74, T77 | (b), (c) | grammar tests plus a per-spelling key-operand corpus (I1-P gap) | none [C: file names] | G | GUARDRAIL + SECURITY | Opus |
+| 6 | TR-C push and git classifier scoping | T38, T42, T51, T80, T82, T85 | (b), (c) | `hooks/guard-push.test.mjs`, `hooks/guard-git.test.mjs` | TP-5, TP-1: signed pin additions, PG-HD1 per PO decision 1 | G | GUARDRAIL | Opus |
+| 7 | TR-M `specs/` writes in the blocked state | T75 (`specs/` half) | (d) device drift | guard-devplan tests [C: file]. A non-approval-bound `specs/` path is admitted in the blocked state; an approval-bound `specs/` path stays refused | none [C] | G | GUARDRAIL | Opus |
+| 8 | TR-D design-advisory admission determinism | T35, T64, T83 | (a) | design-advisory admission tests [C] | none [C] | G | GUARDRAIL | Opus; after PO decision 4 |
+| 9 | TR-L protection consistency and restore | T84 | hygiene (protection) | `hooks/guard-testpath.test.mjs`, `hooks/guard-testpath-override.test.mjs` | TP-2, TP-7: signed | G | GUARDRAIL + SECURITY | Opus |
+| 10 | TR-F record lane | T31, T39, T41, T43, T50, T55 | (c) | record-lane and producer tests [C] | none | G (`lib/guard/dispatch-record-lane.mjs`, imported at `evaluate.mjs:24`) | GUARDRAIL | Opus |
+| 11 | TR-G dispatch-budget behaviour | T34, T37, T49 | (c) | `hooks/guard-dispatch-budget.test.mjs` via WSL (T30) | none | G | GUARDRAIL | Opus |
+| 12 | TR-I evidence and scan tooling | T32, T33, T60 | hygiene | script tests | none; TP-3 untouched | no | none | standard |
+| 13 | TR-J shared-tree and win32 test hygiene | T44, T45, T58 | hygiene | affected suites; typed win32 skips for T78 | none; TP-13 if a pinned case count changes [C] | no | none | standard |
+| 14 | TR-K briefing, template and producer text | T25, T29, T36, T40, T46, T47, T48, T52, T54, T56, T57, T59, T61, T62, T63, T68, T69, T86 | (c) | none (text). `agent-obligations.md` is generated (`:1-9`, verified), so its generator source is edited | none; generator pinned by byte equality (`agent-obligations.md:4`) | no | none | standard |
+
+Tracked rows, not sliced here; owners confirm, and all are in the next local candidate (BN):
+
+- T22, T23, T27: R5-6 / R7-10.
+- T26: ADR-0085 removal (BM).
+- T30: R7-11-W.
+- T53, T79: HOOKREFRESH.
+- T65, T66, T67: backlog items.
+- T70: R7-3 / R7-5.
+- T75 `backlog/` half: R7-4.
+
+Owned: T1-T20. Note: T28.
+
+## 6. Decisions for the PO after the Critic
+
+1. T42: keep PG-HD1 (allow) or flip it (signed pin). Default: keep.
+2. T61: template wording, or a shipped Critic-notes writer script. No permission change either way.
+3. T56: confirm that the orchestrator-written grant is the only budget extension.
+4. TR-D: declare the design-advisory admission advisory or authority-bearing (GL-09).
+5. RS-1 and RS-2: owner and expiry (BK requires both), and whether to extend the credential list.
+6. TR-S2: confirm "no override route", as for env dumps.
+7. TR-M scope: every non-approval-bound `specs/` path, or only `specs/<feature>/evidence/` logs [C].
+8. TR-S1: the typed repair text for a PO who registered an unencrypted key.
+
+## 7. Open items (not verified here)
+
+1. Exact membership of the protected baseline (carried open item 1); column `G` assumes signed.
+2. The specific I4 and I5 pin cases (carried).
+3. Bodies of ADR-0061, ADR-0080 and ADR-0085 (carried).
+4. The `guard-git` and `guard-push` sources, re-checked for a credential-path check (3.3 item 3).
+5. Whether a PowerShell `node -e` reaches `evaluate.mjs:179`.
+6. Which lane refused `rg -g` in T77, given `guard-command-grammar.mjs:381-386`.
+7. Test file names for the TR-B, TR-D, TR-F and TR-M pins.
+
+Closed since `a78507b41`: old open item 4 (by D2-B) and old open item 5 (by section 3.3).
 
 independent review: pending. PO acceptance: open.
