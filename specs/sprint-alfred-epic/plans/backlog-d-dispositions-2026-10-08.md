@@ -117,6 +117,22 @@ Each item's own status was re-read live; group A + in-scope D (BN). "Tranche" = 
 | onboarding-init greenfield matrix slow | open | its tests | test-only (parallelise fixtures) |
 | critic-round-cap enforcement | open; accepted for 0.7.0 | guard/dispatch hook | test-first; tranche |
 
+## C-live. PROBE-C re-verification (read-only Explore, 2026-10-09 night)
+
+Read-only. The paths are under `plugins/pipeline-core/` unless stated otherwise. None of these items is fully fixed.
+
+| Item | Live verdict | Fix or pin site | Next slice | Tranche? |
+|---|---|---|---|---|
+| GREENFIELD-TARGETS | partly. `d1a015ff5` gates on `enabledRunners`; `runner-profile-migration-v3.test.mjs` has no unselected-target assertion | `lib/runner-profile-migration-v3.mjs:378`; existing pins `scripts/onboarding-init.test.mjs:427,523,554,584` | test-first: claude-only publishes no `.codex/*`; Codex/agy enrolling; later Codex activation gives no false drift | no |
+| SCANNER-PROV | partly. Six delivered files located (`lib/security-scanner-diagnostics*.mjs`, schema, `security-scan.mjs`, `semgrep.mjs`); the item claims seven | as listed; ADR draft `docs/adr/draft-scanner-diagnostic-sidecar.md` | a verification run of the diagnostic and security suites at HEAD; the registration/docs successor is signature-gated | successor: likely |
+| CLOSURE-ALL | open. The per-case `throw` at `:336-341`/`:343-349` of the test helper aborts at the first violation | `lib/guard-maintenance-window-kernel-closure.test.mjs:336-349` | collect into a violations array, report once; a two-bad-fixture pin | likely (kernel-closure ratchet) |
+| SIGN-PROMPT | open | `scripts/po-human-approval.mjs` sign-intent `:878`, `:1941`; describers `:79-206`, `:2012-2013` | tests: confirmation ≤ 25 lines, full material to a digest-bound file, one describer per request schema; after TR-S1 (same script) | no (by path) |
+| hooks-enforce-available-parallel-dispatch | open; spec only | none yet | failing hook test plus the serial exceptions; needs a design line first | yes (`hooks/`) |
+| shell-grammar kernel placement | open; item underspecified | `hooks/guard-command-grammar.mjs` | define the placement in the item, then a kernel-list pin | yes |
+| critic-round-cap | open; Triage accepted it for 0.7.0; the rule exists only in prose (QG-13, `critic-review.md` item 5) | none | design line (where the round count lives), then failing dispatch-guard tests | yes |
+| onboarding-init matrix slow | open | `scripts/onboarding-init.test.mjs` | split the cells into selectable cases, after a coverage-equality assert | `harness/` only if registration changes |
+| elephant-main-context wake-ups, scratch retention | open; body not read | — | doc/probe | unverified |
+
 Excluded by front matter (`sprint: batman|nightwing`), stay deferred per BN: every-small-correction (batman); 14
 nightwing items listed in PROBE-A, including verify-evidence-trusted-on-read (so the security flag above needs no 0.7.0
 action — it remains a PO note).
