@@ -38,12 +38,25 @@
  *      of `gh api graphql -f query='mutation{...}'` holds braces and parentheses and is read, not refused.
  *   3. SIMPLE COMMANDS. The text is split at unquoted `;` `&` `|` and newlines (comments and here-document bodies
  *      left out, using the regions scanShell reports). The command word is found after leading `NAME=value`
- *      assignments, looking through transparent wrappers (env, sudo, time, xargs, then, do, ...). `gh` is recognised
- *      by the basename of the command word (`/usr/bin/gh`, `gh.exe`). A runner that takes a command as text (bash -c,
- *      eval, ssh, cmd /c, powershell, find, ...) with a gh word among its arguments is DELIVERY-GH-UNCLASSIFIED.
+ *      assignments and redirection tokens (`2>/dev/null`, `&>out`, `> out`, `</dev/null`), looking through transparent
+ *      wrappers (env, sudo, time, xargs, then, do, ...). `gh` is recognised by the basename of the command word
+ *      (`/usr/bin/gh`, `gh.exe`). A runner that takes a command as text (bash -c, eval, ssh, cmd /c, powershell, find,
+ *      ...) with a gh word among its arguments is DELIVERY-GH-UNCLASSIFIED, and so is `env -S <string>` holding one.
+ *      FAIL-CLOSED MARKER RULE: a segment whose command word is none of those (an unlisted wrapper such as `winpty`,
+ *      `strace`, `flock`, `op run --`, `coproc`, or a program that takes a command in an argument, such as
+ *      `git -c alias.x='!gh pr merge 1'` or `vim -c '!gh pr merge 1'`) is DELIVERY-GH-UNCLASSIFIED, never `none`, when
+ *      any word of the segment, or any whitespace-separated token inside a dequoted word, is a gh word (basename `gh` or
+ *      `gh.exe`, case-insensitive, optional leading `!`) immediately followed by `pr`, `api`, `release`, `repo` or
+ *      `gist`. The one exemption is a command that only prints its arguments (echo, printf, write-output,
+ *      write-host): its gh words are data.
  *   4. ALLOWLIST. Only the read-only subcommands in READ_ONLY_SUBCOMMANDS are `read-only`; every other `gh` shape is
  *      DELIVERY-GH-UNCLASSIFIED. ACCEPTED FALSE POSITIVES (the cost of the marker rule, same as commandIsGitPush):
- *      `gh pr view $(git branch --show-current)` and `bash -c 'gh pr view 1'` are refused as unclassified.
+ *      `gh pr view $(git branch --show-current)`, `bash -c 'gh pr view 1'` and `git commit -m "document gh pr create"`
+ *      are refused as unclassified.
+ *   5. COMMAND-WIDE, after the segments are classified. A `GH_REPO=` or `GH_HOST=` assignment anywhere in the command
+ *      (prefix assignment, `env` argument, `export` segment) turns a delivery into DELIVERY-UNSUPPORTED-CROSS-REPO.
+ *      More than one delivery action in the command is DELIVERY-PR-BINDING-INCOMPLETE: one head and base cannot be
+ *      bound to it.
  *
  * `gh api`: the method comes from `-X` / `--method` and defaults to GET; any `-f` `-F` `--field` `--raw-field`
  * `--input` implies POST when no method is given. A GraphQL call (`gh api graphql`) is judged by its query text: a
@@ -376,24 +389,82 @@ function classifyGhArgs(args) {
   return unclassified("a gh command outside the read-only allowlist");
 }
 
+// A redirection operator at the start of a dequoted word: `>` `>>` `>|` `>&` `<` `<&` `<>` `<<` `<<-` `<<<`, with an
+// optional file descriptor number or a leading `&` (`2>`, `&>`). A word that IS the operator takes the next word as its
+// target (`> out`); otherwise the target is glued on (`2>/dev/null`).
+const REDIRECTION_RE = /^(?:[0-9]*|&)(?:<<<|<<-|<<|<>|<&|>&|>\||>>|>|<)/u;
+// Commands that only print their arguments: a gh word among them is data (`echo gh pr merge 1`), so the marker rule
+// does not apply to them.
+const DATA_PRINTERS = new Set(["echo", "printf", "write-output", "write-host"]);
+// The marker rule: a gh word (basename gh or gh.exe, optional leading `!`, also glued to a delimiter such as
+// `alias.x=!gh`) immediately followed by a subcommand that can deliver, publish or call the API.
+const GH_TOKEN_RE = /(?:^|[;&|(){}`'"\\/<>=!,:@])gh(?:\.exe)?$/iu;
+const GH_SUBCOMMAND_RE = /^(?:pr|api|release|repo|gist)(?![\w.-])/iu;
+// `env -S <string>` (also `-iS`, `--split-string=<string>`) runs a command held in a string.
+const ENV_SPLIT_RE = /^(?:--split-string(?:=|$)|-[A-Za-z]*S)/u;
+// GH_REPO / GH_HOST assignment (prefix, `env` argument, `export`): the pull request would not target this repository.
+const CROSS_REPO_ASSIGNMENT_RE = /(?:^|[^A-Za-z0-9_])GH_(?:REPO|HOST)\+?=/iu;
+
+const wordTokens = (words) => words.flatMap((word) => word.split(/\s+/u)).filter((token) => token !== "");
+
+/** True when any word, or any whitespace-separated token inside a word, is a gh word followed by pr/api/release/repo/gist. */
+function hasGhMarker(words) {
+  const tokens = wordTokens(words);
+  return tokens.some((token, k) => k + 1 < tokens.length && GH_TOKEN_RE.test(token) && GH_SUBCOMMAND_RE.test(tokens[k + 1]));
+}
+
+const hasCrossRepoAssignment = (words) => wordTokens(words).some((token) => CROSS_REPO_ASSIGNMENT_RE.test(token));
+
+/** Index of the first word at or after `from` that is neither a `NAME=value` assignment nor part of a redirection; -1 if none. */
+function skipPrefix(words, from) {
+  let index = from;
+  while (index < words.length) {
+    const word = words[index];
+    const redirection = REDIRECTION_RE.exec(word);
+    if (redirection !== null) index += redirection[0].length === word.length ? 2 : 1;
+    else if (ASSIGNMENT_RE.test(word)) index += 1;
+    else return index;
+  }
+  return -1;
+}
+
+/** Index of the next word at or after `from` that is a known executable (gh, wrapper, runner), redirections skipped; -1 if none. */
+function nextExecutable(words, from) {
+  for (let k = from; k < words.length; k += 1) {
+    const redirection = REDIRECTION_RE.exec(words[k]);
+    if (redirection !== null) {
+      if (redirection[0].length === words[k].length) k += 1;
+      continue;
+    }
+    if (isKnownExecutable(commandBase(words[k]))) return k;
+  }
+  return -1;
+}
+
 /** One simple command (dequoted words): find the command word and classify it. */
 function classifySimple(words) {
   let index = 0;
   for (let hops = 0; hops < 16; hops += 1) {
-    while (index < words.length && ASSIGNMENT_RE.test(words[index])) index += 1;
-    if (index >= words.length) return NONE;
+    index = skipPrefix(words, index);
+    if (index === -1) return NONE;
     const base = commandBase(words[index]);
     if (base === "gh") return classifyGhArgs(words.slice(index + 1));
     if (TRANSPARENT.has(base)) {
-      const next = words.findIndex((w, k) => k > index && isKnownExecutable(commandBase(w)));
-      if (next === -1) return NONE;
+      const next = nextExecutable(words, index + 1);
+      const rest = words.slice(index + 1);
+      // `env -S <string>` is opaque: the string is a command the classifier cannot read, so the marker rule scans it.
+      const envSplit = base === "env" && words.slice(index + 1, next === -1 ? words.length : next).some((w) => ENV_SPLIT_RE.test(w));
+      if (envSplit && hasGhMarker(rest)) return unclassified("a gh word inside an env -S string");
+      if (next === -1) return hasGhMarker(rest) ? unclassified("a gh word handed to a wrapper this classifier cannot read through") : NONE;
       index = next;
       continue;
     }
     if (OPAQUE_RE.test(base)) {
       return words.slice(index + 1).some(hasGhWord) ? unclassified("a gh word handed to a shell, interpreter or launcher") : NONE;
     }
-    return NONE;
+    if (DATA_PRINTERS.has(base)) return NONE;
+    // Fail closed: a command word this classifier does not know, with a gh word and a delivering subcommand among its words.
+    return hasGhMarker(words) ? unclassified("a gh word followed by a subcommand beside a command this classifier does not read") : NONE;
   }
   return unclassified("a wrapper chain too deep to read");
 }
@@ -415,9 +486,18 @@ function classifyUnderReading(command, reading) {
     return unclassified("a here-document with a gh word beside a shell, interpreter or wrapper");
   }
   let result = NONE;
+  let deliveries = 0;
   for (const segment of lexed.segments) {
-    result = moreSevere(result, classifySimple(scanShell(segment, reading).words));
+    const simple = classifySimple(scanShell(segment, reading).words);
+    if (simple.kind === "delivery") deliveries += 1;
+    result = moreSevere(result, simple);
     if (result.kind === "refused") break;
+  }
+  if (result.kind === "delivery" && hasCrossRepoAssignment(scan.words)) {
+    return refused(CROSS_REPO, "GH_REPO or GH_HOST is assigned in the command, so the pull request would not target this repository");
+  }
+  if (result.kind === "delivery" && deliveries > 1) {
+    return refused(BINDING_INCOMPLETE, "more than one delivery action in one command cannot be bound to one head and base");
   }
   return result;
 }
