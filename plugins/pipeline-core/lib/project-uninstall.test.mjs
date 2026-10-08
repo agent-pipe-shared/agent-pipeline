@@ -8,9 +8,10 @@ function test(name, run) {
 }
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync,existsSync,readdirSync,statSync} from 'node:fs';
+import {cpSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync,existsSync,readdirSync,statSync} from 'node:fs';
 import {tmpdir, devNull} from 'node:os';
 import {join,dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {createProjectUninstallController,PROJECT_UNINSTALL_FAULT_STAGES} from './project-uninstall.mjs';
 import {createGovernanceScopeController} from './governance-scope.mjs';
 import {footprintSha256,observeGitHookFootprint} from './git-hook-footprint.mjs';
@@ -51,7 +52,7 @@ for(const change of ['foreign-hook','modified-key','drift'])test('refuse before 
  }
  const f=fixture(t,{hooks:change!=='foreign-hook'});if(change==='foreign-hook')f.put('.git/hooks/pre-commit','#!/bin/sh\nexit 0\n');if(change==='modified-key'){const path=join(f.root,'.claude/pipeline.json'),v=JSON.parse(readFileSync(path));v.humanRoles.po.displayLabel='Foreign Override';writeFileSync(path,JSON.stringify(v));}
  const plan=f.controller.plan({rootDir:f.root});if(change==='drift')f.put('.agents/plugins.json','{"entries":[]}\n');const config=readFileSync(join(f.root,'.git/config')),hooks=observeGitHookFootprint({rootDir:f.root}),bytes=f.digests();
- assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code===(change==='drift'?'PU-PREIMAGE-DRIFT':'PU-OWNERSHIP-CONFLICT'));assert.deepEqual(readFileSync(join(f.root,'.git/config')),config);assert.deepEqual(observeGitHookFootprint({rootDir:f.root}),hooks);assert.deepEqual(f.digests(),bytes);assert(!existsSync(plan.controls));
+ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code===(change==='drift'?'PU-PREIMAGE-DRIFT':change==='foreign-hook'?'PU-FOREIGN-HOOK-CONFLICT':'PU-OWNERSHIP-CONFLICT'));assert.deepEqual(readFileSync(join(f.root,'.git/config')),config);assert.deepEqual(observeGitHookFootprint({rootDir:f.root}),hooks);assert.deepEqual(f.digests(),bytes);assert(!existsSync(plan.controls));
 });
 test('partial shim interruption resumes by exact original entry and private journal survives removal',t=>{
  for(const [stage,path,code] of [['keys','.claude/pipeline.json','PU-KEY-DRIFT'],['workspace','.agents/plugins.json','PU-WORKSPACE-DRIFT'],['workspace','.agents/hooks.json','PU-WORKSPACE-DRIFT'],['workspace','.agents/external-hooks.json','PU-WORKSPACE-DRIFT']]){
@@ -95,7 +96,7 @@ function ac34Refusal(f,hookName,foreignBytes){
  const hookBefore=readFileSync(hookPath),artifacts=ac34Artifacts(f),content=f.digests(),keyBefore=readFileSync(keyPath),config=readFileSync(join(f.root,'.git/config'));
  const plan=f.controller.plan({rootDir:f.root}),conflict=plan.conflicts.find(c=>c.code==='PU-FOREIGN-HOOK-CONFLICT');
  assert(conflict,'expected PU-FOREIGN-HOOK-CONFLICT, got '+JSON.stringify(plan.conflicts));assert.equal(conflict.path,hookPath);
- assert.throws(()=>f.controller.apply(plan,options(plan)));
+ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-FOREIGN-HOOK-CONFLICT'&&e.instructions?.removed===false&&typeof e.instructions?.attendedStep==='string'&&e.instructions.attendedStep.length>0&&e.instructions.hook==='.git/hooks/'+hookName);
  assert.deepEqual(readFileSync(hookPath),hookBefore);assert.deepEqual(ac34Artifacts(f),artifacts);assert.deepEqual(f.digests(),content);assert.deepEqual(readFileSync(keyPath),keyBefore);assert.deepEqual(readFileSync(join(f.root,'.git/config')),config);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
 }
 test('AC34: a foreign pre-commit hook is refused with PU-FOREIGN-HOOK-CONFLICT naming the file and nothing is removed',t=>{
@@ -113,9 +114,25 @@ test('AC34: control - only pipeline-owned hooks are removed and project data, ba
  assert.deepEqual(f.digests(),before);assert.deepEqual(readFileSync(keyPath),keyBefore);assert(existsSync(join(f.root,'backlog/notes.md')));assert(existsSync(join(f.root,'specs/promoted/spec.md')));
  for(const h of plan.git.hooks)assert(!existsSync(h.hookPath)&&!existsSync(h.implPath)&&!existsSync(h.markerPath));
 });
+test('AC34-T3: after a foreign-hook refusal ordinary commit and push still work and history is intact',t=>{
+ const f=fixture(t,{hooks:false});ac34Refusal(f,'pre-commit','#!/bin/sh\nexit 0\n');
+ const before=git(f.root,['rev-parse','HEAD']),remote=join(f.base,'remote.git');mkdirSync(remote);git(remote,['init','--bare','-q']);
+ f.put('README','Product change after refused uninstall\n');git(f.root,['add','README']);git(f.root,['commit','-m','Ordinary commit after refusal']);git(f.root,['remote','add','origin',remote]);git(f.root,['push','origin','main']);
+ const after=git(f.root,['rev-parse','HEAD']);assert.notEqual(after,before);assert.equal(git(remote,['rev-parse','main']),after);git(f.root,['merge-base','--is-ancestor',before,after]);
+});
+test('AC34-T3: CLI apply prints the typed refusal with instructions',t=>{
+ const f=fixture(t,{hooks:false});f.put('.git/hooks/pre-commit','#!/bin/sh\nexit 0\n');
+ const home=join(f.base,'cli-home');mkdirSync(join(home,'.local/state/agent-pipeline'),{recursive:true});cpSync(join(f.base,'host-state'),join(home,'.local/state/agent-pipeline/activation'),{recursive:true});
+ const script=fileURLToPath(new URL('../scripts/project-uninstall.mjs',import.meta.url)),env={...process.env,HOME:home,USERPROFILE:home};
+ const run=args=>spawnSync(process.execPath,[script,...args],{encoding:'utf8',env,timeout:60000});
+ const planned=run(['plan','--root',f.root]);assert.equal(planned.status,0,planned.stdout+planned.stderr);const plan=JSON.parse(planned.stdout);
+ const r=run(['apply','--root',f.root,'--activate','--plan-sha256',plan.planSha256]);assert.equal(r.status,1,r.stdout+r.stderr);
+ const out=JSON.parse(r.stdout);assert.equal(out.schema,'pipeline.project-uninstall-error.v1');assert.equal(out.status,'refused');assert.equal(out.code,'PU-FOREIGN-HOOK-CONFLICT');
+ assert.equal(out.instructions?.hook,'.git/hooks/pre-commit');assert.equal(out.instructions?.removed,false);assert.equal(typeof out.instructions?.attendedStep,'string');assert(out.instructions.attendedStep.length>0);
+});
 
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 10) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 12) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
