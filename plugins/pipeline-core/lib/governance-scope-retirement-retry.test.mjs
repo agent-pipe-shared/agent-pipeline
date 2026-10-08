@@ -10,12 +10,12 @@
 // child-readback block of `readGovernanceEnrollmentRetirement` (the `exec(...)` call, the empty
 // check and the JSON.parse guard).
 //
-// WHAT EXISTS TODAY
-// - `GS-RETIREMENT-READBACK-EMPTY` and `GS-RETIREMENT-READBACK-INVALID` are thrown (commit
-//   d1a015ff5), and governance-scope.test.mjs already asserts the two codes on one input each.
-// - The thrown Error carries only `{code, ownedGitTopology}`. No typed retry action exists, so no
-//   consumer can tell "the host boundary returned nothing" from corrupt project state, and the
-//   inspect command named in the error path cannot be retried mechanically.
+// BEFORE THE FIX (commit 9ac936236)
+// - `GS-RETIREMENT-READBACK-EMPTY` and `GS-RETIREMENT-READBACK-INVALID` were thrown (commit
+//   d1a015ff5), and governance-scope.test.mjs already asserted the two codes on one input each.
+// - The thrown Error carried only `{code, ownedGitTopology}`. No typed retry action existed, so no
+//   consumer could tell "the host boundary returned nothing" from corrupt project state, and the
+//   inspect command named in the error path could not be retried mechanically.
 //
 // SEAM (no production change needed): `readGovernanceEnrollmentRetirement({rootDir, exec})`
 // already takes an injectable `exec`. It is reached only on the plain-Git branch, so the
@@ -48,11 +48,11 @@
 // A8. Surfacing the retry changes no lifecycle state: the Git config and the project tree are
 //     byte-identical before and after, and `exec` only ever receives the read-only inspect command.
 //
-// EXPECTED STATE BEFORE THE FIX (recorded in evidence/GS-RETRY-T-20261009/red.txt)
-// - GREEN guards, behaviour already exists: valid result, wrong schema, invalid JSON, child
-//   failure, empty variants raise the EMPTY code, exact inspect argv, one exec call per
+// EXPECTED STATE BEFORE THE FIX (recorded at the test commit bd0dea586)
+// - GREEN guards, behaviour already existed: valid result, wrong schema, invalid JSON, child
+//   failure, empty variants raised the EMPTY code, exact inspect argv, one exec call per
 //   invocation, no state change.
-// - RED, `nextAction` missing: every test whose name starts with "RETRY".
+// - RED, `nextAction` was missing: every test whose name starts with "RETRY".
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
