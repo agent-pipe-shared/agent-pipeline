@@ -1108,13 +1108,17 @@ function statusLabel(status) {
   }
 }
 
+export function formatScannerLine(s) {
+  const reasonSuffix = s.reason ? ` -- ${s.reason}` : "";
+  const coverageSuffix = s.coverage?.status === "degraded" && Array.isArray(s.coverage.files)
+    ? ` -- coverage: degraded (${s.coverage.files.length} files partially parsed)`
+    : "";
+  return `${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}${coverageSuffix}`;
+}
+
 function printSummary(evidence) {
   for (const s of evidence.scanners) {
-    const reasonSuffix = s.reason ? ` -- ${s.reason}` : "";
-    const coverageSuffix = s.coverage?.status === "degraded" && Array.isArray(s.coverage.files)
-      ? ` -- coverage: degraded (${s.coverage.files.length} files partially parsed)`
-      : "";
-    console.log(`${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}${coverageSuffix}`);
+    console.log(formatScannerLine(s));
   }
   const verdict = evidence.exitCode === 0 ? "CLEAN" : evidence.exitCode === 1 ? "WARNING" : "BLOCKING";
   console.log(`\nVerdict: ${verdict} (thresholds: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);
