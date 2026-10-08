@@ -447,12 +447,25 @@ export function generateInterruptionReport(options, ports = productionPorts) {
 }
 
 /** Aggregate-only AC-6 baseline (ruling 15): never receipt content. Atomic temp-file + rename. */
-export function writeBaseline(root, aggregate, ports = productionPorts) {
+export function writeBaseline(root, aggregate, ports = productionPorts, snapshot = null) {
+  const limitations = Array.isArray(aggregate.limitations) ? [...aggregate.limitations] : [];
+  const collection = snapshot?.collection;
+  if (collection && collection.qualification !== "established") {
+    limitations.push(`collection qualification ${collection.qualification ?? "unestablished"}: fallback collection, not a qualified source`);
+  }
+  if (collection && Array.isArray(collection.unsupportedSourceKinds) && collection.unsupportedSourceKinds.length > 0) {
+    limitations.push(`unsupported source kinds: ${collection.unsupportedSourceKinds.join(", ")}`);
+  }
+  const requested = snapshot?.window;
+  if (requested && (requested.start?.status === "measured" || requested.end?.status === "measured") && aggregate.coverage?.receipts !== "measured") {
+    limitations.push("requested window was not observed");
+  }
   const baseline = {
     window: aggregate.window,
     coverage: aggregate.coverage,
     registrySha256: aggregate.registrySha256,
-    limitations: Array.isArray(aggregate.limitations) ? aggregate.limitations : [],
+    scope: { featureId: null, packageId: null, dispatchId: null },
+    limitations,
     generatedAt: new Date().toISOString(),
   };
   const dir = join(root, "telemetry");
@@ -479,6 +492,13 @@ export function main(argv = process.argv.slice(2), ports = productionPorts) {
       return 0;
     }
 
+    const o = parsed.options;
+    if (o.writeBaseline && (o.feature != null || o.packageId != null || o.dispatchId != null)) {
+      process.stderr.write(`${JSON.stringify({ schema: REPORT_RESULT_SCHEMA, status: "rejected", code: "RI-BASELINE-SCOPED" })}\n`);
+      process.exitCode = 2;
+      return 2;
+    }
+
     const result = generateInterruptionReport(parsed.options, ports);
     if (!result.ok) {
       process.stderr.write(`${JSON.stringify({ schema: REPORT_RESULT_SCHEMA, status: "rejected", code: result.code })}\n`);
@@ -486,7 +506,7 @@ export function main(argv = process.argv.slice(2), ports = productionPorts) {
       return 2;
     }
 
-    if (parsed.options.writeBaseline) writeBaseline(parsed.options.root, result.report.aggregate, ports);
+    if (parsed.options.writeBaseline) writeBaseline(parsed.options.root, result.report.aggregate, ports, result.report.snapshot);
 
     process.stdout.write(result.output);
     process.exitCode = 0;

@@ -515,10 +515,14 @@ export function evaluatePromotionEvidence({ baseline, poApproval } = {}) {
   const plain = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
   if (!plain(parsed) || !plain(parsed.window) || !plain(parsed.coverage)) return "unavailable";
   if (!plain(parsed.window.start) || !plain(parsed.window.end)) return "unavailable";
-  const coverage = Object.values(parsed.coverage);
-  if (coverage.length === 0) return "unavailable";
-  if (coverage.some((status) => status === "unknown")) return "report-only";
-  if (parsed.window.start.value === null || parsed.window.end.value === null) return "report-only";
+  const keys = Object.keys(parsed.coverage).sort();
+  if (keys.length === 0) return "unavailable";
+  if (keys.length !== 2 || keys[0] !== "followup" || keys[1] !== "receipts") return "report-only";
+  if (parsed.coverage.receipts !== "measured" || parsed.coverage.followup !== "measured") return "report-only";
+  const { start, end } = parsed.window;
+  if (start.value === null || start.value === undefined || end.value === null || end.value === undefined) return "report-only";
+  const startMs = Date.parse(start.value), endMs = Date.parse(end.value);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs > endMs) return "report-only";
   const digest = createHash("sha256").update(Buffer.from(baseline, "utf8")).digest("hex");
   return plain(poApproval) && poApproval.baselineSha256 === digest ? "calibrated-pass" : "report-only";
 }
