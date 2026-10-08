@@ -1306,6 +1306,32 @@ for (const [cmd, why] of GITCLS_T_NEGATIVE_TABLE) {
   record(`GITCLS-T: ${JSON.stringify(cmd)} is not a push  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} out=${out}`);
 }
 
+// GITCLS-T2 (Critic GITCLS-D1, ruling 48): remaining ruling-42 forms and the env -S trailing-operand push.
+const GITCLS_T2_PUSH_TABLE = [
+  ["env --split-string='git push origin main'", "long attached form of env -S; git push runs"],
+  ["env --split-string 'git push origin main'", "long separate form of env -S; git push runs"],
+  ["env -iS 'git push origin main'", "clustered -iS short flags end in -S; git push runs"],
+  ["view -c '!git push origin main'", "view -c with an ex bang runs git push through the shell"],
+  ["ex -c '!git push origin main'", "ex -c with a bang runs git push through the shell"],
+  ["vim --cmd '!git push origin main'", "vim --cmd with an ex bang runs git push through the shell"],
+  ["vim -c'!git push origin main'", "attached form of vim -c; git push runs"],
+  ["env -S 'git push \"unterminated'", "unparseable env -S payload fails closed"],
+  ["env -Sgit push origin main", "ruling 48: the -S string joins the trailing operands, so git push runs"],
+];
+for (const [cmd, why] of GITCLS_T2_PUSH_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GITCLS-T2: ${JSON.stringify(cmd)} is a push  ${why}`, out === true, `cmd=${JSON.stringify(cmd)} out=${out}`);
+}
+const GITCLS_T2_NEGATIVE_TABLE = [
+  ["env --split-string='git status'", "long env -S form running git status is not a push"],
+  ["view -c ':q'", "an ex quit command is not a push"],
+  ["env -S 'git log' --oneline", "env -S git log with a trailing operand is not a push"],
+];
+for (const [cmd, why] of GITCLS_T2_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`GITCLS-T2: ${JSON.stringify(cmd)} is not a push  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} out=${out}`);
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
