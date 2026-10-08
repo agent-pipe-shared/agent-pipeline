@@ -22,7 +22,7 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -89,13 +89,13 @@ function assertIncludes(id, haystack, needle) {
 
 assertEqual(
   "evidence root: linked worktree publishes to its shared primary root",
-  resolveEvidenceRoot("/checkout/candidate", { spawnFn: () => ({ status: 0, stdout: "/checkout/.git\n" }) }),
-  "/checkout",
+  resolveEvidenceRoot(resolve("/checkout/candidate"), { spawnFn: () => ({ status: 0, stdout: "/checkout/.git\n" }) }),
+  resolve("/checkout"),
 );
 assertEqual(
   "evidence root: unavailable git metadata keeps the scan root",
-  resolveEvidenceRoot("/checkout/candidate", { spawnFn: () => ({ status: 1, stdout: "" }) }),
-  "/checkout/candidate",
+  resolveEvidenceRoot(resolve("/checkout/candidate"), { spawnFn: () => ({ status: 1, stdout: "" }) }),
+  resolve("/checkout/candidate"),
 );
 
 // ---------------------------------------------------------------------------------------------
@@ -1937,7 +1937,7 @@ security:
   const { PIPELINE_GITLEAKS_PATH, PIPELINE_OSV_SCANNER_PATH, PIPELINE_SEMGREP_PATH, ...baseEnv } = process.env;
   // A blank PATH plus an empty fixture HOME keeps this bare-root smoke
   // independent from host-installed system and standard per-user scanners.
-  const res = spawnSync(process.execPath, [SCRIPT, "--root", rootDir, "--timeout-ms", "5000"], { encoding: "utf8", env: { ...baseEnv, HOME: rootDir, PATH: "", Path: "" }, shell: false });
+  const res = spawnSync(process.execPath, [SCRIPT, "--root", rootDir, "--timeout-ms", "5000"], { encoding: "utf8", env: { ...baseEnv, HOME: rootDir, USERPROFILE: "", APPDATA: "", LOCALAPPDATA: "", PATH: "", Path: "" }, shell: false });
   assertEqual("CLI: bare rootDir -> exit 0", res.status, 0);
   assertIncludes("CLI: stdout contains verdict line", res.stdout, "Verdict: CLEAN");
   assertIncludes("CLI: stdout reports evidence path", res.stdout, "Evidence written:");

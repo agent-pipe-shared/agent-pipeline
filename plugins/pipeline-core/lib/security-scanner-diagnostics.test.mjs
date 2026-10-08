@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,lstatSync,chmodSync,symlinkSync,linkSync,renameSync,unlinkSync,rmSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { runSecurityScan } from "../scripts/security-scan.mjs";
@@ -14,7 +15,10 @@ import { run } from "../scripts/security-adapters/semgrep.mjs";
 import { observeSemgrepChild,observeLocalRules,validateScannerDiagnostics,buildScannerDiagnostics,parseScannerDiagnostics } from "./security-scanner-diagnostics.mjs";
 import { publishScannerDiagnostics } from "./security-scanner-diagnostics-publication.mjs";
 const completionCases=[];
-function test(name,run){completionCases.push({id:"G13D"+String(completionCases.length+1).padStart(3,"0"),name,run});}
+function test(name,run,options={}){completionCases.push({id:"G13D"+String(completionCases.length+1).padStart(3,"0"),name,run:options.skip?async context=>{context.skip(options.skip);}:run});}
+const symlinkSkip=process.platform==="win32"&&"host limitation: creating symlinks needs a privilege this win32 account lacks (EPERM)";
+const socketSkip=process.platform==="win32"&&"host limitation: Unix-domain socket listen on a filesystem path is not permitted on win32 (EACCES)";
+const publisherSkip=process.platform==="win32"&&"host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32";
 const hash='a'.repeat(64);
 const evidence={payloadSha256:hash,candidate:{commit:'b'.repeat(40),tree:'c'.repeat(40),inputSha256:'d'.repeat(64)}};
 const child=(result={status:0,stdout:'{"version":"1.170.0","results":[],"errors":[]}',stderr:''})=>observeSemgrepChild(result,10.4,60000);
@@ -91,7 +95,7 @@ test('unsupported rules mechanics never follow alias/special files or manufactur
     }
     assert.deepEqual(observeLocalRules(root,null),{mode:'auto',sha256:null,reason:'remote-config-not-observed',unchanged:null});assert.equal(readFileSync(privateFile,'utf8'),'SECRET');
   } finally {rmSync(root,{recursive:true,force:true});}
-});
+},{skip:symlinkSkip});
 
 const digest='a'.repeat(64);
 const pubEvidence=(payloadSha256=digest)=>({payloadSha256,candidate:{commit:'b'.repeat(40),tree:'c'.repeat(40),inputSha256:'d'.repeat(64)}});
@@ -110,7 +114,7 @@ test('supported Linux genuinely publishes bounded owned latest data and atomical
   assert.equal(parseScannerDiagnostics(readFileSync(target(root)),pubEvidence(next)).ok,true);assert.equal(parseScannerDiagnostics(bytes,pubEvidence(next)).code,'diagnostic-binding-stale');
   assert.deepEqual(readdirSync(join(root,'evidence')),['security-latest.diagnostics.json']);
  }finally{close(root);}
-});
+},{skip:publisherSkip});
 
 test('foreign existing regular bytes survive rejected publication',()=>{
  const root=fixture();try{writeFileSync(target(root),'UNRELATED',{mode:0o600});assert.equal(publishScannerDiagnostics(root,pubRecord()).status,'unavailable');assert.equal(readFileSync(target(root),'utf8'),'UNRELATED');assert.equal(readdirSync(join(root,'evidence')).length,1);}finally{close(root);}
@@ -118,28 +122,28 @@ test('foreign existing regular bytes survive rejected publication',()=>{
 
 test('terminal symlink and hardlink are not followed/replaced and unrelated referent survives',()=>{
  for(const kind of ['symlink','hardlink']){const root=fixture();try{const other=join(root,'other');writeFileSync(other,'UNRELATED',{mode:0o600});if(kind==='symlink')symlinkSync(other,target(root));else linkSync(other,target(root));const ino=lstatSync(target(root)).ino;assert.equal(publishScannerDiagnostics(root,pubRecord()).status,'unavailable');assert.equal(lstatSync(target(root)).ino,ino);assert.equal(readFileSync(other,'utf8'),'UNRELATED');}finally{close(root);}}
-});
+},{skip:symlinkSkip});
 
 test('actual special socket target is rejected without removal',async()=>{
  const root=fixture();const server=createServer();try{
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(target(root),resolve);});
   assert.equal(lstatSync(target(root)).isSocket(),true);assert.equal(publishScannerDiagnostics(root,pubRecord()).status,'unavailable');assert.equal(lstatSync(target(root)).isSocket(),true);
  }finally{await new Promise(resolve=>server.close(resolve));close(root);}
-});
+},{skip:socketSkip});
 
 test('shared/unsafe evidence directory and root aliases are rejected',()=>{
  const root=fixture();const alias=`${root}-alias`;try{
   chmodSync(join(root,'evidence'),0o777);assert.equal(publishScannerDiagnostics(root,pubRecord()).status,'unavailable');assert.deepEqual(readdirSync(join(root,'evidence')),[]);
   chmodSync(join(root,'evidence'),0o700);symlinkSync(root,alias);assert.equal(publishScannerDiagnostics(alias,pubRecord()).status,'unavailable');assert.deepEqual(readdirSync(join(root,'evidence')),[]);
  }finally{try{unlinkSync(alias);}catch{}close(root);}
-});
+},{skip:symlinkSkip});
 
 test('ancestor directory replacement is detected; anchored cleanup touches only owned staging inode',()=>{
  const root=fixture();try{
   const result=publishScannerDiagnostics(root,pubRecord(),{observer:phase=>{if(phase==='precommit'){renameSync(join(root,'evidence'),join(root,'retained-evidence'));mkdirSync(join(root,'evidence'),{mode:0o700});writeFileSync(join(root,'evidence/foreign'),'UNRELATED',{mode:0o600});}}});
   assert.equal(result.status,'unavailable');assert.equal(readFileSync(join(root,'evidence/foreign'),'utf8'),'UNRELATED');assert.deepEqual(readdirSync(join(root,'retained-evidence')),[]);assert.deepEqual(readdirSync(join(root,'evidence')),['foreign']);
  }finally{close(root);}
-});
+},{skip:publisherSkip});
 
 test('detected terminal content drift keeps the changed bytes instead of overwriting',()=>{
  const root=fixture();try{
@@ -147,21 +151,21 @@ test('detected terminal content drift keeps the changed bytes instead of overwri
   const result=publishScannerDiagnostics(root,pubRecord('f'.repeat(64)),{observer:phase=>{if(phase==='precommit')writeFileSync(target(root),'FOREIGN-CHANGED');}});
   assert.equal(result.status,'unavailable');assert.equal(readFileSync(target(root),'utf8'),'FOREIGN-CHANGED');assert.equal(readdirSync(join(root,'evidence')).length,1);
  }finally{close(root);}
-});
+},{skip:publisherSkip});
 
 test('foreign staging replacement is neither published nor reclaimed by cleanup',()=>{
  const root=fixture();try{
   const result=publishScannerDiagnostics(root,pubRecord(),{observer:phase=>{if(phase==='staged'){renameSync(pending(root),join(root,'evidence/retained-temp'));writeFileSync(pending(root),'FOREIGN-STAGE',{mode:0o600});}}});
   assert.equal(result.status,'unavailable');assert.equal(readFileSync(pending(root),'utf8'),'FOREIGN-STAGE');assert.equal(parseScannerDiagnostics(readFileSync(join(root,'evidence/retained-temp')),pubEvidence()).ok,true);
  }finally{close(root);}
-});
+},{skip:publisherSkip});
 
 test('cooperative concurrent publisher is rejected busy and cannot overwrite the admitted publisher',()=>{
  const root=fixture();let inner;try{
   const outer=publishScannerDiagnostics(root,pubRecord(),{observer:phase=>{if(phase==='staged')inner=publishScannerDiagnostics(root,pubRecord('f'.repeat(64)));}});
   assert.equal(inner.status,'unavailable');assert.equal(inner.code,'diagnostic-publication-busy');assert.equal(outer.status,'published');assert.equal(parseScannerDiagnostics(readFileSync(target(root)),pubEvidence()).ok,true);
  }finally{close(root);}
-});
+},{skip:publisherSkip});
 
 test('new terminal alias during preparation is detected without following or deleting it',()=>{
  const root=fixture();try{
@@ -169,7 +173,7 @@ test('new terminal alias during preparation is detected without following or del
   const result=publishScannerDiagnostics(root,pubRecord(),{observer:phase=>{if(phase==='precommit')symlinkSync(other,target(root));}});
   assert.equal(result.status,'unavailable');assert.equal(lstatSync(target(root)).isSymbolicLink(),true);assert.equal(readFileSync(other,'utf8'),'UNRELATED');
  }finally{close(root);}
-});
+},{skip:symlinkSkip});
 
 test('strict readback rejects duplicate/escaped duplicate keys, invalid UTF8, oversized bytes and stale binding',()=>{
  assert.deepEqual(readFileSync(new URL('../../../schemas/pipeline.security-scanner-diagnostics.v1.json',import.meta.url)),readFileSync(new URL('../schemas/pipeline.security-scanner-diagnostics.v1.json',import.meta.url)));
@@ -233,20 +237,20 @@ test('public CLI genuine missing-tool result publishes an empty bound diagnostic
  // fallback. Omit that opt-in from this fixture so an installed host scanner
  // cannot turn the missing-tool case into a real scan.
  const missingToolEnv={...process.env,PIPELINE_SEMGREP_PATH:join(f.base,'missing-semgrep')};delete missingToolEnv.HOME;
- const result=spawnSync(process.execPath,[new URL('../scripts/security-scan.mjs',import.meta.url).pathname,'--root',f.root,'--timeout-ms','4321'],{env:missingToolEnv,encoding:'utf8',shell:false,timeout:20000});
+ const result=spawnSync(process.execPath,[fileURLToPath(new URL('../scripts/security-scan.mjs',import.meta.url)),'--root',f.root,'--timeout-ms','4321'],{env:missingToolEnv,encoding:'utf8',shell:false,timeout:20000});
  assert.equal(result.status,0,JSON.stringify({stderr:result.stderr,stdout:result.stdout,error:result.error?.code}));const e=JSON.parse(readFileSync(join(f.root,'evidence/security-latest.json'),'utf8'));assert.equal(e.scanners.length,1);assert.equal(e.scanners[0].status,'SKIPPED');assert.equal(e.scanners[0].classification,'binary_missing');
  const record=assertBound({evidence:e},f.root);assert.deepEqual(record.scanners,[]);assert.equal(record.authority,'diagnostic-only');
  }finally{close(f.base);}
-});
+},{skip:publisherSkip});
 test('producer completed synthetic Semgrep preserves clean v1 and binds genuine sidecar executable observation',async()=>{
  const f=producerFixture();try{const result=await produce(f,cleanResponse());assert.equal(result.exitCode,0);assert.equal(result.evidence.scanners[0].status,'PASS');const record=assertBound(result,f.root);assert.equal(record.scanners[0].child.version.value,'1.170.0');assert.equal(record.scanners[0].executableSha256,createHash('sha256').update(readFileSync(f.binary)).digest('hex'));assert.equal(record.scanners[0].rules.sha256,null);}finally{close(f.base);}
-});
+},{skip:publisherSkip});
 test('producer selected child EPERM after real preflight retains ERROR and withholds secret error text',async()=>{
  const f=producerFixture();try{const result=await produce(f,{status:null,error:{code:'EPERM',message:'G13_PRIVATE_SECRET'},stdout:'',stderr:'G13_PRIVATE_SECRET'});assert.equal(result.exitCode,2);assert.equal(result.evidence.scanners[0].status,'ERROR');assert.equal(result.evidence.scanners[0].classification,'execution_environment');const record=assertBound(result,f.root);assert.equal(record.scanners[0].child.errorCode,'EPERM');assert.equal(JSON.stringify(record).includes('G13_PRIVATE_SECRET'),false);}finally{close(f.base);}
-});
+},{skip:publisherSkip});
 test('producer clean JSON before timeout remains ERROR while bounded diagnostic retains completed output facts',async()=>{
  const f=producerFixture();try{const result=await produce(f,{...cleanResponse(),status:null,error:{code:'ETIMEDOUT',message:'G13_PRIVATE_SECRET'},signal:'SIGTERM'});assert.equal(result.exitCode,2);assert.equal(result.evidence.scanners[0].status,'ERROR');const record=assertBound(result,f.root);assert.equal(record.scanners[0].child.errorCode,'ETIMEDOUT');assert.equal(record.scanners[0].child.output.interpretation,'complete-json');assert.equal(record.scanners[0].child.output.resultsCount,0);}finally{close(f.base);}
-});
+},{skip:publisherSkip});
 test('producer publication refusal preserves original evidence and verdict semantics and unrelated foreign bytes',async()=>{
  const f=producerFixture();try{
  const first=await produce(f,cleanResponse());assertBound(first,f.root);writeFileSync(target(f.root),'UNRELATED FOREIGN BYTES',{mode:0o600});
@@ -254,7 +258,7 @@ test('producer publication refusal preserves original evidence and verdict seman
  const normalize=value=>{if(Array.isArray(value))return value.map(normalize);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['finishedAt','snapshotAt','payloadSha256'].includes(key)).map(([key,v])=>[key,normalize(v)]));return value;};
  assert.deepEqual(normalize(second),normalize(first));const {payloadSha256,...core}=second.evidence;assert.equal(createHash('sha256').update(canonical(core)).digest('hex'),payloadSha256);assert.deepEqual(JSON.parse(readFileSync(join(f.root,'evidence/security-latest.json'),'utf8')),second.evidence);assert.notEqual(second.evidenceV2,null);assert.deepEqual(JSON.parse(readFileSync(join(f.root,'evidence/security-latest.v2.json'),'utf8')),second.evidenceV2);assert.deepEqual(JSON.parse(readFileSync(join(f.root,'evidence/security-latest.v2.verdict.json'),'utf8')),second.verdictV2);
  }finally{close(f.base);}
-});
+},{skip:publisherSkip});
 
 if(completionCases.length!==24)throw new Error("G13 completion topology drift");
 const completionFd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined
