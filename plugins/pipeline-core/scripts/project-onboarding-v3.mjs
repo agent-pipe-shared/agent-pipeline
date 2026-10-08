@@ -172,6 +172,25 @@ function resolveIntakeCaptureText(options) {
   }).text;
 }
 
+/**
+ * `--answers-json` / `--answers-file` for the two design-question commands. Returns the answers
+ * text plus, on the file route only, the verified `{sha256, byteLength}`.
+ */
+function resolveIntakeAnswers(options) {
+  if (options.answersJson !== undefined && options.answersFile !== undefined) {
+    throw Object.assign(new Error("accepts exactly one of --answers-json or --answers-file"), { code: "INTAKE-DESIGN-ANSWERS-AMBIGUOUS" });
+  }
+  if (options.answersFileSha256 !== undefined && options.answersFile === undefined) {
+    throw Object.assign(new Error("--answers-file-sha256 requires --answers-file"), { code: "INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE" });
+  }
+  if (options.answersFile === undefined) return { text: options.answersJson, answersFile: undefined };
+  const { text, sha256, byteLength } = readIntakeMaterialReference({
+    rootDir: options.root, filePath: options.answersFile, expectedSha256: options.answersFileSha256 ?? null,
+    maxBytes: 65536, codeSet: "answers-file",
+  });
+  return { text, answersFile: { sha256, byteLength } };
+}
+
 // GUARDDERIVE-1 (backlog:
 // 2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md).
 // The ONE registered subcommand table of this CLI. Every consumer of "which
@@ -350,7 +369,7 @@ function usage() {
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]",
     "       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>",
-    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> (--answers-json <json-array|no-open-questions-disposition> | --answers-file <path> [--answers-file-sha256 <sha256>]) --activate",
   ].join("\n");
 }
 function parse(args) {
@@ -402,6 +421,8 @@ function parse(args) {
     else if (arg === "--text-file-sha256") { const value = args[index + 1]; if (!/^[a-f0-9]{64}$/u.test(value ?? "")) return { error: "--text-file-sha256 requires one lowercase SHA-256 digest" }; output.textFileSha256 = value; index += 1; }
     else if (arg === "--text-turn-ref") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--text-turn-ref requires one host turn reference" }; output.textTurnRef = value; index += 1; }
     else if (arg === "--answers-json") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-json requires a JSON array or no-open-questions disposition" }; output.answersJson = value; index += 1; }
+    else if (arg === "--answers-file") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-file requires one file path" }; output.answersFile = value; index += 1; }
+    else if (arg === "--answers-file-sha256") { const value = args[index + 1]; if (!/^[a-f0-9]{64}$/u.test(value ?? "")) return { error: "--answers-file-sha256 requires one lowercase SHA-256 digest" }; output.answersFileSha256 = value; index += 1; }
     else if (arg === "--summary") output.summary = true;
     else if (arg === "--verbose") output.verbose = true;
     else if (arg === "--request-create-git") output.requestCreateGit = true;
@@ -416,6 +437,10 @@ function parse(args) {
   }
   if ([output.text, output.textFile, output.textTurnRef].filter((value) => value !== undefined).length > 1) {
     return { error: "accepts exactly one of --text, --text-file, or --text-turn-ref" };
+  }
+  if (!output.help && ["intake-design-questions-apply", "intake-design-questions-replace"].includes(output.command)
+    && output.answersJson === undefined && output.answersFile === undefined && output.answersFileSha256 === undefined) {
+    return { error: `${output.command} requires one of --answers-json or --answers-file` };
   }
   if (output.summary && output.command !== "intake-generate-plan") return { error: "--summary is only valid for intake-generate-plan" };
   if (output.verbose && output.command !== "intake-generate-plan") return { error: "--verbose is only valid for intake-generate-plan" };
@@ -930,10 +955,12 @@ export function main(args = process.argv.slice(2), {
     });
     else if (["intake-design-questions-apply", "intake-design-questions-replace"].includes(options.command)) {
       let answers;
-      try { answers = JSON.parse(options.answersJson ?? "null"); } catch { answers = null; }
+      const resolvedAnswers = resolveIntakeAnswers(options);
+      try { answers = JSON.parse(resolvedAnswers.text ?? "null"); } catch { answers = null; }
       output = applyOnboardingIntakeDesignQuestions({
         rootDir: options.root, repositoryCapability, answers, replace: options.command === "intake-design-questions-replace", activate: options.activate, deps,
       });
+      if (resolvedAnswers.answersFile !== undefined) output = { ...output, answersFile: resolvedAnswers.answersFile };
     }
     else if (options.command === "intake-generate-plan") {
       const fullPlan = planOnboardingIntakeGenerate({ rootDir: options.root, repositoryCapability, deps });
