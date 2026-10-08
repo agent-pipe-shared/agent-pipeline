@@ -263,7 +263,10 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
   }
 }
 
-function verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps = {}) {
+// `requireReadinessExecution` is true for every caller except the explicit rebind route
+// (lib/rebind-approval.mjs, PO decision BL): only the exact value `false` relaxes the
+// device-local readiness host-execution proof; every other value keeps it required.
+export function verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps = {}, requireReadinessExecution = true) {
   try {
     if (state.planApproved !== true || !["epic", "feature"].includes(state.planSubmission?.profile)
       || state.planSubmission.featureId !== state.activeFeature?.id) return { ok: false, code: "DWP-FINAL-APPROVAL-STATE" };
@@ -300,6 +303,7 @@ function verifyFinalDesignWorkflowApproval(root, state, authority, observation, 
     };
     const packageRead = readDesignWorkflowPackageFromRepository({
       repoRoot: root, packagePath, readCandidate, requireCurrentCandidate: false,
+      requireReadinessExecution: requireReadinessExecution !== false,
       ...(deps.trustedAdvisorExecutablePath ? { trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath } : {}),
       ...(typeof deps.verifyReadinessExecution === "function" ? { verifyReadinessExecution: deps.verifyReadinessExecution } : {}),
     });
