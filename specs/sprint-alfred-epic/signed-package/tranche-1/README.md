@@ -29,3 +29,17 @@ All seven test files and their modules are tracked at HEAD (`git ls-files`).
 ## Not done
 - Q11/T33 suites (`hardened-private-directory-install-tests`, `gitleaks-repair-ignore-cli-tests`) are not registered (manifest: needs decision).
 - `plugins/pipeline-core/lib/fs-durability.mjs` has no test file, so nothing was added for it.
+
+## R7-6-P
+Post-image of `plugins/pipeline-core/scripts/pipeline-state.mjs` (ruling 19: the approve-push anchor resolves its key
+directory through `resolvePoKeyDirectory`). HEAD blob of the original: `b06f093d505b9af0122247abe3d54caaf6f94f6c`.
+Three hunks, everything else byte-identical:
+1. Imports: the dead `readRepoKeyDirectory` binding is removed; `resolvePoKeyDirectory` is added to the existing
+   `./po-human-approval.mjs` import.
+2. `repoScopedPushKeyAnchor(dir, gitCommonDir)` calls `resolvePoKeyDirectory({ repoRoot: resolve(dir), dependencies: { gitCommonDirFn: () => gitCommonDir } })`
+   inside the existing `try`; it returns `null` unless the status is `resolved` and the directory is absolute
+   (`isAbsolute`, already imported). The `trust-policy.json` read and shape check are unchanged.
+3. The call site in `localPushScratchArtifacts` becomes `repoScopedPushKeyAnchor(dir, common.path)`.
+Pins it must turn green: `plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs` cases 1, 3a, 3b
+(cases 2 and 4 stay green). Verification runs between the package `apply` and `authorize-commit` with
+`node --test plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs`.
