@@ -810,4 +810,328 @@ describe("RV-4: legacy custody disposition - preserve, replay, archive, absence"
       "directory at the receipt path",
     );
   });
+
+  // -------------------------------------------------------------------------
+  // RV-S6-T (Spec 20.3 RV-5 and RV-6, spec.md 1212-1218; design note slice S6).
+  // Test-only RED pins; the fix is RV-S6-F. No export is added or renamed: every case drives
+  // applyLegacyCustodyDisposition and reads the disk.
+  //
+  // Contract pinned here (new beyond the RV-4/RV-S5 cases above; the spec names no LOC- code for
+  // RV-5/RV-6, so every refusal below reuses a code this module already registers):
+  //   - RESUME (RV-6 "crash recovery is forward-only"): an apply re-run over the state an
+  //     interrupted archive leaves - the exclusive publish done and/or the audit line appended,
+  //     the original still present with the signed bytes - completes FORWARD: it keeps the
+  //     published copy (reading it back against the signed bytes first), appends the audit line
+  //     only if this archive has none, removes the original and returns { status: "archived",
+  //     mutated: true }. Today archiveDestinationUsable() treats an existing copy as
+  //     LOC-TARGET-UNSAFE, so the resume cases are RED;
+  //   - INTERVENING CHANGE (RV-6 "preserves intervening changes", RV-5 receipt drift and concurrent
+  //     writer): a published copy exists but the original no longer holds the signed bytes ->
+  //     refused LOC-ARCHIVE-ORPHANED-COPY with mutated false (this call wrote nothing; ruling 44c's
+  //     "an orphaned archived copy exists" rather than the dead-end LOC-PROOF-BINDING-MISMATCH).
+  //     The changed original and the copy stay exactly as found, no audit line is written, nothing
+  //     is rolled back. Today the byte check answers LOC-PROOF-BINDING-MISMATCH first, so it is RED;
+  //   - everything else below is a positive or negative CONTROL that already passes (readback after
+  //     apply, no authority for an archived receipt, receipt drift before any publish, an unterminated
+  //     audit line, an untrusted published copy, a second apply, State/activeFeature/proofs/history
+  //     byte identity). They pin behaviour the S6 fix must not lose.
+  // Not pinned here (named so they are not mistaken for covered): "wrong repo" as a signed repository
+  // identity mismatch - the apply path has no on-disk repository identity input to contradict
+  // (see the tampered-package case above), so a pin needs a new input the dispatcher has not decided;
+  // a symlinked archive/receipt target is pinned by the RV-4 and RV-S5-T2 cases above (the symlink
+  // case skips on win32 without privilege).
+  // -------------------------------------------------------------------------
+  const RV6_DECOYS = Object.freeze({
+    ".git/agent-pipeline/pipeline-state.json": '{"schema":"fixture.state","phase":"implement"}\n',
+    ".git/agent-pipeline/active-feature.json": '{"schema":"fixture.active-feature","featureId":"rv-s6"}\n',
+    ".git/agent-pipeline/po-gate/profile-receipt.json": '{"schema":"fixture.proof","signature":"AAAA"}\n',
+    "project/critical-human-proof.json": '{"schema":"fixture.trust-anchor","keyReference":"fixture"}\n',
+    ".git/agent-pipeline/history/events.jsonl": '{"seq":1}\n{"seq":2}\n',
+    "docs/state.md": "# fixture state\n",
+  });
+  const OTHER_AUDIT_LINE = `${JSON.stringify({
+    schema: "pipeline.legacy-custody-archive-audit.v1",
+    sessionId: OTHER_SESSION_ID,
+    receiptSha256: sha256Of("another receipt"),
+    disposition: "archive",
+    classification: "conflicting",
+    intentSha256: sha256Of("another intent"),
+    keyReference: anchor.keyReference,
+    archivedAt: "2026-10-07T00:00:00.000Z",
+  })}\n`;
+
+  function decoyPath(f, relativePath) {
+    return join(f.caseRoot, ...relativePath.split("/"));
+  }
+
+  function plantDecoys(f) {
+    for (const [relativePath, text] of Object.entries(RV6_DECOYS)) {
+      const path = decoyPath(f, relativePath);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, text);
+      utimesSync(path, OLD_TIME, OLD_TIME);
+    }
+  }
+
+  function assertDecoysIntact(f, label) {
+    for (const [relativePath, text] of Object.entries(RV6_DECOYS)) {
+      const path = decoyPath(f, relativePath);
+      assert.ok(readFileSync(path).equals(Buffer.from(text)), `${label}: ${relativePath} bytes changed`);
+      assert.equal(lstatSync(path).mtimeMs, OLD_TIME.getTime(), `${label}: ${relativePath} was rewritten (mtime changed)`);
+    }
+  }
+
+  /** A conflicting receipt with its signed archive package and a proof that verifies; decoy State/proof/history files planted. */
+  function signedArchive() {
+    const f = fixture({ [`${SESSION_ID}.json`]: conflictingReceipt() });
+    plantDecoys(f);
+    const bytes = readFileSync(f.receiptPath);
+    const pkg = archivePackageFor(bytes, ARCHIVE_DESTINATION);
+    const proof = signCustodyPackage(pkg, signer);
+    assertProofVerifies(pkg, proof);
+    return { f, bytes, pkg, proof };
+  }
+
+  const copyName = (bytes) => `${SESSION_ID}.${sha256Of(bytes)}.json`;
+
+  /** The state an interrupted archive leaves after the exclusive publish: the copy at its final name. */
+  function seedPublishedCopy(f, bytes, copyBytes = bytes) {
+    mkdirSync(join(f.archiveRoot, "archived"), { recursive: true });
+    const path = join(f.archiveRoot, "archived", copyName(bytes));
+    writeFileSync(path, copyBytes);
+    utimesSync(path, OLD_TIME, OLD_TIME);
+    return path;
+  }
+
+  function seedAuditText(f, text) {
+    const path = join(f.archiveRoot, AUDIT_NAME);
+    writeFileSync(path, text);
+    utimesSync(path, OLD_TIME, OLD_TIME);
+  }
+
+  /** The audit line archiveReceipt() writes for this archive (same fields as the module's entry). */
+  function auditLineFor(bytes, proof) {
+    return `${JSON.stringify({
+      schema: "pipeline.legacy-custody-archive-audit.v1",
+      sessionId: SESSION_ID,
+      receiptSha256: sha256Of(bytes),
+      disposition: "archive",
+      classification: "conflicting",
+      intentSha256: proof.intentSha256,
+      keyReference: proof.keyReference,
+      archivedAt: "2026-10-08T00:00:00.000Z",
+    })}\n`;
+  }
+
+  /** A forward completion: copy kept and byte-equal, original gone, exactly one audit line for THIS archive, nothing else moved. */
+  function assertResumedForward(f, result, before, originalBytes, { priorAuditText, hadAuditLine }, label) {
+    const sha = sha256Of(originalBytes);
+    assert.equal(result?.status, "archived", `${label}: expected archived, got ${JSON.stringify(result)}`);
+    assert.equal(result.mutated, true, `${label}: completing the archive removes the original, so mutated must be true`);
+    assert.equal(pathPresent(f.receiptPath), false, `${label}: the original name must be gone after the completed archive`);
+    const copyPath = join(f.archiveRoot, "archived", copyName(originalBytes));
+    assert.ok(readFileSync(copyPath).equals(originalBytes), `${label}: the published copy must read back as the original bytes`);
+    const { text, entries } = readAudit(f.archiveRoot);
+    assert.ok(text.startsWith(priorAuditText), `${label}: the audit log is append-only: earlier lines must stay byte-identical`);
+    const mine = entries.filter((entry) => entry.sessionId === SESSION_ID && entry.receiptSha256 === sha && entry.disposition === "archive");
+    assert.equal(mine.length, 1, `${label}: exactly one audit line for this archive (none missing, none duplicated)`);
+    const priorLineCount = priorAuditText.split("\n").filter((row) => row !== "").length;
+    assert.equal(entries.length, priorLineCount + (hadAuditLine ? 0 : 1), `${label}: the audit line count is wrong`);
+    const auditKey = `archive/${AUDIT_NAME}`;
+    const withoutAudit = (listing) => new Map([...listing].filter(([key]) => key !== auditKey));
+    const copyKey = `archive/archived/${copyName(originalBytes)}`;
+    assertChangeSet(withoutAudit(before), withoutAudit(snapshot(f.caseRoot)), {
+      removed: [`session-cleanup/receipts/${SESSION_ID}.json`],
+      added: before.has(copyKey) ? [] : [copyKey],
+    }, label);
+  }
+
+  // RV-5: archive readback preserves exact original bytes.
+  test("RV-S6 RV-5 readback after apply: the archived copy reads back byte-identical to the original, its name digest and its audit line agree, and the original name is gone", async () => {
+    const { f, bytes, pkg, proof } = signedArchive();
+    const before = snapshot(f.caseRoot);
+    const result = await apply(f, pkg, proof);
+    assertArchived(f, result, before, bytes);
+    const archived = readFileSync(join(f.archiveRoot, "archived", copyName(bytes)));
+    assert.equal(archived.length, bytes.length, "the archived copy has another size than the original");
+    assert.equal(sha256Of(archived), sha256Of(bytes), "the archived copy has another digest than the original");
+    assert.equal(result.receiptSha256, sha256Of(archived), "the result must report the digest of the bytes that read back");
+    assert.equal(result.archivedAs, `archived/${copyName(bytes)}`);
+    assert.equal(readAudit(f.archiveRoot).entries.at(-1).receiptSha256, sha256Of(archived), "the audit line must carry the digest of the bytes that read back");
+    assertDecoysIntact(f, "readback after apply");
+  });
+
+  // RV-5: an archived receipt grants no authority - the old receipt cannot be re-presented as the live one.
+  const ARCHIVED_BYTES_REPRESENTATIONS = [
+    ["a signed preserve", (bytes) => presentPackage(bytes, "matching", "preserve")],
+    ["a signed replay", (bytes) => presentPackage(bytes, "matching", "replay")],
+    ["a repeated signed archive", (bytes) => archivePackageFor(bytes, ARCHIVE_DESTINATION)],
+  ];
+  for (const [label, makePackage] of ARCHIVED_BYTES_REPRESENTATIONS) {
+    test(`RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, ${label} naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched`, async () => {
+      const { f, bytes, pkg, proof } = signedArchive();
+      const before = snapshot(f.caseRoot);
+      assertArchived(f, await apply(f, pkg, proof), before, bytes);
+      const again = makePackage(bytes);
+      const againProof = signCustodyPackage(again, signer);
+      assertProofVerifies(again, againProof);
+      await assertTypedAndUntouched(
+        f,
+        () => apply(f, again, againProof),
+        { status: "refused", code: S5T2_CODES.bindingMismatch, closedSet: S5T2_CODES },
+        `${label} after archive`,
+      );
+      assert.equal(pathPresent(f.receiptPath), false, "the archived receipt was resurrected at the receipt path");
+      assert.ok(readFileSync(join(f.archiveRoot, "archived", copyName(bytes))).equals(bytes), "the archived copy changed");
+    });
+  }
+
+  // RV-5: receipt drift (before any publish).
+  test("RV-S6 RV-5 receipt drift: a receipt rewritten after it was signed is refused LOC-PROOF-BINDING-MISMATCH, publishes nothing and keeps the drifted bytes", async () => {
+    const { f, pkg, proof } = signedArchive();
+    const drifted = Buffer.from(`${JSON.stringify(validReceipt())}\n`);
+    writeFileSync(f.receiptPath, drifted);
+    utimesSync(f.receiptPath, OLD_TIME, OLD_TIME);
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof),
+      { status: "refused", code: S5T2_CODES.bindingMismatch, closedSet: S5T2_CODES },
+      "drifted receipt",
+    );
+    assert.ok(readFileSync(f.receiptPath).equals(drifted), "the drifted receipt bytes changed");
+    assert.deepStrictEqual(readdirSync(f.archiveRoot), [], "something was created under the archive destination");
+  });
+
+  // RV-5: concurrent writer - a writer caught mid-append leaves an unterminated audit line.
+  test("RV-S6 RV-5 concurrent writer: an audit log whose last line is unterminated returns typed unavailable LOC-TARGET-UNSAFE before anything is published", async () => {
+    const { f, pkg, proof } = signedArchive();
+    seedAuditText(f, OTHER_AUDIT_LINE.slice(0, -1));
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof),
+      { status: "unavailable", code: RV4_CODES.targetUnsafe, closedSet: RV4_CODES },
+      "unterminated audit line",
+    );
+    assert.equal(pathPresent(join(f.archiveRoot, "archived")), false, "a publish directory was created next to a live writer's log");
+  });
+
+  // RV-5: interrupted archive - a published copy that does not read back as the signed bytes is never trusted.
+  test("RV-S6 RV-5 interrupted archive: a published copy that does not read back as the signed bytes is never trusted - typed unavailable LOC-TARGET-UNSAFE, the original stays and the copy is not overwritten", async () => {
+    const { f, bytes, pkg, proof } = signedArchive();
+    const truncated = bytes.subarray(0, 10);
+    const copyPath = seedPublishedCopy(f, bytes, truncated);
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof),
+      { status: "unavailable", code: RV4_CODES.targetUnsafe, closedSet: RV4_CODES },
+      "untrusted published copy",
+    );
+    assert.ok(readFileSync(f.receiptPath).equals(bytes), "the original receipt must stay when the copy does not read back");
+    assert.ok(readFileSync(copyPath).equals(truncated), "the untrusted copy was overwritten");
+  });
+
+  // RV-6: State, activeFeature, proofs and history stay byte-for-byte unchanged across archival.
+  test("RV-S6 RV-6 State, activeFeature, proofs and history stay byte-for-byte unchanged across a signed archive (bytes, size, mtime; no other entry changed)", async () => {
+    const { f, bytes, pkg, proof } = signedArchive();
+    const before = snapshot(f.caseRoot);
+    for (const relativePath of Object.keys(RV6_DECOYS)) {
+      assert.ok(before.has(relativePath), `fixture guard: ${relativePath} is in the snapshot`);
+    }
+    const result = await apply(f, pkg, proof);
+    assertArchived(f, result, before, bytes); // its change set proves no other entry was touched
+    assertDecoysIntact(f, "signed archive");
+  });
+
+  // RV-6: crash recovery is forward-only - a re-run completes an interrupted archive.
+  const CRASH_BOUNDARIES = [
+    [
+      "before the publish (archived/ exists and is empty)",
+      false,
+      (f) => {
+        mkdirSync(join(f.archiveRoot, "archived"), { recursive: true });
+      },
+    ],
+    [
+      "after the exclusive publish and before the audit line",
+      false,
+      (f, bytes) => {
+        seedPublishedCopy(f, bytes);
+      },
+    ],
+    [
+      "after the audit line and before the original is removed",
+      true,
+      (f, bytes, proof) => {
+        seedPublishedCopy(f, bytes);
+        seedAuditText(f, OTHER_AUDIT_LINE + auditLineFor(bytes, proof));
+      },
+    ],
+  ];
+  for (const [label, hadAuditLine, seed] of CRASH_BOUNDARIES) {
+    test(`RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash ${label} completes the archive and leaves State, proofs and history byte-identical`, async () => {
+      const { f, bytes, pkg, proof } = signedArchive();
+      seedAuditText(f, OTHER_AUDIT_LINE);
+      seed(f, bytes, proof);
+      const priorAuditText = readFileSync(join(f.archiveRoot, AUDIT_NAME), "utf8");
+      const before = snapshot(f.caseRoot);
+      const result = await apply(f, pkg, proof);
+      assertResumedForward(f, result, before, bytes, { priorAuditText, hadAuditLine }, label);
+      assertDecoysIntact(f, label);
+    });
+  }
+
+  // RV-6: crash recovery preserves intervening changes (and never rolls back).
+  test("RV-S6 RV-6 crash recovery preserves intervening changes: a published copy plus an original that no longer holds the signed bytes is refused LOC-ARCHIVE-ORPHANED-COPY, nothing is written or rolled back", async () => {
+    const { f, bytes, pkg, proof } = signedArchive();
+    seedAuditText(f, OTHER_AUDIT_LINE);
+    const copyPath = seedPublishedCopy(f, bytes);
+    const changed = Buffer.from(`${JSON.stringify(validReceipt())}\n`);
+    assert.ok(!changed.equals(bytes), "fixture guard: the intervening bytes differ from the signed bytes");
+    writeFileSync(f.receiptPath, changed);
+    utimesSync(f.receiptPath, OLD_TIME, OLD_TIME);
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof),
+      { status: "refused", code: S5T2_CODES.orphanedCopy, closedSet: S5T2_CODES },
+      "intervening change next to a published copy",
+    );
+    assert.ok(readFileSync(f.receiptPath).equals(changed), "the intervening change to the original was overwritten or removed");
+    assert.ok(readFileSync(copyPath).equals(bytes), "the published copy was altered or rolled back");
+    assert.equal(readAudit(f.archiveRoot).text, OTHER_AUDIT_LINE, "an audit line was written for an archive that did not complete");
+    assertDecoysIntact(f, "intervening change");
+  });
+
+  // RV-6: forward-only - a completed archive is never re-run or rolled back.
+  test("RV-S6 RV-6 forward-only: a second apply of the same signed archive after it completed is refused LOC-PROOF-BINDING-MISMATCH - never re-archived, never rolled back", async () => {
+    const { f, bytes, pkg, proof } = signedArchive();
+    const before = snapshot(f.caseRoot);
+    assertArchived(f, await apply(f, pkg, proof), before, bytes);
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof),
+      { status: "refused", code: S5T2_CODES.bindingMismatch, closedSet: S5T2_CODES },
+      "second apply",
+    );
+    assert.equal(pathPresent(f.receiptPath), false, "the original was restored by the second apply");
+    assert.ok(readFileSync(join(f.archiveRoot, "archived", copyName(bytes))).equals(bytes), "the archived copy changed");
+    assert.equal(readAudit(f.archiveRoot).entries.length, 1, "a second audit line was appended");
+    assertDecoysIntact(f, "second apply");
+  });
+
+  test("RV-S6 RV-6 forward-only: a receipt another writer put at the original name after a completed archive survives a re-run of the old signed archive byte-for-byte", async () => {
+    const { f, bytes, pkg, proof } = signedArchive();
+    const before = snapshot(f.caseRoot);
+    assertArchived(f, await apply(f, pkg, proof), before, bytes);
+    const newer = Buffer.from(`${JSON.stringify(validReceipt())}\n`);
+    writeFileSync(f.receiptPath, newer);
+    utimesSync(f.receiptPath, OLD_TIME, OLD_TIME);
+    await assertTypedAndUntouched(
+      f,
+      () => apply(f, pkg, proof),
+      { status: "refused", code: S5T2_CODES.bindingMismatch, closedSet: S5T2_CODES },
+      "old signed archive over a newer receipt",
+    );
+    assert.ok(readFileSync(f.receiptPath).equals(newer), "the newer receipt was overwritten or removed");
+    assertDecoysIntact(f, "newer receipt");
+  });
 });
