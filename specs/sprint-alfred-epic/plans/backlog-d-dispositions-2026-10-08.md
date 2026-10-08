@@ -38,7 +38,15 @@ One read-only probe dispatch establishes fixed / not fixed with `file:line` or c
 
 2026-10-07-desktop-app-support-is-unverified · 2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.
 
-## D. Deferred beyond 0.7.0 — PO confirmation requested (owner: Elephant of the 0.8 planning session; expiry: 0.8 kickoff)
+## D. SUPERSEDED by PO decision BN (2026-10-08 late) and BM
+
+Nothing goes to 0.8 by default. Every item below whose `sprint:` is NOT `batman` or `nightwing` (that includes
+`sprint: none`) is IN SCOPE for the next local candidate and joins group A as a fix slice; ADR-0085 removal is in 0.7.0
+(BM). Only items with `sprint: batman` or `sprint: nightwing` stay deferred (owner: Elephant of the 0.8 planning
+session; expiry: 0.8 kickoff). Verify-evidence-trusted-on-read is sprint nightwing → deferred. Problems → targeted PO
+question. The original proposal is kept below for the record.
+
+## D (original proposal, superseded). Deferred beyond 0.7.0 — PO confirmation requested
 
 - Superseded by ADR-0085 (close as superseded once the ADR-0085 removal lands): 2026-08-08-the-authority-decision-offers-two-candidates-and-one-of-them-is-a-literal ·
   2026-09-28-readiness-input-omits-current-advisor-observation · 2026-09-29-codex-advisor-evidence-fails-after-host-update ·
