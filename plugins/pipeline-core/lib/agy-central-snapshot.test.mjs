@@ -802,3 +802,253 @@ test('AM-T3: F7 unresolved anchor - nothing is created in the working directory,
     cleanup(home, src, scratchCwd);
   }
 });
+
+// ================================================================================================
+// AM-T4: pins for the Critic findings AM-D2..AM-D5 and the dispatcher ruling 50 in its disposition
+// (specs/sprint-alfred-epic/evidence/critic-2026-10-07/am-delta.md). Test-only: the modules are not touched, so every case
+// that pins behavior they do not have yet is RED by design (QG-04). AM-D1 (wiring the three callers) is a separate slice and
+// is NOT pinned here. AM-1..AM-T3 and their helpers are not edited; the wrapper case (D2) lives here because no separate
+// refresh test file exists and AM-14..AM-17 live in this file.
+// Expected today: RED = D2, D3 marker, D4 (aged directory lock, fresh-lock message, live-owner message), the D5 seam cases;
+// todo = D3 interleave (missing seam); GREEN = the D5 uncertain-ownership aging case (closes a test gap over :295).
+//
+// No conflict with the ratified assumptions in the headers above: ruling 33 / B5 says the workspace Pipeline entry is retired
+// BEFORE the refresh, and ruling 50 / AM-D2 keeps that order (retirement still precedes the refresh) while moving it after the
+// host check, so a refused refresh mutates nothing. Ruling 34 (publish lock, C1) is extended, not contradicted, by D3/D4.
+//
+// AM-T4 assumptions (for ratification) - ruling 50 fixes behavior, not these names; smallest shape chosen:
+//  E1. Reclaim marker (ruling 50): `<anchor dir>/agy-snapshot/publish.lock.reclaim`, exclusively created by the one reclaimer
+//      that acts. Its content is not pinned: a FRESH marker of any content (the case writes an empty file) means another
+//      reclaimer is acting, so this publisher yields AGS-PUBLISH-BUSY without moving, parking or rewriting the stale lock.
+//  E2. Interleave seam (todo): `deps.afterLockObserved(lockPath)`, called synchronously in the lock acquisition after the lock
+//      was judged stale and before any reclaim step. No seam of that kind exists, so the interleave case is a todo.
+//  E3. Unreadable lock (ruling 50 / AM-D4): a directory at the lock path follows the unknown-shape age rule (older than twice
+//      the 80 s publish budget is reclaimed, anything younger is held). AGS-PUBLISH-BUSY carries the lock path relative to the
+//      snapshot root (never absolute) and the owner pid when it is known (a lock file naming a live owner).
+//  E4. Source hook: `deps.afterSourceOpen(absolutePath, relativePath)`, called synchronously once per source file after the
+//      descriptor was opened and fstat-ed and BEFORE the first read (readSourceInventory has no deps today, so it must take them).
+//  E5. Rename hook: `deps.beforeRenameCall(tempDir)`, called synchronously immediately before renameSync(temp, destination),
+//      i.e. after the pre-rename convergence check found no destination. A destination that appears there makes the real
+//      rename fail, and the publish must converge on the existing digest instead of throwing.
+//  E6. Directory fsync injection: `deps.fsyncDirectoryFn(directory)` replaces fsyncDirectoryDurable at every publish call site
+//      and returns its outcome. 'confirmed' and 'unsupported' (the win32 tolerance in fs-durability.mjs) are success; any other
+//      outcome fails the publish with a typed AGS-* error, and a pointer is never moved over an unconfirmed directory flush.
+// ================================================================================================
+import { renameSync, utimesSync } from 'node:fs';
+
+const T4_MARKER = 'publish.lock.reclaim';
+const T4_AGED_MS = 10 * 60 * 1000; // well past twice the 80 s publish budget
+function t4Age(path, ms) { const when = new Date(Date.now() - ms); utimesSync(path, when, when); }
+const t4Parked = (root) => entries(root).filter((n) => n.startsWith('publish.lock.') && n !== T4_MARKER);
+function t4Attempt(mod, src, deps) {
+  try { return { result: mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps }), error: null }; } catch (error) { return { result: null, error }; }
+}
+
+test('AM-T4: D3 a reclaim marker held by another reclaimer - the stale lock is left untouched and the publish yields AGS-PUBLISH-BUSY; once the marker is gone the lock is reclaimed', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    t3WriteLock(root, t3DeadPid(), Date.now() - 3600000);
+    const lockPath = join(root, T3_LOCK);
+    const marker = join(root, T4_MARKER);
+    writeFileSync(marker, '');
+    const lockBefore = readFileSync(lockPath, 'utf8');
+    assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps }), fail('AGS-PUBLISH-BUSY'));
+    assert.equal(readFileSync(lockPath, 'utf8'), lockBefore, 'the stale lock was not parked, moved or rewritten by a reclaimer that lost the marker');
+    assert.equal(existsSync(marker), true, 'the marker belongs to the other reclaimer: it is not removed');
+    assert.deepEqual(t4Parked(root), [], 'no parked copy of the lock is left behind');
+    assert.deepEqual(t3Published(root), [], 'nothing was published');
+    rmSync(marker);
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    assert.equal(pointer(root).snapshotSha256, v1.snapshotSha256, 'with the marker gone the stale lock is reclaimed and the publish proceeds');
+    assert.deepEqual(t3Leftovers(root), [], 'the reclaim marker and the lock are both released');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D3 interleaved reclaimers - a lock swapped in after the stale judgement is never parked: the publish yields and the live lock survives byte-identical', async (t) => {
+  t.todo('missing seam: deps.afterLockObserved(lockPath) (E2) - nothing in the lock acquisition lets a test interleave between judging the lock stale and reclaiming it');
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const lockPath = join(root, T3_LOCK);
+    t3WriteLock(root, t3DeadPid(), Date.now() - 3600000);
+    let fired = 0;
+    let liveRaw = null;
+    const interleaving = { ...deps, afterLockObserved: () => {
+      fired += 1;
+      t3WriteLock(root, process.pid, Date.now() - process.uptime() * 1000); // a third publisher acquired after the other reclaimer finished
+      liveRaw = readFileSync(lockPath, 'utf8');
+    } };
+    const { error } = t4Attempt(mod, src, interleaving);
+    assert.equal(fired, 1, 'deps.afterLockObserved must fire once, after the lock was judged stale and before any reclaim step');
+    assert.equal(error?.code, 'AGS-PUBLISH-BUSY', `a lock that was not read as stale must make this publisher yield (got ${error?.code ?? 'success'})`);
+    assert.equal(readFileSync(lockPath, 'utf8'), liveRaw, 'the live lock was never replaced');
+    assert.deepEqual(t4Parked(root), [], 'the live lock was never parked');
+    assert.deepEqual(t3Published(root), [], 'nothing was published');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D4 an unreadable lock (a directory at the lock path) older than twice the publish budget is reclaimed', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const lockPath = join(root, T3_LOCK);
+    mkdirSync(lockPath, { recursive: true });
+    t4Age(lockPath, T4_AGED_MS);
+    const { result, error } = t4Attempt(mod, src, deps);
+    assert.equal(error, null, `an aged unreadable lock must be reclaimed, got ${error?.code}: ${error?.message}`);
+    assert.equal(pointer(root).snapshotSha256, result.snapshotSha256);
+    assert.deepEqual(t3Leftovers(root), [], 'the aged lock is gone and the publish released its own');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D4 a fresh unreadable lock refuses AGS-PUBLISH-BUSY and the message carries the lock path relative to the snapshot root', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const lockPath = join(root, T3_LOCK);
+    mkdirSync(lockPath, { recursive: true });
+    const { error } = t4Attempt(mod, src, deps);
+    assert.equal(error?.code, 'AGS-PUBLISH-BUSY');
+    assert.ok(String(error?.message).includes(T3_LOCK), `the message must name the lock path relative to the snapshot root, got: ${error?.message}`);
+    assert.equal(String(error?.message).includes(root), false, 'relative to the snapshot root: never the absolute path');
+    assert.equal(statSync(lockPath).isDirectory(), true, 'a fresh unreadable lock is retained');
+    assert.deepEqual(t3Published(root), [], 'nothing was published');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D4 a lock held by a live owner refuses AGS-PUBLISH-BUSY naming the lock path relative to the snapshot root and the owner pid', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    t3WriteLock(root, process.pid, Date.now() - process.uptime() * 1000);
+    const { error } = t4Attempt(mod, src, deps);
+    assert.equal(error?.code, 'AGS-PUBLISH-BUSY');
+    assert.ok(String(error?.message).includes(T3_LOCK), `the message must name the lock path, got: ${error?.message}`);
+    assert.ok(String(error?.message).includes(String(process.pid)), `the message must name the owner pid when it is known, got: ${error?.message}`);
+    assert.equal(String(error?.message).includes(root), false, 'relative to the snapshot root: never the absolute path');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D5 uncertain ownership - a lock file of unknown shape is retained while fresh and reclaimed once older than twice the publish budget', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const lockPath = join(root, T3_LOCK);
+    mkdirSync(root, { recursive: true });
+    writeFileSync(lockPath, 'not a lock\n');
+    assert.throws(() => mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps }), fail('AGS-PUBLISH-BUSY'));
+    assert.equal(readFileSync(lockPath, 'utf8'), 'not a lock\n', 'a fresh lock of uncertain ownership is retained untouched');
+    t4Age(lockPath, T4_AGED_MS);
+    const v1 = mod.publishAgySnapshot({ sourcePluginRoot: src, attestationSourceRoot: src, deps });
+    assert.equal(pointer(root).snapshotSha256, v1.snapshotSha256);
+    assert.deepEqual(t3Leftovers(root), [], 'the aged lock was reclaimed and the publish released its own');
+  } finally { cleanup(home, src); }
+});
+
+function t4IdentityCase(label, mutate) {
+  test(`AM-T4: D5 a source file whose identity changes between open and read (${label}) is refused AGS-SOURCE-UNSAFE and nothing is published`, async (t) => {
+    const { mod, home, src, deps, root } = await setup('1.0.0');
+    try {
+      let fired = 0;
+      let mutateError = null;
+      const hooked = { ...deps, afterSourceOpen: (absolutePath, relativePath) => {
+        if (relativePath !== 'lib/l.mjs') return;
+        fired += 1;
+        try { mutate(absolutePath); } catch (e) { mutateError = e; }
+      } };
+      const { error } = t4Attempt(mod, src, hooked);
+      if (mutateError !== null && ['EPERM', 'EBUSY', 'EACCES'].includes(mutateError.code)) { t.skip(`${label}: ${mutateError.code} on this host`); return; }
+      assert.equal(mutateError, null, `the fixture mutation itself failed: ${mutateError?.message}`);
+      assert.ok(fired >= 1, 'deps.afterSourceOpen (E4) must fire for lib/l.mjs after the descriptor was opened and before the first read');
+      assert.equal(error?.code, 'AGS-SOURCE-UNSAFE', `got ${error?.code ?? 'success'}`);
+      assert.deepEqual(t3Published(root), [], 'no digest directory, no pointer');
+      assert.deepEqual(t3Leftovers(root), [], 'no temp, lock released');
+    } finally { cleanup(home, src); }
+  });
+}
+t4IdentityCase('a second hard link appears', (absolutePath) => linkSync(absolutePath, `${absolutePath}.alias`));
+t4IdentityCase('the path is replaced by another file', (absolutePath) => { writeFileSync(`${absolutePath}.swap`, readFileSync(absolutePath)); renameSync(`${absolutePath}.swap`, absolutePath); });
+
+test('AM-T4: D5 a rename that fails after a same-version publisher won converges on the existing digest directory', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  const elsewhere = t3Elsewhere(mod, src);
+  try {
+    const existing = elsewhere.result;
+    let fired = 0;
+    const racing = { ...deps, beforeRenameCall: () => {
+      fired += 1;
+      cpSync(existing.root, join(root, `plugin-${existing.snapshotSha256}`), { recursive: true });
+    } };
+    const { result, error } = t4Attempt(mod, src, racing);
+    assert.ok(fired >= 1, 'deps.beforeRenameCall (E5) must fire immediately before the rename call');
+    assert.equal(error, null, `a rename that fails because the digest directory now exists must converge, got ${error?.code ?? 'an untyped error'}: ${error?.message}`);
+    assert.equal(result.snapshotSha256, existing.snapshotSha256, 'the result equals the existing digest');
+    assert.equal(result.root, join(root, `plugin-${existing.snapshotSha256}`));
+    mod.verifyAgySnapshot({ root: result.root, snapshotSha256: result.snapshotSha256 });
+    assert.equal(pointer(root).snapshotSha256, existing.snapshotSha256);
+    assert.deepEqual(t3Leftovers(root), [], 'no temp, lock released');
+  } finally { cleanup(home, elsewhere.home, src); }
+});
+
+test('AM-T4: D5 a directory fsync that reports a failure outcome fails the publish with a typed error before anything becomes visible', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const seen = [];
+    const failing = { ...deps, fsyncDirectoryFn: (directory) => { seen.push(directory); return 'failed'; } };
+    const { error } = t4Attempt(mod, src, failing);
+    assert.ok(seen.length > 0, 'deps.fsyncDirectoryFn (E6) must replace fsyncDirectoryDurable at the publish call sites');
+    assert.match(error?.code ?? '', /^AGS-/, `a failure outcome must fail the publish with a typed error, got ${error?.code ?? 'success'}`);
+    assert.deepEqual(t3Published(root), [], 'no digest directory, no pointer');
+    assert.deepEqual(t3Leftovers(root), [], 'no temp, lock released');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D5 a failure outcome on the final root flush fails the publish and the pointer never moves', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const seen = [];
+    const rootOnly = { ...deps, fsyncDirectoryFn: (directory) => { seen.push(directory); return directory === root ? 'failed' : 'confirmed'; } };
+    const { error } = t4Attempt(mod, src, rootOnly);
+    assert.ok(seen.includes(root), 'the snapshot root must be flushed through deps.fsyncDirectoryFn after the rename');
+    assert.match(error?.code ?? '', /^AGS-/, `an unconfirmed root flush must fail the publish, got ${error?.code ?? 'success'}`);
+    assert.equal(existsSync(join(root, 'current.json')), false, 'the pointer is never moved over an unconfirmed directory flush');
+    assert.deepEqual(t3Leftovers(root), [], 'no temp, lock released');
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D5 an unsupported directory fsync (the win32 tolerance) is not a failure - the publish succeeds', async () => {
+  const { mod, home, src, deps, root } = await setup('1.0.0');
+  try {
+    const seen = [];
+    const tolerant = { ...deps, fsyncDirectoryFn: (directory) => { seen.push(directory); return 'unsupported'; } };
+    const { result, error } = t4Attempt(mod, src, tolerant);
+    assert.ok(seen.length > 0, 'deps.fsyncDirectoryFn (E6) must be called at the publish call sites');
+    assert.equal(error, null, `unsupported is tolerated, got ${error?.code}: ${error?.message}`);
+    assert.equal(pointer(root).snapshotSha256, result.snapshotSha256);
+  } finally { cleanup(home, src); }
+});
+
+test('AM-T4: D2 broken global surface plus an existing workspace entry - the wrapper returns refused with the host code and the workspace entry is still present', async () => {
+  const seams = await loadSeams();
+  const home = makeHome();
+  const agy = makeFakeAgy();
+  const ws = physicalTmp('ags-ws-');
+  const receipts = makeReceipts();
+  const git = agyPlugin('1.0.0');
+  const checkout = agyPlugin('1.0.0');
+  try {
+    mkdirSync(join(ws, '.agents'), { recursive: true });
+    const wsIndex = join(ws, '.agents', 'plugins.json');
+    writeFileSync(wsIndex, JSON.stringify({ entries: [{ path: checkout }] }));
+    assert.deepEqual(seams.host.observeAntigravityWorkspaceBindings({ workspaceRoot: ws }).ownedIndexes, [0], 'pre-state: the workspace entry is a Pipeline registration');
+    writeFileSync(join(agy.configRoot, 'config', 'plugins.json'), '{"entries":"not-an-array"}\n');
+    const wsBefore = readFileSync(wsIndex, 'utf8');
+    const wsTreeBefore = listTree(ws);
+    const agyBefore = listTree(agy.configRoot);
+    const { installAgyFromCentralSnapshot } = await loadEntry();
+    const result = await installAgyFromCentralSnapshot({ sourcePluginRoot: git, attestationSourceRoot: git, configRoot: agy.configRoot, workspaceRoot: ws, deps: { homedirFn: () => home }, runCli: agy.runCli, writeInstalledReceipt: receipts.writeInstalledReceipt });
+    assert.equal(result.status, 'refused');
+    assert.match(result.reason ?? '', /^ATR-[A-Z-]+$/, 'the host code, unchanged');
+    assert.equal(readFileSync(wsIndex, 'utf8'), wsBefore, 'the workspace entry is still present and byte-identical: retirement runs only after the host check succeeded');
+    assert.deepEqual(seams.host.observeAntigravityWorkspaceBindings({ workspaceRoot: ws }).ownedIndexes, [0]);
+    assert.deepEqual(listTree(ws), wsTreeBefore, 'nothing else moved in the workspace');
+    assert.deepEqual(agy.mutating(), [], 'no agy lifecycle command ran');
+    assert.deepEqual(listTree(agy.configRoot), agyBefore, 'agy state is byte-identical');
+    assert.equal(receipts.written.length, 0);
+  } finally { cleanup(home, agy.configRoot, ws, git, checkout); }
+});
