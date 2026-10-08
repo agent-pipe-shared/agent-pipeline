@@ -64,15 +64,15 @@ export const MUTATING_ONBOARDING_ARGV_SHAPES = Object.freeze({
   }),
   "intake-design-questions-apply": Object.freeze({
     required: Object.freeze(["--activate"]),
-    requiredValue: Object.freeze(["--root", "--answers-json"]),
-    requiredValueOneOf: Object.freeze([]),
-    optionalValue: Object.freeze([]),
+    requiredValue: Object.freeze(["--root"]),
+    requiredValueOneOf: Object.freeze(["--answers-json", "--answers-file"]),
+    optionalValue: Object.freeze(["--answers-file-sha256"]),
   }),
   "intake-design-questions-replace": Object.freeze({
     required: Object.freeze(["--activate"]),
-    requiredValue: Object.freeze(["--root", "--answers-json"]),
-    requiredValueOneOf: Object.freeze([]),
-    optionalValue: Object.freeze([]),
+    requiredValue: Object.freeze(["--root"]),
+    requiredValueOneOf: Object.freeze(["--answers-json", "--answers-file"]),
+    optionalValue: Object.freeze(["--answers-file-sha256"]),
   }),
   "intake-generate-apply": Object.freeze({
     required: Object.freeze(["--activate"]),
