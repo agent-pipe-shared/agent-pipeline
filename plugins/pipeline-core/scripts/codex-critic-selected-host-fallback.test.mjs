@@ -12,6 +12,14 @@
 //   - profile-drift maps to CLF-EVIDENCE-STALE (design note :78).
 // Every case drives runSelectedCriticHost with stand-ins only; the app-server
 // invoker is a spy that must never be reached (zero real spawns).
+//
+// AL-T2d: every runSelectedCriticHost case first asserts that the run got past
+// the activation/route early return ("selected-critic-route-invalid"), so a
+// RED that comes from that early return is visible as such and cannot be
+// mistaken for a missing-fallback RED. On win32 the activation observer
+// (lib/model-family-runtime-host.mjs, directoryPathChain) currently reports
+// MODEL-FAMILY-GIT-COMMON-DIR-UNAVAILABLE for any Git repository, so these
+// cases stop at that guard on Windows; this fixture cannot inject around it.
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -32,6 +40,8 @@ const REVIEW_BASE = "b".repeat(40);
 const CRITIC_ROUTE = Object.freeze({
   dutyId: "critic_high_risk", runner: "codex", model: "gpt-6-sol", effort: "max", sourceSha256: "a".repeat(64), candidateCommit: null,
 });
+const ROUTE_INVALID = "selected-critic-route-invalid";
+const ROUTE_INVALID_MESSAGE = "wrong-reason RED: runSelectedCriticHost returned at the activation/route early return before the pre-launch path";
 
 const scratchRoots = [];
 after(() => { for (const dir of scratchRoots) rmSync(dir, { recursive: true, force: true }); });
@@ -100,6 +110,7 @@ for (const outcome of PRE_LAUNCH_OUTCOMES) {
     const { reads, readSelection } = selectionReader(outcome.terminalCode);
     const { transport, spawns } = stubTransport({ executeSandboxedReadonlyDuty: noChild(outcome.failureClass), readSelection });
     const result = await runSelectedCriticHost(criticInput(), transport);
+    assert.notEqual(result.code, ROUTE_INVALID, ROUTE_INVALID_MESSAGE);
     assert.equal(result.ok, false);
     assert.ok(result.fallback, "a typed fallback must be present");
     assert.deepEqual(result.fallback, {
@@ -120,6 +131,7 @@ test("AL-T2b: unavailableResult carries failureClass and the persisted terminalC
   const { readSelection } = selectionReader("child-stdio-error");
   const { transport } = stubTransport({ executeSandboxedReadonlyDuty: noChild("preflight-failed"), readSelection });
   const result = await runSelectedCriticHost(criticInput(), transport);
+  assert.notEqual(result.code, ROUTE_INVALID, ROUTE_INVALID_MESSAGE);
   assert.equal(result.failureClass, "preflight-failed");
   assert.equal(result.terminalCode, "child-stdio-error");
   assert.equal(result.selectionId, SELECTION_ID);
@@ -130,6 +142,7 @@ test("AL-T2b: unavailableResult carries an explicit null terminalCode when the p
   const { readSelection } = selectionReader(null);
   const { transport } = stubTransport({ executeSandboxedReadonlyDuty: noChild("evidence-stale"), readSelection });
   const result = await runSelectedCriticHost(criticInput(), transport);
+  assert.notEqual(result.code, ROUTE_INVALID, ROUTE_INVALID_MESSAGE);
   assert.equal(result.failureClass, "evidence-stale");
   assert.equal(Object.hasOwn(result, "terminalCode"), true);
   assert.equal(result.terminalCode, null);
@@ -145,6 +158,7 @@ for (const { label, readSelection } of UNREADABLE_SELECTIONS) {
   test(`AL-T2b: ${label} readSelection falls back with CLF-SELECTION-UNREADABLE and no terminal code`, async () => {
     const { transport, spawns } = stubTransport({ executeSandboxedReadonlyDuty: noChild("preflight-failed"), readSelection });
     const result = await runSelectedCriticHost(criticInput(), transport);
+    assert.notEqual(result.code, ROUTE_INVALID, ROUTE_INVALID_MESSAGE);
     assert.equal(result.ok, false);
     assert.ok(result.fallback, "a typed fallback must be present");
     assert.equal(result.fallback?.code, "CLF-SELECTION-UNREADABLE");
@@ -172,6 +186,7 @@ test("AL-T2b: the fallback result carries a laneRecord that validates (typed pre
   const { readSelection } = selectionReader("child-stdio-error");
   const { transport } = stubTransport({ executeSandboxedReadonlyDuty: noChild("preflight-failed"), readSelection });
   const result = await runSelectedCriticHost(criticInput(), transport);
+  assert.notEqual(result.code, ROUTE_INVALID, ROUTE_INVALID_MESSAGE);
   assert.equal(result.fallback?.code, "CLF-PREFLIGHT-FAILED");
   assertValidFallbackLaneRecord(result);
 });
@@ -179,6 +194,7 @@ test("AL-T2b: the fallback result carries a laneRecord that validates (typed pre
 test("AL-T2b: the fallback result carries a laneRecord that validates (unreadable selection)", async () => {
   const { transport } = stubTransport({ executeSandboxedReadonlyDuty: noChild("preflight-failed"), readSelection: undefined });
   const result = await runSelectedCriticHost(criticInput(), transport);
+  assert.notEqual(result.code, ROUTE_INVALID, ROUTE_INVALID_MESSAGE);
   assert.equal(result.fallback?.code, "CLF-SELECTION-UNREADABLE");
   assertValidFallbackLaneRecord(result);
 });
@@ -195,6 +211,7 @@ test("AL-T2b: a post-launch failure (child started) preserves selected-critic-tr
     }),
   });
   const result = await runSelectedCriticHost(criticInput(), transport);
+  assert.notEqual(result.code, ROUTE_INVALID, ROUTE_INVALID_MESSAGE);
   assert.equal(result.ok, false);
   assert.equal(result.code, "selected-critic-transport-failed");
   assert.equal(result.selectionId, SELECTION_ID);
