@@ -1097,7 +1097,7 @@ test("C1 createOperation initializes only the fixed immutable store layout on th
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test("C1 createOperation preserves duplicate definitions, locks, partial bytes and unsafe components", () => {
+test("C1 createOperation preserves duplicate definitions, locks, partial bytes and unsafe components", { skip: process.platform !== "linux" && "C1 store requires the Linux ext backend (see report-interruptions.test.mjs:37-40)" }, () => {
   const root = fs.mkdtempSync("scratch/c1-store-create-guards-");
   try {
     const ids = ["nonce-1", "store-1", "operation-1", "nonce-2", "operation-1"];
