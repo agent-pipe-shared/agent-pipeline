@@ -229,7 +229,7 @@ function findHeredocBodyEnd(cmd, from, heredoc) {
   return -1;
 }
 
-function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
+export function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false) {
   const pathBackslash = reading === READING_WINDOWS_PATH;
   const powershell = reading === READING_POWERSHELL;
   const words = [];
