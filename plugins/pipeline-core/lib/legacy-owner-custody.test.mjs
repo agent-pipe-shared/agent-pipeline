@@ -44,6 +44,13 @@
 //   LOC-COMPARE-FLAG-MISSING  a required compare flag is absent (ambiguity)
 //   LOC-FIELD-MISSING         a required receipt field is absent (ambiguity)
 //   LOC-RECEIPT-AMBIGUOUS     two or more candidate receipts for one session
+//
+// RV-3 (slice S4) extends the closed LOC- set with four detached-proof codes
+// (see the "RV-3: ..." block at the end of this file):
+//   LOC-PROOF-BINDING-MISMATCH  a bound field differs from what the proof signed
+//   LOC-PROOF-SIGNER-MISMATCH   the proof is signed by a key other than the anchor
+//   LOC-PROOF-INVALID           the proof envelope is malformed
+//   LOC-SESSION-NOT-ENDED       the builder was not given sessionEnded === true
 const RV2_CODES = Object.freeze({
   statusMismatch: "LOC-STATUS-MISMATCH",
   schemaMismatch: "LOC-SCHEMA-MISMATCH",
@@ -53,9 +60,15 @@ const RV2_CODES = Object.freeze({
   fieldMissing: "LOC-FIELD-MISSING",
   receiptAmbiguous: "LOC-RECEIPT-AMBIGUOUS",
 });
+const RV3_CODES = Object.freeze({
+  bindingMismatch: "LOC-PROOF-BINDING-MISMATCH",
+  signerMismatch: "LOC-PROOF-SIGNER-MISMATCH",
+  proofInvalid: "LOC-PROOF-INVALID",
+  sessionNotEnded: "LOC-SESSION-NOT-ENDED",
+});
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   existsSync,
   lstatSync,
@@ -72,6 +85,12 @@ import { after, before, describe, test } from "node:test";
 
 import { CLEANUP_RECEIPT_SCHEMA } from "./worktree-lifecycle.mjs";
 import { classifyLegacyReceipt } from "./legacy-owner-custody.mjs";
+import {
+  canonical,
+  createPoApprovalIntent,
+  PO_APPROVAL_PROOF_SCHEMA,
+  verifyPoApprovalProof,
+} from "./po-approval-proof.mjs";
 
 const SESSION_ID = "legacy-session-01";
 const OTHER_SESSION_ID = "legacy-session-02";
@@ -300,4 +319,289 @@ describe("RV-2: legacy receipt CAS-conflict classification", () => {
     assertSnapshotsIdentical(sweepBefore, snapshot(root), "sweep");
     assert.equal(existsSync(join(root, "never-created")), false, "classification created a directory for an absent receipts path");
   });
+});
+
+// ===========================================================================
+// RV-3 pins (Spec 20.3, "RV-3"; design note Q2, slice S4): the detached human
+// proof binds the exact receipt bytes (as sha256 + size) or explicit absence,
+// the repository, the classification/comparison, the disposition, the
+// session-ended confirmation and the CAS precondition. Change any one of them
+// after signing and the proof stops verifying.
+//
+// QG-04 RED pin: `./legacy-owner-custody.mjs` exists (RV-2) but does not export
+// `buildLegacyCustodyAuthorization` or `verifyLegacyCustodyProof` yet. A static
+// named import of a missing export would break the whole file at link time and
+// take the 17 RV-2 cases down with it, so the RV-3 block imports them
+// dynamically, one export at a time, inside each case. The RV-3 cases that call
+// them fail with a message naming the missing export; that is the deliverable.
+//
+// Contract pinned here (both functions synchronous):
+//   buildLegacyCustodyAuthorization({ repository, receipt, classification,
+//       disposition, sessionEnded, casPrecondition }) -> package
+//     package = { schema: "pipeline.legacy-custody-authorization.v1",
+//                 repository, receipt, classification, disposition,
+//                 sessionEnded: true, casPrecondition }   (no other keys)
+//     - receipt is { sha256, size } or { absent: true }; never the bytes (the
+//       receipt is owner-private; the package binds a digest and a length);
+//     - repository is { commit, tree } (design note Q2, option A: the git
+//       root-commit OID and its tree, as createPoApprovalIntent's `candidate`);
+//     - sessionEnded must be exactly `true`; anything else returns the typed
+//       refusal { ok: false, code: "LOC-SESSION-NOT-ENDED" } and no package;
+//     - the inputs are not mutated.
+//   verifyLegacyCustodyProof({ package, proof, anchor }) -> { ok: true } |
+//       { ok: false, code }
+//     - proof is the real `pipeline.po-approval-proof.v1` envelope
+//       (po-approval-proof.mjs): { schema, intentSha256, keyReference,
+//       publicKey, signatureBase64 }, an Ed25519 signature over the UTF-8 hex
+//       intent sha;
+//     - anchor is the externally supplied trust policy
+//       { keyReference, publicKeySha256 }; it is never read from the proof;
+//     - the signed intent is derived from the package ALONE (custodyIntentFor()
+//       below is the pinned derivation): kind "legacy-custody", subjectSha256 =
+//       sha256(canonical(package)), candidate = package.repository, decision =
+//       package.disposition. Nothing else is needed to verify;
+//     - each case below exercises ONE defect, so no precedence between the
+//       codes is pinned:
+//         malformed envelope                              -> LOC-PROOF-INVALID
+//         well-formed envelope, intentSha256 differs from
+//           the intent derived from the package           -> LOC-PROOF-BINDING-MISMATCH
+//         embedded public key is not the anchor's         -> LOC-PROOF-SIGNER-MISMATCH
+// Key material is generated in-process; no real key directory is read.
+// ===========================================================================
+const RV3_SCHEMA = "pipeline.legacy-custody-authorization.v1";
+const RV3_DOMAIN_SHA256 = sha256Of(RV3_SCHEMA);
+
+/** Present-receipt inputs: a conflicting receipt, archived by signed disposition. */
+function rv3PresentInputs() {
+  const receiptBytes = JSON.stringify({ ...validReceipt(), status: "blocked" });
+  return {
+    repository: { commit: sha256Of("rv3-root-commit").slice(0, 40), tree: sha256Of("rv3-root-tree").slice(0, 40) },
+    receipt: { sha256: sha256Of(receiptBytes), size: Buffer.byteLength(receiptBytes) },
+    classification: {
+      classification: "conflicting",
+      compare: { statusMatches: false, schemaMatches: true, digestMatches: true },
+    },
+    disposition: "archive",
+    sessionEnded: true,
+    casPrecondition: { receiptPath: `${SESSION_ID}.json`, expectedState: "present" },
+  };
+}
+
+/** Absent-receipt inputs: explicit absence, bound without fabricating a digest. */
+function rv3AbsentInputs() {
+  return {
+    ...rv3PresentInputs(),
+    receipt: { absent: true },
+    classification: { classification: "absent" },
+    disposition: "bind-absence",
+    casPrecondition: { receiptPath: `${SESSION_ID}.json`, expectedState: "absent" },
+  };
+}
+
+/** The package the builder must produce for `inputs`, spelled out by hand so the verify cases do not depend on the builder. */
+function rv3Package(inputs) {
+  return { schema: RV3_SCHEMA, ...structuredClone(inputs) };
+}
+
+function rv3Signer() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
+  return {
+    privateKey,
+    publicKeyPem,
+    anchor: { keyReference: "rv3-fixture-key", publicKeySha256: sha256Of(publicKeyPem) },
+  };
+}
+
+/** The pinned intent derivation: a pure function of the package. */
+function custodyIntentFor(pkg) {
+  return createPoApprovalIntent({
+    kind: "legacy-custody",
+    featureId: "legacy-custody",
+    planSha256: RV3_DOMAIN_SHA256,
+    specSha256: RV3_DOMAIN_SHA256,
+    candidate: pkg.repository,
+    policyRevision: "legacy-custody-v1",
+    subjectSha256: sha256Of(canonical(pkg)),
+    decision: pkg.disposition,
+  });
+}
+
+/** Signs with the real po-approval-proof envelope and recipe (Ed25519 over the UTF-8 hex intent sha). */
+function signCustodyPackage(pkg, signer, { keyReference = signer.anchor.keyReference } = {}) {
+  const intent = custodyIntentFor(pkg);
+  return {
+    schema: PO_APPROVAL_PROOF_SCHEMA,
+    intentSha256: intent.sha256,
+    keyReference,
+    publicKey: signer.publicKeyPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), signer.privateKey).toString("base64"),
+  };
+}
+
+/** Dynamic, per-export import: a missing export fails only the cases that need it. */
+async function rv3Export(name) {
+  const mod = await import("./legacy-owner-custody.mjs");
+  assert.equal(
+    typeof mod[name],
+    "function",
+    `legacy-owner-custody.mjs does not export ${name}() yet (RV-3 RED pin, slice S4)`,
+  );
+  return mod[name];
+}
+
+function assertRefusal(result, code, label) {
+  assert.equal(result?.ok, false, `${label}: expected a refusal, got ${JSON.stringify(result)}`);
+  assert.equal(result.code, code, `${label}: wrong refusal code`);
+}
+
+describe("RV-3: detached human proof binds the legacy custody authorization", () => {
+  const signer = rv3Signer();
+  const stranger = rv3Signer();
+  const anchor = signer.anchor;
+
+  test("RV-3: fixture guard - the signing helper emits an envelope the real po-approval-proof verifier accepts", () => {
+    // Keeps the RED cases honest: if this fixture were malformed, every verify
+    // case would be red for the wrong reason.
+    const pkg = rv3Package(rv3PresentInputs());
+    const result = verifyPoApprovalProof({
+      intent: custodyIntentFor(pkg),
+      trustPolicy: anchor,
+      proof: signCustodyPackage(pkg, signer),
+    });
+    assert.equal(result.verified, true, `fixture proof rejected: ${result.code}`);
+  });
+
+  test("RV-3: builder emits the canonical package for a present receipt - sha256 and size, never bytes - and does not mutate its inputs", async () => {
+    const build = await rv3Export("buildLegacyCustodyAuthorization");
+    const inputs = rv3PresentInputs();
+    const untouched = structuredClone(inputs);
+    const pkg = build(inputs);
+    assert.deepStrictEqual(pkg, rv3Package(untouched));
+    assert.equal(pkg.schema, RV3_SCHEMA);
+    assert.deepStrictEqual(Object.keys(pkg.receipt).sort(), ["sha256", "size"]);
+    assert.deepStrictEqual(inputs, untouched, "the builder mutated its inputs");
+  });
+
+  test("RV-3: builder binds explicit absence as { absent: true } without fabricating a digest or size", async () => {
+    const build = await rv3Export("buildLegacyCustodyAuthorization");
+    const pkg = build(rv3AbsentInputs());
+    assert.deepStrictEqual(pkg, rv3Package(rv3AbsentInputs()));
+    assert.deepStrictEqual(pkg.receipt, { absent: true });
+  });
+
+  for (const [form, inputs] of [
+    ["present receipt", rv3PresentInputs],
+    ["explicit absence", rv3AbsentInputs],
+  ]) {
+    test(`RV-3: a valid proof over the package verifies - ${form}`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      const pkg = rv3Package(inputs());
+      const result = verify({ package: pkg, proof: signCustodyPackage(pkg, signer), anchor });
+      assert.equal(result.ok, true, `valid proof refused: ${JSON.stringify(result)}`);
+    });
+  }
+
+  test("RV-3: a valid proof over a builder-produced package verifies end to end", async () => {
+    const build = await rv3Export("buildLegacyCustodyAuthorization");
+    const verify = await rv3Export("verifyLegacyCustodyProof");
+    const pkg = build(rv3PresentInputs());
+    const result = verify({ package: pkg, proof: signCustodyPackage(pkg, signer), anchor });
+    assert.equal(result.ok, true, `valid proof refused: ${JSON.stringify(result)}`);
+  });
+
+  // One case per bound field. Each row signs `base()`, mutates a clone of the
+  // signed package, and verifies the clone against the ORIGINAL proof.
+  const BINDING_ROWS = [
+    ["receipt sha256", rv3PresentInputs, (p) => { p.receipt.sha256 = sha256Of("tampered receipt bytes"); }],
+    ["receipt size", rv3PresentInputs, (p) => { p.receipt.size += 1; }],
+    ["absence flag flipped (present receipt -> absent)", rv3PresentInputs, (p) => { p.receipt = { absent: true }; }],
+    [
+      "absence flag flipped (absent -> present receipt)",
+      rv3AbsentInputs,
+      (p) => { p.receipt = { sha256: sha256Of("fabricated receipt bytes"), size: 42 }; },
+    ],
+    ["repository commit", rv3PresentInputs, (p) => { p.repository.commit = sha256Of("another-root-commit").slice(0, 40); }],
+    ["repository tree", rv3PresentInputs, (p) => { p.repository.tree = sha256Of("another-root-tree").slice(0, 40); }],
+    ["classification", rv3PresentInputs, (p) => { p.classification.classification = "matching"; }],
+    ["comparison flag", rv3PresentInputs, (p) => { p.classification.compare.statusMatches = true; }],
+    ["disposition", rv3PresentInputs, (p) => { p.disposition = "replay"; }],
+    ["sessionEnded set to false", rv3PresentInputs, (p) => { p.sessionEnded = false; }],
+    ["casPrecondition", rv3PresentInputs, (p) => { p.casPrecondition.expectedState = "absent"; }],
+  ];
+  for (const [field, inputs, mutate] of BINDING_ROWS) {
+    test(`RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - ${field}`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      const signed = rv3Package(inputs());
+      const proof = signCustodyPackage(signed, signer);
+      assert.equal(verify({ package: signed, proof, anchor }).ok, true, "control: the untouched package must verify first");
+      const tampered = structuredClone(signed);
+      mutate(tampered);
+      assert.notDeepStrictEqual(tampered, signed, "the row did not change the package");
+      assertRefusal(verify({ package: tampered, proof, anchor }), RV3_CODES.bindingMismatch, field);
+    });
+  }
+
+  test("RV-3: a proof signed by a key other than the anchor refuses with LOC-PROOF-SIGNER-MISMATCH", async () => {
+    const verify = await rv3Export("verifyLegacyCustodyProof");
+    const pkg = rv3Package(rv3PresentInputs());
+    // The stranger signs the UNCHANGED package and claims the anchor's key
+    // reference, so the only defect is whose key it is.
+    const proof = signCustodyPackage(pkg, stranger, { keyReference: anchor.keyReference });
+    assertRefusal(verify({ package: pkg, proof, anchor }), RV3_CODES.signerMismatch, "stranger key");
+  });
+
+  const validSample = signCustodyPackage(rv3Package(rv3PresentInputs()), signer);
+  const MALFORMED_ENVELOPES = [
+    ["null", () => null],
+    ["undefined", () => undefined],
+    ["a string", () => "not-an-envelope"],
+    ["an array", () => []],
+    ["an empty object", () => ({})],
+    ["missing signatureBase64", () => { const { signatureBase64: _s, ...rest } = validSample; return rest; }],
+    ["missing publicKey", () => { const { publicKey: _p, ...rest } = validSample; return rest; }],
+    ["an extra key", () => ({ ...validSample, note: "unsigned" })],
+    ["the wrong envelope schema", () => ({ ...validSample, schema: "pipeline.po-approval-proof.v0" })],
+    ["an empty signature", () => ({ ...validSample, signatureBase64: "" })],
+    ["a non-string signature", () => ({ ...validSample, signatureBase64: 12345 })],
+  ];
+  for (const [label, makeProof] of MALFORMED_ENVELOPES) {
+    test(`RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - ${label}`, async () => {
+      const verify = await rv3Export("verifyLegacyCustodyProof");
+      assertRefusal(verify({ package: rv3Package(rv3PresentInputs()), proof: makeProof(), anchor }), RV3_CODES.proofInvalid, label);
+    });
+  }
+
+  test("RV-3: a proof whose signature bytes are corrupted never verifies", async () => {
+    const verify = await rv3Export("verifyLegacyCustodyProof");
+    const pkg = rv3Package(rv3PresentInputs());
+    const proof = signCustodyPackage(pkg, signer);
+    const bytes = Buffer.from(proof.signatureBase64, "base64");
+    bytes[0] ^= 0xff;
+    const result = verify({ package: pkg, proof: { ...proof, signatureBase64: bytes.toString("base64") }, anchor });
+    assert.equal(result?.ok, false, `corrupted signature accepted: ${JSON.stringify(result)}`);
+    assert.match(String(result.code), /^LOC-PROOF-/u, "a corrupted signature must refuse with a LOC-PROOF- code");
+  });
+
+  // sessionEnded is the human's confirmation that the owning session is over;
+  // anything but the boolean true must be refused at build time, not coerced.
+  const NOT_ENDED_VALUES = [
+    ["false", { sessionEnded: false }],
+    ["undefined", { sessionEnded: undefined }],
+    ["absent", {}],
+    ["null", { sessionEnded: null }],
+    ["the string 'true'", { sessionEnded: "true" }],
+    ["the number 1", { sessionEnded: 1 }],
+  ];
+  for (const [label, override] of NOT_ENDED_VALUES) {
+    test(`RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - ${label}`, async () => {
+      const build = await rv3Export("buildLegacyCustodyAuthorization");
+      const inputs = rv3PresentInputs();
+      delete inputs.sessionEnded;
+      Object.assign(inputs, override);
+      const result = build(inputs);
+      assertRefusal(result, RV3_CODES.sessionNotEnded, label);
+      assert.equal(Object.hasOwn(result, "schema"), false, "a refusal must not carry a package");
+    });
+  }
 });
