@@ -35,6 +35,8 @@ import { devNull } from 'node:os';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 
 test('genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail',async t=>{
+ // readinessFixture reaches lib/codex-design-readiness-host-store.mjs, which throws CRHS-INPUT unless the platform is Linux.
+ if(process.platform==='win32'){t.skip('win32: readinessFixture needs the linux-only codex-design-readiness-host-store (CRHS-INPUT); run via WSL: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"');return;}
  assert.ok(readFileSync(new URL('../schemas/pipeline.design-workflow-package.v2.json',import.meta.url)).equals(readFileSync(new URL('../../../schemas/pipeline.design-workflow-package.v2.json',import.meta.url))),'Source and root package schemas must remain byte-identical');
  const f=advisorHostFixture(t),readinessProcess=readinessFixture(t);
  const consultation=await coordinateInitialDesignAdvisory({repoRoot:f.root,featureId:'advisor-feature',authoringDispatchId:'elephant-author',sources:f.sources,reason:'risk-review',profile:'feature',dispatch:f.args.dispatch,route:f.route,hostExecution:f.execution});
