@@ -9,6 +9,7 @@ import { tmpdir, devNull } from "node:os";
 import { spawnSync } from "node:child_process";
 
 import {
+  designWorkflowAdvisorExceptionRationale,
   designWorkflowAdvisorQuestionSha256,
   readApprovedDesignWorkflowPackage,
   readDesignWorkflowPackageFromRepository,
@@ -182,7 +183,7 @@ function baseFixture({ unavailable = false, selectedCandidate = candidate } = {}
       receipt: { path: "specs/feature/evidence/advisor.json", sha256: sha(advisorReceiptBytes) },
       attemptTrail: { path: "specs/feature/evidence/advisor-attempts.json", sha256: sha(attemptTrailBytes) },
       disposition: null,
-      exception: { status: "proposed", failureCode: "capacity-unavailable", rationale: "The route was exhausted; the complete readiness review still passed." },
+      exception: { status: "proposed", failureCode: "capacity-unavailable", rationale: designWorkflowAdvisorExceptionRationale({ advisorReceipt, attemptTrail }) },
     } : {
       status: "answered",
       runner: "codex",
