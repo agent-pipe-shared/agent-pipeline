@@ -11912,3 +11912,39 @@ for (const shape of ENVDUMP_SHAPES) {
     });
   }
 }
+
+// ENVDUMP-T1-T2 (critic finding T1-F1, ruling 40): `env` used as a WRAPPER for an environment dump. Same data-only safety
+// contract as above: the strings are inspected in-process, never executed. RED until the lane fix lands.
+const ENVDUMP_WRAPPER_DUMP_CASES = [
+  ["Bash", "env printenv"],
+  ["Bash", "env env"],
+  ["Bash", "env FOO=1 printenv"],
+  ["Bash", "env -i printenv"],
+  ["Bash", "env -- printenv"],
+  ["Bash", "env FOO=1 env"],
+];
+const ENVDUMP_WRAPPER_CONTROL_CASES = [
+  ["Bash", "env FOO=1 node --version"],
+];
+
+for (const shape of ENVDUMP_SHAPES) {
+  for (const [tool, command] of ENVDUMP_WRAPPER_DUMP_CASES) {
+    test(`ENVDUMP: ${shape} ${tool} ${JSON.stringify(command)} (T1-T2)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 2, `an env-wrapped environment-dump command must be refused in the ${shape} session (got exit ${result.exitCode}); stderr: ${result.stderr}`);
+        assert.match(result.stderr, /GUARD-ENV-DUMP/u);
+      } finally { fx.cleanup(); }
+    });
+  }
+  for (const [tool, command] of ENVDUMP_WRAPPER_CONTROL_CASES) {
+    test(`ENVDUMP: control ${shape} ${tool} ${JSON.stringify(command)} (T1-T2)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 0, `an env-wrapped ordinary command must stay admitted in the ${shape} session; stderr: ${result.stderr}`);
+      } finally { fx.cleanup(); }
+    });
+  }
+}
