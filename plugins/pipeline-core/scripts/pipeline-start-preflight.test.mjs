@@ -164,6 +164,21 @@ function readyObservation() {
     },
   };
 }
+// Hermetic stand-in for the real `checkCloneProvisioning(cwd)` (the default of the
+// `checkCloneProvisioningFn` seam): all three clone hooks report `current`. Cases
+// that call `observePipelineStartPreflight` directly (not through `preflight()`
+// below, which injects an equivalent report by default) pass it explicitly so
+// their `ready` assertions never depend on which hooks this machine's checkout
+// happens to have installed or whether they are stale.
+function readyCloneProvisioning() {
+  return {
+    schema: "pipeline.clone-provisioning-report.v1", status: "ready", checks: [
+      { id: "pre-commit-hook", status: "current" },
+      { id: "commit-msg-hook", status: "current" },
+      { id: "pre-push-hook", status: "current" },
+    ],
+  };
+}
 function preflight(options) {
   return observePipelineStartPreflight({
     checkCloneProvisioningFn: () => ({ schema: "pipeline.clone-provisioning-report.v1", status: "ready", checks: [
@@ -1646,6 +1661,7 @@ test("F2: attestation is skipped entirely (not attempted, not failed) for a real
     pluginList: pluginList(),
     read: () => manifest,
     scriptUrl: fixtureScriptUrl(pluginRoot),
+    checkCloneProvisioningFn: readyCloneProvisioning,
     observe: () => { called = true; return readyObservation(); },
   });
   assert.equal(called, false, "the observer must never be invoked when no .git exists");
@@ -1663,6 +1679,7 @@ test("F4(c): the .git-presence gate skips real attestation for a no-.git fixture
     pluginList: pluginList(),
     read: () => manifest,
     scriptUrl: fixtureScriptUrl(pluginRoot),
+    checkCloneProvisioningFn: readyCloneProvisioning,
   });
   assert.equal(result.status, "ready");
   assert.equal(result.pluginRoot, pluginRoot);
@@ -1677,6 +1694,7 @@ test("F4(a): runner claude reaches the real observePublicCoreIdentity default pa
       pluginList: () => JSON.stringify({ installed: [] }),
       read: () => JSON.stringify({ version: "0.0.1+fixture" }),
       scriptUrl: fixture.scriptUrl,
+      checkCloneProvisioningFn: readyCloneProvisioning,
     });
     assert.equal(result.status, "ready",
       "the real observePublicCoreIdentity path succeeds against this valid, allowlisted, clean self-application fixture");
@@ -1740,6 +1758,7 @@ test("PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulese
       pluginList: pluginList(),
       read: () => manifest,
       scriptUrl: fixtureScriptUrl(pluginRoot),
+      checkCloneProvisioningFn: readyCloneProvisioning,
     });
     assert.equal(result.status, "ready");
     assert.equal(result.installedSource, "remote");
@@ -1829,6 +1848,7 @@ test("PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a ty
       read: () => manifest,
       cwd: gitRoot,
       currentSessionId: mine.sessionId,
+      checkCloneProvisioningFn: readyCloneProvisioning,
     };
 
     const beforeOther = preflight(preflightOptions);
