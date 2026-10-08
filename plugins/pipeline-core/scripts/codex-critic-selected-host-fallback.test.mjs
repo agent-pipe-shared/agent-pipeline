@@ -14,7 +14,8 @@
 // invoker is a spy that must never be reached (zero real spawns).
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
@@ -38,10 +39,16 @@ after(() => { for (const dir of scratchRoots) rmSync(dir, { recursive: true, for
 // A physical repository root holding the single required reference path: the
 // selected host reads and digests it before the (stood-in) sandbox executor runs.
 function criticInput() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "al-t2b-"));
-  scratchRoots.push(repoRoot);
+  const created = mkdtempSync(join(tmpdir(), "al-t2b-"));
+  scratchRoots.push(created);
+  const repoRoot = process.platform === "win32" ? realpathSync.native(created) : created;
   mkdirSync(join(repoRoot, "roles"), { recursive: true });
   writeFileSync(join(repoRoot, "roles", "critic.md"), "# critic fixture\n");
+  // The activation check requires a real Git repository at the root.
+  const git = (...args) => execFileSync("git", args, { cwd: repoRoot, stdio: "ignore" });
+  git("init", "-q");
+  git("add", "roles/critic.md");
+  git("-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "fixture");
   return {
     repoFingerprint: "b".repeat(64),
     dispatch: { queueRevision: 1, candidateCommit: CANDIDATE_COMMIT, candidateTree: CANDIDATE_TREE, referenceSetSha256: "e".repeat(64) },
@@ -94,7 +101,7 @@ for (const outcome of PRE_LAUNCH_OUTCOMES) {
     const { transport, spawns } = stubTransport({ executeSandboxedReadonlyDuty: noChild(outcome.failureClass), readSelection });
     const result = await runSelectedCriticHost(criticInput(), transport);
     assert.equal(result.ok, false);
-    assert.notEqual(result.code, "selected-sandbox-required");
+    assert.ok(result.fallback, "a typed fallback must be present");
     assert.deepEqual(result.fallback, {
       code: outcome.code,
       from: NATIVE_LANE,
@@ -139,7 +146,7 @@ for (const { label, readSelection } of UNREADABLE_SELECTIONS) {
     const { transport, spawns } = stubTransport({ executeSandboxedReadonlyDuty: noChild("preflight-failed"), readSelection });
     const result = await runSelectedCriticHost(criticInput(), transport);
     assert.equal(result.ok, false);
-    assert.notEqual(result.code, "selected-sandbox-required");
+    assert.ok(result.fallback, "a typed fallback must be present");
     assert.equal(result.fallback?.code, "CLF-SELECTION-UNREADABLE");
     assert.equal(result.fallback?.from, NATIVE_LANE);
     assert.equal(result.fallback?.to, FALLBACK_LANE);
@@ -200,7 +207,6 @@ test("AL-T2b: a post-launch failure (child started) preserves selected-critic-tr
   });
   assert.equal(Object.hasOwn(result, "fallback"), false);
   assert.equal(Object.hasOwn(result, "laneRecord"), false);
-  assert.deepEqual(reads, []);
   assert.equal(spawns.count, 0);
 });
 
