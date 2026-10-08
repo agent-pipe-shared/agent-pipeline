@@ -212,6 +212,9 @@ function createApprovalReview({ workflowPackage, sourceBytes, readinessReceipt, 
       status: workflowPackage.advisor.status,
       runner: workflowPackage.advisor.runner,
       nativeAvailable: workflowPackage.advisor.nativeAvailable,
+      // Derived from the receipt's adapter, never read from the package: a
+      // consult-adapter answer is the labelled, non-authorizing fallback.
+      assurance: advisorReceipt.adapter === "consult" ? "fallback-self-dispatch" : "native",
       receipt: Object.freeze({
         path: workflowPackage.advisor.receipt.path,
         sha256: workflowPackage.advisor.receipt.sha256,
@@ -291,11 +294,52 @@ function validateReadiness(receipt) {
   return { ok: true };
 }
 
+const EVIDENCE_BINDING_FIELDS = Object.freeze(["templateSha256", "sentPromptSha256", "subagentId", "resultSha256"]);
+function validEvidenceBinding(value) {
+  return exact(value, EVIDENCE_BINDING_FIELDS)
+    && SHA256.test(value.templateSha256 ?? "") && SHA256.test(value.sentPromptSha256 ?? "") && SHA256.test(value.resultSha256 ?? "")
+    && typeof value.subagentId === "string" && value.subagentId.trim().length > 0 && value.subagentId.length <= 256;
+}
+// Self-review: the evidence dispatch is the authoring dispatch when the whole
+// binding is equal or when both ran as the same native subagent.
+function reviewsItself(authoring, evidence) {
+  return authoring.subagentId === evidence.subagentId
+    || EVIDENCE_BINDING_FIELDS.every((field) => authoring[field] === evidence[field]);
+}
+
+/**
+ * The only Advisor-exception rationale the validator can back: built solely
+ * from fields of the Advisor receipt and its attempt trail / route selection,
+ * so it can state no fact the receipt does not contain. Deterministic.
+ */
+export function designWorkflowAdvisorExceptionRationale({ advisorReceipt, attemptTrail = null } = {}) {
+  if (!object(advisorReceipt) || !object(advisorReceipt.configuredRoute) || !object(advisorReceipt.observed)
+    || !object(advisorReceipt.fallback)) throw new TypeError("DWP-RATIONALE-INPUT");
+  const trail = object(attemptTrail) ? attemptTrail : null;
+  let route = "no attempt trail was recorded";
+  if (trail !== null && trail.schema === ADVISORY_ROUTE_SELECTION_SCHEMA) {
+    route = `route selection ${trail.status} (${trail.code}) and no child was started`;
+  } else if (trail !== null && Array.isArray(trail.attempts)) {
+    route = `attempts ${trail.attempts.length === 0 ? "none" : trail.attempts
+      .map((attempt) => `${attempt?.kind}/${attempt?.adapter}/${attempt?.runner}:${attempt?.status}`).join(", ")}`;
+  }
+  return `Advisor receipt ${advisorReceipt.receiptId} records no usable answer: configured runner `
+    + `${advisorReceipt.configuredRoute.runner}, adapter ${advisorReceipt.adapter}, observed status `
+    + `${advisorReceipt.observed.status}, fallback reason ${advisorReceipt.fallback.reason}, error class `
+    + `${advisorReceipt.fallback.redactedErrorClass ?? "none"}; ${route}.`;
+}
+
 /**
  * Validate the complete pre-approval package and its referenced bytes.
  * `sourceBytes` must be read by the caller from the physical, non-symlink
  * repository files named in the package; `candidate` must be the dispatch-time
  * Git identity. The package bytes are hashed exactly as persisted.
+ *
+ * Optional route inputs (absent or null keeps the earlier behaviour exactly):
+ * `roleRoutePreflight` is a role-route preflight result; only
+ * `roles.readiness.state` is read and anything but `native` refuses.
+ * `evidenceBindings` is `{ authoring, advisor, readiness }`, each
+ * `{ templateSha256, sentPromptSha256, subagentId, resultSha256 }`.
  */
 export function validateDesignWorkflowPackage({
   workflowPackage,
@@ -311,6 +355,8 @@ export function validateDesignWorkflowPackage({
   repoRoot,
   verifyReadinessExecution,
   requireReadinessExecution = true,
+  roleRoutePreflight,
+  evidenceBindings,
 } = {}) {
   if (!object(workflowPackage)) return fail("DWP-PACKAGE-SHAPE");
   const packageSchema = JSON.parse(readFileSync(PACKAGE_SCHEMA_PATH, "utf8"));
@@ -372,6 +418,26 @@ export function validateDesignWorkflowPackage({
     || !noBlockingFindings(readinessReceipt)
     || JSON.stringify(readinessReceipt.candidate) !== JSON.stringify(workflowPackage.candidate)
     || !equalSources(readinessReceipt.sources, workflowPackage.sources)) return fail("DWP-READINESS-BINDING");
+
+  // Optional route verdict (AC-29 / R4-1). Absent keeps today's behaviour (BD:
+  // report-only without an observation); a SUPPLIED verdict that does not prove
+  // a native readiness route refuses, and a malformed one never counts as native.
+  if (roleRoutePreflight !== undefined && roleRoutePreflight !== null) {
+    const readinessRoute = object(roleRoutePreflight?.roles) && object(roleRoutePreflight.roles.readiness)
+      ? roleRoutePreflight.roles.readiness.state : undefined;
+    if (readinessRoute === "fallback-self-dispatch") return fail("DWP-READINESS-FALLBACK-EVIDENCE");
+    if (readinessRoute !== "native") return fail("DWP-READINESS-ROUTE-UNAVAILABLE");
+  }
+  // Optional self-review binding check (AC-29 / R4-2), on top of the dispatch-id
+  // inequality above. A supplied but malformed set never counts as independent.
+  if (evidenceBindings !== undefined && evidenceBindings !== null) {
+    if (!exact(evidenceBindings, ["authoring", "advisor", "readiness"])
+      || !["authoring", "advisor", "readiness"].every((name) => validEvidenceBinding(evidenceBindings[name]))) {
+      return fail("DWP-EVIDENCE-BINDINGS-INVALID");
+    }
+    if (reviewsItself(evidenceBindings.authoring, evidenceBindings.advisor)
+      || reviewsItself(evidenceBindings.authoring, evidenceBindings.readiness)) return fail("DWP-EVIDENCE-SELF-REVIEW");
+  }
 
   if (requireReadinessExecution) {
     if (typeof verifyReadinessExecution !== "function") return fail("DWP-READINESS-HOST-VERIFIER-UNAVAILABLE");
