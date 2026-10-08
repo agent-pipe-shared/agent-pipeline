@@ -11948,3 +11948,42 @@ for (const shape of ENVDUMP_SHAPES) {
     });
   }
 }
+
+// ENVDUMP-T1-T3 (ruling 51): bounded `env` recursion. An adversarial chain must not exhaust the classifier (a crashed
+// PreToolUse hook does not block); beyond the nesting bound the lane fails closed. Same data-only safety contract: strings are
+// built in-process, inspected, never executed. RED (crash or wrong verdict) until the lane fix lands.
+function envdumpNestedEnvS(levels, tail) {
+  let command = tail;
+  for (let level = 0; level < levels; level += 1) command = `env -S '${command.replace(/'/gu, "'\\''")}'`;
+  return command;
+}
+const ENVDUMP_DEEP_DUMP_CASES = [
+  ["5000 env words then printenv", () => `${Array(5000).fill("env").join(" ")} printenv`],
+  ["5000 env words then node --version", () => `${Array(5000).fill("env").join(" ")} node --version`],
+  ["40-level nested env -S", () => envdumpNestedEnvS(40, "printenv")],
+];
+const ENVDUMP_DEEP_CONTROL_CASES = [
+  ["two-level env env node --version", () => "env env node --version"],
+];
+
+for (const shape of ENVDUMP_SHAPES) {
+  for (const [label, build] of ENVDUMP_DEEP_DUMP_CASES) {
+    test(`ENVDUMP: ${shape} ${label} (T1-T3)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, "Bash", build());
+        assert.equal(result.exitCode, 2, `a deeply nested env chain must be refused in the ${shape} session (got exit ${result.exitCode}); stderr: ${result.stderr}`);
+        assert.match(result.stderr, /GUARD-ENV-DUMP/u);
+      } finally { fx.cleanup(); }
+    });
+  }
+  for (const [label, build] of ENVDUMP_DEEP_CONTROL_CASES) {
+    test(`ENVDUMP: control ${shape} ${label} (T1-T3)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, "Bash", build());
+        assert.equal(result.exitCode, 0, `a shallow env chain must stay admitted in the ${shape} session; stderr: ${result.stderr}`);
+      } finally { fx.cleanup(); }
+    });
+  }
+}
