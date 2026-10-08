@@ -33,6 +33,7 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedTopology } from "../lib/antigravity-topology-refresh-host.mjs";
 import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
 import {
   evaluateSelfApplicationAttestation,
   pluginRootHasSelfApplicationGit,
@@ -1864,6 +1865,29 @@ async function observeEnvironmentReadiness() {
 }
 
 /**
+ * Ruling 57 (AM-W): the agy start hint is read-only, never throws and never changes readiness.
+ * `observeAgyStartHint` is async, and `observePipelineStartPreflight` is synchronous and its key
+ * set is pinned, so the hint is observed by the async process entry and carried as a separate
+ * top-level `agyStartHint` field beside the envelope (like `environmentReadiness`). Returns the
+ * hint only for a governed workspace whose agy-loaded plugin is not current; otherwise null
+ * (ungoverned, loaded-and-current, or any failure) and no field is written.
+ */
+export async function observeAgyStartHintField({
+  observeHint = (args) => observeAgyStartHint(args),
+  cwd = process.cwd(),
+  configRoot = resolve(homedir(), ".gemini"),
+  loadedPluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
+} = {}) {
+  try {
+    const hint = await observeHint({ workspaceRoot: cwd, configRoot, loadedPluginRoot });
+    if (hint?.governed !== true || hint.loaded?.status === "current") return null;
+    return hint;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
  * called with no options, writes the same one compact line. `environmentReadiness` is an
  * optional seam the async process entry (`runEntry`, below) fills; an exported function must
@@ -1871,8 +1895,14 @@ async function observeEnvironmentReadiness() {
  */
 export function main(options = {}) {
   const environmentReadiness = options?.environmentReadiness;
+  const agyStartHint = options?.agyStartHint;
   const result = observePipelineStartPreflight();
-  process.stdout.write(`${JSON.stringify(environmentReadiness === undefined ? result : { ...result, environmentReadiness })}\n`);
+  const envelope = {
+    ...result,
+    ...(environmentReadiness === undefined ? {} : { environmentReadiness }),
+    ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
+  };
+  process.stdout.write(`${JSON.stringify(envelope)}\n`);
   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
   // Antigravity-only: the structured field above already carries this, but a
   // human watching the terminal reads stderr, not a JSON blob -- so the same
@@ -1909,7 +1939,8 @@ export function main(options = {}) {
 /** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */
 async function runEntry() {
   const environmentReadiness = await observeEnvironmentReadiness();
-  return main({ environmentReadiness });
+  const agyStartHint = await observeAgyStartHintField();
+  return main({ environmentReadiness, agyStartHint });
 }
 
 if (isDirectInvocation(import.meta.url)) {
