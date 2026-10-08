@@ -66,6 +66,7 @@ import {
   criticalProofWaiverFor, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+import { fsyncDirectoryDurable } from "./fs-durability.mjs";
 import { resolveLocalOperatorKeyAnchor } from "./machine-plane.mjs";
 
 const OID = /^[a-f0-9]{40,64}$/u;
@@ -223,8 +224,7 @@ function pinTrustAnchorOnFirstUse(anchorDir, policy, kind, signer) {
       throw error;
     }
     try {
-      const dirFd = openSync(parent, "r");
-      try { fsyncSync(dirFd); } finally { closeSync(dirFd); }
+      fsyncDirectoryDurable(parent);
     } catch { /* directory fsync is best-effort durability, not correctness */ }
   } catch {
     // Best-effort by design — see doc comment above.

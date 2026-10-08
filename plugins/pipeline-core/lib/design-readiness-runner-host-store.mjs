@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import { canonicalJson } from "./codex-sandbox-compatibility.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
+import { fsyncDirectoryDurable } from "./fs-durability.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;
@@ -132,8 +133,7 @@ export function createDesignReadinessRunnerHostStore({ gitCommonDir, repoFingerp
         linked = true;
         unlinkSync(temporary);
         try {
-          const directoryDescriptor = openSync(directory, "r");
-          try { fsyncSync(directoryDescriptor); } finally { closeSync(directoryDescriptor); }
+          fsyncDirectoryDurable(directory);
         } catch (error) {
           directoryDurability = ["EINVAL", "ENOTSUP", "EISDIR", "EPERM"].includes(error?.code) ? "unsupported" : "unknown";
         }

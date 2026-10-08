@@ -10,6 +10,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import { validateGovernanceActionEvent } from "./governance-action-events.mjs";
 import { canonicalizeJson } from "./governance-event.mjs";
+import { fsyncDirectoryDurable } from "./fs-durability.mjs";
 
 export const GOVERNANCE_ACTION_ARTIFACT_RETRY_SCHEMA = "pipeline.governance-action-artifact-retry.v1";
 
@@ -135,8 +136,7 @@ export function writeGovernanceActionArtifact({ rootDir, eventOutPath, event, al
     fd = undefined;
     linkSync(temporary, plan.target);
     unlinkSync(temporary);
-    const directoryFd = openSync(dirname(plan.target), "r");
-    try { fsyncSync(directoryFd); } finally { closeSync(directoryFd); }
+    fsyncDirectoryDurable(dirname(plan.target));
   } catch {
     if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve primary failure */ } }
     try { unlinkSync(temporary); } catch { /* absent or retained only until cleanup */ }

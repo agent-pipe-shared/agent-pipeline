@@ -22,6 +22,7 @@ import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { fsyncDirectoryDurable } from "../lib/fs-durability.mjs";
 import { resolveSystemExecutable } from "./tool-identity.mjs";
 import { runCodexDesignReadinessHost } from "./codex-design-readiness-host.mjs";
 import { readCurrentReadinessAdvisorObservation } from "../lib/codex-readiness-finalization.mjs";
@@ -117,8 +118,7 @@ function publishExclusive(target, value) {
     unlinkSync(temporary);
     let directoryDurability = "confirmed";
     try {
-      const directory = openSync(dirname(target), "r");
-      try { fsyncSync(directory); } finally { closeSync(directory); }
+      fsyncDirectoryDurable(dirname(target));
     } catch (error) {
       if (process.platform === "win32" && ["EPERM", "EINVAL", "EISDIR", "ENOTSUP"].includes(error?.code)) directoryDurability = "unsupported";
       else directoryDurability = "unknown";

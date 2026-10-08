@@ -32,6 +32,7 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { fsyncDirectoryDurable } from "../lib/fs-durability.mjs";
 import { resolveSystemExecutable } from "./tool-identity.mjs";
 import {buildRunnerDesignReadinessPrompt} from '../lib/runner-readiness-request.mjs';
 import {readDesignReadinessPreparationFromRepository} from '../lib/design-workflow-package-v2.mjs';
@@ -148,8 +149,7 @@ function publishExclusive(target, value) {
     unlinkSync(temporary);
     let directoryDurability = "confirmed";
     try {
-      const parent = openSync(dirname(target), "r");
-      try { fsyncSync(parent); } finally { closeSync(parent); }
+      fsyncDirectoryDurable(dirname(target));
     } catch (error) {
       directoryDurability = ["EINVAL", "ENOTSUP", "EISDIR", "EPERM"].includes(error?.code) ? "unsupported" : "unknown";
     }
