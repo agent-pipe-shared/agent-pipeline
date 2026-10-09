@@ -2119,3 +2119,147 @@ test("TR-G T34: a governance state change between two guard calls takes effect o
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// CRITIC-CKPT-T2 (tranche-2 post-image, 2026-10-09): RED pins for the Critic's checkpoint budget and its confined notes lane
+// (Ruling 161, which corrects Ruling 159). Appended after TR-G T34; every case above is unchanged. Test-only (QG-04): the change
+// that turns the red cases green is CRITIC-CKPT-F.
+//   The subject is a `pipeline-core:critic` subagent whose agent definition is the SHIPPED agents/critic.md, read at test time (no
+//   hard-coded maxTurns), with a preflight-bound base cap of 50. The binding is real (realBudgetBinding) because the checkpoint
+//   notice is only emitted for a budget-bearing role. A second runner, derived at run time from the shared runner source, also
+//   returns each call's stdout (the notice is stdout) and expands a `repeat` field so a 90-call scenario stays a short argv.
+//   (a) 50 working calls are admitted and the 51st is DISPATCH-BUDGET-EXHAUSTED.
+//   (b) the first checkpoint notice is on call 40, not on call 39.
+//   (c) five closing acts after the 50th call pass; the sixth names the exhausted closing allowance.
+//   (d) after the cap, a Write to scratch/dispatch/critic-<id>/critic-notes.md is the one admitted write; scratch/x.md,
+//       evidence/other.json, scratch/dispatch/critic-abc/other.md, scratch/critic-notes.md, an Edit of another path and
+//       scratch/dispatch/other/critic-notes.md stay refused. Control: a goldfish-deep Write to a critic-notes.md path stays
+//       refused after its own cap. The (d) cases reach "after the cap" by measuring the cap with a probe run, so they do not
+//       depend on which cap the shipped definition yields.
+// ---------------------------------------------------------------------------
+import { effectiveDispatchBaseCap } from "../lib/dispatch-budget-core.mjs";
+import { readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
+
+const CKPT_BASE_CALLS = 50;
+const CKPT_TOOL_USE_ID = "parent-tool-critic-1";
+const CKPT_NOTES_PATH = "scratch/dispatch/critic-abc/critic-notes.md";
+
+function ckptCriticFiles() {
+  const definition = readFileSync(fileURLToPath(new URL("../agents/critic.md", import.meta.url)), "utf8");
+  const maxTurns = readAgentMaxTurns("critic", "/shipped-plugin", { existsSyncFn: () => true, readFileSyncFn: () => definition });
+  assert.ok(Number.isSafeInteger(maxTurns), "the shipped agents/critic.md must carry a well-formed maxTurns line");
+  const effectiveCap = effectiveDispatchBaseCap(CKPT_BASE_CALLS, maxTurns);
+  assert.ok(Number.isSafeInteger(effectiveCap), `the shipped maxTurns ${maxTurns} must leave a working cap for a base cap of ${CKPT_BASE_CALLS}`);
+  return {
+    [agentDefPath("critic")]: definition,
+    [PARENT_META_PATH]: JSON.stringify({ agentType: "pipeline-core:critic", description: "x", toolUseId: CKPT_TOOL_USE_ID, spawnDepth: 1 }),
+    [pendingBindingPath(CKPT_TOOL_USE_ID)]: `${JSON.stringify({
+      schema: "pipeline.pending-dispatch-budget-binding.v1",
+      toolUseIdSha256: createHash("sha256").update(CKPT_TOOL_USE_ID).digest("hex"),
+      bindings: [{ agentType: "critic", baseCalls: CKPT_BASE_CALLS, maxTurns, effectiveCap }],
+    })}\n`,
+  };
+}
+
+const ckptCriticCall = (tool_name, tool_input) => ({ op: "guard", input: measuredSubagentPayload({ agent_type: "pipeline-core:critic", tool_name, tool_input }) });
+const ckptReads = (count) => ({ ...ckptCriticCall("Read", { file_path: "/x" }), repeat: count });
+const ckptWrite = (path) => ckptCriticCall("Write", { file_path: path, content: "interim notes" });
+
+let ckptRunnerPath;
+function ckptRun(scenario) {
+  if (ckptRunnerPath === undefined) {
+    const resultLine = "results.push({ exitCode: r.exitCode, stderr: r.stderr });";
+    const scenarioLine = "const scenario = JSON.parse(Buffer.from(scenarioB64, 'base64').toString('utf8'));";
+    assert.ok(RUNNER_SOURCE.includes(resultLine) && RUNNER_SOURCE.includes(scenarioLine), "the shared runner no longer has the lines this block extends");
+    ckptRunnerPath = join(runnerDir, "critic-ckpt-runner.mjs");
+    writeFileSync(ckptRunnerPath, RUNNER_SOURCE
+      .replace(resultLine, "results.push({ exitCode: r.exitCode, stderr: r.stderr, stdout: r.stdout ?? '' });")
+      .replace(scenarioLine, `${scenarioLine}\nscenario.steps = (scenario.steps || []).flatMap((s) => Array.from({ length: s.repeat || 1 }, () => s));`));
+  }
+  const b64 = Buffer.from(JSON.stringify(scenario), "utf8").toString("base64");
+  // A Critic scenario is 41 to 90 sequential guard calls; on a mounted drive each call spends hundreds of milliseconds inside
+  // observeGovernanceScope (the same cost the file-top bound note describes), so the shared 10 s bound would only measure the host.
+  const res = spawnSync(process.execPath, [ckptRunnerPath, GUARD, b64], { input: "", encoding: "utf8", timeout: Math.max(RUNNER_TIMEOUT_MS, 240000) });
+  const stdout = res.stdout ?? "";
+  assert.equal(res.status, 0, `critic runner child exited ${res.status} (expected 0) -- stderr: ${(res.stderr ?? "").trim().slice(0, 500)}`);
+  assert.ok(stdout.includes("BUDGETRUN-OK"), `critic runner did not print the success marker BUDGETRUN-OK -- stdout ${JSON.stringify(stdout)}`);
+  const line = stdout.split("\n").find((l) => l.startsWith("RESULT: "));
+  assert.ok(line, `critic runner did not print a RESULT line -- stdout ${JSON.stringify(stdout)}`);
+  return JSON.parse(line.slice("RESULT: ".length));
+}
+
+const ckptScenario = (steps) => ({ rootDir: FAKE_ROOT, realBudgetBinding: true, files: ckptCriticFiles(), steps });
+const ckptWhy = (verdict) => `${verdict.stderr.trim().slice(0, 300)}`;
+
+let ckptMeasuredCap;
+/** The number of working calls the shipped definition admits for a base cap of 50: the index of the first refusal in a long run of reads. */
+function ckptCap() {
+  if (ckptMeasuredCap === undefined) {
+    const { results } = ckptRun(ckptScenario([ckptReads(90)]));
+    const firstRefusal = results.findIndex((verdict) => verdict.exitCode !== 0);
+    assert.ok(firstRefusal > 0, `the probe needs a Critic that is admitted first and refused later; first refusal at index ${firstRefusal}: ${ckptWhy(results[0])}`);
+    ckptMeasuredCap = firstRefusal;
+  }
+  return ckptMeasuredCap;
+}
+
+test("CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED", () => {
+  const { results } = ckptRun(ckptScenario([ckptReads(51)]));
+  const firstRefusal = results.findIndex((verdict) => verdict.exitCode !== 0);
+  assert.equal(firstRefusal, 50, `the Critic must be admitted for exactly 50 working calls; the first refusal was call ${firstRefusal + 1}: ${firstRefusal < 0 ? "none" : ckptWhy(results[firstRefusal])}`);
+  assert.equal(results[50].exitCode, 2, "the 51st call is outside the working cap");
+  assert.match(results[50].stderr, /DISPATCH-BUDGET-EXHAUSTED/u);
+});
+
+test("CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39", () => {
+  const { results } = ckptRun(ckptScenario([ckptReads(41)]));
+  const noticeCalls = results.map((verdict, index) => (verdict.stdout.includes("DISPATCH-BUDGET-CHECKPOINT") ? index + 1 : null)).filter((call) => call !== null);
+  assert.equal(noticeCalls[0], 40, `the first DISPATCH-BUDGET-CHECKPOINT notice must be on call 40; notices were on calls [${noticeCalls.join(", ")}]`);
+  assert.doesNotMatch(results[38].stdout, /DISPATCH-BUDGET-CHECKPOINT/u, "call 39 carries no notice");
+  assert.equal(results[39].exitCode, 0, `call 40 is admitted with its notice -- got: ${ckptWhy(results[39])}`);
+});
+
+test("CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance", () => {
+  const { results } = ckptRun(ckptScenario([ckptReads(50), { ...ckptWrite(CKPT_NOTES_PATH), repeat: 6 }]));
+  const refusedWorking = results.slice(0, 50).findIndex((verdict) => verdict.exitCode !== 0);
+  assert.equal(refusedWorking, -1, `all 50 working calls must be admitted; call ${refusedWorking + 1} was refused: ${ckptWhy(results[Math.max(refusedWorking, 0)])}`);
+  for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
+    assert.equal(results[49 + ordinal].exitCode, 0, `closing act ${ordinal} of 5 -- got: ${ckptWhy(results[49 + ordinal])}`);
+  }
+  assert.equal(results[55].exitCode, 2, "the sixth post-cap call is outside the allowance");
+  assert.match(results[55].stderr, /The closing allowance of 5 tool calls is exhausted\./u);
+});
+
+test("CRITIC-CKPT-T2 (d1): after the cap a Critic Write to scratch/dispatch/critic-<id>/critic-notes.md is admitted as a closing act (green today)", () => {
+  const cap = ckptCap();
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ckptWrite(CKPT_NOTES_PATH)]));
+  assert.ok(results.slice(0, cap).every((verdict) => verdict.exitCode === 0), `the ${cap} working calls are admitted`);
+  assert.equal(results[cap].exitCode, 0, `the confined notes write must be admitted after the cap -- got: ${ckptWhy(results[cap])}`);
+});
+
+test("CRITIC-CKPT-T2 (d2): after the cap a Critic Write anywhere else, or to another file name, stays refused (green today)", () => {
+  const cap = ckptCap();
+  const refused = ["scratch/x.md", "evidence/other.json", "scratch/dispatch/critic-abc/other.md", "scratch/critic-notes.md"];
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ...refused.map(ckptWrite)]));
+  refused.forEach((path, index) => trgAssertRefusedAfterCap(results[cap + index], path));
+});
+
+test("CRITIC-CKPT-T2 (d3): after the cap a Critic Edit of another path stays refused (green today)", () => {
+  const cap = ckptCap();
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ckptCriticCall("Edit", { file_path: "scratch/x.md", old_string: "a", new_string: "b" })]));
+  trgAssertRefusedAfterCap(results[cap], "Edit scratch/x.md");
+});
+
+test("CRITIC-CKPT-T2 (d4): after the cap a Critic Write to scratch/dispatch/other/critic-notes.md is refused -- the subdirectory must be critic-prefixed", () => {
+  const cap = ckptCap();
+  const path = "scratch/dispatch/other/critic-notes.md";
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ckptWrite(path)]));
+  trgAssertRefusedAfterCap(results[cap], path);
+});
+
+test("CRITIC-CKPT-T2 (d5, control): a goldfish-deep Write to a critic-notes.md path stays refused after its own cap (green today)", () => {
+  const steps = [...trgCapSteps(), { op: "guard", input: trgDeepCall("Write", { file_path: CKPT_NOTES_PATH, content: "interim notes" }) }];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let index = 0; index < 5; index += 1) assert.equal(results[index].exitCode, 0, `work call ${index + 1} is within the cap`);
+  trgAssertRefusedAfterCap(results[5], `goldfish-deep Write ${CKPT_NOTES_PATH}`);
+});
