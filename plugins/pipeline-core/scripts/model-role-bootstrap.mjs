@@ -171,9 +171,13 @@ export async function prepareFamilyBootstrapProjection({ familyInvocationEntry,
     runner, sessionId, receipts };
 }
 
-/** The confirmation callback must be a host-owned human event, never a model-supplied JSON flag. */
+/** The confirmation callback must be a host-owned human event, never a model-supplied JSON flag.
+ * `readOnly` (Ruling 84 F2) makes a readback write nothing: wherever this would call
+ * `admitModelRoleHostBootstrap` (which persists an admission) it returns `admission-pending` instead. A
+ * session already recorded (REUSED) still reads `ready`, and a mapping that needs a human acknowledgement still
+ * reads `confirmation-required`; the store is only ever inspected and read. */
 export async function runModelRoleBootstrap({ rootDir, runner, env = process.env,
-  hostHookSessionId = null, confirm = null,
+  hostHookSessionId = null, confirm = null, readOnly = false,
   familyInvocationEntry = null,
   familyRouteSource = registeredModelFamilyTaskRoutes(),
   routeSource = registeredFunctionalTaskRoutes(),
@@ -278,6 +282,9 @@ export async function runModelRoleBootstrap({ rootDir, runner, env = process.env
       status: "confirmation-required", readback: proposal.readback };
     acknowledgement = { sessionId: identity.sessionId, confirmed: true,
       readbackSha256: proposal.readback.readbackSha256 };
+  }
+  if (readOnly === true) {
+    return { ok: false, code: "MODEL-ROLE-BOOTSTRAP-ADMISSION-PENDING", status: "admission-pending" };
   }
   const admitted = admitModelRoleHostBootstrap({ proposal, acknowledgement, store,
     authority: signed?.ok ? { routeSource, bundle: signed.bundle }

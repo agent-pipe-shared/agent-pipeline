@@ -38,9 +38,13 @@ export function assessMandatoryHookReadiness(report) {
   if (required.some((entry) => entry.status === "unresolved")) {
     return { status: "unresolved", code: "HOOK-READINESS-REPOSITORY-UNRESOLVED", required: projection };
   }
-  if (required.every((entry) => entry.status === "install")) {
+  // Partial provisioning (Ruling 84 F1): at least one hook is missing (`install`) and every other mandatory hook is
+  // `current` (a stale `refresh` was mapped to `current` above). Foreign, declined and unresolved entries were already
+  // answered above, so this is installable by the coordinator, which installs only the `install` entries.
+  if (required.some((entry) => entry.status === "install") && required.every((entry) => entry.status === "install" || entry.status === "current")) {
     return { status: "provisioning-required", code: "HOOK-READINESS-INSTALL-REQUIRED", required: projection };
   }
+  // Any other (unknown) status stays unsupported: the guard against an unclassified projection.
   return { status: "blocked", code: "HOOK-READINESS-STATE-UNSUPPORTED", required: projection };
 }
 

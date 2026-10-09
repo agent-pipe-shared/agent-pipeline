@@ -1597,10 +1597,11 @@ export function observePipelineStartPreflight({
         }
       : resultStatus === "hook-refresh-required"
       ? refreshAction
-      // `refreshAction` is null unless an Elephant session has a stale mandatory hook next to a
-      // missing one (HOOKREFRESH, Ruling 70): that mix used to be a dead end with no action.
+      // A blocked mandatory-hook state (foreign owner, decline, unsupported) carries no action. A stale hook
+      // next to a missing one is no longer blocked (Ruling 84 F1): it is provisioning-required first, then refresh.
+      // The arm stays, as an explicit null, so a blocked state cannot fall through to the onboarding action below.
       : resultStatus === "hook-provisioning-blocked"
-      ? refreshAction
+      ? null
       : resultStatus === "antigravity-topology-refresh-required"
       ? { kind: "command", executable: "node", argv: [resolve(antigravityTopology?.sourcePluginRoot ?? pluginRoot, "install-agy.mjs")], mutation: true, requiresConfirmation: true, executionBoundary: "host", expected: { schema: "pipeline.antigravity-refresh-result.v1", status: "refreshed" } }
       : status === "plugin-attestation-required"
@@ -1702,17 +1703,18 @@ export function observePipelineStartPreflight({
   // so the measured budget is unchanged. Without the seam the plain envelope is returned, byte-identical
   // to before, which keeps every synchronous caller and the pinned key set unchanged.
   if (typeof runModelRoleBootstrapFn !== "function") return envelope;
-  return attachModelRoleBootstrap(envelope, runModelRoleBootstrapFn, { rootDir: resolve(cwd), runner, env });
+  return attachModelRoleBootstrap(envelope, runModelRoleBootstrapFn, { rootDir: resolve(cwd), runner, env, readOnly: true });
 }
 
 /**
  * HOOKREFRESH (Rulings 67 and 70): turn a stale mandatory hook into an enforced, typed refresh. It applies
  * only to an Elephant session (every role except "goldfish" and "critic") whose base status is already
- * `ready` -- the same precondition as `applyMandatoryHookGate`. Two shapes qualify: a ready mandatory-hook
+ * `ready` -- the same precondition as `applyMandatoryHookGate`. Exactly one shape qualifies: a ready mandatory-hook
  * report with stale hooks (status becomes `hook-refresh-required`, which the exit-code allowlist does not
- * list, so it exits non-zero), and the blocked stale+missing mix (status stays `hook-provisioning-blocked`
- * but now carries the action instead of a dead end). The advisory pre-push hook never changes the status;
- * it is only listed in `refreshes` when it is stale beside a mandatory one. Anything else is returned unchanged.
+ * list, so it exits non-zero). A stale hook next to a missing one is NOT a second shape (Ruling 84 F1): that mix
+ * is `provisioning-required` first (the coordinator installs the missing hook), and only the ready state it
+ * leaves behind is refreshed. The advisory pre-push hook never changes the status; it is only listed in
+ * `refreshes` when it is stale beside a mandatory one. Anything else is returned unchanged.
  */
 function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisioning, mandatoryHookReadiness, pluginRoot, cwd, executionBoundary }) {
   const unchanged = { status: gatedStatus, action: null };
@@ -1720,17 +1722,13 @@ function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisio
   const staleReady = mandatoryHookReadiness?.status === "ready"
     && Array.isArray(mandatoryHookReadiness.refreshAvailable)
     && mandatoryHookReadiness.refreshAvailable.length > 0;
-  const staleMissingMix = mandatoryHookReadiness?.status === "blocked"
-    && mandatoryHookReadiness.code === "HOOK-READINESS-STATE-UNSUPPORTED"
-    && Array.isArray(mandatoryHookReadiness.required)
-    && mandatoryHookReadiness.required.some((entry) => entry?.status === "refresh");
-  if (!staleReady && !staleMissingMix) return unchanged;
+  if (!staleReady) return unchanged;
   const refreshes = (Array.isArray(cloneProvisioning?.checks) ? cloneProvisioning.checks : [])
     .filter((entry) => entry?.status === "refresh" && typeof entry.id === "string" && entry.id.endsWith("-hook"))
     .map((entry) => entry.id)
     .sort();
   return {
-    status: staleReady ? "hook-refresh-required" : gatedStatus,
+    status: "hook-refresh-required",
     action: {
       kind: "command",
       executable: process.execPath,
@@ -1746,10 +1744,14 @@ function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisio
 
 const MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE = "MODEL-ROLE-BOOTSTRAP-UNAVAILABLE";
 
+/** The statuses the readback field carries as their own (Ruling 84 F4). A pending human confirmation or a
+ * pending admission is not an outage, so it is reported as itself; everything else folds to `unavailable`. */
+const MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES = new Set(["ready", "confirmation-required", "admission-pending"]);
+
 /** The readback field: only the bootstrap's own `status` and `code`, folded to a closed shape. */
 function modelRoleBootstrapField(value) {
   return {
-    status: value?.status === "ready" ? "ready" : "unavailable",
+    status: MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES.has(value?.status) ? value.status : "unavailable",
     code: typeof value?.code === "string" ? value.code : MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE,
   };
 }
@@ -2075,6 +2077,7 @@ async function observeModelRoleBootstrapReadback() {
       rootDir: process.cwd(),
       runner: resolveActiveRunner({ env: process.env, read: readFileSync }),
       env: process.env,
+      readOnly: true,
     });
   } catch {
     return { ok: false, code: MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE, status: "unavailable" };

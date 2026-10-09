@@ -36,8 +36,9 @@ function describeFailure(value) {
 }
 
 /** Undo the pre-commit install made earlier in this same call. It only ever runs for a hook this call
- * installed (the apply precondition is that both hooks are absent), and the installer's own removal path
- * refuses a hook that was modified since, so a pre-existing or foreign hook is never removed. */
+ * installed (`preCommitResult` is `null` when pre-commit was already current and so never attempted), and the
+ * installer's own removal path refuses a hook that was modified since, so a pre-existing or foreign hook is
+ * never removed. */
 function applyFailureError({ rootDir, cause, preCommitResult, remove }) {
   const failedHook = "commit-msg-hook";
   const hook = "pre-commit-hook";
@@ -109,23 +110,35 @@ export function applyMandatoryHookReadiness(rootDir = process.cwd(), dependencie
   const before = inspectMandatoryHookReadiness(rootDir);
   if (before.status !== "provisioning-required") return { ...before, status: before.status === "ready" ? "ready" : "refused" };
   const required = new Map(before.required.map((entry) => [entry.id, entry]));
-  if ([...required.values()].some((entry) => entry.status !== "install")) {
+  // Ruling 84 F1: a partly provisioned pair is installable. Only the `install` entries are installed; a `current`
+  // entry (and a stale `refresh` one, which counts as current here and is refreshed by its own helper) is left
+  // byte-identical. Anything else is a drift between the plan and this read.
+  if ([...required.values()].some((entry) => entry.status !== "install" && entry.status !== "current" && entry.status !== "refresh")
+    || ![...required.values()].some((entry) => entry.status === "install")) {
     return { ...before, status: "refused", code: "HOOK-READINESS-PLAN-DRIFT" };
   }
   const installPreCommit = dependencies.applyPreCommit ?? applyPreCommit;
   const installCommitMsg = dependencies.applyCommitMsg ?? applyCommitMsg;
   const root = resolve(rootDir);
-  const preCommitResult = installPreCommit({ rootDir: root });
   const remove = dependencies.removePreCommit ?? removePreCommit;
-  let commitMsgResult;
-  try { commitMsgResult = installCommitMsg({ rootDir: root }); }
-  catch (cause) { throw applyFailureError({ rootDir: root, cause, preCommitResult, remove }); }
-  // A returned refusal (plan/install race) is a failed install exactly like a throw: it must not fall through to
-  // the readback with pre-commit left installed beside a missing commit-msg hook.
-  if (!APPLIED_INSTALL_STATUSES.has(commitMsgResult?.status)) {
-    throw applyFailureError({ rootDir: root, cause: commitMsgResult, preCommitResult, remove });
+  const results = [];
+  // `null` when pre-commit was not installed by this call, which makes the rollback `not-needed`.
+  let preCommitResult = null;
+  if (required.get("pre-commit-hook")?.status === "install") {
+    preCommitResult = installPreCommit({ rootDir: root });
+    results.push({ id: "pre-commit-hook", result: preCommitResult });
   }
-  const results = [{ id: "pre-commit-hook", result: preCommitResult }, { id: "commit-msg-hook", result: commitMsgResult }];
+  if (required.get("commit-msg-hook")?.status === "install") {
+    let commitMsgResult;
+    try { commitMsgResult = installCommitMsg({ rootDir: root }); }
+    catch (cause) { throw applyFailureError({ rootDir: root, cause, preCommitResult, remove }); }
+    // A returned refusal (plan/install race) is a failed install exactly like a throw: it must not fall through to
+    // the readback with pre-commit left installed beside a missing commit-msg hook.
+    if (!APPLIED_INSTALL_STATUSES.has(commitMsgResult?.status)) {
+      throw applyFailureError({ rootDir: root, cause: commitMsgResult, preCommitResult, remove });
+    }
+    results.push({ id: "commit-msg-hook", result: commitMsgResult });
+  }
   const after = inspectMandatoryHookReadiness(rootDir);
   return {
     ...after,
