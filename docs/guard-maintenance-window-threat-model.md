@@ -494,6 +494,25 @@ order, are:
 `lib/guard/verdict.mjs`, and
 `lib/guard/write-scope.mjs`.
 
+The Ruling 86a closure repair additionally protects exactly fifteen modules that
+the kernel closure test found imported by kernel modules but not yet listed:
+`lib/agy-central-refresh.mjs`, `lib/agy-central-snapshot.mjs`,
+`lib/agy-start-hint.mjs`, `lib/checkpoint-push-approval.mjs`,
+`lib/continuity-authority-drift.mjs`, `lib/critical-action-authorization.mjs`,
+`lib/fs-durability.mjs`, `lib/git-null-device.mjs`,
+`lib/guard/env-dump-lane.mjs`, `lib/hardened-private-directory.mjs`,
+`lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
+`scripts/security-readiness/gitleaks-readiness.mjs`,
+`scripts/security-readiness/osv-scanner-readiness.mjs`, and
+`scripts/security-readiness/semgrep-readiness.mjs`. These modules decide the
+central-refresh and start-hint behavior of the agy runner, checkpoint-push
+approval and critical-action authorization, the continuity-authority drift
+projection, durable filesystem writes and private-directory hardening, hook
+currentness, the lifecycle guard's environment-dump lane, and the toolchain and
+security-scanner readiness probes. Each is imported by a kernel module and
+executes in that module's process, so it is protected through both the project
+and the installed-plugin anchors for the same reason as the dependencies above.
+
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 
