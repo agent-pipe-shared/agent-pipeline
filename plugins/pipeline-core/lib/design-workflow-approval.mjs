@@ -3,7 +3,7 @@
 /** Exact PO-decision contract for a complete design workflow package. */
 import { execFileSync } from "node:child_process";
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
-import { designWorkflowAdvisorExceptionBinding, readApprovedDesignWorkflowPackage, readDesignWorkflowPackageFromRepository } from "./design-workflow-package.mjs";
+import { designWorkflowAdvisorExceptionBinding, readApprovedDesignWorkflowPackage, readDesignWorkflowPackageFromRepository, rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
 import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 
 export const DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA = "pipeline.design-workflow-package-approval-request.v1";
@@ -175,6 +175,15 @@ export function verifyDesignWorkflowPackageApproval({
  * implementation boundary. The approval record is only a cache: its digest,
  * proof and human attribution are all checked against the physical package
  * and the independently configured trust anchors again here.
+ *
+ * ADR-0085 C2 (decision T): the package is re-read through
+ * `rereadApprovedDesignWorkflowPackage`, which reads the package, the PRD and
+ * the Spec only. No live candidate, course store, host evidence, revision chain
+ * or readiness file is consulted, and the signature is checked against the trust
+ * anchors directly rather than through `verifyDesignWorkflowPackageApproval`
+ * (whose request validation re-reads with the live candidate). `readCandidate`
+ * and `trustedAdvisorExecutablePath` are still accepted so existing callers keep
+ * their call shape, and are unused here.
  */
 export function verifyStoredDesignWorkflowPackageSignature({
   repoRoot, packagePath, packageSha256, featureId, planPath, planSha256, specPath, specSha256,
@@ -184,10 +193,9 @@ export function verifyStoredDesignWorkflowPackageSignature({
     || approval.schema !== DESIGN_WORKFLOW_APPROVAL_SCHEMA || approval.mode !== "signature"
     || approval.packageSha256 !== packageSha256 || !SHA256.test(approval.intentSha256 ?? "")
     || !SHA256.test(approval.proofSha256 ?? "")) return { ok: false, code: "DWP-APPROVAL-RECORD-SHAPE" };
-  const packageRead = readApprovedDesignWorkflowPackage({
+  const packageRead = rereadApprovedDesignWorkflowPackage({
     repoRoot, packagePath, packageSha256, featureId, planPath, planSha256, specPath, specSha256,
-    readCandidate: candidateReader(readCandidate),
-    trustedAdvisorExecutablePath, advisorExceptionBinding: approval.advisorException ?? null,
+    advisorExceptionBinding: approval.advisorException ?? null,
   });
   if (!packageRead.ok) return packageRead;
   let approvalIntent;
@@ -200,22 +208,14 @@ export function verifyStoredDesignWorkflowPackageSignature({
     });
   } catch { return { ok: false, code: "DWP-APPROVAL-INTENT" }; }
   if (approvalIntent.sha256 !== approval.intentSha256) return { ok: false, code: "DWP-APPROVAL-INTENT-DRIFT" };
-  const request = {
-    schema: DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA,
-    packagePath,
-    packageSha256,
-    approvalIntent,
-    ...(approval.advisorException ? { advisorException: structuredClone(approval.advisorException) } : {}),
-  };
-  const verified = verifyDesignWorkflowPackageApproval({
-    repoRoot, request, proof: approval.proof, anchors,
-    packagePath, featureId, planPath, planSha256, specPath, specSha256,
-    readCandidate, trustedAdvisorExecutablePath, allowUnrelatedCommits: true,
-  });
-  if (!verified.ok) return verified;
+  const verified = verifyAgainstTrustAnchors({ intent: approvalIntent, anchors, proof: approval.proof });
+  if (!verified.verified) return { ok: false, code: verified.code ?? "DWP-APPROVAL-PROOF-INVALID" };
   if (verified.proofSha256 !== approval.proofSha256
     || approval.approvedBy !== `verified:${verified.signer.keyReference}`) {
     return { ok: false, code: "DWP-APPROVAL-RECORD-DRIFT" };
   }
-  return { ...verified, code: "DWP-APPROVAL-STORED-SIGNATURE-VERIFIED" };
+  return { ok: true, code: "DWP-APPROVAL-STORED-SIGNATURE-VERIFIED", packageSha256,
+    intentSha256: approvalIntent.sha256, proof: structuredClone(approval.proof), proofSha256: verified.proofSha256,
+    signer: verified.signer, packageRead,
+    ...(approval.advisorException ? { advisorException: structuredClone(approval.advisorException) } : {}) };
 }
