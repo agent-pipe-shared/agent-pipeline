@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { test } from "node:test";
+import { join, resolve } from "node:path";
+import { describe, test } from "node:test";
 
-import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
+import {
+  AGENT_PIPELINE_ROOT_INSECURE_OWNED_POSTURE,
+  AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY,
+  ensureAgentPipelineRoot,
+  ensureHardenedPrivateDirectory,
+} from "./hardened-private-directory.mjs";
 import { PrivateBoundaryError } from "./private-boundary.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { applyDecline as applyPreCommitDecline } from "../scripts/pre-commit-hook-install.mjs";
@@ -259,5 +264,409 @@ test("win32 refusal of a pre-existing insecure directory leaves it in place and 
     assert.ok(message.includes("agent-pipeline") && message.includes("insecure") && message.includes("foreign ACE"), message);
     assert.ok(message.includes(REMEDY), message);
     assert.equal(message.includes(anchor), false, "the message is anchor-relative and carries no host path");
+  });
+});
+
+// WIN-AP-T2 (Ruling 141 D0; Ruling 146 open item i): characterisation pins for every branch of the
+// repository-private root entry point. WIN-AP-F2 exercised the refusal branches only through an
+// untracked probe. These cases are expected GREEN against the current implementation; a red one is a
+// finding about the implementation, not a reason to loosen the case.
+//
+// Three kinds of case, named in their titles. "seam-driven" cases inject the observation, hardening,
+// assessment, chmod or uid seams because a real host cannot build the state (a foreign owner, a
+// chmod that does not take, an unobservable DACL); the directories themselves are still real.
+// "real win32 DACL host" and "real POSIX mode host" cases need the host's own mechanism and skip
+// with a typed `SKIP-HOST-CLASS` reason when that mechanism is missing, probed rather than assumed.
+describe("ensureAgentPipelineRoot (Ruling 141 D0 root entry point)", () => {
+  const SEGMENT = "agent-pipeline";
+  const ME = "HOST\\me";
+  const SECURE = { status: "secure", reason: "ok" };
+  const INSECURE = { status: "insecure", reason: "foreign ACE" };
+  const observed = (over = {}) => ({ status: null, reason: null, observation: { currentOwner: ME, owner: ME, reparsePoint: false, principals: [ME, "Everyone"], ...over } });
+  const shape = (path, over = {}) => ({ path, created: false, repaired: false, advisory: null, detail: null, ...over });
+  const withCommon = (prefix, run) => withTemp(prefix, (common) => run(common, join(resolve(common), SEGMENT)));
+
+  function expectRefusal(run, code) {
+    let thrown = null;
+    try { run(); } catch (error) { thrown = error; }
+    assert.ok(thrown instanceof PrivateBoundaryError, `expected a PrivateBoundaryError, got ${thrown?.name ?? "no throw"}: ${thrown?.message ?? ""}`);
+    assert.equal(thrown.code, code, thrown.message);
+    return thrown.message;
+  }
+
+  /** win32 seams with call counters; `assessed` is the sequence the assess seam walks, its last entry repeating. */
+  function win32Seams({ observe, assessed = [SECURE], ...extra }) {
+    const calls = { observe: 0, assess: 0, harden: [] };
+    const queue = [...assessed];
+    return {
+      calls,
+      options: {
+        platform: "win32",
+        observe: () => { calls.observe += 1; return observe; },
+        harden: (path) => { calls.harden.push(path); return SECURE; },
+        assess: () => { calls.assess += 1; return queue.length > 1 ? queue.shift() : queue[0]; },
+        ...extra,
+      },
+    };
+  }
+
+  function chmodSpy(effect = () => {}) {
+    const calls = [];
+    return { calls, chmod: (...args) => { calls.push(args); effect(...args); } };
+  }
+
+  /** Makes `root` group/other readable; returns a typed skip reason when the host does not record that. */
+  function makeInsecurePosixRoot(root) {
+    mkdirSync(root);
+    chmodSync(root, 0o755);
+    return (lstatSync(root).mode & 0o077) !== 0 ? null : "SKIP-HOST-CLASS group-other-readable-mode-not-recorded";
+  }
+
+  function makeDirectoryLink(target, link) {
+    try {
+      symlinkSync(target, link, process.platform === "win32" ? "junction" : "dir");
+      return null;
+    } catch (error) {
+      return `SKIP-HOST-CLASS directory-link-creation-denied (${error?.code ?? "unknown"})`;
+    }
+  }
+
+  function removeLink(link) {
+    try { unlinkSync(link); } catch { try { rmdirSync(link); } catch { /* the temporary-directory sweep reports a stuck link */ } }
+  }
+
+  /** A host that records and enforces POSIX mode bits and owner ids; probed, not inferred from the platform name. */
+  const POSIX_MODE_HOST_SKIP = (() => {
+    if (typeof process.getuid !== "function") return "SKIP-HOST-CLASS no-posix-owner-ids";
+    try {
+      return withTemp("apr-mode-probe-", (dir) => {
+        chmodSync(dir, 0o700);
+        if ((lstatSync(dir).mode & 0o077) !== 0) return "SKIP-HOST-CLASS posix-private-mode-not-recorded";
+        chmodSync(dir, 0o755);
+        return (lstatSync(dir).mode & 0o077) === 0 ? "SKIP-HOST-CLASS posix-open-mode-not-recorded" : false;
+      });
+    } catch (error) {
+      return `SKIP-HOST-CLASS posix-mode-probe-failed (${error?.code ?? "unknown"})`;
+    }
+  })();
+  const WIN32_DACL_HOST_SKIP = process.platform === "win32" ? false : "SKIP-HOST-CLASS no-windows-dacl-on-this-host";
+
+  test("the D0 default posture is repair, and an omitted, undefined or explicit posture takes it (seam-driven win32)", () => {
+    assert.equal(AGENT_PIPELINE_ROOT_INSECURE_OWNED_POSTURE, "repair");
+    assert.equal(AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY, "PB-ROOT-REPAIRED");
+    for (const extra of [{}, { posture: undefined }, { posture: "repair" }]) {
+      withCommon("apr-default-", (common, root) => {
+        mkdirSync(root);
+        const { calls, options } = win32Seams({ observe: observed(), ...extra });
+        assert.equal(ensureAgentPipelineRoot(common, options).repaired, true, JSON.stringify(extra));
+        assert.deepEqual(calls.harden, [root], JSON.stringify(extra));
+      });
+    }
+  });
+
+  test("an absent root is created hardened and reported as created, nothing repaired (seam-driven win32)", () => {
+    withCommon("apr-w-absent-", (common, root) => {
+      const { calls, options } = win32Seams({ observe: observed() });
+      assert.deepEqual(ensureAgentPipelineRoot(common, options), shape(root, { created: true }));
+      assert.deepEqual(calls.harden, [root], "the created root is hardened exactly once");
+      assert.equal(calls.observe, 0, "an absent root has no owner or DACL to observe");
+      assert.equal(statSync(root).isDirectory(), true);
+    });
+  });
+
+  test("a present, secure root is returned as found under either posture, never hardened (seam-driven win32)", () => {
+    for (const posture of ["repair", "refuse"]) {
+      withCommon("apr-w-secure-", (common, root) => {
+        mkdirSync(root);
+        const { calls, options } = win32Seams({ observe: observed({ principals: [ME] }), posture });
+        assert.deepEqual(ensureAgentPipelineRoot(common, options), shape(root), posture);
+        assert.deepEqual(calls.harden, [], `${posture}: a secure root is not hardened again`);
+      });
+    }
+  });
+
+  test("an insecure root owned by the current user is repaired in place and carries PB-ROOT-REPAIRED (seam-driven win32)", () => {
+    withCommon("apr-w-repair-", (common, root) => {
+      mkdirSync(root);
+      const { calls, options } = win32Seams({ observe: observed(), assessed: [SECURE] });
+      const result = ensureAgentPipelineRoot(common, options);
+      assert.deepEqual(result, shape(root, { repaired: true, advisory: "PB-ROOT-REPAIRED", detail: "private path DACL grants a non-owner principal" }));
+      assert.deepEqual(calls.harden, [root], "the repair hardens the root exactly once");
+      assert.equal(calls.assess, 1, "the repair is re-assessed once, after hardening");
+      assert.equal(existsSync(root), true);
+    });
+  });
+
+  for (const [label, after, status, reason, remedy] of [
+    ["insecure", INSECURE, "insecure", "foreign ACE", REMEDY],
+    ["unavailable", { status: "unavailable", reason: "PowerShell missing" }, "unavailable", "PowerShell missing", REMEDY_UNAVAILABLE],
+    ["unreported", undefined, "unavailable", "no reason reported", REMEDY_UNAVAILABLE],
+  ]) {
+    test(`a repair whose re-assessment is ${label} is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)`, () => {
+      withCommon(`apr-w-norepair-${label}-`, (common, root) => {
+        mkdirSync(root);
+        const { calls, options } = win32Seams({ observe: observed(), assessed: [after] });
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, options), "PB-WINDOWS-ASSURANCE");
+        assert.deepEqual(calls.harden, [root], "the repair was attempted exactly once");
+        assert.equal(existsSync(root), true, "a pre-existing root is never removed by a failed repair");
+        assert.ok(message.includes(`assurance is ${status} for ${SEGMENT}: ${reason}.`), message);
+        assert.ok(message.includes("An in-place repair reset its DACL to the current principal, but it did not end secure."), message);
+        assert.ok(message.includes(remedy), message);
+        assert.equal(message.includes(common), false, "the message names the segment, never a host path");
+      });
+    });
+  }
+
+  test("a refuse or unrecognised posture leaves an insecure root untouched and refuses (seam-driven win32)", () => {
+    for (const posture of ["refuse", "REPAIR", "Repair", "", null, true]) {
+      withCommon("apr-w-posture-", (common, root) => {
+        mkdirSync(root);
+        const { calls, options } = win32Seams({ observe: observed(), assessed: [INSECURE], posture });
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, options), "PB-WINDOWS-ASSURANCE");
+        assert.deepEqual(calls.harden, [], `posture ${JSON.stringify(posture)}: nothing is hardened`);
+        assert.equal(existsSync(root), true);
+        assert.ok(message.includes("The directory already existed and was left untouched."), message);
+        assert.ok(message.includes("insecure") && message.includes("foreign ACE"), message);
+      });
+    }
+  });
+
+  test("a root owned by anyone else is refused and left untouched under either posture (seam-driven win32)", () => {
+    for (const posture of ["repair", "refuse"]) {
+      withCommon("apr-w-foreign-", (common, root) => {
+        mkdirSync(root);
+        const { calls, options } = win32Seams({ observe: observed({ owner: "HOST\\other" }), assessed: [INSECURE], posture });
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, options), "PB-WINDOWS-ASSURANCE");
+        assert.deepEqual(calls.harden, [], `${posture}: a foreign-owned root is never hardened`);
+        assert.equal(existsSync(root), true);
+        assert.ok(message.includes("The directory already existed and was left untouched."), message);
+      });
+    }
+  });
+
+  test("a root the observation reports as a reparse point is refused even with a clean DACL, and left untouched (seam-driven win32)", () => {
+    withCommon("apr-w-reparse-", (common, root) => {
+      mkdirSync(root);
+      const reason = "private path is a reparse point or its state is unknown";
+      const { calls, options } = win32Seams({ observe: observed({ reparsePoint: true, principals: [ME] }), assessed: [{ status: "insecure", reason }] });
+      const message = expectRefusal(() => ensureAgentPipelineRoot(common, options), "PB-WINDOWS-ASSURANCE");
+      assert.deepEqual(calls.harden, [], "a reparse point is never hardened");
+      assert.equal(existsSync(root), true);
+      assert.ok(message.includes(reason), message);
+    });
+  });
+
+  for (const [label, observation] of [
+    ["an unavailable status carrying an observation", { status: "unavailable", reason: "PowerShell missing", observation: observed().observation }],
+    ["an unavailable status without an observation", { status: "unavailable", reason: "PowerShell missing", observation: null }],
+    ["no observation at all", undefined],
+  ]) {
+    test(`a root whose owner and DACL cannot be observed (${label}) is refused with the unavailable remedy and left untouched (seam-driven win32)`, () => {
+      withCommon("apr-w-unobservable-", (common, root) => {
+        mkdirSync(root);
+        const { calls, options } = win32Seams({ observe: observation, assessed: [{ status: "unavailable", reason: "PowerShell missing" }] });
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, options), "PB-WINDOWS-ASSURANCE");
+        assert.deepEqual(calls.harden, [], "an unobservable root is never hardened");
+        assert.equal(existsSync(root), true);
+        assert.ok(message.includes(`assurance is unavailable for ${SEGMENT}: PowerShell missing.`), message);
+        assert.ok(message.includes(REMEDY_UNAVAILABLE), message);
+      });
+    });
+  }
+
+  test("a link at the root is refused with PB-DIRECTORY under every platform branch, link and target untouched (seam-driven platform over a real link)", (t) => {
+    withCommon("apr-link-", (common, root) => {
+      const target = join(common, "link-target");
+      mkdirSync(target);
+      writeFileSync(join(target, "keep.txt"), "keep");
+      const skip = makeDirectoryLink(target, root);
+      if (skip !== null) { t.skip(skip); return; }
+      try {
+        const modeBefore = lstatSync(target).mode;
+        for (const options of [
+          { platform: "win32", observe: unreachable("observe"), harden: unreachable("harden"), assess: unreachable("assess") },
+          { platform: "linux", chmod: unreachable("chmod"), getuid: unreachable("getuid") },
+          {},
+        ]) {
+          const message = expectRefusal(() => ensureAgentPipelineRoot(common, options), "PB-DIRECTORY");
+          assert.ok(message.includes("must be a physical directory"), message);
+          assert.equal(lstatSync(root).isSymbolicLink(), true, "the link is left exactly as found");
+          assert.equal(readFileSync(join(target, "keep.txt"), "utf8"), "keep", "nothing behind the link is touched");
+          assert.equal(lstatSync(target).mode, modeBefore, "the link target's mode is never changed through the link");
+        }
+      } finally {
+        removeLink(root);
+      }
+    });
+  });
+
+  test("a file at the root path is refused with PB-DIRECTORY under every platform branch and its content stays (seam-driven platform over a real file)", () => {
+    withCommon("apr-file-", (common, root) => {
+      writeFileSync(root, "not a directory");
+      for (const options of [
+        { platform: "win32", observe: unreachable("observe"), harden: unreachable("harden"), assess: unreachable("assess") },
+        { platform: "linux", chmod: unreachable("chmod"), getuid: unreachable("getuid") },
+        {},
+      ]) {
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, options), "PB-DIRECTORY");
+        assert.ok(message.includes("must be a physical directory"), message);
+        assert.equal(lstatSync(root).isFile(), true, "the file is never replaced");
+        assert.equal(readFileSync(root, "utf8"), "not a directory");
+      }
+    });
+  });
+
+  test("an anchor that is missing, empty, not a string or not a directory is refused with PB-ANCHOR and creates nothing (seam-driven platform)", () => {
+    withTemp("apr-anchor-", (dir) => {
+      const missing = join(dir, "missing-anchor");
+      const file = join(dir, "anchor-is-a-file");
+      writeFileSync(file, "x");
+      for (const options of [
+        { platform: "win32", observe: unreachable("observe"), harden: unreachable("harden"), assess: unreachable("assess") },
+        { platform: "linux", chmod: unreachable("chmod"), getuid: unreachable("getuid") },
+      ]) {
+        for (const anchor of [missing, file, "", undefined, null, 7]) {
+          expectRefusal(() => ensureAgentPipelineRoot(anchor, options), "PB-ANCHOR");
+        }
+      }
+      assert.equal(existsSync(missing), false, "a missing anchor is never created");
+      assert.equal(existsSync(join(missing, SEGMENT)), false);
+      assert.equal(lstatSync(file).isFile(), true);
+    });
+  });
+
+  test("an insecure root owned by someone else, or by an unknown uid, is refused with PB-ROOT-INSECURE and never chmodded (seam-driven POSIX)", (t) => {
+    withCommon("apr-p-foreign-", (common, root) => {
+      const skip = makeInsecurePosixRoot(root);
+      if (skip !== null) { t.skip(skip); return; }
+      const before = lstatSync(root);
+      for (const [label, getuid] of [["another uid", () => before.uid + 1], ["null", () => null], ["undefined", () => undefined], ["NaN", () => Number.NaN], ["a string", () => String(before.uid)]]) {
+        const spy = chmodSpy();
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, { platform: "linux", getuid, chmod: spy.chmod }), "PB-ROOT-INSECURE");
+        assert.match(message, /private-state directory agent-pipeline is insecure \(mode 0o[0-7]{3}\)\./u, label);
+        assert.ok(message.includes("It is not owned by the current user and was left untouched."), `${label}: ${message}`);
+        assert.ok(message.includes(REMEDY), message);
+        assert.deepEqual(spy.calls, [], `${label}: a root that is not provably ours is never chmodded`);
+        assert.equal(lstatSync(root).mode, before.mode, `${label}: the mode is untouched`);
+        assert.equal(message.includes(common), false, "the message names the segment, never a host path");
+      }
+    });
+  });
+
+  test("a refuse or unrecognised posture refuses an insecure root owned by the current user without chmod (seam-driven POSIX)", (t) => {
+    withCommon("apr-p-posture-", (common, root) => {
+      const skip = makeInsecurePosixRoot(root);
+      if (skip !== null) { t.skip(skip); return; }
+      const before = lstatSync(root);
+      for (const posture of ["refuse", "REPAIR", "", null]) {
+        const spy = chmodSpy();
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, { platform: "linux", posture, getuid: () => before.uid, chmod: spy.chmod }), "PB-ROOT-INSECURE");
+        assert.ok(message.includes("It is owned by the current user and was left untouched (refuse posture)."), `${JSON.stringify(posture)}: ${message}`);
+        assert.deepEqual(spy.calls, [], `${JSON.stringify(posture)}: nothing is chmodded`);
+        assert.equal(lstatSync(root).mode, before.mode);
+      }
+    });
+  });
+
+  test("a chmod that does not take is refused with PB-ROOT-INSECURE after exactly one attempt on the assessed inode (seam-driven POSIX)", (t) => {
+    withCommon("apr-p-notake-", (common, root) => {
+      const skip = makeInsecurePosixRoot(root);
+      if (skip !== null) { t.skip(skip); return; }
+      const before = lstatSync(root);
+      const spy = chmodSpy();
+      const message = expectRefusal(() => ensureAgentPipelineRoot(common, { platform: "linux", getuid: () => before.uid, chmod: spy.chmod }), "PB-ROOT-INSECURE");
+      assert.equal(spy.calls.length, 1, "the repair is attempted exactly once");
+      const [path, mode, expected] = spy.calls[0];
+      assert.equal(path, join(resolve(common), SEGMENT));
+      assert.equal(mode, 0o700);
+      assert.deepEqual([expected.dev, expected.ino], [before.dev, before.ino], "the chmod is bound to the inode that was assessed");
+      assert.match(message, /did not end private after an in-place repair \(mode 0o[0-7]{3}\)\./u);
+      assert.ok(message.includes(REMEDY), message);
+      assert.equal(existsSync(root), true, "the root is never removed");
+    });
+  });
+
+  test("an error thrown by the chmod seam propagates unchanged and is not read as a repair (seam-driven POSIX)", (t) => {
+    withCommon("apr-p-throws-", (common, root) => {
+      const skip = makeInsecurePosixRoot(root);
+      if (skip !== null) { t.skip(skip); return; }
+      const boom = new Error("chmod crashed");
+      const before = lstatSync(root);
+      assert.throws(() => ensureAgentPipelineRoot(common, { platform: "linux", getuid: () => before.uid, chmod: () => { throw boom; } }), (error) => error === boom);
+      assert.equal(lstatSync(root).mode, before.mode);
+    });
+  });
+
+  test("real POSIX mode host: an absent root is created with mode 0o700 and reported as created", { skip: POSIX_MODE_HOST_SKIP }, () => {
+    withCommon("apr-rp-absent-", (common, root) => {
+      assert.deepEqual(ensureAgentPipelineRoot(common), shape(root, { created: true }));
+      assert.equal(statSync(root).mode & 0o777, 0o700);
+    });
+  });
+
+  test("real POSIX mode host: a present root with mode 0o700 is returned as found", { skip: POSIX_MODE_HOST_SKIP }, () => {
+    withCommon("apr-rp-secure-", (common, root) => {
+      mkdirSync(root);
+      chmodSync(root, 0o700);
+      assert.deepEqual(ensureAgentPipelineRoot(common), shape(root));
+      assert.equal(statSync(root).mode & 0o777, 0o700);
+    });
+  });
+
+  for (const mode of [0o755, 0o770, 0o705]) {
+    test(`real POSIX mode host: an insecure root of mode 0o${mode.toString(8)} owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED`, { skip: POSIX_MODE_HOST_SKIP }, () => {
+      withCommon("apr-rp-repair-", (common, root) => {
+        mkdirSync(root);
+        chmodSync(root, mode);
+        assert.deepEqual(ensureAgentPipelineRoot(common), shape(root, { repaired: true, advisory: "PB-ROOT-REPAIRED", detail: `mode 0o${mode.toString(8)} reset to 0o700` }));
+        assert.equal(statSync(root).mode & 0o777, 0o700);
+      });
+    });
+  }
+
+  test("real POSIX mode host: the refuse posture leaves an insecure root of the current user at its mode and refuses with PB-ROOT-INSECURE", { skip: POSIX_MODE_HOST_SKIP }, () => {
+    withCommon("apr-rp-refuse-", (common, root) => {
+      mkdirSync(root);
+      chmodSync(root, 0o755);
+      const message = expectRefusal(() => ensureAgentPipelineRoot(common, { posture: "refuse" }), "PB-ROOT-INSECURE");
+      assert.ok(message.includes("(mode 0o755)") && message.includes("(refuse posture)"), message);
+      assert.equal(statSync(root).mode & 0o777, 0o755, "the refused root keeps the mode it had");
+    });
+  });
+
+  test("real win32 DACL host: an absent root is created with a secure DACL; a second call returns it as found", { skip: WIN32_DACL_HOST_SKIP }, () => {
+    withCommon("apr-rw-absent-", (common, root) => {
+      assert.deepEqual(ensureAgentPipelineRoot(common), shape(root, { created: true }));
+      assert.equal(assessWindowsPrivatePath(root).status, "secure");
+      assert.deepEqual(ensureAgentPipelineRoot(common), shape(root));
+      assert.equal(assessWindowsPrivatePath(root).status, "secure");
+    });
+  });
+
+  test("real win32 DACL host: an insecure root of the current user is repaired to a secure DACL with PB-ROOT-REPAIRED", { skip: WIN32_DACL_HOST_SKIP }, (t) => {
+    withCommon("apr-rw-repair-", (common, root) => {
+      mkdirSync(root);
+      if (assessWindowsPrivatePath(root).status !== "insecure") {
+        t.skip("SKIP-HOST-CLASS temp-directory-inherits-no-foreign-ace (an explicit foreign ACE survives the repair and is refused, Ruling 146 open item ii)");
+        return;
+      }
+      const result = ensureAgentPipelineRoot(common);
+      assert.deepEqual({ ...result, detail: typeof result.detail }, shape(root, { repaired: true, advisory: "PB-ROOT-REPAIRED", detail: "string" }));
+      assert.match(result.detail, /DACL/u);
+      assert.equal(assessWindowsPrivatePath(root).status, "secure");
+    });
+  });
+
+  test("real win32 DACL host: the refuse posture leaves an insecure root of the current user insecure and refuses with PB-WINDOWS-ASSURANCE", { skip: WIN32_DACL_HOST_SKIP }, (t) => {
+    withCommon("apr-rw-refuse-", (common, root) => {
+      mkdirSync(root);
+      if (assessWindowsPrivatePath(root).status !== "insecure") {
+        t.skip("SKIP-HOST-CLASS temp-directory-inherits-no-foreign-ace (the insecure-existing premise cannot be built)");
+        return;
+      }
+      const message = expectRefusal(() => ensureAgentPipelineRoot(common, { posture: "refuse" }), "PB-WINDOWS-ASSURANCE");
+      assert.ok(message.includes("The directory already existed and was left untouched."), message);
+      assert.equal(assessWindowsPrivatePath(root).status, "insecure", "the refused root is never hardened");
+    });
   });
 });
