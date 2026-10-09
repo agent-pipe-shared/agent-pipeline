@@ -2263,3 +2263,87 @@ test("CRITIC-CKPT-T2 (d5, control): a goldfish-deep Write to a critic-notes.md p
   for (let index = 0; index < 5; index += 1) assert.equal(results[index].exitCode, 0, `work call ${index + 1} is within the cap`);
   trgAssertRefusedAfterCap(results[5], `goldfish-deep Write ${CKPT_NOTES_PATH}`);
 });
+
+// ---------------------------------------------------------------------------
+// CRITIC-CKPT-T3 (tranche-2 post-image, 2026-10-09): RED pins for the Critic's confined Write lane BEFORE the cap. Appended after the
+// CRITIC-CKPT-T2 block; every line above is unchanged. Test-only (QG-04): the change that turns the red cases green is CRITIC-CKPT-F.
+//   Ruling 157 (Write/Edit confined by a guard to scratch/dispatch/critic-*/critic-notes.md) and Ruling 159 (the confined Write is
+//   admitted, every other path refused) bind at EVERY call, not only after the cap. The T2 block pinned only the post-cap lane and
+//   claimed that the agent's `tools` frontmatter settles pre-cap confinement; a `tools` list cannot confine paths, so that claim is
+//   overruled and the lane is pinned here at call 1 and at call 20, both well below the cap. Same subject and harness as T2: the
+//   shipped agents/critic.md, a preflight-bound cap of 50, the derived runner, and the T2 helpers.
+//   (a) at call 1 and at call 20 a Critic Write and a Critic Edit of scratch/dispatch/critic-<id>/critic-notes.md are admitted.
+//   (b)-(e) at call 1 and at call 20 a Critic Write (b, c) and a Critic Edit (d, e) of every other path -- the four T2 (d) paths, a
+//       plugin source file and evidence/x.json -- is refused with a typed DISPATCH-BUDGET-* code that is neither the budget
+//       exhaustion code nor the exhausted-allowance text (the cap is not reached, so either would be the wrong refusal). The six
+//       paths of a case run as ONE scenario: the first is call 1 (or 20), the others the calls right after it, all below the cap.
+//   (f) T2 open item (d4): scratch/dispatch/other/critic-notes.md is refused at call 1 and at call 20, as a Write and an Edit.
+//   (g) control: a goldfish-deep Write to plugins/pipeline-core/lib/x.mjs at call 1 stays admitted -- the confinement is the Critic's.
+// ---------------------------------------------------------------------------
+const CKPT3_REFUSED_PATHS = [
+  "scratch/x.md",
+  "evidence/other.json",
+  "scratch/dispatch/critic-abc/other.md",
+  "scratch/critic-notes.md",
+  "plugins/pipeline-core/lib/x.mjs",
+  "evidence/x.json",
+];
+const CKPT3_OTHER_DIR_NOTES_PATH = "scratch/dispatch/other/critic-notes.md";
+
+const ckptEdit = (path) => ckptCriticCall("Edit", { file_path: path, old_string: "a", new_string: "b" });
+const ckptMutate = (tool, path) => (tool === "Edit" ? ckptEdit(path) : ckptWrite(path));
+/** A scenario whose first listed step is call number `call` (call - 1 admitted reads come first; ckptReads(0) would expand to one read). */
+const ckptAt = (call, steps) => ckptScenario([...(call > 1 ? [ckptReads(call - 1)] : []), ...steps]);
+
+/** Why `verdict` is not the typed pre-cap confinement refusal, or null when it is. */
+function ckpt3Problem(verdict) {
+  if (verdict.exitCode === 0) return "admitted (exit 0)";
+  const problems = [];
+  if (verdict.exitCode !== 2) problems.push(`exit ${verdict.exitCode}, expected 2`);
+  if (!/BLOCKED \(guard-dispatch-budget/u.test(verdict.stderr)) problems.push("not a guard-dispatch-budget refusal");
+  if (!/DISPATCH-BUDGET-[A-Z-]+/u.test(verdict.stderr)) problems.push("no typed DISPATCH-BUDGET-* code");
+  if (/DISPATCH-BUDGET-EXHAUSTED/u.test(verdict.stderr)) problems.push("budget exhaustion, but the cap is not reached");
+  if (/closing allowance of 5 tool calls is exhausted/u.test(verdict.stderr)) problems.push("exhausted-allowance text, but the cap is not reached");
+  return problems.length === 0 ? null : problems.join(", ");
+}
+
+/** Every [tool, path] pair, run as consecutive calls starting at call number `call`, must be refused with the typed pre-cap code. */
+function ckpt3AssertConfined(call, pairs) {
+  const reads = call - 1;
+  const { results } = ckptRun(ckptAt(call, pairs.map(([tool, path]) => ckptMutate(tool, path))));
+  assert.ok(results.slice(0, reads).every((verdict) => verdict.exitCode === 0), `the ${reads} working reads before the first write are admitted (the cap is not reached)`);
+  const problems = pairs.flatMap(([tool, path], index) => {
+    const problem = ckpt3Problem(results[reads + index]);
+    return problem === null ? [] : [`${tool} ${path} (call ${call + index}): ${problem}`];
+  });
+  assert.equal(problems.length, 0, `a Critic write outside scratch/dispatch/critic-<id>/critic-notes.md must be refused with a typed DISPATCH-BUDGET-* code before the cap; ${problems.length} of ${pairs.length} were not -- ${problems.join(" | ")}`);
+}
+
+test("CRITIC-CKPT-T3 (a): a Critic Write and a Critic Edit of scratch/dispatch/critic-<id>/critic-notes.md are admitted at call 1 and at call 20 (green today)", () => {
+  for (const call of [1, 20]) {
+    for (const tool of ["Write", "Edit"]) {
+      const reads = call - 1;
+      const { results } = ckptRun(ckptAt(call, [ckptMutate(tool, CKPT_NOTES_PATH)]));
+      assert.ok(results.slice(0, reads).every((verdict) => verdict.exitCode === 0), `the ${reads} working reads before the ${tool} are admitted`);
+      assert.equal(results[reads].exitCode, 0, `a ${tool} of the confined notes file must be admitted at call ${call} -- got: ${ckptWhy(results[reads])}`);
+    }
+  }
+});
+
+for (const [label, tool, call] of [["b", "Write", 1], ["c", "Write", 20], ["d", "Edit", 1], ["e", "Edit", 20]]) {
+  test(`CRITIC-CKPT-T3 (${label}): a Critic ${tool} of any path but its notes file is refused with a typed code at call ${call}, before the cap`, () => {
+    ckpt3AssertConfined(call, CKPT3_REFUSED_PATHS.map((path) => [tool, path]));
+  });
+}
+
+for (const call of [1, 20]) {
+  test(`CRITIC-CKPT-T3 (f): a Critic Write and Edit of scratch/dispatch/other/critic-notes.md are refused with a typed code from call ${call}, before the cap (T2 open item d4)`, () => {
+    ckpt3AssertConfined(call, [["Write", CKPT3_OTHER_DIR_NOTES_PATH], ["Edit", CKPT3_OTHER_DIR_NOTES_PATH]]);
+  });
+}
+
+test("CRITIC-CKPT-T3 (g, control): a goldfish-deep Write to plugins/pipeline-core/lib/x.mjs at call 1 stays admitted (green today)", () => {
+  const steps = [{ op: "guard", input: trgDeepCall("Write", { file_path: "plugins/pipeline-core/lib/x.mjs", content: "export {};" }) }];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  assert.equal(results[0].exitCode, 0, `a goldfish-deep source Write at call 1 must stay admitted -- got: ${results[0].stderr.trim().slice(0, 300)}`);
+});
