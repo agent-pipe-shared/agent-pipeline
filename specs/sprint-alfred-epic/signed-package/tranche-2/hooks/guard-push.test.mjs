@@ -2456,6 +2456,77 @@ function freshRepoIn(parentDir, name) {
     "git --help", dir, ALLOW, { stderrEmpty: true });
   check("PGC-T5F4b block  a real push after --help is still a push candidate and stays refused (as declared for --version)",
     "git --help push origin main:refs/heads/feature-test", dir, BLOCK);
+
+  // ---- GREP-PUSH-T: markers after a clearly non-push subcommand (Ruling 157 GREP-PUSH bullet; Ruling 81 trigger) -----------
+  // Added by the tranche-2 post-image of dispatch GREP-PUSH-T-20261009b. Ruling 81 found the trigger: the marker set ( ) { $
+  // and the backtick after a git word, not the caret and not --no-index. Ruling 157 accepted the security trade for the
+  // subcommands commit, grep, log, show, diff and status on ONE condition: a push hidden in a command substitution, a
+  // backtick pair or a process substitution in ANY argument, and a push-capable subcommand (push, remote, config, an
+  // alias form) that carries a marker, stay refused.
+  // PGM-A* (admitted) are RED today: each is a push candidate on the marker rule alone, so guard-push refuses it (exit 2
+  // where 0 is expected). PGM-R* (refused) are GREEN today and are the condition of the trade: GREP-PUSH-F may not make
+  // them pass by loosening the rule. T38b/c, T80a/b, T42b/c, T82b/c and the HEREDOC_PAREN control of T5F3a pin the CURRENT
+  // refusal ("Ruling 81 option B"); GREP-PUSH-F must flip or re-aim them (TR-C-MANIFEST.md / GREP-PUSH-MANIFEST.md).
+  const PGM_PUSH = "git push origin main:refs/heads/feature-test";
+  const PGM_ADMITTED = [
+    ["A01", "commit: ( ) in a Dispatch trailer beside -F (the T91 shape)", 'git commit -F scratch/commit-msg/slice.txt --trailer "Dispatch: GREP-PUSH-T-20261009 (goldfish)" --trailer "AI-Assisted: true" -- docs/a.md'],
+    ["A02", "commit: ( ) in a plain -m message", 'git commit -m "s (goldfish)"'],
+    ["A03", "commit: ( ) in the Dispatch trailer of the printed -m form", 'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: GREP-PUSH-T-20261009 (goldfish)" -- docs/a.md'],
+    ["A04", "commit: $ of a harmless command substitution", 'git commit -m "$(date)"'],
+    ["A05", "commit: backtick in a single-quoted message", "git commit -m 'built with `date`'"],
+    ["A06", "commit: { } in a JSON-looking message", "git commit -m '{\"a\":1}'"],
+    ["A07", "commit: a lone ) in a message", "git commit -m 'closes the loop :)'"],
+    ["A08", "grep: ( ) in an alternation pattern", 'git grep -n "(alpha|beta)" -- README.md'],
+    ["A09", "grep: { } in a pattern", "git grep -n -e '{alpha}' -- README.md"],
+    ["A10", "grep: $ of a variable", 'git grep -n "$HOME" -- README.md'],
+    ["A11", "grep: backtick in a pattern", "git grep -n 'alpha`beta' -- README.md"],
+    ["A12", "log: ( ) in a --grep pattern", "git log -n 5 --grep='fix(core)'"],
+    ["A13", "log: { } in a --format", "git log -n 1 --format='%h {%s}'"],
+    ["A14", "log: $ of a variable", 'git log -n 1 --author="$USER"'],
+    ["A15", "log: backtick in a --grep pattern", "git log -n 1 --grep='a`b'"],
+    ["A16", "show: ( ) in a --format", "git show --no-patch --format='%h (%s)' HEAD"],
+    ["A17", "show: { } in a --format", "git show --no-patch --format='{%h}' HEAD"],
+    ["A18", "show: $ of a variable in a pathspec", 'git show HEAD -- "$PWD"'],
+    ["A19", "show: backtick in a --format", "git show --no-patch --format='a`b' HEAD"],
+    ["A20", "diff: ( ) in a pathspec", "git diff -- 'a (1).txt'"],
+    ["A21", "diff: { } in a pathspec", "git diff --stat -- '{a,b}.txt'"],
+    ["A22", "diff: $( ) of a nested NON-push git command (the accepted false positive named in lib/git-cmd.mjs)", 'git diff "$(git merge-base HEAD main)" -- README.md'],
+    ["A23", "diff: backtick in a pathspec", "git diff -- 'a`b'"],
+    ["A24", "status: ( ) in a pathspec", "git status --short -- 'dir (copy)'"],
+    ["A25", "status: { } in a pathspec", "git status --short -- '{a,b}.txt'"],
+    ["A26", "status: $ of a variable", 'git status --short -- "$PWD"'],
+    ["A27", "status: backtick in a pathspec", "git status --short -- 'a`b'"],
+  ];
+  for (const [id, label, command] of PGM_ADMITTED) {
+    check(`PGM-${id} allow  ${label}`, command, dir, ALLOW, { stderrEmpty: true });
+  }
+  const PGM_REFUSED = [
+    ["R01", "commit: a push inside $( ) in -m", `git commit -m "$(${PGM_PUSH})"`],
+    ["R02", "commit: a push inside a backtick pair in -m", 'git commit -m "`' + PGM_PUSH + '`"'],
+    ["R03", "commit: a push inside <( ) as an argument", `git commit -m x <(${PGM_PUSH})`],
+    ["R04", "diff: a push inside <( ) as an argument", `git diff <(${PGM_PUSH}) README.md`],
+    ["R05", "grep: a push inside $( ) in the pattern", `git grep -n "$(${PGM_PUSH})" -- README.md`],
+    ["R06", "log: a push inside $( ) in --grep", `git log -n 1 --grep="$(${PGM_PUSH})"`],
+    ["R07", "log: a push inside a backtick pair in --grep", 'git log -n 1 --grep="`' + PGM_PUSH + '`"'],
+    ["R08", "show: a push inside $( ) as the revision", `git show "$(${PGM_PUSH})"`],
+    ["R09", "diff: a push inside $( ) as the revision", `git diff "$(${PGM_PUSH})" -- README.md`],
+    ["R10", "status: a push inside $( ) in a pathspec", `git status --short -- "$(${PGM_PUSH})"`],
+    ["R11", "commit: a harmless ( ) message beside a push inside $( ) in a later trailer", `git commit -m "s (goldfish)" --trailer "X: $(${PGM_PUSH})"`],
+    ["R12", "commit: a push inside $( ) behind a global option", `git -C . commit -m "$(${PGM_PUSH})"`],
+    ["R13", "push: a ( ) in the refspec", 'git push origin "main:refs/heads/feature(x)"'],
+    ["R14", "push: a nested $( ) in the refspec", 'git push origin "$(git rev-parse HEAD):refs/heads/feature-test"'],
+    ["R15", "push: { } in the refspec", "git push origin 'main:refs/heads/{a,b}'"],
+    ["R16", "remote: $( ) in the url of an added remote", 'git remote add origin2 "$(echo https://example.invalid/r.git)"'],
+    ["R17", "remote: ( ) in the push url", "git remote set-url --push origin '(x)'"],
+    ["R18", "config: ( ) in a push url setting", "git config remote.origin.pushurl '(x)'"],
+    ["R19", "config: an alias that runs a push, with { } ( )", 'git config alias.p "!f() { git push origin main:refs/heads/feature-test; }; f"'],
+    ["R20", "alias form: -c alias that runs a push, with a ( ) marker", `git -c "alias.ps=!${PGM_PUSH}" ps -- "(x)"`],
+    ["R21", "alias form: -c alias that shadows an exempt subcommand name (status)", `git -c "alias.status=!${PGM_PUSH}" status -- "(x)"`],
+    ["R22", "alias form: -c alias for an unknown subcommand beside a commit-style ( ) message", `git -c "alias.ci=!${PGM_PUSH}" ci -m "s (goldfish)"`],
+  ];
+  for (const [id, label, command] of PGM_REFUSED) {
+    check(`PGM-${id} block  ${label}`, command, dir, BLOCK);
+  }
 }
 
 // ---- Cleanup ----------------------------------------------------------------------------
