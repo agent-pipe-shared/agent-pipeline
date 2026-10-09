@@ -13,7 +13,8 @@ const LEGACY_SUBMISSION_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
 const PREVIOUS_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v4";
 const V5_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v5";
 const V6_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v6";
-export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v7";
+const V7_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v7";
+export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v8";
 // Schema-identifier collision, resolved additively and deliberately NOT merged:
 // "pipeline.plan-approval.v3" denotes two disjoint historical record shapes.
 //   - PREVIOUS_CURRENT_APPROVAL_SCHEMA (above): the submission-bound approval
@@ -117,7 +118,7 @@ const SUBMISSION_KEYS = [
   "submittedBy",
   "submittedAt",
 ];
-const CURRENT_APPROVAL_KEYS = [
+const V7_CURRENT_APPROVAL_KEYS = [
   "schema",
   "approvedBy",
   "approvedAt",
@@ -130,7 +131,19 @@ const CURRENT_APPROVAL_KEYS = [
   "designWorkflowPackageSha256",
   "designWorkflowApproval",
 ];
-const V6_CURRENT_APPROVAL_KEYS = CURRENT_APPROVAL_KEYS.filter((key) => key !== "designWorkflowApproval");
+// v8 (ADR-0085 C4): one designApproval record replaces the four v7 design
+// fields. v7 stays readable through validPreviousCurrentPlanApproval.
+const CURRENT_APPROVAL_KEYS = [
+  "schema",
+  "approvedBy",
+  "approvedAt",
+  "submissionSha256",
+  "profileSha256",
+  "poGateAuthority",
+  "priorInvalidationSha256",
+  "designApproval",
+];
+const V6_CURRENT_APPROVAL_KEYS = V7_CURRENT_APPROVAL_KEYS.filter((key) => key !== "designWorkflowApproval");
 const V5_CURRENT_APPROVAL_KEYS = V6_CURRENT_APPROVAL_KEYS.filter((key) => !["designWorkflowPackagePath", "designWorkflowPackageSha256"].includes(key));
 const PREVIOUS_CURRENT_APPROVAL_KEYS = V5_CURRENT_APPROVAL_KEYS.filter((key) => key !== "designAdvisorAdmissionSha256");
 const LEGACY_SUBMISSION_APPROVAL_KEYS = PREVIOUS_CURRENT_APPROVAL_KEYS.filter((key) => key !== "priorInvalidationSha256");
@@ -232,6 +245,30 @@ function validDesignWorkflowApproval(value, packageSha256) {
   if (value.mode === "chat") return value.intentSha256 === null && value.proofSha256 === null && value.proof === null;
   const proof = value.proof;
   return SHA256.test(value.intentSha256 ?? "") && SHA256.test(value.proofSha256 ?? "")
+    && hasExactKeys(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])
+    && proof.schema === "pipeline.po-approval-proof.v1" && proof.intentSha256 === value.intentSha256
+    && isNonBlankString(proof.keyReference) && isNonBlankString(proof.publicKey) && isNonBlankString(proof.signatureBase64);
+}
+
+// ADR-0085 C4 (contract P1, amendment a2): the v8 designApproval record is one
+// closed key set with a mode-conditional proof. Both modes bind the same
+// bindingSha256 and a NON-null intentSha256. A chat record is attribution only
+// (proofSha256 and proof null); a signature record carries its proof, whose
+// intentSha256 equals the record's. proofSha256 is deliberately not bound to
+// the canonical proof here (the proof is verified against the trust anchor by
+// the route that writes it), and the record's approvedBy is not required to
+// equal the plan approval's approvedBy.
+const DESIGN_APPROVAL_SCHEMA = "pipeline.design-approval.v1";
+const DESIGN_APPROVAL_KEYS = ["schema", "mode", "approvedBy", "approvedAt", "bindingSha256", "intentSha256", "proofSha256", "proof"];
+function validDesignApproval(value) {
+  if (!hasExactKeys(value, DESIGN_APPROVAL_KEYS)
+    || value.schema !== DESIGN_APPROVAL_SCHEMA
+    || !isNonBlankString(value.approvedBy) || !isCanonicalIso(value.approvedAt)
+    || !SHA256.test(value.bindingSha256 ?? "") || !SHA256.test(value.intentSha256 ?? "")) return false;
+  if (value.mode === "chat") return value.proofSha256 === null && value.proof === null;
+  if (value.mode !== "signature") return false;
+  const proof = value.proof;
+  return SHA256.test(value.proofSha256 ?? "")
     && hasExactKeys(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])
     && proof.schema === "pipeline.po-approval-proof.v1" && proof.intentSha256 === value.intentSha256
     && isNonBlankString(proof.keyReference) && isNonBlankString(proof.publicKey) && isNonBlankString(proof.signatureBase64);
@@ -375,12 +412,8 @@ export function validCurrentPlanApproval(value) {
     && SHA256.test(value.submissionSha256)
     && SHA256.test(value.profileSha256)
     && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256))
-    && (value.designAdvisorAdmissionSha256 === null || SHA256.test(value.designAdvisorAdmissionSha256))
-    && ((value.designWorkflowPackagePath === null && value.designWorkflowPackageSha256 === null)
-      || (isRepositoryPath(value.designWorkflowPackagePath) && SHA256.test(value.designWorkflowPackageSha256 ?? "")))
-    && ((value.designWorkflowPackagePath === null && value.designWorkflowApproval === null)
-      || (value.designWorkflowPackagePath !== null
-        && validDesignWorkflowApproval(value.designWorkflowApproval, value.designWorkflowPackageSha256)))
+    // null is the mini-profile shape (no design review, so no design approval).
+    && (value.designApproval === null || validDesignApproval(value.designApproval))
     && validAuthority(value.poGateAuthority);
 }
 
@@ -390,7 +423,16 @@ export function validPreviousCurrentPlanApproval(value) {
     && SHA256.test(value?.submissionSha256 ?? "")
     && SHA256.test(value?.profileSha256 ?? "")
     && validAuthority(value?.poGateAuthority);
-  return shared && ((hasExactKeys(value, V6_CURRENT_APPROVAL_KEYS)
+  return shared && ((hasExactKeys(value, V7_CURRENT_APPROVAL_KEYS)
+      && value.schema === V7_CURRENT_APPROVAL_SCHEMA
+      && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256))
+      && (value.designAdvisorAdmissionSha256 === null || SHA256.test(value.designAdvisorAdmissionSha256))
+      && ((value.designWorkflowPackagePath === null && value.designWorkflowPackageSha256 === null)
+        || (isRepositoryPath(value.designWorkflowPackagePath) && SHA256.test(value.designWorkflowPackageSha256 ?? "")))
+      && ((value.designWorkflowPackagePath === null && value.designWorkflowApproval === null)
+        || (value.designWorkflowPackagePath !== null
+          && validDesignWorkflowApproval(value.designWorkflowApproval, value.designWorkflowPackageSha256))))
+    || (hasExactKeys(value, V6_CURRENT_APPROVAL_KEYS)
       && value.schema === V6_CURRENT_APPROVAL_SCHEMA
       && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256))
       && (value.designAdvisorAdmissionSha256 === null || SHA256.test(value.designAdvisorAdmissionSha256))
@@ -508,6 +550,10 @@ function currentApproval(state, submission, observation) {
     const requiredSeal = invalidation === undefined ? null : sha256CanonicalJson(invalidation);
     const advisorBindingMatchesProfile = approval.schema === CURRENT_APPROVAL_SCHEMA
       ? (submission.profile === "mini"
+        ? approval.designApproval === null
+        : validDesignApproval(approval.designApproval))
+      : approval.schema === V7_CURRENT_APPROVAL_SCHEMA
+      ? (submission.profile === "mini"
         ? approval.designWorkflowPackagePath === null && approval.designWorkflowPackageSha256 === null && approval.designWorkflowApproval === null
         : isRepositoryPath(approval.designWorkflowPackagePath) && SHA256.test(approval.designWorkflowPackageSha256 ?? "")
           && validDesignWorkflowApproval(approval.designWorkflowApproval, approval.designWorkflowPackageSha256))
@@ -520,7 +566,8 @@ function currentApproval(state, submission, observation) {
           ? approval.designAdvisorAdmissionSha256 === null
           : SHA256.test(approval.designAdvisorAdmissionSha256 ?? ""))
         : true;
-    const sealed = (approval.schema === CURRENT_APPROVAL_SCHEMA || approval.schema === V6_CURRENT_APPROVAL_SCHEMA || approval.schema === V5_CURRENT_APPROVAL_SCHEMA
+    const sealed = (approval.schema === CURRENT_APPROVAL_SCHEMA || approval.schema === V7_CURRENT_APPROVAL_SCHEMA
+      || approval.schema === V6_CURRENT_APPROVAL_SCHEMA || approval.schema === V5_CURRENT_APPROVAL_SCHEMA
       || approval.schema === PREVIOUS_CURRENT_APPROVAL_SCHEMA)
       ? approval.priorInvalidationSha256 === requiredSeal
       : invalidation === undefined;
@@ -1010,8 +1057,11 @@ export function approveSubmittedPlan({
   if ((submission.profile === "mini") !== (designWorkflowPackagePath === null && designWorkflowPackageSha256 === null)) {
     return fail("PLAN-APPROVE-DESIGN-WORKFLOW-PROFILE-INVALID");
   }
+  // Still writes v7: the v8 writer (designApproval) belongs to the approve-plan
+  // route slice. validCurrentPlanApproval no longer accepts this record; it is
+  // read back through validPreviousCurrentPlanApproval.
   const approval = {
-    schema: CURRENT_APPROVAL_SCHEMA,
+    schema: V7_CURRENT_APPROVAL_SCHEMA,
     approvedBy: by,
     approvedAt: at,
     submissionSha256: expectedSubmissionSha256,
