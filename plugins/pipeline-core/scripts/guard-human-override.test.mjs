@@ -620,7 +620,11 @@ test("the external-path check uses the platform's own separator, so an in-reposi
  * default-platform (POSIX) path on this test host, the same way the sibling win32 test
  * above exercises win32 by injecting it.
  */
-test("NVA-HGOFIX-2: the external-path check does not misread a POSIX in-repository file whose name merely contains a backslash as external", () => {
+test("NVA-HGOFIX-2: the external-path check does not misread a POSIX in-repository file whose name merely contains a backslash as external", {
+  // A backslash is a path separator on win32 (and NTFS cannot name a component with one), so the
+  // default-platform arm of this case exists only on a POSIX host.
+  skip: process.platform === "win32" ? "a backslash is a path separator on win32; a single component containing one cannot exist there" : false,
+}, () => {
   const digest = "a".repeat(64);
   const argv = (proofPath) => [
     "authorize-by-signature",

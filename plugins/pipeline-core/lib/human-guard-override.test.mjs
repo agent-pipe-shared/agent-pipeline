@@ -1822,7 +1822,7 @@ test("NVA-W3-16: a rejected drift audit entry names exactly which checks diverge
   }
 });
 
-test("security and authority boundaries return typed recovery without an ambient bypass", () => {
+test("security and authority boundaries return typed recovery without an ambient bypass", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
   const root = fixture();
   try {
     mkdirSync(join(root, "physical"), { recursive: true });
@@ -1906,7 +1906,7 @@ test("security and authority boundaries return typed recovery without an ambient
 // (boundedOpaqueCopyCommand()), mirroring codex-pretool-guard.mjs's own commandDisclosureFields()
 // for its equivalent denial class. Non-Bash tools (Edit/Write) have no `command` field at
 // all and keep the unchanged toolInputSha256-only disclosure.
-test("NVA-W4-01B: HGO-EXTERNAL-PROJECT-BOUNDARY discloses a bounded copy-safe rendering of the exact denied Bash command", () => {
+test("NVA-W4-01B: HGO-EXTERNAL-PROJECT-BOUNDARY discloses a bounded copy-safe rendering of the exact denied Bash command", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
   const root = fixture();
   try {
     // Same in-root-symlink-escape shape as the "security and authority boundaries" test's
@@ -2099,7 +2099,7 @@ test("a non-push git apply --check command whose patch path says push never sele
   }
 });
 
-test("pipeline author repair binds one exact source root and action without State readiness", () => {
+test("pipeline author repair binds one exact source root and action without State readiness", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
   const root = fixture();
   try {
     const sourceRoot = join(root, "plugins", "pipeline-core");
@@ -2587,8 +2587,13 @@ test("a recovery guard excludes a second reclaimer and a raced replacement is ne
     killedAuditWriter(base);
     const first = humanGuardOverrideInternals.acquireAuditLock(paths, secret, {
       afterRecoveryGuardFn: () => {
+        // The recovery guard is held by THIS live process. Linux proves that owner live and answers
+        // RECOVERY-BUSY; win32 keeps no per-process start identity and never answers "live"
+        // (win32AuditLockOwnerState), so it fails closed as AMBIGUOUS before touching the guard.
+        // Either way the second reclaimer is excluded and the guard stays in place for the outer call.
+        const secondReclaimerCode = process.platform === "win32" ? "HGO-AUDIT-LOCK-AMBIGUOUS" : "HGO-AUDIT-LOCK-RECOVERY-BUSY";
         assert.throws(() => humanGuardOverrideInternals.acquireAuditLock(paths, secret),
-          (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCK-RECOVERY-BUSY");
+          (error) => error instanceof HumanGuardOverrideError && error.code === secondReclaimerCode);
       },
     });
     assert.equal(first.recovered, true);
@@ -4710,7 +4715,7 @@ test("NOVA-HGOELIG-3: an out-of-root capability binds one exact command -- a dif
 // candidate that genuinely escapes `root` (the same escape test safePath() itself
 // applies) may become eligible. crossBoundaryTarget() re-derives that escape test
 // independently rather than trusting "safePath() said no" as sufficient on its own.
-test("NOVA-HGOELIG-4: an in-root symlink or hardlink attack is never reclassified as a cross-repository target", () => {
+test("NOVA-HGOELIG-4: an in-root symlink or hardlink attack is never reclassified as a cross-repository target", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
   const root = fixture();
   try {
     mkdirSync(join(root, "physical", "nested"), { recursive: true });
@@ -4805,7 +4810,10 @@ test("NVA-HGOFIX-1: crossBoundaryTarget() never rescues an in-root `..\\x` symli
 // argv-token normalization.
 // ---------------------------------------------------------------------------------
 
-test("NVA-HGOFIX-2: separatorNormalized() and safePath() gain an injectable platform seam, provable from a POSIX host", () => {
+// The default-platform arms below also build a directory whose NAME contains a backslash and compare host
+// path-module results (resolve/relative) that only the real POSIX host can produce; the `platform` seam
+// reaches separatorNormalized() alone, so on win32 these two are typed-skipped, not driven by injection.
+test("NVA-HGOFIX-2: separatorNormalized() and safePath() gain an injectable platform seam, provable from a POSIX host", { skip: POSIX_BACKSLASH_SKIP }, () => {
   assert.equal(humanGuardOverrideInternals.separatorNormalized("a\\b"), "a\\b",
     "the default platform (POSIX on this host) must leave a backslash-bearing value untouched");
   assert.equal(humanGuardOverrideInternals.separatorNormalized("a\\b", { platform: "win32" }), "a/b",
@@ -4827,7 +4835,7 @@ test("NVA-HGOFIX-2: separatorNormalized() and safePath() gain an injectable plat
   }
 });
 
-test("NVA-HGOFIX-2: crossBoundaryTarget()'s :792 hardBoundaryPath() check is intentionally unnormalized on POSIX, and its platform seam reaches the win32 branch", () => {
+test("NVA-HGOFIX-2: crossBoundaryTarget()'s :792 hardBoundaryPath() check is intentionally unnormalized on POSIX, and its platform seam reaches the win32 branch", { skip: POSIX_BACKSLASH_SKIP }, () => {
   const root = fixture();
   try {
     // Genuinely escapes root; the final literal component is SHAPED like a secrets path
@@ -4849,7 +4857,7 @@ test("NVA-HGOFIX-2: eligibility()'s Bash argv-token normalization (:1385) is win
     // Single-quoted so the closed-shell tokenizer preserves the literal backslash (outside
     // quotes it is the tokenizer's own escape character, exactly like real POSIX shells).
     const command = "touch 'secrets\\backup.txt'";
-    const posixResult = humanGuardOverrideInternals.eligibility(root, "Bash", { command });
+    const posixResult = humanGuardOverrideInternals.eligibility(root, "Bash", { command }, { platform: "linux" });
     assert.equal(posixResult.eligible, true,
       "a token merely CONTAINING a backslash must not be misread as a hard-boundary path on POSIX");
     const win32Result = humanGuardOverrideInternals.eligibility(root, "Bash", { command }, { platform: "win32" });
@@ -5872,7 +5880,7 @@ test("NVA-CROSSREPOGUIDANCE-1a: an ordinary in-root denial returns the coordinat
     });
     assert.equal(plan.root, recorded.root,
       "the returned root must be the one the ceremony resolves the request under");
-    assert.equal(recorded.root, git(root, "rev-parse", "--path-format=absolute", "--show-toplevel"),
+    assert.equal(recorded.root, join(git(root, "rev-parse", "--path-format=absolute", "--show-toplevel")),
       "an ordinary in-root denial must still name the coordinator's own root, unchanged");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -6034,7 +6042,7 @@ test("NVA-CROSSREPOGUIDANCE-1b: a cross-repository denial returns the TARGET roo
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
     });
     assert.equal(recorded.status, "planned");
-    assert.equal(recorded.root, git(target, "rev-parse", "--path-format=absolute", "--show-toplevel"),
+    assert.equal(recorded.root, join(git(target, "rev-parse", "--path-format=absolute", "--show-toplevel")),
       "a cross-repository denial must name the target repository, not the coordinator");
     assert.notEqual(recorded.root, root, "naming the coordinator here is exactly the defect under test");
 
