@@ -133,17 +133,24 @@ bytes.
   `evidence/ADR0085-T0c-a-20261009/red-run3.txt`; the probe that cleared the fixture is in
   `evidence/ADR0085-T0c-run2-20261009/`.
 
-### guard-devplan-design-approval-v7.test.mjs (ADR-0085 row 3b; Ruling 77(c)): pending, fixture
+### guard-devplan-design-approval-v7.test.mjs (ADR-0085 row 3b; Ruling 77(c))
 
-- Target path: `plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs`. No post-image yet.
-- Measured cause (WSL, `evidence/ADR0085-T0c-b-20261009/red.txt` and `enroll-diagnostic.txt`): the fixture no longer
-  fails with `DWP2-CURRENT-CANDIDATE`. That refusal is cleared once the evidence commit stages exactly the package's
-  bound paths, derived from the package object (the v2 reader admits HEAD only as an evidence-only descendant of the
-  package candidate). The builder now stops one step later, in the governance enrollment: `applyDecision` returns scope
-  state `declined` (provenance `explicit-local-decision` / `git-common-config`, `requiresEnforcement: false`) instead of
-  `active`, so neither the control nor the target case runs.
-- Unverified hypothesis: `governance-scope.mjs` writes `declined` when enrollment history is retained (the
-  `plan.decision==='enroll'&&!retained` ternary in `applyDecision`), and this fixture enrolls after
-  `coordinateInitialDesignAdvisory` has written under the git common dir, whereas draft A enrolls right after `git init`.
-  Next step: enroll immediately after `advisorHostFixture` returns, then rerun. The working copy that carries the
-  bound-path fix is `scratch/dispatch-wip/t0c-run/b.test.mjs` (untracked).
+- Target path: `plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs`
+- Post-image: `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval-v7.test.mjs`
+- sha256: `e11f1a405b59bed85a7b712860548c0c4a6888529af541a9636ac54b7e64973d`
+- Install: copy the post-image to the target path unchanged. It imports `../lib/`, `../scripts/` and `./` and resolves
+  the guard from `./guard-devplan.mjs`, so it runs only at the target path, not in place here.
+- WSL command (hook tests run under WSL only; on win32 the case skips with its reason):
+  `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs"`
+- State before the F slice: control green, target red (the run reports 3 tests: the control passes, the target fails and
+  the parent test fails with it). RED reason: with the private course store removed (a fresh clone) the v7 package re-read
+  refuses with `DWP2-DURABLE-FAILURE` (`design-workflow-package-v2.mjs:97`) and the Edit lane exits 2 with that code,
+  whereas the contract (design note section 17) is that the boundary admits without the store. Only the Edit-lane
+  assertion is reached today; the Bash lane's own refusal is not measured.
+- Fixture: the disposable repository is enrolled right after `advisorHostFixture` returns, before any state file is
+  written, because `governance-scope.mjs` `enrollmentHistory()` counts `.claude/pipeline-state.json` and an enrollment
+  made after it is recorded as `declined`. The evidence commit stages exactly the package's bound paths (the v2 reader
+  admits HEAD only as an evidence-only descendant of the package candidate).
+- Evidence (machine-written capture of a scratch run copy that differs from the post-image only in the 14 import lines
+  and the `GUARD` line): `evidence/ADR0085-T0c-b-20261009/red-run4.txt`. The two earlier failing states of the same
+  fixture are in `red.txt` (`DWP2-CURRENT-CANDIDATE`, then the declined enrollment) and `enroll-diagnostic.txt`.
