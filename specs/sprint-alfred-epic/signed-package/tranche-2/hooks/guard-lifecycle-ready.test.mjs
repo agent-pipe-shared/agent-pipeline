@@ -1,0 +1,12199 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+import assert from "node:assert/strict";
+import {linkSync} from "node:fs";
+import {PO_PLAN_ACKNOWLEDGEMENT_MARKER} from "../lib/onboarding-staging-authoring.mjs";
+import { spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { delimiter, dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+import {
+  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
+  ProjectOnboardingReadyError,
+} from "../lib/project-onboarding-ready-gate.mjs";
+// NVA-INTAKEARGV-1: the guidance renderer comes from the lib module that now owns the shape
+// table; the table and argv emitter keep arriving through the CLI seam below, unchanged.
+import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
+import {
+  EVIDENCE_HOST_PATH_DENIAL_CODE,
+  checkDispatchRecordCollision,
+  DISPATCH_RECORD_COLLISION_DENIAL_CODE,
+  isEvidenceArtifactPath,
+  extractWritePayload,
+  ADMITTED_GRAMMAR_SHAPES,
+  BASE_GOVERNANCE_MARKERS,
+  claudeSessionMemoryDirectory,
+  evaluateLifecycleReadyGuard,
+  gateStrengthShellNeedleFor,
+  governanceMarkers,
+  isClaudeSessionMemoryWritePath,
+  isForbiddenCrossRepositoryMutation,
+  isMachinePlaneWritePath,
+  isMeaningfulGateStrengthShellNeedle,
+  isNarrowRepositoryRecoveryCommand,
+  isProjectWritePath,
+  isReadOnlyDiagnosticCommand,
+  isRealpathedWithinBoundary,
+  isRestartResumeHintInputWrite,
+  isSanctionedGhReadOnlyDiagnostic,
+  isSanctionedLifecycleCommand,
+  isSanctionedStartPreflightInvocation,
+  machinePlaneFilePath,
+  main,
+  MANIFEST_FAILURE_WARNING,
+  retryActionsForDeniedCommand,
+} from "./guard-lifecycle-ready.mjs";
+// NVA-STARNEEDLE-1 AC-3: imported straight from the module the shell lane itself imports
+// (GATE_STRENGTH_PATHS), never restated here as a copy or a fixed count -- the same
+// single-source discipline TPSHELL-5 pins for its own protected-test-path table.
+import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
+import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
+// AC-10: imported straight from the library module the guard now defers to, never
+// through the guard's own re-export, so this test cannot pass merely because both
+// names happen to reference the identical function object.
+import { MACHINE_PLANE_SCHEMA, machinePlaneFilePath as libMachinePlaneFilePath, writeMachinePlane } from "../lib/machine-plane.mjs";
+import {
+  isBoundedReadOnlyPipeline,
+  parseGuardCommand,
+} from "./guard-command-grammar.mjs";
+// GUARDDERIVE-1: imported straight from the onboarding CLI the guard defers to, never
+// restated here -- the whole point of the change is that one table is the single source.
+import {
+  automatedLifecycleArgvCommands,
+  automatedMutatingApplyArgv,
+  MUTATING_ONBOARDING_ARGV_SHAPES,
+  ONBOARDING_SUBCOMMANDS,
+} from "../scripts/project-onboarding-v3.mjs";
+// NOVA-LCR-HGO-1 (ADR-0059 Decision 3/4): the same generic HGO Bash class the guard now
+// consumes for its three closed-shell-grammar denials. Arming driven through the library
+// directly, mirroring guard-testpath-override.test.mjs's `arm()` (chat) and
+// lib/human-guard-override.test.mjs's `prepareSignedArming()` (signature) helpers.
+import {
+  authorizeHumanGuardOverride,
+  authorizeHumanGuardOverrideBySignature,
+  HGO_SIGNATURE_REASON,
+  planHumanGuardOverride,
+  prepareHumanGuardOverrideAuthorization,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
+import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
+// TPSHELL-*: the shell lane of the test-path authority gate. Imported from the library the
+// guard defers to, for the same reason AC-10 states above -- and because the write lane
+// (guard-testpath.mjs) reads the identical exports, which is the property TPSHELL-5 pins.
+import {
+  loadProtectedTestPathRules,
+  protectedTestPathBasenameNeedles,
+  protectedTestPathShellHit,
+  resolveGuardConfigPath,
+  TESTPATH_SHELL_DENIAL_CODE,
+} from "../lib/protected-test-paths.mjs";
+// DEVPLANSHELL-*: the shell lane of the Dev-Plan lifecycle gate. Imported from the library
+// the guard defers to, for the same reason AC-10/TPSHELL-* state above -- and because the
+// write lane (guard-devplan.mjs) reads the identical `devPlanGateVerdict()`, so the two
+// lanes can never independently decide a path's dev-plan-gate fate differently from
+// each other.
+import { DEFAULT_EXEMPT_PREFIXES, DEVPLAN_SHELL_DENIAL_CODE } from "../lib/guard-devplan-policy.mjs";
+// NVA-V4-PUSHDRIVER: the driver's own real argv-emission function, never a hand-typed copy
+// (same discipline as automatedMutatingApplyArgv() above, NVA-CODEXARGV-1's own pattern).
+import { buildPushInitArgv } from "../scripts/push-init.mjs";
+// NVA-V4-PUSHDRIVER: the real command builder the signature step is rendered from
+// (push-prepare.mjs's own `authorize` line calls this with no override) -- used to prove the
+// exact command push-init.mjs would present to a human is refused for an agent's own Bash
+// tool call, never reconstructed by hand.
+import { authorizeCriticalPushCommand } from "../scripts/po-human-approval.mjs";
+
+const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
+const PUSH_INIT_SCRIPT = fileURLToPath(new URL("../scripts/push-init.mjs", import.meta.url));
+const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
+const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
+const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
+const PRE_PUSH_HOOK_INSTALL_SCRIPT = fileURLToPath(new URL("../scripts/pre-push-hook-install.mjs", import.meta.url));
+const OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../scripts/observation-governance-bootstrap.mjs", import.meta.url));
+const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../scripts/runner-transcript-recovery.mjs", import.meta.url));
+const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../scripts/repair-map.mjs", import.meta.url));
+const SCRIPTS_DIR = fileURLToPath(new URL("../scripts/", import.meta.url));
+const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
+const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
+// NVA-VERIFYGREEN-1: sanctionedMigrationArgs()'s own script -- distinct from
+// PROJECT_AUTHORITY_MIGRATION_SCRIPT just above, which is project-authority-migration.mjs and is
+// gated by a different guard function (sanctionedProjectAuthorityMigrationArgs()). This is the
+// runner-profile-migration-v3.mjs the MIGRATION_SCRIPT constant in guard-lifecycle-ready.mjs
+// resolves to; the test file previously had zero coverage of this script's admission branch.
+const RUNNER_PROFILE_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
+const RESUME_HINT_SCRIPT = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
+const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
+const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
+const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
+const PO_APPROVAL_GATE_SCRIPT = fileURLToPath(new URL("../scripts/po-approval-gate.mjs", import.meta.url));
+
+function root() {
+  const path = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-"));
+  mkdirSync(join(path, ".claude"), { recursive: true });
+  return path;
+}
+
+function markGovernedFixture(path) {
+  mkdirSync(join(path, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(path, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-09-29T00:00:00.000Z",
+  }));
+}
+
+function activeGitRoot() {
+  const path = root();
+  const initialized = spawnSync("git", ["init", "--quiet", "--template="], {
+    cwd: path, encoding: "utf8", env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/u.test(key))),
+  });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  mkdirSync(join(path, ".agent-pipeline"));
+  writeFileSync(join(path, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-09-29T00:00:00.000Z",
+  }));
+  return path;
+}
+
+function edit(filePath = "src/implementation.mjs") {
+  return { tool_name: "Edit", tool_input: { file_path: filePath } };
+}
+
+function write(filePath = "src/implementation.mjs") {
+  return { tool_name: "Write", tool_input: { file_path: filePath } };
+}
+
+// MACHPATH-1: NotebookEdit is the third WRITE_TOOLS member and carries its target under
+// `notebook_path`, not `file_path` (lib/tool-write-target.mjs) -- AC-1 requires every
+// write-capable tool proven, not only the two `edit`/`write` helpers above already cover.
+function notebookEdit(filePath = "src/implementation.ipynb") {
+  return { tool_name: "NotebookEdit", tool_input: { notebook_path: filePath } };
+}
+
+// MEMPATH-1: real Edit/Write PreToolUse payloads carry `file_path` alongside sibling
+// top-level fields the tool itself never sees or sets, `transcript_path` among them. `edit`/
+// `write` above stay unmodified (every pre-existing test relies on their exact shape); these
+// two add only the one field this feature reads, mirroring the real harness contract rather
+// than a synthetic shortcut.
+function editWithTranscript(filePath, transcriptPath) {
+  return { tool_name: "Edit", tool_input: { file_path: filePath }, transcript_path: transcriptPath };
+}
+
+function writeWithTranscript(filePath, transcriptPath) {
+  return { tool_name: "Write", tool_input: { file_path: filePath }, transcript_path: transcriptPath };
+}
+
+/**
+ * A real Claude Code session directory: an absolute transcript file (a UUID `.jsonl`
+ * sibling of the memory directory, exactly what `dirname(transcript_path)` yields) plus its
+ * already-materialized `memory/` directory -- matching this session's own observed on-disk
+ * shape (confirmed live, this dispatch, Linux/WSL2) rather than a guessed layout.
+ */
+function claudeMemorySessionFixture() {
+  const sessionDir = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-session-"));
+  const transcriptPath = join(sessionDir, "9f86d081-884c-4d30-8c19-ffcaa4c07bd1.jsonl");
+  const memoryDir = join(sessionDir, "memory");
+  mkdirSync(memoryDir, { recursive: true });
+  return { sessionDir, transcriptPath, memoryDir };
+}
+
+// MACHPATH-1: the repository's own gitignored scratch/ tree, never system tmpdir and never
+// the real $HOME (field-4 constraint: this feature IS a home-directory write surface, so its
+// own fixtures must stay inside the repository rather than merely stand in for one, unlike the
+// pre-existing MEMPATH-1 session fixtures above which model Claude Code's own session dir).
+const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+
+/**
+ * A fake home directory rooted under SCRATCH_ROOT, standing in for `os.homedir()` via the
+ * injected `homedirFn` dependency -- never the real one. Returns the fixture directory plus
+ * the exact single file this feature is meant to admit, both already realpathed so the fixture
+ * agrees with what machinePlaneFilePath() itself derives.
+ */
+function machinePlaneHomeFixture() {
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const home = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-machine-home-"));
+  const realHome = realpathSync(home);
+  return { home, target: join(realHome, ".agent-pipeline", "machine.json") };
+}
+
+function bash(command = "printf implementation") {
+  return { tool_name: "Bash", tool_input: { command } };
+}
+
+function deny(status = "partial") {
+  throw new ProjectOnboardingReadyError(
+    "PORG-NOT-READY",
+    "raw lifecycle message containing /private/root",
+    { intent: "session", lifecycleStatus: status },
+  );
+}
+
+test("ordinary non-governed repositories remain untouched and never inspect lifecycle", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    assert.deepEqual(evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { calls += 1; },
+    }), { exitCode: 0, stderr: "" });
+    assert.equal(calls, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("inactive repositories remain silent for session writes and Bash; valid consent enforces readiness", () => {
+  for (const toolName of ["Edit", "Write", "NotebookEdit", "Bash"]) {
+    const path = root();
+    let calls = 0;
+    try {
+      const input = toolName === "NotebookEdit"
+        ? { tool_name: toolName, session_id: "session-positive", tool_input: { notebook_path: "src/game.ipynb" } }
+        : toolName === "Bash"
+          ? { tool_name: toolName, session_id: "session-positive", tool_input: { command: "printf unchanged" } }
+          : { tool_name: toolName, session_id: "session-positive", tool_input: { file_path: "src/game.js" } };
+      const dependencies = { projectDir: path, requireProjectOnboardingReadyFn() { calls += 1; deny(); } };
+      assert.deepEqual(evaluateLifecycleReadyGuard(input, dependencies), { exitCode: 0, stderr: "" }, toolName);
+      assert.equal(calls, 0, toolName);
+      markGovernedFixture(path);
+      const enforced = evaluateLifecycleReadyGuard(input, dependencies);
+      assert.equal(enforced.exitCode, 2, toolName);
+      assert.match(enforced.stderr, /GUARD-LIFECYCLE-NOT-READY/u, toolName);
+      assert.equal(calls, 1, toolName);
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  }
+});
+
+test("bare invalid source, calibration, lock, runtime and consent markers stay inactive; valid consent enforces", () => {
+  const markers = [
+    ".agent-pipeline/core.lock.json", "pipeline.user.yaml", ".claude/pipeline.json",
+    ".claude/pipeline.yaml", ".claude/settings.json", ".codex/config.toml",
+    ".codex/agents/critic.toml", ".agent-pipeline/onboarding-consent.json",
+  ];
+  for (const marker of markers) {
+    const path = root();
+    let calls = 0;
+    try {
+      mkdirSync(dirname(join(path, marker)), { recursive: true });
+      writeFileSync(join(path, marker), "marker\n");
+      const dependencies = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn({ rootDir, intent }) {
+          calls += 1;
+          assert.equal(rootDir, path);
+          assert.equal(intent, "session");
+          deny();
+        },
+      };
+      assert.deepEqual(evaluateLifecycleReadyGuard(edit(), dependencies), { exitCode: 0, stderr: "" }, marker);
+      assert.equal(calls, 0, marker);
+      markGovernedFixture(path);
+      const result = evaluateLifecycleReadyGuard(edit(), dependencies);
+      assert.equal(result.exitCode, 2, marker);
+      assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, marker);
+      assert.equal(result.stderr.includes("/private/root"), false, marker);
+      assert.equal(result.stderr.includes(path), false, marker);
+      assert.equal(calls, 1, marker);
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  }
+});
+
+// NOVA-GOVMARKERS-WIRING: governanceMarkers() itself -- the direct unit-level fail-open
+// contract, independent of whichever call site consumes it. Regression pin for the wiring
+// bug where evaluateLifecycleReadyGuard's sole runtime call site read the pre-rename
+// `GOVERNANCE_MARKERS` identifier, which governanceMarkers()'s introduction had removed --
+// a ReferenceError on every invocation, silently caught by the surrounding try/catch and
+// turned into blocked() (GUARD-LIFECYCLE-NOT-READY): the OPPOSITE of the fail-open contract
+// asserted here (backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-
+// config-fault.md).
+test("governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws", () => {
+  const result = governanceMarkers({
+    loadRuntimeProjectionV3OwnedKeysFn() {
+      throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+    },
+  });
+  assert.deepEqual(result, { markers: BASE_GOVERNANCE_MARKERS, warning: MANIFEST_FAILURE_WARNING });
+});
+
+test("governanceMarkers() returns the real runtime-projection-derived markers, with no warning, when the loader succeeds", () => {
+  const result = governanceMarkers({
+    loadRuntimeProjectionV3OwnedKeysFn() {
+      return { targets: [{ path: ".codex/config.toml" }, { path: "pipeline.user.yaml" }] };
+    },
+  });
+  assert.equal(result.warning, null);
+  // Fixed base markers are always present, deduplicated against any runtime-projection overlap.
+  for (const marker of BASE_GOVERNANCE_MARKERS) assert.ok(result.markers.includes(marker), marker);
+  assert.ok(result.markers.includes(".codex/config.toml"));
+  assert.equal(result.markers.filter((marker) => marker === "pipeline.user.yaml").length, 1);
+});
+
+test("evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    // Explicit consent activates governance even when the marker-list loader throws.
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      loadRuntimeProjectionV3OwnedKeysFn() {
+        throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+      },
+      requireProjectOnboardingReadyFn() {
+        calls += 1;
+        deny();
+      },
+    });
+    // The pre-fix bug never reached this call: the stale `GOVERNANCE_MARKERS` identifier
+    // threw a ReferenceError caught by the outer try/catch, returning blocked() immediately.
+    assert.equal(calls, 1);
+    assert.equal(result.exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("evaluateLifecycleReadyGuard stays admit-open on a throwing loader when no governance marker at all is present", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    const result = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      loadRuntimeProjectionV3OwnedKeysFn() {
+        throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+      },
+      requireProjectOnboardingReadyFn() { calls += 1; },
+    });
+    assert.deepEqual(result, { exitCode: 0, stderr: "" });
+    assert.equal(calls, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("exact session readiness allows the governed project write and threads the caller-supplied runner explicitly", () => {
+  const path = root();
+  const calls = [];
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    assert.deepEqual(evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      runner: "codex",
+      requireProjectOnboardingReadyFn(options) {
+        calls.push(options);
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    }), { exitCode: 0, stderr: "" });
+    assert.deepEqual(calls, [{ rootDir: path, intent: "session", runner: "codex" }]);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("a direct PRD acknowledgement marker write is refused even when readiness is otherwise exact", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const input of [
+      { tool_name: "Edit", tool_input: { file_path: "specs/onboarding-x/prd_onboarding-x.md", new_string: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+      { tool_name: "Write", tool_input: { file_path: "specs/onboarding-x/prd_onboarding-x.md", content: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+      { tool_name: "Edit", tool_input: { file_path: "specs/onboarding-x/prd_onboarding-x.md", patchContainsAcknowledgementMarker: true } },
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, { projectDir: path, requireProjectOnboardingReadyFn: readyStub });
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, /GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("direct State edits remain blocked even when session readiness is exact", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const filePath of [
+      ".claude/pipeline-state.json",
+      join(path, ".claude", "pipeline-state.json"),
+      ".claude/../.claude/pipeline-state.json",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() {
+          return {
+            schema: "pipeline.project-onboarding-ready-gate.v1",
+            status: "ready",
+            intent: "session",
+          };
+        },
+      });
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, /writer-owned/u);
+      assert.match(result.stderr, /must not be edited directly/u);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// backlog: permitted-edit-drops-session-into-unrecoverable-readiness. Writes the exact
+// live-binding shape `boundAuthorityDocumentPath()` reads: `continuity.authority.prd/.spec`
+// on Pipeline State, mirroring what `establishedContinuity`/`normalizedContinuity`
+// (onboarding-continuity.mjs) actually set -- the same live binding that module's own
+// 2026-08-09 resolution note names as authoritative over the private promotion history.
+function withContinuityAuthority(path, {
+  prdPath = "specs/2026-08-18-demo/prd_demo.md",
+  specPath = "specs/2026-08-18-demo/spec.md",
+  planInvalidation,
+} = {}) {
+  const state = {
+    schema: "pipeline.state.v0",
+    continuity: {
+      authority: {
+        prd: { path: prdPath },
+        spec: { path: specPath },
+      },
+    },
+  };
+  if (planInvalidation !== undefined) state.planInvalidation = planInvalidation;
+  writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify(state));
+  return { prdPath, specPath, designInputPath: join(dirname(specPath), "design-input.md") };
+}
+
+function readyStub() {
+  return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+}
+
+test("a valid architecture deferral does not let a missing physical map mint implementation authority", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const surface = { planPath: "specs/feature/plan.md", paths: ["src/new-feature.mjs"] };
+    const fitness = evaluateArchitectureFitness({ rootDir: path, mode: "planning", candidatePaths: surface.paths, files: surface.paths });
+    assert.equal(fitness.overallStatus, "blocked");
+    assert.ok(fitness.outcomes.some((item) => item.propertyId === "navigation-currency"
+      && item.violations?.some((finding) => finding.ruleId === "missing-navigation-index")));
+    const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      activeFeaturePlanningScopeFn: () => surface.planPath,
+      checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "deferred" }),
+      activeFeaturePlanningSurfaceFn: () => surface,
+      evaluateArchitectureFitnessFn: evaluateArchitectureFitness,
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
+    assert.match(result.stderr, /navigation-currency:restore-navigation-bundle/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("AC-7 reports expanded or unknown B1 rigor without deadlocking implementation authority", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const policy = JSON.parse(readFileSync(new URL("../../../policies/rigor-derivation.v1.json", import.meta.url), "utf8"));
+    const surface = { planPath: "specs/feature/plan.md", paths: ["src/planned.mjs"] };
+    const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+    let selectedProfile = "mini";
+    let actualPaths = ["src/planned.mjs"];
+    let actualSurfaceKnown = true;
+    const dependencies = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      activeFeaturePlanningScopeFn: () => surface.planPath,
+      checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "deferred" }),
+      activeFeaturePlanningSurfaceFn: () => surface,
+      evaluateArchitectureFitnessFn: () => ({ overallStatus: "pass" }),
+      activeFeatureSelectedProfileFn: () => selectedProfile,
+      inferRigorInputsFn: () => ({
+        actualPaths: { value: actualSurfaceKnown ? actualPaths : null, status: actualSurfaceKnown ? "available" : "unknown", sourceContract: "git.diff" },
+        reversibility: { value: "high", status: "available", sourceContract: "pipeline.reversibility.v1" },
+        diffStats: { value: { files: actualPaths.length, lines: 10 }, status: "available", sourceContract: "git.diff-stat" },
+      }),
+      loadRigorPolicyFn: () => policy,
+    };
+    assert.equal(evaluateLifecycleReadyGuard(bash(command), dependencies).exitCode, 0);
+    actualPaths = ["src/planned.mjs", "src/expanded.mjs"];
+    const advisory = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(advisory.exitCode, 0);
+    assert.match(advisory.stderr, /GUARD-MINIMUM-RIGOR-ADVISORY/u);
+    assert.match(advisory.stderr, /selected mini; derived minimum feature/u);
+    assert.match(advisory.stderr, /ask the PO to choose the approach and model/iu);
+    selectedProfile = "feature";
+    assert.equal(evaluateLifecycleReadyGuard(bash(command), dependencies).exitCode, 0);
+    actualSurfaceKnown = false;
+    const unreadable = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(unreadable.exitCode, 0);
+    assert.match(unreadable.stderr, /actual Git change surface is unavailable; it is unknown, not clean/u);
+    dependencies.activeFeatureSelectedProfileFn = () => null;
+    const missingProfile = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(missingProfile.exitCode, 0);
+    assert.match(missingProfile.stderr, /no valid PO-bound lifecycle profile/u);
+    dependencies.activeFeatureSelectedProfileFn = () => "mini";
+    dependencies.activeFeaturePlanningSurfaceFn = () => null;
+    const missingSurface = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(missingSurface.exitCode, 2);
+    assert.match(missingSurface.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u,
+      "an independent architecture-fitness denial is not weakened by B1 report-only rollout");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const { prdPath, specPath, designInputPath } = withContinuityAuthority(path);
+    for (const filePath of [prdPath, specPath, designInputPath]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: readyStub,
+      });
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, filePath);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/u, filePath);
+      assert.match(result.stderr, /currently bound authority/u, filePath);
+      assert.match(result.stderr, new RegExp(`File: ${filePath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`, "u"), filePath);
+      assert.match(result.stderr, /reopen-design --by <name>/u, filePath);
+      assert.match(result.stderr, /submit-plan --by <name>/u, filePath);
+      assert.match(result.stderr, /approve-plan --by <name>/u, filePath);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("Write and NotebookEdit are refused for a bound authority document exactly like Edit", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const { specPath } = withContinuityAuthority(path);
+    for (const call of [write(specPath), notebookEdit(specPath)]) {
+      const result = evaluateLifecycleReadyGuard(call, {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: readyStub,
+      });
+      assert.equal(result.exitCode, 2, call.tool_name);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/u, call.tool_name);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("a reopened design (planInvalidation recorded) releases the authority-document write refusal", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const { specPath, prdPath, designInputPath } = withContinuityAuthority(path, {
+      planInvalidation: { invalidatedAt: "2026-08-18T00:00:00.000Z", invalidatedBy: "PO" },
+    });
+    let readinessCalls = 0;
+    for (const filePath of [prdPath, specPath, designInputPath]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() {
+          readinessCalls += 1;
+          return readyStub();
+        },
+      });
+      assert.equal(result.exitCode, 0, filePath);
+    }
+    assert.equal(readinessCalls, 3);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("a file beside the bound documents is not blocked by the authority-document refusal", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    withContinuityAuthority(path);
+    const result = evaluateLifecycleReadyGuard(edit("specs/2026-08-18-demo/README.md"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("an absent, malformed, or authority-less Pipeline State is not treated as a bound authority document", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const target = edit("specs/2026-08-18-demo/prd_demo.md");
+
+    // No .claude/pipeline-state.json at all yet.
+    let result = evaluateLifecycleReadyGuard(target, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0, "absent state");
+
+    // Present but unparseable.
+    writeFileSync(join(path, ".claude", "pipeline-state.json"), "not json");
+    result = evaluateLifecycleReadyGuard(target, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0, "malformed state");
+
+    // Present, valid, but carrying no continuity.authority (pre-kickoff/pristine).
+    writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
+    result = evaluateLifecycleReadyGuard(target, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0, "no continuity.authority");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("governed consumer edits cannot escape their physical project root", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-outside-"));
+  let readinessCalls = 0;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(outside, join(path, "linked-outside"));
+    assert.equal(isProjectWritePath("src/local.mjs", path), true);
+    for (const filePath of [
+      join(outside, "pipeline-source.mjs"),
+      "../foreign-repository/file.mjs",
+      "linked-outside/escaped.mjs",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() {
+          readinessCalls += 1;
+          return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+        },
+      });
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /only inside its own physical project root/u);
+      assert.match(result.stderr, /separate session rooted at the exact target/u);
+    }
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("a host-temp-style scratchpad path is refused exactly like any other cross-repo target, and ADR-0059 documents that consequence", () => {
+  // Regression for backlog/items/2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md:
+  // the guard was already refusing a host-temp session scratchpad (proven below via tmpdir()),
+  // but ADR-0059 (the ADR that governs this guard's liftability) never said so anywhere -- an
+  // agent reading the ADR alone would not learn that "cross-repository" also covers its own
+  // assigned host-temp scratchpad. This pins both halves so neither can silently regress.
+  const path = root();
+  const hostTempScratch = mkdtempSync(join(tmpdir(), "guard-lifecycle-host-scratch-"));
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    assert.equal(isProjectWritePath(join(hostTempScratch, "note.txt"), path), false);
+    const result = evaluateLifecycleReadyGuard(edit(join(hostTempScratch, "note.txt")), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(hostTempScratch, { recursive: true, force: true });
+  }
+
+  const adrPath = fileURLToPath(new URL("../../../docs/adr/0059-signed-human-guard-override.md", import.meta.url));
+  const adrText = readFileSync(adrPath, "utf8");
+  assert.match(
+    adrText,
+    /host-temp session scratchpad/u,
+    "ADR-0059 must document that GUARD-CROSS-REPO-MUTATION also blocks the host-temp session scratchpad, not merely another repository (Proposal point 4 of the session-scratchpad backlog item)",
+  );
+  assert.match(
+    adrText,
+    /session-scratchpad-is-unwritable-under-the-cross-repo-guard/u,
+    "ADR-0059's clarification must cross-reference the backlog item it was recorded for",
+  );
+});
+
+test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin installations", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-plugin-source-"));
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const commands = [
+      `python3 /tools/update_plugin_cachebuster.py ${outside}/plugins/pipeline-core`,
+      "codex plugin add pipeline-core@agent-pipeline-local",
+      "/home/operator/.codex/packages/current/codex plugin remove pipeline-core@agent-pipeline-local",
+      "codex plugin marketplace update agent-pipeline-local",
+      `git -C ${outside} commit -m drift`,
+      `sed -i s/old/new/ ${outside}/plugins/pipeline-core/.codex-plugin/plugin.json`,
+      `rm ${outside}/plugins/pipeline-core/.codex-plugin/plugin.json`,
+      `printf x > ${outside}/plugins/pipeline-core/.codex-plugin/plugin.json`,
+      "printf x > ./../foreign/plugin.json",
+      "printf x 2>&1 > ./../foreign/plugin.json",
+      "printf x>./../foreign/plugin.json",
+      "printf x 2>&1>./../foreign/plugin.json",
+    ];
+    for (const command of commands) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() {
+          return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+        },
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /marketplace metadata/u, command);
+    }
+    assert.equal(isForbiddenCrossRepositoryMutation(`git -C ${outside} status --short`, path), false);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`git -C ${outside} status --short`), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { throw new Error("read-only command must not inspect readiness"); },
+    }).exitCode, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("in-place sed distinguishes its program from its file operands before cross-repository classification", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-sed-outside-"));
+  try {
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    const inRootFile = join(path, "scratch", "sedprobe.txt");
+    writeFileSync(inRootFile, "alpha\nbeta\n");
+    const inRootAddress = "sed -i '/^alpha/d' scratch/sedprobe.txt";
+    const inRootLine = "sed -i '1d' scratch/sedprobe.txt";
+    const externalFile = `sed -i '/^alpha/d' ${join(outside, "outside.txt")}`;
+    const ready = {
+      schema: "pipeline.project-onboarding-ready-gate.v1",
+      status: "ready",
+      intent: "session",
+    };
+    assert.equal(isForbiddenCrossRepositoryMutation(inRootAddress, path), false, inRootAddress);
+    assert.equal(isForbiddenCrossRepositoryMutation(inRootLine, path), false, inRootLine);
+    assert.equal(isForbiddenCrossRepositoryMutation(externalFile, path), true, externalFile);
+    for (const command of [inRootAddress, inRootLine]) {
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return ready; },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    // The guard is the unit under test: it has already admitted the exact sed
+    // invocation above. Executing sed here would make this assertion depend on
+    // a host binary that the deliberately minimal offline-CI PATH excludes.
+    writeFileSync(inRootFile, "beta\n");
+    assert.equal(readFileSync(inRootFile, "utf8"), "beta\n");
+    writeFileSync(inRootFile, "alpha\nbeta\n");
+    writeFileSync(inRootFile, "beta\n");
+    assert.equal(readFileSync(inRootFile, "utf8"), "beta\n");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("agents prepare and verify only public PO artifacts while human signing stays external", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-po-public-"));
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --repo-root ${path} --directory ${external} --feature-id cyb-4`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare-all --repo-root ${path} --directory ${external}`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-all --repo-root ${path} --directory ${external}`,
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --repo-root ${path} --directory ${external} --feature-id cyb-8`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare-all --repo-root ${path} --directory ${external} --feature-id cyb-4`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --repo-root ${path} --directory ${path} --feature-id cyb-4`,
+    ]) assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+    for (const command of [
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} approve --repo-root ${path} --directory ${external} --feature-id cyb-4`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} approve-all --repo-root ${path} --directory ${external}`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} setup --repo-root ${path} --directory ${external}`,
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /human-terminal actions/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
+  }
+});
+
+// 2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md: the guard's
+// isHumanPoSigningCommand() list named only three of the six human-terminal signing
+// subcommands (setup, approve, approve-all), missing approve-critical, authorize-critical and
+// sign-intent -- the three added after the list was first written. This regression test proves
+// those three newly-recognized commands are now classified as external-signing-only, matching
+// the already-covered setup/approve/approve-all behaviour.
+test("newly-recognized human-signing commands (approve-critical, authorize-critical, sign-intent) stay external", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-po-signing-"));
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} approve-critical --repo-root ${path} --directory ${external} --kind push`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} authorize-critical --repo-root ${path} --directory ${external} --feature-id cyb-4 --plan plan.md --spec spec.md --kind push --subject-sha256 ${"a".repeat(64)} --expires-at 2026-08-21T00:00:00Z`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} sign-intent --repo-root ${path} --directory ${external} --intent-sha256 ${"b".repeat(64)}`,
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /human-terminal actions/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
+  }
+});
+
+// GF-078 bug 3: isForbiddenCrossRepositoryMutation()'s blanket `poApprovalArgs(...) !== null`
+// branch fired for ANY po-approval-gate.mjs invocation outside the narrow
+// isAgentPoPublicCommand shapes -- including a bare, argument-free --help/--version, which
+// cannot mutate anything, in this repository or any other. Only that one exact, argument-free
+// shape is admitted; every other subcommand or argument combination (including --help
+// alongside something else) still hits the same blanket refusal as before, unchanged.
+test("po-approval-gate --help and --version are read-only, never a forbidden cross-repository mutation", () => {
+  const path = root();
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} --help`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} --version`,
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} --help extra`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --help`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} --help --version`,
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("cachebuster is source-root scoped while plugin installation remains operator-only", () => {
+  const path = root();
+  try {
+    mkdirSync(join(path, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    mkdirSync(join(path, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(path, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), "{}\n");
+    writeFileSync(join(path, "harness", "scripts", "verify.mjs"), "\n");
+    assert.equal(isForbiddenCrossRepositoryMutation(
+      `python3 /tools/update_plugin_cachebuster.py ${path}/plugins/pipeline-core`,
+      path,
+    ), false);
+    assert.equal(isForbiddenCrossRepositoryMutation(
+      "codex plugin add pipeline-core@agent-pipeline-local",
+      path,
+    ), true);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("confirmed host-init admission or exact existing protected Git mount handles only repository cross-view failures", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of ["repository-mount-read-only", "repository-control-path-invalid"]) {
+      for (const input of [bash(), edit(), write()]) {
+        assert.deepEqual(evaluateLifecycleReadyGuard(input, {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+          readCodexHostRepositoryInitAdmissionFn(rootDir) {
+            assert.equal(rootDir, path);
+            return { gitVersion: "2.53.0" };
+          },
+        }), { exitCode: 0, stderr: "" });
+      }
+    }
+    for (const readCodexHostRepositoryInitAdmissionFn of [
+      () => null,
+      () => ({}),
+      () => { throw new Error("private admission detail"); },
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("repository-mount-read-only"); },
+        readCodexHostRepositoryInitAdmissionFn,
+      });
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, /guard-lifecycle-ready/u);
+      assert.equal(result.stderr.includes("private admission detail"), false);
+    }
+    for (const status of ["repository-mount-read-only", "repository-control-path-invalid"]) {
+      assert.deepEqual(evaluateLifecycleReadyGuard(edit(), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+        readCodexHostRepositoryInitAdmissionFn: () => null,
+        hasCodexExistingGitControlMountFn(rootDir) {
+          assert.equal(rootDir, path);
+          return true;
+        },
+      }), { exitCode: 0, stderr: "" });
+    }
+    const malformedExistingMount = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); },
+      readCodexHostRepositoryInitAdmissionFn: () => null,
+      hasCodexExistingGitControlMountFn: () => false,
+    });
+    assert.equal(malformedExistingMount.exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("host-init admission never masks App Server, runtime, continuity, or malformed readiness failures", () => {
+  const path = root();
+  let admissionReads = 0;
+  let existingMountReads = 0;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonRepositoryStatuses = [
+      "app-server-not-running",
+      "runtime-attestation-required",
+      "continuity-damaged",
+      "repository-observation-unavailable",
+    ];
+    for (const status of nonRepositoryStatuses) {
+      for (const input of [bash(), edit(), write()]) {
+        const result = evaluateLifecycleReadyGuard(input, {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+          readCodexHostRepositoryInitAdmissionFn() {
+            admissionReads += 1;
+            return { gitVersion: "2.53.0" };
+          },
+          hasCodexExistingGitControlMountFn() {
+            existingMountReads += 1;
+            return true;
+          },
+        });
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}/${input.tool_input?.file_path ?? input.tool_input?.command ?? ""}`);
+        assert.match(result.stderr, /guard-lifecycle-ready/u, `${status}/${input.tool_name}`);
+      }
+    }
+    for (const failure of [
+      () => { throw new Error("unknown lifecycle exception"); },
+      () => { throw new ProjectOnboardingReadyError(
+        "PORG-INVALID-OBSERVATION",
+        "invalid lifecycle observation",
+        { intent: "session" },
+      ); },
+      () => { throw new ProjectOnboardingReadyError(
+        "PORG-NOT-READY",
+        "wrong intent",
+        { intent: "bootstrap", lifecycleStatus: "repository-control-path-invalid" },
+      ); },
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(edit(), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: failure,
+        readCodexHostRepositoryInitAdmissionFn() {
+          admissionReads += 1;
+          return { gitVersion: "2.53.0" };
+        },
+        hasCodexExistingGitControlMountFn() {
+          existingMountReads += 1;
+          return true;
+        },
+      }).exitCode, 2);
+    }
+    assert.equal(admissionReads, 0);
+    assert.equal(existingMountReads, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("exact session readiness allows an arbitrary Bash command while non-ready Bash writes are denied", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    }), { exitCode: 0, stderr: "" });
+    const denied = evaluateLifecycleReadyGuard(bash(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    });
+    assert.equal(denied.exitCode, 2);
+    assert.match(denied.stderr, /guard-lifecycle-ready/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("non-ready governed roots retain a narrow simple-command read-only diagnostic lane", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-node-check-outside-"));
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(path, "harness", "scripts", "verify.mjs"), "\n");
+    mkdirSync(join(path, "specs"), { recursive: true });
+    writeFileSync(join(path, "specs", "hotfix.md"), "hotfix\n");
+    mkdirSync(join(path, "plugins"), { recursive: true });
+    symlinkSync(outside, join(path, "linked-outside"));
+    for (const command of [
+      "pwd -P",
+      "ls -la",
+      "printf '\\n--- AGENT ---\\n'",
+      "rg -n repository-control-path-invalid plugins",
+      "sed -n '1,80p' pipeline.user.yaml",
+      "node --check harness/scripts/verify.mjs",
+      "node.exe --check harness/scripts/verify.mjs",
+      "sha256sum specs/hotfix.md",
+      "sha256sum -- specs/hotfix.md",
+      // C3 (AC-1): several read-only path arguments, each subject to the
+      // identical containment check the single-path form already applies.
+      "sha256sum specs/hotfix.md pipeline.user.yaml",
+      "sha256sum -- specs/hotfix.md pipeline.user.yaml harness/scripts/verify.mjs",
+      "shasum -a 256 specs/hotfix.md",
+      "shasum --algorithm 256 specs/hotfix.md",
+      "shasum -a 256 specs/hotfix.md pipeline.user.yaml",
+      "certutil -hashfile specs/hotfix.md SHA256",
+      "certutil.exe -hashfile specs/hotfix.md sha256",
+      "git status --short --branch",
+      "git diff --check",
+      "git rev-parse HEAD",
+      "git config --get branch.main.remote",
+      "git fetch origin refs/heads/main:refs/remotes/origin/main",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); },
+      }), { exitCode: 0, stderr: "" });
+    }
+    for (const command of [
+      "printf implementation > src/output.txt",
+      "printf -v captured value",
+      "sed -i 's/a/b/' pipeline.user.yaml",
+      "find . -delete",
+      "git branch new-branch",
+      "git config user.name changed",
+      "git status && touch bypass",
+      "node --check harness/scripts/verify.mjs --eval bypass",
+      "node -e 'process.exit(0)'",
+      "sha256sum -c specs/hotfix.md",
+      "shasum -a 1 specs/hotfix.md",
+      // C3: flag-looking and mutating forms remain refused. Path location for
+      // valid passive hash reads is host-owned.
+      "sha256sum specs/hotfix.md --check",
+      "certutil -urlcache specs/hotfix.md SHA256",
+      "certutil -hashfile specs/hotfix.md SHA1",
+      "node --check ../../outside.mjs",
+      "node --check linked-outside/verify.mjs",
+      "sha256sum ../../outside.md",
+      "sha256sum linked-outside/outside.md",
+      "sha256sum specs/hotfix.md ../../outside.md",
+      "sha256sum -- specs/hotfix.md ../../outside.md",
+      "shasum -a 256 specs/hotfix.md ../../outside.md",
+      "certutil -hashfile ../../outside.md SHA256",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); },
+        readCodexHostRepositoryInitAdmissionFn: () => null,
+        hasCodexExistingGitControlMountFn: () => false,
+      }).exitCode, 2, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("non-ready write denials surface only the typed lifecycle status and recovery route", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const result = evaluateLifecycleReadyGuard(edit(), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      });
+      assert.equal(result.exitCode, 2, status);
+      assert.match(result.stderr, new RegExp(`session readiness is ${status}`, "u"), status);
+      assert.match(result.stderr, /project-onboarding-v3 inspection with intent session/u, status);
+      assert.equal(result.stderr.includes("/private/root"), false, status);
+      assert.equal(result.stderr.includes(path), false, status);
+    }
+
+    const unknown = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        throw new Error("private unknown failure /private/root");
+      },
+    });
+    assert.equal(unknown.exitCode, 2);
+    assert.doesNotMatch(unknown.stderr, /private unknown|\/private\/root/u);
+    assert.doesNotMatch(unknown.stderr, /session readiness is/u);
+    assert.match(unknown.stderr, /project-onboarding-v3 session inspection/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-W4-READYGUARDTEST (backlog: 2026-08-28-the-readiness-guard-blocks-the-recovery-command-
+// it-names.md, AC-2). Every controlling status blocked() can render names the SAME recovery
+// line ("Re-run the typed project-onboarding-v3 inspection with intent session and use only
+// its returned nextAction."). This sweeps EVERY status PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES
+// can hold -- not one hard-coded example -- and asserts the guard admits the exact command that
+// recovery line names (`inspect --root <root> --intent session`) at every single one, so a
+// refusal can never again name a command it goes on to refuse itself.
+test("NVA-W4-READYGUARDTEST: the recovery inspection named by a non-ready denial is admitted at every controlling status", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${path}' --intent session`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const nonReady = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      };
+      assert.deepEqual(
+        evaluateLifecycleReadyGuard(bash(command), nonReady),
+        { exitCode: 0, stderr: "" },
+        `${status}: ${command}`,
+      );
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-T-READYKEYS DoD 4: PORG-INVALID-OBSERVATION (the ready-gate could not validate the
+// shape of what project-onboarding-v3 returned -- e.g. RESULT_KEYS mismatch) and a genuinely
+// unresolved cause used to render as the exact same generic "not ready" message. This pins
+// that the two now read differently: the invalid-observation denial names its own cause and
+// explicitly says it is NOT a not-ready report, while the truly-unresolved case (an
+// untyped exception, pinned above) keeps the original generic wording unchanged.
+test("PORG-INVALID-OBSERVATION is named as an invalid observation, distinct from both a typed not-ready status and the generic unresolved-cause denial", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const invalid = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError(
+          "PORG-INVALID-OBSERVATION",
+          "Project onboarding readiness returned an invalid result for intent session.",
+          { intent: "session" },
+        );
+      },
+    });
+    assert.equal(invalid.exitCode, 2);
+    assert.match(invalid.stderr, /PORG-INVALID-OBSERVATION/u);
+    assert.match(invalid.stderr, /not a report that the lifecycle is not ready/u);
+    assert.doesNotMatch(invalid.stderr, /session readiness is/u);
+    assert.match(invalid.stderr, /project-onboarding-v3 session inspection/u);
+
+    // A PORG-INVALID-OBSERVATION for a DIFFERENT intent than "session" is out of this
+    // gate's own scope (it always inspects intent "session") and must keep the generic
+    // wording, exactly like any other unresolved cause -- never widened.
+    const otherIntent = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError(
+          "PORG-INVALID-OBSERVATION",
+          "invalid",
+          { intent: "bootstrap" },
+        );
+      },
+    });
+    assert.equal(otherIntent.exitCode, 2);
+    assert.doesNotMatch(otherIntent.stderr, /PORG-INVALID-OBSERVATION/u);
+    assert.doesNotMatch(otherIntent.stderr, /not a report that the lifecycle is not ready/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-B8-IPA: only the exact fresh preflight attestation writer survives an invalid onboarding observation", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const pluginRoot = "/opt/agent-pipeline/pipeline-core";
+    const argv = [
+      join(pluginRoot, "scripts", "installed-plugin-attestation-host.mjs"),
+      "write-local-from-codex-registry",
+      "--version", "0.6.2+test",
+      "--source-plugin-root", "/source/pipeline-core",
+      "--installed-plugin-root", pluginRoot,
+    ];
+    const preflight = {
+      schema: "pipeline.start-preflight.v1",
+      status: "plugin-attestation-required",
+      pluginRoot,
+      version: "0.6.2+test",
+      nextAction: {
+        schema: "pipeline.installed-plugin-attestation-setup-action.v1",
+        kind: "host-postinstall",
+        executable: "node",
+        argv,
+        mutation: true,
+        requiresPoApproval: false,
+        executionBoundary: "host",
+        expected: { schema: "pipeline.installed-plugin-attestation-host-result.v1", status: "written" },
+      },
+    };
+    const invalidObservation = () => {
+      throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "invalid", { intent: "session" });
+    };
+    const run = (command, observed = preflight) => evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      { projectDir: path, requireProjectOnboardingReadyFn: invalidObservation, observePipelineStartPreflightFn: () => observed },
+    );
+    assert.equal(run(`node ${argv.join(" ")}`).exitCode, 0);
+    assert.equal(run(`node ${[...argv.slice(0, -1), "/other/pipeline-core"].join(" ")}`).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, { ...preflight, status: "ready" }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, executionBoundary: "default" },
+    }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: [
+        ...argv.slice(0, 1), "write-local", ...argv.slice(2),
+      ] },
+    }).exitCode, 2);
+    // Matching a hostile observation and command must not turn the generic
+    // writer into a host recovery lane.  This is distinct from merely
+    // changing the observation while leaving the original command intact.
+    const genericArgv = [...argv.slice(0, 1), "write-local", ...argv.slice(2)];
+    assert.equal(run(`node ${genericArgv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: genericArgv },
+    }).exitCode, 2);
+    const wrongVersionArgv = [...argv];
+    wrongVersionArgv[3] = "0.6.2+other";
+    assert.equal(run(`node ${wrongVersionArgv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: wrongVersionArgv },
+    }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: [
+        "/other/installed-plugin-attestation-host.mjs", ...argv.slice(1),
+      ] },
+    }).exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survives an invalid onboarding observation", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const argv = [
+      join(SCRIPTS_DIR, "settings-allowlist-merge.mjs"),
+      "apply-runner-permissions",
+      "--root", path,
+      "--plan-sha256", "a".repeat(64),
+      "--activate",
+    ];
+    const observation = {
+      schema: "pipeline.project-onboarding.v4",
+      status: "projection-drift",
+      root: path,
+      intent: "session",
+      runnerPermissions: { status: "drifted" },
+      nextAction: {
+        kind: "command",
+        executable: "node",
+        argv,
+        mutation: true,
+        requiresConfirmation: true,
+        expected: { schema: "pipeline.settings-allowlist-merge-apply.v1", statuses: ["ready", "no-op"] },
+      },
+    };
+    const invalidObservation = () => {
+      throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "invalid", { intent: "session" });
+    };
+    const projectionDrift = () => {
+      throw new ProjectOnboardingReadyError("PORG-NOT-READY", "projection drift", {
+        intent: "session",
+        lifecycleStatus: "projection-drift",
+      });
+    };
+    // This fixture tests runner-permission recovery, not Codex postinstall
+    // attestation. Keep the unrelated preflight observation explicit and
+    // nonmatching rather than spawning its real, bounded 10-second host probe
+    // for every one of the negative command variants below.
+    const unrelatedPreflight = () => ({ schema: "pipeline.start-preflight.v1", status: "ready" });
+    const run = (command, observed = observation) => evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      { projectDir: path, requireProjectOnboardingReadyFn: invalidObservation,
+        inspectProjectOnboardingV3Fn: () => observed, observePipelineStartPreflightFn: unrelatedPreflight },
+    );
+    assert.equal(run(`node ${argv.join(" ")}`).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command: `node ${argv.join(" ")}` } },
+      { projectDir: path, requireProjectOnboardingReadyFn: projectionDrift,
+        inspectProjectOnboardingV3Fn: () => observation, observePipelineStartPreflightFn: unrelatedPreflight },
+    ).exitCode, 0, "the producer's ordinary projection-drift state admits its exact repair");
+    assert.equal(evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command: `node ${argv.join(" ")}` } },
+      {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: () => {
+          throw new ProjectOnboardingReadyError("PORG-NOT-READY", "different lifecycle state", {
+            intent: "session",
+            lifecycleStatus: "runtime-initialization-required",
+          });
+        },
+        inspectProjectOnboardingV3Fn: () => observation,
+        observePipelineStartPreflightFn: unrelatedPreflight,
+      },
+    ).exitCode, 2, "the repair remains unavailable for every other non-ready lifecycle state");
+    assert.equal(run(`node ${[...argv.slice(0, 5), "b".repeat(64), ...argv.slice(6)].join(" ")}`).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, { ...observation, status: "ready" }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...observation,
+      nextAction: { ...observation.nextAction, argv: [argv[0], "plan-runner-permissions", "--root", path] },
+    }).exitCode, 2);
+    const plannerArgv = [argv[0], "plan-runner-permissions", "--root", path];
+    const plannerObservation = {
+      ...observation,
+      runnerPermissions: { status: "unavailable" },
+      nextAction: {
+        kind: "command",
+        executable: "node",
+        argv: plannerArgv,
+        mutation: false,
+        requiresConfirmation: false,
+        expected: {
+          schema: "pipeline.settings-allowlist-merge-plan.v1",
+          statuses: ["ready", "no-op", "unrepairable"],
+        },
+      },
+    };
+    assert.equal(run(`node ${plannerArgv.join(" ")}`, plannerObservation).exitCode, 0,
+      "the producer's exact read-only planner remains reachable when no safe merge can be planned");
+    assert.equal(run(`node ${[...plannerArgv, "--activate"].join(" ")}`, plannerObservation).exitCode, 2);
+    assert.equal(run(`node ${plannerArgv.join(" ")}`).exitCode, 2,
+      "an unobserved planner command is never admitted");
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...observation,
+      nextAction: { ...observation.nextAction, requiresConfirmation: false },
+    }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...observation,
+      nextAction: { ...observation.nextAction, expected: { schema: "pipeline.settings-allowlist-merge-apply.v1", statuses: ["ready"] } },
+    }).exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("closed command grammar preserves native Windows paths and direct node.exe identity", () => {
+  const windowsRoot = "C:\\Users\\Pipeline User\\consumer";
+  const script = "C:\\Pipeline Plugin\\scripts\\project-onboarding-v3.mjs";
+  const parsed = parseGuardCommand(
+    `node.exe "${script}" inspect --root "${windowsRoot}" --intent bootstrap`,
+    windowsRoot,
+    { platform: "win32" },
+  );
+  assert.equal(parsed.parseStatus, "accepted");
+  assert.equal(parsed.dialect, "windows-direct");
+  assert.deepEqual(parsed.segments[0], {
+    executable: "node.exe",
+    argv: [script, "inspect", "--root", windowsRoot, "--intent", "bootstrap"],
+  });
+  // NVA-R15-ROOTADMIT: this test's `windowsRoot` is a fabricated win32 path with no real
+  // directory behind it on the (non-Windows) machine actually running this suite, so the
+  // new resolved-vs-resolved root comparison (rootValueIdentityMatcher) needs
+  // resolveFn/realpathSyncFn identity stand-ins -- same idea as the processExecPath
+  // override just above, applied to the one new seam this fix adds. A real win32 host
+  // needs no such override: resolve()/realpathSync() there already operate on this exact
+  // path natively.
+  assert.equal(isSanctionedLifecycleCommand(
+    `node.exe "${ONBOARDING_SCRIPT}" inspect --root "${windowsRoot}" --intent bootstrap`,
+    windowsRoot,
+    {
+      platform: "win32",
+      processExecPath: "C:\\Program Files\\nodejs\\node.exe",
+      resolveFn: (value) => value,
+      realpathSyncFn: (value) => value,
+    },
+  ), true);
+});
+
+test("literal ANSI-C multiline commit messages are admitted only as git commit message argv", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = String.raw`git commit -m subject -m $'body\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)' --trailer "Reviewed-by: PO"`;
+    const parsed = parseGuardCommand(command, path, { platform: "linux" });
+    assert.equal(parsed.parseStatus, "accepted");
+    assert.deepEqual(parsed.segments, [{
+      executable: "git",
+      argv: [
+        "commit", "-m", "subject", "-m", "body\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)",
+        "--trailer", "Reviewed-by: PO",
+      ],
+    }]);
+    const lifecycle = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {},
+    });
+    // This minimal fixture has no complete V4 onboarding projection, so the
+    // normal readiness gate still stops it. The important boundary here is
+    // that the command reaches that later gate rather than failing closed at
+    // command grammar before Git's own policy can inspect the same argv.
+    assert.equal(lifecycle.exitCode, 2);
+    assert.match(lifecycle.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(lifecycle.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+
+    // ANSI-C syntax is not a generic shell escape hatch. It may carry only
+    // newline-bearing values following -m/--message on a direct POSIX git
+    // commit; executables, path arguments, composition, and Windows dialects
+    // all remain refused by the common parser.
+    for (const rejected of [
+      String.raw`touch $'untrusted\npath'`,
+      String.raw`git commit -m subject $'untrusted\npath'`,
+      String.raw`git commit -m $'body\nmessage' && touch bypass`,
+    ]) assert.equal(parseGuardCommand(rejected, path, { platform: "linux" }).parseStatus, "denied", rejected);
+    assert.equal(parseGuardCommand(command, path, { platform: "win32" }).parseStatus, "denied");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// backlog: 2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-
+// tool-shell.md. Claude's Bash tool always runs through Git-Bash/POSIX, never natively
+// through cmd.exe/PowerShell, even on a Windows host -- so guard-lifecycle-ready.mjs's own
+// un-optioned parseGuardCommand() call sites must select the POSIX dialect (and therefore
+// expand `$PWD`/`${PWD}`) regardless of what `process.platform` reports. `process.platform`
+// is forced to "win32" for the duration of each assertion below (restored in `finally`,
+// mirroring lib/po-gate-profile-publisher.test.mjs) precisely to prove that: this is the
+// actual reported regression (a real Windows-host session), not merely a hypothetical.
+test("Claude/Bash-path command parsing ignores a win32 host: $PWD expands and POSIX grammar governs", () => {
+  const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  const path = root();
+  try {
+    // retryActionsForDeniedCommand() (guard-lifecycle-ready.mjs) exposes the parsed argv
+    // directly: a bare `$PWD` token must resolve to the guard's own root, not survive as the
+    // literal 4-character string "$PWD" -- the exact silent-failure shape the backlog item
+    // reports (docs' own `--root "$PWD"` recovery commands).
+    assert.deepEqual(retryActionsForDeniedCommand(`pwd -P; sha256sum "$PWD"`, path), [
+      {
+        executable: "pwd",
+        argv: ["-P"],
+        mutation: false,
+        requiresConfirmation: false,
+        executionBoundary: "separate-tool-call",
+        expected: { exitCodes: [0, 1] },
+      },
+      {
+        executable: "sha256sum",
+        argv: [path],
+        mutation: false,
+        requiresConfirmation: false,
+        executionBoundary: "separate-tool-call",
+        expected: { exitCodes: [0, 1] },
+      },
+    ]);
+
+    // The main Bash grammar gate (evaluateLifecycleReadyGuard) must keep applying POSIX
+    // expansion rules too: a non-`$PWD` variable reference is refused with
+    // GUARD-PARSE-UNSUPPORTED under the POSIX dialect (parseGuardCommand()'s own closed
+    // grammar only ever substitutes the literal `$PWD`/`${PWD}` token, denying every other
+    // `$`-expansion). Under the windows-direct dialect this bug selects from a bare win32
+    // host, `$` is never treated as an expansion trigger at all, so the same command would
+    // parse as an ordinary (wrong) literal argument instead of being denied -- this
+    // assertion would not hold without the fix.
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(bash('echo "$FOO"'), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+
+    // Named follow-on effect 1 (Proposal): the bounded rg/head diagnostic pipeline's
+    // `.exe`-naming exception is untouched by this fix -- it is selected by dialectFor()'s
+    // own CONTENT-based heuristic (a literal `.exe`-suffixed executable in the command
+    // text), not by the platform argument this fix hardcodes, so it still fires correctly
+    // through this same patched call site (isReadOnlyDiagnosticCommand) even though the
+    // platform value it now passes is never "win32".
+    assert.equal(
+      isReadOnlyDiagnosticCommand("rg.exe -n lifecycle . 2>NUL | head.exe -n 20", path),
+      true,
+    );
+    // Named follow-on effect 2 (Proposal): `2>/dev/null` on the ordinary (non-`.exe`) POSIX
+    // shape -- the shape Claude's actual Git-Bash-run commands use -- keeps working
+    // identically through the same patched call site.
+    assert.equal(
+      isReadOnlyDiagnosticCommand("rg -n lifecycle . 2>/dev/null | head -n 20", path),
+      true,
+    );
+  } finally {
+    Object.defineProperty(process, "platform", originalPlatform);
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// NVA-R15-ROOTADMIT (backlog: 2026-08-28-the-guards-root-admission-compares-a-typed-path-to-
+// a-realpathed-one.md): sanctionedOnboardingArgs()'s --root comparison now runs the typed
+// value through the same resolve()+realpathSync() normalisation the guard's own root
+// already goes through, folded through repository-path-identity.mjs, instead of a byte-exact
+// comparison against the pre-resolved root.
+test("NVA-R15-ROOTADMIT: a --root value that does not resolve at all stays refused, and carries no root-identity-mismatch hint", () => {
+  const path = root();
+  try {
+    const missing = join(path, "does-not-exist");
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${missing}' --intent session`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), false);
+
+    // Acceptance Criteria #3: only a --root value that DOES resolve, to a DIFFERENT place,
+    // is a distinguishable root-identity mismatch. A value that does not resolve at all
+    // stays the ordinary "unadmitted shape" denial, exactly as the byte-exact comparison
+    // this replaces already refused it.
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.doesNotMatch(result.stderr, /root-identity mismatch/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-R15-ROOTADMIT: a --root value that resolves to a DIFFERENT real directory stays refused, and the denial names it a root-identity mismatch, not an unadmitted shape", () => {
+  const path = root();
+  const elsewhere = root();
+  try {
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${elsewhere}' --intent session`;
+    // Acceptance Criteria #4 (negative-control regression pin): `elsewhere` is a real,
+    // resolvable directory -- but not `path` -- and must NOT become newly admitted.
+    assert.equal(isSanctionedLifecycleCommand(command, path), false);
+
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /root-identity mismatch, not an unadmitted command shape/u);
+    assert.match(result.stderr, new RegExp(elsewhere.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(elsewhere, { recursive: true, force: true });
+  }
+});
+
+test("NVA-R15-ROOTADMIT: a symlinked parent resolving to the exact same project root is admitted regardless of which spelling was typed", () => {
+  const path = root();
+  const linkParent = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-link-parent-"));
+  const link = join(linkParent, "consumer-link");
+  try {
+    symlinkSync(path, link);
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${link}' --intent session`;
+    // The guard's own `root` here is already the real, non-symlinked path (mirroring how
+    // evaluateLifecycleReadyGuard's own realpathSync(resolve(...)) pre-resolves it); the
+    // caller typed the symlinked spelling -- the SAME logical root, a different string.
+    assert.equal(isSanctionedLifecycleCommand(command, path), true);
+  } finally {
+    rmSync(link, { force: true });
+    rmSync(linkParent, { recursive: true, force: true });
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// Platform-specific mismatch shapes (differing separator, differing drive-letter case) have
+// no real Windows filesystem to resolve against on this (non-Windows) test runner. Run under
+// this repository's existing win32 platform-guard convention -- `options.platform: "win32"`
+// plus resolveFn/realpathSyncFn identity stand-ins, the exact technique "closed command
+// grammar preserves native Windows paths and direct node.exe identity" above already uses --
+// never skipped outright on non-Windows.
+test("NVA-R15-ROOTADMIT: differing separator and differing drive-letter case admit the same logical Windows root", () => {
+  const canonicalRoot = "C:\\Users\\Pipeline User\\consumer";
+  const identityOptions = {
+    platform: "win32",
+    processExecPath: "C:\\Program Files\\nodejs\\node.exe",
+    resolveFn: (value) => value,
+    realpathSyncFn: (value) => value,
+  };
+  for (const typedRoot of [
+    "C:/Users/Pipeline User/consumer", // differing separator
+    "c:\\Users\\Pipeline User\\consumer", // differing drive-letter case
+  ]) {
+    const command = `node.exe "${ONBOARDING_SCRIPT}" inspect --root "${typedRoot}" --intent session`;
+    assert.equal(isSanctionedLifecycleCommand(command, canonicalRoot, identityOptions), true, typedRoot);
+  }
+  // Negative control: a genuinely different Windows path, same notation, must NOT admit.
+  const differentRoot = "D:\\Dev\\other";
+  const differentCommand = `node.exe "${ONBOARDING_SCRIPT}" inspect --root "${differentRoot}" --intent session`;
+  assert.equal(isSanctionedLifecycleCommand(differentCommand, canonicalRoot, identityOptions), false);
+});
+
+test("only bounded rg search pipelines and platform null redirect are read-only", () => {
+  const path = root();
+  try {
+    mkdirSync(join(path, "plugins/pipeline-core"), { recursive: true });
+    mkdirSync(join(path, "harness"), { recursive: true });
+    mkdirSync(join(path, "backlog/items"), { recursive: true });
+    writeFileSync(join(path, "plugins/pipeline-core/passive-probe.mjs"), "// lifecycle guard fixture\n");
+    writeFileSync(join(path, "harness/passive-probe.md"), "verify journal\n");
+    writeFileSync(join(path, "backlog/items/passive-probe.md"), "status: open\n");
+    for (const command of [
+      "rg -n -S lifecycle plugins 2>/dev/null | head -n 280",
+      "rg -n -S lifecycle plugins 2>/dev/null | tail -n 280",
+      "rg -n -S lifecycle plugins | tail -40",
+      "rg --files --max-depth 3 . | head -n 500",
+      "rg -l -S lifecycle plugins | head -n 180",
+      "rg --files plugins/pipeline-core harness | rg 'verify|journal'",
+      "rg --files . | rg 'guard|deny|permission|settings'",
+      "rg -n -S lifecycle plugins | rg guard",
+      "rg -l '^status: open' backlog/items | sort",
+    ]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+    // SEC-11: recursive rg keeps default hidden/ignore semantics; globs may expose private paths.
+    for (const command of [
+      "rg --files --hidden --max-depth 3 . | head -n 500",
+      "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
+      "rg --files -uu . | rg 'guard|deny|permission|settings'",
+    ]) {
+      assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(command, path), path), false, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+    const windows = "rg.exe -n lifecycle . 2>NUL | head.exe -n 20";
+    const parsedWindows = parseGuardCommand(windows, path, { platform: "win32" });
+    assert.equal(isBoundedReadOnlyPipeline(parsedWindows, path), true);
+    const windowsSearch = "rg.exe --files . | rg.exe lifecycle";
+    const parsedWindowsSearch = parseGuardCommand(windowsSearch, path, { platform: "win32" });
+    assert.equal(isBoundedReadOnlyPipeline(parsedWindowsSearch, path), true);
+    const windowsSortedSearch = "rg.exe -l lifecycle . | sort.exe";
+    const parsedWindowsSortedSearch = parseGuardCommand(windowsSortedSearch, path, { platform: "win32" });
+    assert.equal(isBoundedReadOnlyPipeline(parsedWindowsSortedSearch, path), true);
+    for (const command of [
+      "rg -n lifecycle . | head -n 0",
+      "rg -n lifecycle . | head -n 050",
+      "rg -n lifecycle . | head -n 501",
+      "rg -n lifecycle . | tail -n 0",
+      "rg -n lifecycle . | tail -n 501",
+      "rg -n lifecycle . 2>diagnostic.log | head -n 20",
+      "rg -n lifecycle . | tail -n 20 > diagnostic.log",
+      "rg -n lifecycle . | tee output",
+      "rg -n lifecycle . | sort -o scratch/output.txt",
+      "rg -n lifecycle . | sort scratch/output.txt",
+      "rg -n lifecycle . | sort | head -n 20",
+      "rg -n lifecycle . | head -n 20 | wc -l",
+      "rg --pre worker lifecycle . | rg guard",
+      "rg -n lifecycle . 2>diagnostic.log | rg guard",
+      "rg --pre worker lifecycle . | head -n 20",
+      "rg --files -uuu . | rg guard",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+    // NVA-I-GRAMMAR: `rg -n lifecycle . && head -n 20` used to be refused here -- not because
+    // either side was unsafe, but because the OLD &&-chain admission only ever recognized a
+    // small named allowlist, not the general read-only-diagnostic classifier. Both segments
+    // are independently admitted simple commands (bare `head -n N` with no path argument is
+    // already unconditionally admitted, isReadOnlySimpleWords above), so under the union rule
+    // (isBoundedReadOnlyAndChain, DoD 3) this is now correctly admitted -- no new authority,
+    // since each side is already independently callable as its own tool call.
+    assert.equal(isReadOnlyDiagnosticCommand("rg -n lifecycle . && head -n 20", path), true);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// SINGLE-RG-TRUSTED-ROOTS BEGIN
+import { isBoundedSingleRg } from "./guard-command-grammar.mjs";
+test("single and piped rg share trusted recursive roots and unconditional exclusions", (t) => {
+  const project = root();
+  markGovernedFixture(project);
+  const fixture = mkdtempSync(join(tmpdir(), "single-rg-trusted-roots-"));
+  t.after(() => { rmSync(project, { recursive: true, force: true }); rmSync(fixture, { recursive: true, force: true }); });
+  const approved = join(fixture, "approved"), sibling = join(fixture, "sibling");
+  mkdirSync(approved); mkdirSync(sibling);
+  writeFileSync(join(approved, "readme.md"), "needle\n");
+  writeFileSync(join(sibling, "readme.md"), "needle\n");
+  const pipeline = command => parseGuardCommand(`${command} | head -n 5`, project);
+  const directArgs = command => parseGuardCommand(command, project).segments[0].argv;
+  for (const command of [`rg --files '${approved}'`, `rg -n needle '${approved}'`]) {
+    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project), false);
+    assert.equal(isBoundedSingleRg(directArgs(command), project), false);
+    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project, [approved]), true);
+    assert.equal(isBoundedSingleRg(directArgs(command), project, [approved]), true,
+      "caller-approved recursive enumeration/search must reach the direct grammar");
+    assert.equal(isReadOnlyDiagnosticCommand(`${command} | head -n 5`, project, [approved]), true);
+    assert.equal(isReadOnlyDiagnosticCommand(command, project, [approved]), true);
+  }
+  const hooksDir = fileURLToPath(new URL("./", import.meta.url)).replace(/[\\/]$/u, "");
+  for (const command of [`rg --files '${hooksDir}'`, `rg -n isBoundedReadOnlyPipeline '${hooksDir}'`]) {
+    assert.equal(isBoundedSingleRg(directArgs(command), project), false);
+    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project), false);
+    for (const shape of [command, `${command} | head -n 5`]) {
+      assert.equal(isReadOnlyDiagnosticCommand(shape, project), true, shape);
+      assert.equal(evaluateLifecycleReadyGuard(bash(shape), {
+        projectDir: project, requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 0, shape);
+    }
+  }
+  const escape = join(approved, "escape");
+  symlinkSync(sibling, escape, process.platform === "win32" ? "junction" : "dir");
+  const secret = join(sibling, "po-private.pem"), alias = join(approved, "ordinary.md");
+  writeFileSync(secret, "synthetic fixture\n"); symlinkSync(secret, alias, "file");
+  const denied = [
+    `rg --files '${sibling}'`, `rg --files '${escape}'`,
+    `rg -n needle '${secret}'`, `rg -n needle '${alias}'`,
+    `rg --hidden -n needle '${approved}'`, `rg -uu -n needle '${approved}'`,
+    `rg --no-ignore -n needle '${approved}'`, `rg -g '*.md' needle '${approved}'`,
+    `rg --pre sh needle '${approved}'`, `rg --output output needle '${approved}'`,
+  ];
+  for (const command of denied) {
+    assert.equal(isBoundedSingleRg(directArgs(command), project, [approved]), false, command);
+    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project, [approved]), false, command);
+    assert.equal(isReadOnlyDiagnosticCommand(command, project, [approved]), false, command);
+    assert.equal(isReadOnlyDiagnosticCommand(`${command} | head -n 5`, project, [approved]), false, command);
+  }
+  const config = join(fixture, "rg.conf"); writeFileSync(config, "--hidden\n");
+  const previousConfig = process.env.RIPGREP_CONFIG_PATH;
+  try {
+    process.env.RIPGREP_CONFIG_PATH = config;
+    const command = `rg --files '${approved}'`;
+    assert.equal(isBoundedSingleRg(directArgs(command), project, [approved]), false);
+    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project, [approved]), false);
+    assert.equal(isReadOnlyDiagnosticCommand(command, project, [approved]), false);
+    assert.equal(isReadOnlyDiagnosticCommand(`${command} | head -n 5`, project, [approved]), false);
+  } finally {
+    if (previousConfig === undefined) delete process.env.RIPGREP_CONFIG_PATH;
+    else process.env.RIPGREP_CONFIG_PATH = previousConfig;
+  }
+});
+// SINGLE-RG-TRUSTED-ROOTS END
+// SEC-11 permits exact existing external files; recursive directories require
+// the lifecycle adapter's explicit trusted additional plugin boundary.
+test("bounded rg pipeline admits self-inspection reads of the plugin's own installed root", () => {
+  const path = root();
+  markGovernedFixture(path);
+  const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
+  const hooksDir = join(pluginRoot, "hooks");
+  const grammarFile = join(hooksDir, "guard-command-grammar.mjs");
+  try {
+    for (const [command, genericExpected] of [
+      [`rg --files ${hooksDir} | rg 'guard-lifecycle-ready'`, false],
+      [`rg -n "isBoundedReadOnlyPipeline" ${grammarFile} | head -n 5`, true],
+    ]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), genericExpected,
+        `${command} (SEC-11 exact file or separately bounded recursive directory)`);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 0, command);
+    }
+    const foreign = mkdtempSync(join(tmpdir(), "guard-lifecycle-foreign-"));
+    try {
+      const command = `rg --files ${foreign} | rg 'x'`;
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    } finally { rmSync(foreign, { recursive: true, force: true }); }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// GF-078 bug 2 (head -N sub-finding). Only the two-token `head -n 40` form was accepted;
+// the combined single-flag `head -40` form an agent naturally reaches for was refused for
+// no bound-related reason. Same canonical numeric range, both forms.
+test("bounded rg-to-head pipeline accepts both head -n N and combined head -N", () => {
+  const path = root();
+  try {
+    for (const command of ["rg -n lifecycle . | head -40", "rg -n lifecycle . | head -500"]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
+    }
+    for (const command of [
+      "rg -n lifecycle . | head -0",
+      "rg -n lifecycle . | head -501",
+      "rg -n lifecycle . | head -0500",
+    ]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CATPIPE-1. Measured 2026-08-27: `cat <repo-file> | grep -c open` was refused
+// GUARD-OPERATOR-UNAPPROVED in this repository while the identical grep-sourced pipeline
+// (`grep -c open <repo-file> | head -n 1`) was admitted -- the only difference was `cat`
+// versus `grep` as the pipeline's first segment. Pins the exact live shape admitted.
+test("NVA-CATPIPE-1: cat-sourced bounded pipeline -- single-path grep and head sinks are admitted, the exact live GUARD-OPERATOR-UNAPPROVED refusal", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "notes.txt"), "keep this open line\nother line\n");
+    for (const command of ["cat notes.txt | grep open", "cat notes.txt | head -n 20"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }), { exitCode: 0, stderr: "" });
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CATPIPE-1. The multi-path form the live Antigravity refusal actually used:
+// `cat .claude/pipeline.yaml .claude/pipeline.json .claude/settings.json | grep -E '...'`.
+test("NVA-CATPIPE-1: a multi-path cat source piped into grep -E is admitted -- the exact live multi-file refusal shape", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "a.txt"), "alpha\n");
+    writeFileSync(join(path, "b.txt"), "bravo\n");
+    writeFileSync(join(path, "c.txt"), "charlie\n");
+    const command = "cat a.txt b.txt c.txt | grep -E 'alpha|bravo'";
+    assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+    assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    }), { exitCode: 0, stderr: "" });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CATPIPE-1. Measured 2026-08-27 in a different governed repository: an Antigravity
+// session was refused twice with GUARD-GATE-STRENGTH-SHELL for a `cat ... | grep -E ...`
+// pipeline naming .claude/pipeline.yaml/.claude/pipeline.json/.claude/settings.json, and
+// separately for one naming pipeline.user.yaml -- even though that refusal's own text
+// claims cat reads are admitted (true only for the single-command form until now). Both
+// directions, matching GSSHELL-STAGE-1's own discipline: a genuine WRITE shape naming these
+// same paths must stay refused, proving the fixture is live rather than the assertions
+// passing vacuously.
+test("NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as a read, never GUARD-GATE-STRENGTH-SHELL", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+    writeFileSync(join(path, ".claude", "pipeline.yaml"), "schema: pipeline.yaml.v1\n");
+    const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    });
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      "cat pipeline.user.yaml | grep push_approval",
+      "cat pipeline.user.yaml | head -n 5",
+      "cat .claude/pipeline.yaml pipeline.user.yaml | grep -E 'push_approval|routing'",
+    ]) {
+      const result = run(command);
+      assert.doesNotMatch(result.stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+      assert.deepEqual(result, { exitCode: 0, stderr: "" }, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CATPIPE-1. Exactness: command shape remains closed even though passive-read visibility
+// is host-owned. Exactly two segments, a grep/head sink, canonical 1..500 head count, and the
+// null-device stderr redirect remain the only admitted composition.
+test("NVA-CATPIPE-1: exactness -- an outside-root read and unsafe composition stay refused", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-catpipe-outside-"));
+  try {
+    writeFileSync(join(path, "notes.txt"), "keep this open line\n");
+    writeFileSync(join(outside, "secret.txt"), "outside\n");
+    const outsideRead = `cat ${join(outside, "secret.txt")} | grep open`;
+    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
+    for (const command of [
+      "cat notes.txt | grep open | wc -l",
+      "cat notes.txt | wc -l",
+      "cat notes.txt | head -n 0",
+      "cat notes.txt | head -n 501",
+      "cat notes.txt > output.txt | head -n 5",
+      "cat notes.txt 2>diagnostic.log | head -n 5",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// NVA-CATPIPE-1. CAT_PIPELINE_DISPLAY_FLAGS is a deliberate allowlist, not a denylist (unlike
+// grep's argv rule): a recognised display-only flag is admitted, an unrecognised one fails
+// closed rather than being silently ignored.
+test("NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecognised flag fails closed", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "notes.txt"), "keep this open line\n");
+    for (const command of [
+      "cat -n notes.txt | grep open",
+      "cat -A notes.txt | head -n 5",
+      "cat --number notes.txt | grep open",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+    }
+    for (const command of [
+      "cat -w notes.txt | grep open",
+      "cat --unsafe-flag notes.txt | grep open",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CF-GITPIPEALLOWLIST. Measured live this session: `git log | head` was refused
+// GUARD-PARSE-UNSUPPORTED even though `git log` alone is already unconditionally trusted
+// read-only. Mirrors NVA-CATPIPE-1's own admission test shape for the `head`-only sink.
+test("NVA-CF-GITPIPEALLOWLIST: git-sourced bounded pipeline into head is admitted, both head forms", () => {
+  const path = root();
+  try {
+    for (const command of ["git log | head -5", "git log | head -n 40", "git status | head -n 3"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }), { exitCode: 0, stderr: "" });
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CF-GITPIPEALLOWLIST. Exactness: read path location is host-owned while head bounds and
+// the read-only git subcommand allowlist remain closed. `git commit ... | head` in particular
+// must never be admitted.
+test("NVA-CF-GITPIPEALLOWLIST: exactness -- outside-root reads, mutation, and unsafe composition stay refused", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-gitpipe-outside-"));
+  try {
+    writeFileSync(join(outside, "secret.txt"), "synthetic passive-read fixture\n");
+    const outsideRead = `git log ${join(outside, "secret.txt")} | head -5`;
+    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
+    for (const command of [
+      "git log | head -n 0",
+      "git log | head -n 501",
+      "git commit -m x | head -5",
+      "git push origin main | head -5",
+      "git log | grep open",
+      "git log | head -n 5 > output.txt",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// NVA-CF-GITPIPEALLOWLIST. The refusal message's "complete admitted grammar" text now names
+// the new shape too, in the same terse style as every other bullet -- executed rather than
+// merely matched, per NVA-I-GRAMMAR's own discipline (ADMITTED_GRAMMAR_SHAPES pins the exact
+// live text, and its own test elsewhere proves every example is independently admitted).
+test("NVA-CF-GITPIPEALLOWLIST: the admitted grammar shapes include the git-to-head pipeline, and its example is genuinely admitted", () => {
+  const path = root();
+  try {
+    const shape = ADMITTED_GRAMMAR_SHAPES.find((entry) => entry.spelling.includes("git-to-head"));
+    assert.ok(shape, "a git-to-head shape must be present in ADMITTED_GRAMMAR_SHAPES");
+    assert.equal(isReadOnlyDiagnosticCommand(shape.example, path), true, shape.example);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+test("the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-and-chain-outside-"));
+  try {
+    mkdirSync(join(path, "backlog/items"), { recursive: true });
+    mkdirSync(join(path, "plugins/pipeline-core/hooks"), { recursive: true });
+    writeFileSync(join(path, "backlog/items/passive-probe.txt"), "pattern fixture\n");
+    writeFileSync(join(path, "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"), "// pattern fixture\n");
+    // SEC-11: grep is an exact-file read lane; recursive -rl is unsupported.
+    for (const command of [
+      'grep -rl "pattern" backlog/items/ 2>/dev/null',
+      'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | head -n 5',
+      'grep -rl "pattern" backlog/items/ | head -n 5 && git status',
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+    for (const command of [
+      'git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain',
+      "git status --short && printf '\\n--- AGENT ---\\n' && git log --oneline -1",
+      "git status --short && printf $'\\n--- AGENT ---\\n' && git log --oneline -1",
+      "mkdir -p scratch/probe && ls -la scratch/probe",
+      'grep -n "pattern" backlog/items/passive-probe.txt 2>/dev/null',
+      "git status && git log -n 10 --oneline",
+      "git rev-parse HEAD && git log --max-count=3",
+      'git rev-parse HEAD && grep -n "pattern" backlog/items/passive-probe.txt | head -n 5',
+      'git status && grep -n "pattern" plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs | grep -v "test"',
+      // NVA-I-GRAMMAR (DoD 3): position no longer matters -- a bounded pipeline segment that
+      // is independently admitted as a standalone command is now admitted in ANY chain
+      // position, not only trailing, per the "no new authority" argument (each side is
+      // already separately callable). Previously refused as "non-trailing pipe fails closed".
+      'grep -n "pattern" backlog/items/passive-probe.txt | head -n 5 && git status',
+      // NVA-I-GRAMMAR (DoD 3): `git log --all` is unconditionally admitted as a STANDALONE
+      // command (isReadOnlySimpleWords's git branch admits `log` with any args -- it is
+      // already read-only regardless of flags), so under the union rule it is also admitted
+      // as a chain segment. The OLD chain-only GIT_LOG_CHAIN_ALLOWED_FLAGS restriction was
+      // stricter than the single-command rule for no reason the union principle preserves;
+      // this widening grants no new authority, since `git log --all` was always independently
+      // reachable as its own tool call. Previously refused as a "disclosed exclusion".
+      "git log --all && git status",
+      // NVA-CF-GITPIPEALLOWLIST: `git log --oneline -5 | head -n 5` is now independently
+      // admitted as a standalone read-only command (isBoundedGitPipeline), so under the exact
+      // same "no new authority" union rule already exercised above for the grep-to-head
+      // segment, it is also admitted as a chain segment. Previously refused (see the git-log
+      // NVA-CATPIPE-1-era comment moved out of the refused list below): this widening grants
+      // no new authority, since the pipe segment was always independently reachable as its
+      // own tool call once isBoundedGitPipeline exists.
+      "git rev-parse HEAD && git log --oneline -5 | head -n 5",
+      "git --no-pager log",
+      "git --no-pager diff",
+      "git -p log",
+      "git branch -a",
+      "git branch -r",
+      "git describe",
+      "git tag -l",
+      "git config -l",
+      "git config --list",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+    assert.deepEqual(evaluateLifecycleReadyGuard(
+      bash('git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain'),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+    ), { exitCode: 0, stderr: "" });
+    assert.deepEqual(evaluateLifecycleReadyGuard(
+      bash("git status --short && printf '\\n--- AGENT ---\\n' && git log --oneline -1"),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+    ), { exitCode: 0, stderr: "" });
+    assert.deepEqual(evaluateLifecycleReadyGuard(
+      bash("git status --short && printf $'\\n--- AGENT ---\\n' && git log --oneline -1"),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+    ), { exitCode: 0, stderr: "" });
+
+    for (const command of [
+      // (a) an allowlisted command name chained with a mutating/cross-reaching one.
+      "git log && rm -rf /tmp/x",
+      "git status && git push",
+      // (b) mkdir -p targeting a path outside the permitted-write predicate.
+      `mkdir -p ${outside} && ls -la ${outside}`,
+      // (c) a trailing 2>/dev/null on a command that is not independently read-only.
+      "rm -rf /tmp/x 2>/dev/null",
+      // (d) a chain longer than the chosen bound, or an operator this design never admits.
+      "echo 1 && echo 2 && echo 3 && echo 4 && echo 5 && echo 6 && echo 7",
+      "git status ; git log",
+      "git status || git log",
+      "git status && printf $'format %s\\n' && git log",
+      // Trailing pipe where sink is neither grep nor head fails closed
+      'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
+      // Disclosed exclusion: a git global -c flag is never a subcommand match, so the
+      // segment fails the read-only classifier and the chain fails closed by construction.
+      "git -c core.pager=evil log && git status",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("physical newline diagnostic blocks admit only independently read-only lines", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "plugins/pipeline-core/scripts"), { recursive: true });
+    mkdirSync(join(path, "docs"), { recursive: true });
+    writeFileSync(join(path, "docs/push-release-flow.md"), "synthetic lifecycle fixture\n");
+    for (const command of [
+      "git status --short\ngit log --oneline -5",
+      "rg -n lifecycle plugins/pipeline-core\nhead -n 20 docs/push-release-flow.md",
+      "git rev-parse HEAD\nrg -n push-init plugins/pipeline-core/scripts",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(
+        bash(command),
+        { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+      ), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      "git status\ntouch bypass.txt",
+      "git status\nmkdir -p scratch/not-read-only",
+      "git status\n\ngit log --oneline",
+      "git status\ngit log --oneline > output.txt",
+      "git status; git log --oneline",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+// Critic finding F2 (rework round against commit b3153385): the test above uses an
+// UNGOVERNED root (root() writes no BASE_GOVERNANCE_MARKERS file), so
+// evaluateLifecycleReadyGuard's own `if (!governed) return verdict(0);` short-circuits
+// before ever reaching the mkdir-chain admission logic the test above claims to prove --
+// the requireProjectOnboardingReadyFn mock it injects at line ~699 is dead code, and F1's
+// bug (isChainEligibleSegment admitting ANY in-repo mkdir -p target) shipped underneath a
+// passing suite. This test uses a genuinely GOVERNED root (a real marker file on disk) with
+// requireProjectOnboardingReadyFn mocked not-ready, and proves both directions of the
+// narrowed mkdir predicate (F1): the scratch/ target stays admitted; an arbitrary in-repo
+// path outside scratch/ or .claude/worktrees/ (guardrails/, the Critic's own live-proved
+// bypass target) is now refused.
+//
+// Neither direction ever calls requireProjectOnboardingReadyFn, and both assert that
+// explicitly rather than leaving it unobserved: the admitted scratch/ chain is classified
+// read-only-diagnostic and short-circuits to verdict(0) BEFORE evaluateAfterGrammarAdmission
+// (the onboarding-readiness check) is reached -- the same early-exit shape the "non-ready
+// governed roots retain a narrow simple-command read-only diagnostic lane" test above
+// already establishes for other read-only shapes. The refused guardrails/ chain is refused
+// at the closed-grammar layer itself: guard-command-grammar.mjs's tokenizer unconditionally
+// rejects any top-level `&&` as a CONTROL operator (parseStatus "denied"), so a chain that
+// isReadOnlyDiagnosticCommand no longer admits is refused as GUARD-PARSE-UNSUPPORTED before
+// onboarding-readiness is ever consulted either -- refused unconditionally, which is at
+// least as strong a guarantee as "refused only while not yet onboarding-ready" would have
+// been. Documented here rather than assumed: this is a stronger, not weaker, proof than a
+// literal onboarding-readiness-mock-invocation would have given.
+test("the narrowed mkdir chain predicate (F1) still admits scratch/ and refuses an arbitrary in-repo path on a genuinely governed, not-yet-ready root", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    const admitted = "mkdir -p scratch/probe && ls -la scratch/probe";
+    assert.equal(isReadOnlyDiagnosticCommand(admitted, path), true, admitted);
+    let admittedCalls = 0;
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { admittedCalls += 1; deny("partial"); },
+    }), { exitCode: 0, stderr: "" });
+    assert.equal(admittedCalls, 0,
+      "scratch/ chain must short-circuit before onboarding-readiness is ever consulted");
+
+    const worktree = "mkdir -p .claude/worktrees/probe && ls -la .claude/worktrees/probe";
+    assert.equal(isReadOnlyDiagnosticCommand(worktree, path), true, worktree);
+
+    const refused = "mkdir -p guardrails/critic-probe && ls -la guardrails/critic-probe";
+    assert.equal(isReadOnlyDiagnosticCommand(refused, path), false, refused);
+    let refusedCalls = 0;
+    const result = evaluateLifecycleReadyGuard(bash(refused), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { refusedCalls += 1; deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2, refused);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u, refused);
+    assert.equal(refusedCalls, 0,
+      "the arbitrary in-repo path must be refused at the closed-grammar layer, "
+        + "never reaching onboarding-readiness");
+
+    // The Critic's own live reproduction shape, DoD check 1: refused end to end.
+    const reproduction = "git rev-parse HEAD && mkdir -p guardrails/critic-probe";
+    assert.equal(isReadOnlyDiagnosticCommand(reproduction, path), false, reproduction);
+    const reproductionResult = evaluateLifecycleReadyGuard(bash(reproduction), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(reproductionResult.exitCode, 2, reproduction);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("redirect-looking quoted data stays argv while hostile composition is typed and denied", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const quoted = parseGuardCommand("node -e 'console.log(\"a>b\")'", path);
+    assert.equal(quoted.parseStatus, "accepted");
+    assert.equal(quoted.redirects.length, 0);
+    for (const [command, code] of [
+      ["rg -n lifecycle . > output.txt | head -n 20", "GUARD-REDIRECT-UNAPPROVED"],
+      ["rg -n lifecycle . | tee output.txt", "GUARD-OPERATOR-UNAPPROVED"],
+      ["rg -n lifecycle . && touch output.txt", "GUARD-PARSE-UNSUPPORTED"],
+      ["rg -n lifecycle . ; head -n 20 output.txt", "GUARD-PARSE-UNSUPPORTED"],
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, new RegExp(code, "u"), command);
+      assert.doesNotMatch(result.stderr, /exact V4 ready result/u, command);
+      assert.match(result.stderr, /one simple shell command per tool call/u, command);
+      assert.match(result.stderr, /separate parallel tool calls/u, command);
+      assert.match(result.stderr, /Do not construct a new composed command/u, command);
+      assert.match(result.stderr, /If typed retryActions are present/u, command);
+      // NVA-I-GRAMMAR DoD 5: the refusal states the COMPLETE admitted grammar with bounds and
+      // exact spellings, not just the shape names -- pinned property-style, against the
+      // guard's own ADMITTED_GRAMMAR_SHAPES table, in the dedicated test below.
+      assert.match(result.stderr, /The complete admitted grammar, with bounds and exact spellings:/u, command);
+      assert.match(result.stderr, /N in 1\.\.500/u, command);
+    }
+
+    // A physical newline is now an alternative spelling of separately-admitted
+    // diagnostic reads. The dedicated newline corpus above proves the broader
+    // closure; retain this nearby regression for the original reproduction too.
+    writeFileSync(join(path, "output.txt"), "synthetic passive-read fixture\n");
+    const newlineReadBlock = "rg -n lifecycle .\nhead -n 20 output.txt";
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(newlineReadBlock), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    }), { exitCode: 0, stderr: "" }, newlineReadBlock);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("grammar denials return closed typed retries only for independent read diagnostics", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "one.txt"), "one\n");
+    writeFileSync(join(path, "two.txt"), "two\n");
+    const command = "sed -n '1,10p' one.txt ; sed -n '1,10p' two.txt";
+    const actions = retryActionsForDeniedCommand(command, path);
+    assert.deepEqual(actions, [
+      {
+        executable: "sed", argv: ["-n", "1,10p", "one.txt"], mutation: false,
+        requiresConfirmation: false, executionBoundary: "separate-tool-call", expected: { exitCodes: [0, 1] },
+      },
+      {
+        executable: "sed", argv: ["-n", "1,10p", "two.txt"], mutation: false,
+        requiresConfirmation: false, executionBoundary: "separate-tool-call", expected: { exitCodes: [0, 1] },
+      },
+    ]);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
+    assert.ok(envelopeLine);
+    assert.deepEqual(JSON.parse(envelopeLine).retryActions, actions);
+    assert.deepEqual(
+      retryActionsForDeniedCommand("sed -n '1,10p' one.txt\nsed -n '1,10p' two.txt", path),
+      actions,
+    );
+    assert.deepEqual(
+      retryActionsForDeniedCommand("sed -n '1,10p' one.txt\r\nsed -n '1,10p' two.txt", path),
+      actions,
+    );
+    assert.deepEqual(retryActionsForDeniedCommand("sed -n '1,10p' one.txt ; touch changed.txt", path), []);
+    assert.deepEqual(retryActionsForDeniedCommand("rg one . | head -n 10", path), []);
+    assert.deepEqual(retryActionsForDeniedCommand("sed -n \"$(id)\" one.txt ; pwd", path), []);
+    assert.deepEqual(retryActionsForDeniedCommand("sed -n '1,10p' one.txt\\\nsed -n '1,10p' two.txt", path), []);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    // Operator: parsed.operators[0] already carries the exact token -- pure read, no re-derivation.
+    const operator = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . | tee output.txt"), { projectDir: path });
+    assert.equal(operator.exitCode, 2);
+    assert.match(operator.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.match(operator.stderr, /Rejected element: the operator "\|"\./u);
+
+    // Redirect: parsed.redirects[0] carries the token; the target path itself must never appear (AC-5).
+    const redirect = evaluateLifecycleReadyGuard(
+      bash("rg -n lifecycle . > output.txt | head -n 20"), { projectDir: path },
+    );
+    assert.equal(redirect.exitCode, 2);
+    assert.match(redirect.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
+    assert.match(redirect.stderr, /Rejected element: the redirect operator ">"\./u);
+    assert.doesNotMatch(redirect.stderr, /Rejected element:[^\n]*output\.txt/u);
+
+    // Newline: the one control-character case mirrored from parseGuardCommand()'s own
+    // unconditional first-line gate -- the exact GRAMMARHINT-1 regression.
+    const newline = evaluateLifecycleReadyGuard(bash('git commit -m "line one\n\nline two"'), { projectDir: path });
+    assert.equal(newline.exitCode, 2);
+    assert.match(newline.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(newline.stderr, /Rejected element: a newline character inside the command text\./u);
+
+    // Composed with && (also GUARD-PARSE-UNSUPPORTED, no raw control character): denied()
+    // itself does not preserve which of its several rejection paths fired, but NVA-I-GRAMMAR
+    // DoD 4 closes this specific gap WITHOUT touching guard-command-grammar.mjs --
+    // rejectedAndChainSegment() independently re-splits the well-formed &&-chain (this file's
+    // own quote-aware splitTopLevelAndChain) and names the FIRST segment that fails the exact
+    // union isBoundedReadOnlyAndChain itself applies: "touch output.txt" is not read-only and
+    // not on the always-safe-write allowlist, so it is named as segment 2 of 2.
+    const composed = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(composed.exitCode, 2);
+    assert.match(composed.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(
+      composed.stderr,
+      /Rejected element: "&&"-chain segment 2 of 2 \("touch output\.txt"\) is not independently admitted/u,
+    );
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded newline yields no typed action", () => {
+  const path = activeGitRoot();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = 'git commit -m "line one\n\nline two"';
+    // GUARDFIX-2: this test used to require a `git commit -F` action carrying mutation:true.
+    // The expectation was itself the defect -- AC-047-140 admits only independently admitted
+    // read-only diagnostics into the envelope. The remediation did not disappear; it moved to
+    // the message text, pinned by the GUARDFIX-2 test below. What AC-2 still pins here is that
+    // a quoted newline is normalized into nothing runnable at all.
+    assert.deepEqual(retryActionsForDeniedCommand(command, path), []);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
+    assert.ok(envelopeLine);
+    assert.deepEqual(JSON.parse(envelopeLine).retryActions, []);
+
+    // The --message spelling reaches the same remediation (the AC-2 coverage that used to
+    // ride on the action's shape now rides on the text, where it can still fail).
+    const spelling = evaluateLifecycleReadyGuard(bash('git commit --message "one\ntwo"'), { projectDir: path });
+    assert.equal(spelling.exitCode, 2);
+    assert.match(spelling.stderr, /git commit -m /u);
+    assert.match(spelling.stderr, /--trailer 'AI-Assisted: true'/u);
+    assert.deepEqual(retryActionsForDeniedCommand('git commit --message "one\ntwo"', path), []);
+
+    // An ordinary single-line -m commit carries no control character, so it is neither denied
+    // for this reason nor given the remediation, and an ordinary multi-part denied command
+    // keeps returning [] exactly as before this change.
+    const singleLine = evaluateLifecycleReadyGuard(bash("git commit -m fixture -- a.md"), { projectDir: path });
+    assert.doesNotMatch(String(singleLine.stderr ?? ""), /Remediation:/u);
+    assert.deepEqual(retryActionsForDeniedCommand("git commit -m fixture", path), []);
+    assert.deepEqual(
+      retryActionsForDeniedCommand("sed -n '1,10p' one.txt ; touch changed.txt", path),
+      [],
+    );
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDFIX-2: AC-047-140 admits a `pipeline.guard-retry-actions.v1` envelope "only when every
+ * returned action is a separate-tool-call, independently admitted read-only diagnostic", and
+ * sprint-nova-epic repeats it -- normalized retries "only when every resulting line is
+ * independently an admitted, read-only, single command". `git commit -F` is a mutation and is
+ * not admitted by the closed grammar, so it can never be an action in that envelope; it is not
+ * a borderline case but the exact thing the sentence excludes. The envelope's only in-repo
+ * consumer agrees: denialRetryActions() (lib/human-guard-override.mjs) drops every action whose
+ * `mutation` is not `false`, so the action could never have been executed through that path
+ * either -- it could only mislead a reader of the raw denial text.
+ *
+ * The help itself is not the problem and is not withdrawn: it moves into the human-readable
+ * message, where a mutating remediation belongs and where no schema promises it is read-only.
+ */
+test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the structured commit shape as text", () => {
+  const path = activeGitRoot();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = 'git commit -m "line one\n\nline two"';
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+
+    // The envelope is emitted (the schema line is unconditional for grammar denials) and
+    // carries nothing that declares mutation, under any spelling other than exactly false.
+    const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
+    assert.ok(envelopeLine, "a grammar denial still prints the typed envelope");
+    const actions = JSON.parse(envelopeLine).retryActions;
+    assert.deepEqual(actions.filter((action) => action?.mutation !== false), []);
+    assert.deepEqual(retryActionsForDeniedCommand(command, path), []);
+    assert.deepEqual(retryActionsForDeniedCommand('git commit --message "one\ntwo"', path), []);
+
+    // Every surviving action would also pass the consumer's own filter -- the producer and the
+    // only consumer of this schema now agree instead of one silently discarding the other's work.
+    for (const action of actions) {
+      assert.equal(action.mutation, false);
+      assert.equal(action.requiresConfirmation, false);
+    }
+
+    // The remediation survives as message text, with pathspec on both calls and
+    // the same paths in each. A message file is unnecessary for this route.
+    assert.match(result.stderr, /git add -- <paths>/u);
+    assert.match(result.stderr, /git commit -m /u);
+    assert.match(result.stderr, /--trailer 'AI-Assisted: true'/u);
+    assert.match(result.stderr, /--trailer 'Dispatch: <task> \(<role>\)' -- <paths>/u);
+    assert.doesNotMatch(result.stderr, /msgfile/u);
+
+    // ...and the printed guarantee about the envelope is true again (guardrails/git.md: a gate
+    // states what it actually enforces). "typed" was the weakening that let a mutation in.
+    assert.match(result.stderr, /run only those exact read-only actions as separate tool calls/u);
+    assert.doesNotMatch(result.stderr, /exact typed actions/u);
+
+    // A grammar denial with no commit-message cause must not acquire the commit remediation.
+    const composed = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(composed.exitCode, 2);
+    assert.doesNotMatch(composed.stderr, /git commit -F/u);
+    assert.match(composed.stderr, /run only those exact read-only actions as separate tool calls/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("HEREDOCHINT-1: a refused real heredoc teaches the Write/Edit route without admitting it", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = "cat >> notes.md <<'EOF'\ncontent\nEOF";
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(result.stderr, /here-documents are not admitted/u);
+    assert.match(result.stderr, /use Write for a new file or Edit for an existing file/u);
+    assert.deepEqual(retryActionsForDeniedCommand(command, path), []);
+
+    // Quoted data resembling a heredoc never gets the mutation-oriented hint.
+    const quoted = evaluateLifecycleReadyGuard(bash("printf '<<EOF\\n'"), { projectDir: path });
+    assert.equal(quoted.exitCode, 2);
+    assert.doesNotMatch(String(quoted.stderr ?? ""), /here-documents are not admitted/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("GRAMMARHINT-1 AC-4: GUARD-OPERATOR-UNAPPROVED and GUARD-PARSE-UNSUPPORTED stay distinct, own codes never conflated", () => {
+  const path = hgoGitFixture("chat");
+  try {
+    const operator = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . | tee output.txt"), { projectDir: path });
+    assert.match(operator.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.doesNotMatch(operator.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    // Unaffected by this dispatch: the operator/redirect codes already route through
+    // humanOverrideRoute() the same way GUARD-PARSE-UNSUPPORTED does (guard-lifecycle-ready.mjs,
+    // unchanged by this dispatch) -- a plain "nothing armed" fixture offers the route for both;
+    // pinned here as the CURRENT, unchanged behaviour, not narrowed or widened by this change.
+    assert.match(operator.stderr, /Human override available for this exact command/u);
+
+    const parseUnsupported = evaluateLifecycleReadyGuard(
+      bash('git commit -m "line one\n\nline two"'), { projectDir: path },
+    );
+    assert.match(parseUnsupported.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(parseUnsupported.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.match(parseUnsupported.stderr, /Human override available for this exact command/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("non-ready Bash permits only exact plugin-local lifecycle remediation argv", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const inspect = `node '${ONBOARDING_SCRIPT}' inspect --root '${path}' --intent bootstrap`;
+    const apply = `node '${ONBOARDING_SCRIPT}' apply-readback --root '${path}' --plan-sha256 ${"a".repeat(64)} --activate`;
+    const preflight = `node '${START_PREFLIGHT_SCRIPT}'`;
+    // OBLIGROUTE-1: the second zero-argument member of this list. Enumerated here with the
+    // rest so the admitted set stays one list rather than two, and refuted below in the
+    // argument-bearing spellings, which are not part of the map's interface at all.
+    const repairMap = `node '${REPAIR_MAP_SCRIPT}'`;
+    const hostPlan = `node '${HOST_REPOSITORY_INIT_SCRIPT}' plan --root '${path}'`;
+    const hostApply = `node '${HOST_REPOSITORY_INIT_SCRIPT}' apply --root '${path}' --plan-sha256 ${"b".repeat(64)} --activate`;
+    const kickoffPlan = `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game' --language de`;
+    const kickoffApply = `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --language de --plan-sha256 ${"c".repeat(64)} --activate`;
+    // GF-093: a bare --help/-h must reach the CLI's own usage text even while non-ready, the
+    // same reasoning as the preflight and repair-map bare no-arg admissions above -- main()
+    // returns immediately on options.help with zero filesystem access (project-onboarding-v3.mjs
+    // main()/parse()), before --root is even required.
+    const onboardingHelp = `node '${ONBOARDING_SCRIPT}' --help`;
+    const onboardingHelpShort = `node '${ONBOARDING_SCRIPT}' -h`;
+    const overlayRoute = `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root '${path}'`;
+    const poRebind = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`;
+    const poRebindCodex = `${poRebind} --runner codex`;
+    const poAcknowledgePlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root '${path}' --by 'Phoenix PO' --runner codex`;
+    const poAcknowledgeApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate --runner codex`;
+    const poAcknowledgeApplyCwd = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`;
+    const poDecisionPlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-plan`;
+    const poDecisionSelect = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-select --plan-sha256 ${"d".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec`;
+    const poDecisionApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-apply --plan-sha256 ${"d".repeat(64)} --selection-digest ${"e".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec --activate`;
+    const poDecisionSelectClaude = `${poDecisionSelect} --runner claude`;
+    const poDecisionApplyAntigravity = `${poDecisionApply} --runner antigravity`;
+    const legacyRevocationRecoveryPlan = `node '${PIPELINE_STATE_SCRIPT}' plan-legacy-v2-revocation-recovery --by 'Phoenix PO'`;
+    const legacyRevocationRecoveryApply = `node '${PIPELINE_STATE_SCRIPT}' apply-legacy-v2-revocation-recovery --by 'Phoenix PO' --prepared-at 2026-07-29T09:00:00.000Z --preimage-sha256 ${"a".repeat(64)} --postimage-sha256 ${"b".repeat(64)} --plan-sha256 ${"c".repeat(64)} --activate true`;
+    const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
+    const submitPlan = `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile epic`;
+    const approvePlan = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by 'PO recovery'`;
+    const approvePlanReceipt = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/bootstrap-plan-acknowledgement-receipt-${"a".repeat(64)}.json`;
+    const setPhase = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+    const profileRepairPlan = `node '${PO_PROFILE_REPAIR_SCRIPT}' plan --root '${path}'`;
+    const profileRepairApply = `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
+    const authorityMigrationPlan = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' plan --root '${path}'`;
+    const authorityMigrationApply = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
+    // sanctionedProjectAuthorityMigrationArgs() gained "vendor-sync" alongside "plan"/"apply" --
+    // the CLI's own vendor-sync subcommand (project-authority-migration.mjs) uses the identical
+    // two-shape (bare read-only plan vs. --plan-sha256/--activate mutation) pattern.
+    const authorityMigrationVendorSyncPlan = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root '${path}'`;
+    const authorityMigrationVendorSyncApply = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
+    const overridePlan = `node '${HUMAN_OVERRIDE_SCRIPT}' plan --repo '${path}' --request-sha256 ${"f".repeat(64)}`;
+    const overridePrepare = `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-authorization --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --reason 'PO attended exact action'`;
+    const overrideAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --activate`;
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
+    const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
+    const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poRebindCodex, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionSelectClaude, poDecisionApply, poDecisionApplyAntigravity, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, approvePlanReceipt, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" });
+    }
+    // NVA-BOOTADMIT-2: flag order carries no behavioural meaning to the target CLI --
+    // project-onboarding-v3.mjs parse() (lines 195-250) walks a flat, order-insensitive
+    // flag set for every subcommand, so --language before --goal parses identically to the
+    // canonical order above. The guard's old positional strictness excluded a shape its own
+    // target already accepted unchanged; this pair is pre-authorized to flip to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --language de --goal 'Build one HTML game'`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --language de --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`, path), true);
+    // POACKROOT: the target parser is flag-order-insensitive. Admit only permutations of
+    // the writer's exact root-bound set; root-less plan stays unavailable and the existing
+    // cwd-relative apply spelling above remains admitted unchanged.
+    assert.equal(isSanctionedLifecycleCommand(
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO' --runner claude --root '${path}'`, path,
+    ), true);
+    assert.equal(isSanctionedLifecycleCommand(
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --by 'Phoenix PO' --activate --updated-at 2026-07-29T09:00:00.000Z --root '${path}' --plan-sha256 ${"d".repeat(64)}`, path,
+    ), true);
+    for (const command of [
+      `${inspect}; printf bypass > src/output.txt`,
+      `node '${ONBOARDING_SCRIPT}' apply-readback --root /tmp/other --plan-sha256 ${"a".repeat(64)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-readback --root '${path}' --plan-sha256 ${"a".repeat(64)} --activate && touch bypass`,
+      `${preflight}; touch bypass`,
+      // OBLIGROUTE-1, the closing half: an argument-bearing map invocation is not a narrower
+      // version of an admitted command, it is a different command, and none of these is part
+      // of the map's interface -- it parses no flag and no subcommand.
+      `${repairMap} --json`,
+      `${repairMap} --root '${path}'`,
+      `${repairMap}; touch bypass`,
+      `${repairMap} && touch bypass`,
+      `${hostApply} && touch bypass`,
+      `node '${ONBOARDING_SCRIPT}' kickoff-plan --root '${path}' --goal 'Build one HTML game'`,
+      `node '${ONBOARDING_SCRIPT}' plan-kickoff --root '${path}' --goal 'Build one HTML game'`,
+      `node '${ONBOARDING_SCRIPT}' plan --root '${path}' --goal 'Build one HTML game'`,
+      `node '${ONBOARDING_SCRIPT}' kickoff --root '${path}' --goal 'Build one HTML game'`,
+      // GF-074: --language <de|en> is mandatory since the CLI's GF-066 addition. The
+      // pre-fix shape (no --language at all) is now a negative case -- proves the fix
+      // closes the gap rather than just widening the allowlist.
+      `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game'`,
+      `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`,
+      // Invalid --language value (not de|en).
+      `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game' --language fr`,
+      `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --language fr --plan-sha256 ${"c".repeat(64)} --activate`,
+      // GF-093: --help is a bare, argument-free admission only -- never an escape hatch
+      // bolted onto a real command. Combined with anything else it still falls through to
+      // exact refusal, same as every other malformed onboarding shape.
+      `node '${ONBOARDING_SCRIPT}' --root '${path}' --help`,
+      `node '${ONBOARDING_SCRIPT}' kickoff plan --help`,
+      `node '${ONBOARDING_SCRIPT}' --help --root '${path}'`,
+      `node '${ONBOARDING_SCRIPT}' -h --root '${path}'`,
+      `node '${ONBOARDING_SCRIPT}' --help --help`,
+      `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root /tmp/other`,
+      `node '${PRIVATE_OVERLAY_SCRIPT}' status --project-root '${path}'`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at invalid --activate`,
+      `node '/tmp/other/harness/scripts/pipeline-state.mjs' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`,
+      `${poRebind} --bypass`,
+      `${poRebind} --runner codepilot`,
+      `${poRebindCodex} --runner claude`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO'`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root '${path}' --by 'Phoenix PO' --runner codepilot`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root /tmp/other --by 'Phoenix PO'`,
+      `${poAcknowledgePlan} --root '${path}'`,
+      `${poAcknowledgePlan} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root /tmp/other --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`,
+      `${poAcknowledgeApply} --root '${path}'`,
+      `${poAcknowledgeApply} --runner codex`,
+      `${poAcknowledgeApply} --activate`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"D".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at invalid --by 'Phoenix PO' --activate`,
+      `${poAcknowledgeApply} --runner claude`,
+      `${poDecisionPlan} --selection spec`,
+      `${poDecisionSelect} --runner codepilot`,
+      `${poDecisionSelectClaude} --runner codex`,
+      `${poDecisionApply} --bypass`,
+      `${poDecisionApply} --runner codepilot`,
+      `${poDecisionApplyAntigravity} --runner codex`,
+      legacyRevocationRecoveryApply,
+      `node '${PIPELINE_STATE_SCRIPT}' apply-legacy-v2-revocation-recovery --by 'Phoenix PO' --prepared-at 2026-07-29T09:00:00.000Z --preimage-sha256 ${"a".repeat(64)} --postimage-sha256 ${"b".repeat(64)} --plan-sha256 ${"c".repeat(64)} --activate false`,
+      `${legacyRevocationRecoveryApply} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by`,
+      `${reopenDesign} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile unsafe`,
+      `${submitPlan} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by ''`,
+      `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/bootstrap-plan-acknowledgement-receipt-${"A".repeat(64)}.json`,
+      `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/other.json`,
+      `${approvePlanReceipt} --by 'PO recovery'`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase release`,
+      `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --activate`,
+      `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' apply --root '${path}' --activate`,
+      `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root '${path}' --activate`,
+      `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root /tmp/other`,
+      `${overrideAuthorize} --bypass`,
+      `${overridePlan} --author-source-root /tmp/other`,
+      `${overrideAuthorAuthorize} --bypass`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo /tmp/other --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason x --reason-sha256 ${"b".repeat(64)} --activate`,
+      `node -e 'require("node:fs").writeFileSync("bypass","x")'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("greenfield verify transition admits only the exact non-placeholder set-phase argv", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+    const valid = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command 'node --test'`;
+    assert.equal(isSanctionedLifecycleCommand(valid, path), true, valid);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(valid), nonReady), { exitCode: 0, stderr: "" });
+
+    for (const command of [
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command 'the verify contract of this project is not configured'`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command 'node --test' --verify-command 'node test.mjs'`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-commands 'node --test'`,
+      `${valid} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase design --verify-command 'node --test'`,
+      `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery' --verify-command 'node --test'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GF-097. `gh --version` and `gh auth status`, bare, are GitHub CLI's own documented
+ * read-only diagnostics and must reach the operator even while lifecycle is not-ready --
+ * the same class of gap GF-093 closed for the onboarding CLI's `--help`, but for a
+ * third-party binary rather than a bundled script (guard-lifecycle-ready.mjs,
+ * isSanctionedGhReadOnlyDiagnostic()). This is a narrow, exact-shape admission for two
+ * specific invocations, never a blanket `gh` carve-out -- the negative list below proves
+ * near-miss `gh` shapes (extra flags, a different subcommand, no args at all) stay refused.
+ */
+test("GF-097: bare `gh --version` and `gh auth status` are admitted while lifecycle is not-ready, and no other `gh` shape is", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+    for (const command of ["gh --version", "gh auth status"]) {
+      assert.equal(isSanctionedGhReadOnlyDiagnostic(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), nonReady), { exitCode: 0, stderr: "" });
+    }
+    for (const command of [
+      "gh pr create",
+      "gh auth login",
+      "gh repo clone owner/repo",
+      "gh --version --help",
+      "gh auth status --hostname example.com",
+      "gh",
+      "gh auth",
+    ]) {
+      assert.equal(isSanctionedGhReadOnlyDiagnostic(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * OBLIGROUTE-1. templates/prompts/agent-obligations.md SS5 instructs every dispatched agent to
+ * ASK which refusals can be lifted -- `node <plugin-root>/scripts/repair-map.mjs` -- and SS1a
+ * calls the non-ready lane "the state you are in precisely when you most need to look around".
+ * The map's `GUARD-LIFECYCLE-NOT-READY` row is the row that state needs, and until this
+ * admission existed the question was refused in exactly the state that asks it.
+ *
+ * Both directions are pinned, because an admission test alone cannot fail for the reason that
+ * matters here. This is the file that stops an agent weakening the gate authorizing it, so the
+ * proof that nothing else rode along is a SWEEP, not an example: every other script this plugin
+ * ships, invoked with the identical zero-argument shape, must still be refused in the same
+ * fixture. The two known zero-argument admissions are named and justified; a third one appearing
+ * turns this test red instead of passing quietly.
+ */
+test("stale pipeline-owned pre-push hook recovery is admitted only by its exact installer argv", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partial = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const admitted = `node '${PRE_PUSH_HOOK_INSTALL_SCRIPT}' --install`;
+    assert.equal(isSanctionedLifecycleCommand(admitted, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), partial), { exitCode: 0, stderr: "" });
+    for (const command of [`node '${PRE_PUSH_HOOK_INSTALL_SCRIPT}'`, `node '${PRE_PUSH_HOOK_INSTALL_SCRIPT}' --install --extra`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partial).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("root-bound governance bootstrap is admitted only by its exact read-only argv", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partial = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const admitted = `node '${OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT}' --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(admitted, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), partial), { exitCode: 0, stderr: "" });
+    for (const command of [`node '${OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT}'`, `node '${OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT}' --root '${path}' --extra`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partial).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("F6 governance checker is admitted only from the active repository root", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partial = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const checker = join(path, "harness", "scripts", "check-observation-governance.mjs");
+    const admitted = `node '${checker}'`;
+    assert.equal(isSanctionedLifecycleCommand(admitted, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), partial), { exitCode: 0, stderr: "" });
+    for (const command of [`node '${checker}' --extra`, `node '${join(path, "other", "check-observation-governance.mjs")}'`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partial).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and nothing beside it", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+
+    // Direction 1 -- the instruction SS5 gives is now executable in the state SS1a describes.
+    const map = `node '${REPAIR_MAP_SCRIPT}'`;
+    assert.equal(isSanctionedLifecycleCommand(map, path), true, map);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(map), nonReady), { exitCode: 0, stderr: "" });
+
+    // Direction 2a -- the named neighbour. critic-dispatch-preflight.mjs is the sharpest case:
+    // agent-obligations SS4 already lists it as a read-only script exempt from the gate-strength
+    // shell lane, so "read-only and already named in that document" is demonstrably NOT what
+    // this admission keys on. Its existence is asserted so a rename fails here loudly rather
+    // than silently degrading this into an assertion about a path that no longer exists.
+    const neighbour = join(SCRIPTS_DIR, "critic-dispatch-preflight.mjs");
+    assert.ok(existsSync(neighbour), "the named neighbour script still exists");
+    const neighbourCommand = `node '${neighbour}'`;
+    assert.equal(isSanctionedLifecycleCommand(neighbourCommand, path), false, neighbourCommand);
+    const refused = evaluateLifecycleReadyGuard(bash(neighbourCommand), nonReady);
+    assert.equal(refused.exitCode, 2, neighbourCommand);
+    assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+
+    // Direction 2b -- the sweep. Zero arguments is exactly the shape just admitted, so any
+    // sibling that answers the same way would be a widening this dispatch did not intend.
+    const zeroArgumentAdmissions = new Set(["repair-map.mjs", "pipeline-start-preflight.mjs"]);
+    const siblings = readdirSync(SCRIPTS_DIR)
+      .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs"))
+      .filter((name) => !zeroArgumentAdmissions.has(name));
+    assert.ok(siblings.length > 10, "the sweep still covers this plugin's script directory");
+    for (const name of siblings) {
+      const command = `node '${join(SCRIPTS_DIR, name)}'`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+    // ...and the one sibling deliberately left out of the sweep is the pre-existing zero-argument
+    // admission, restated here so the exclusion above is a justified fact, not a hidden hole.
+    assert.equal(isSanctionedLifecycleCommand(`node '${START_PREFLIGHT_SCRIPT}'`, path), true);
+
+    // Direction 2c -- the admission is the exact resolved path of THIS plugin's map, not a
+    // basename, a suffix or anything under some `scripts/` directory. A same-named script in a
+    // foreign root is a different program entirely and stays refused.
+    const foreign = `node '${join(path, "plugins", "pipeline-core", "scripts", "repair-map.mjs")}'`;
+    assert.equal(isSanctionedLifecycleCommand(foreign, path), false, foreign);
+    assert.equal(evaluateLifecycleReadyGuard(bash(foreign), nonReady).exitCode, 2, foreign);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("LND-5 admits only canonical session Critic prelaunch and finalization requests under the project scratch root", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "session-critic-finalizer-outside-"));
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    writeFileSync(join(path, "scratch", "session-critic-finalization-request.json"), "{}\n");
+    writeFileSync(join(outside, "request.json"), "{}\n");
+    symlinkSync(join(outside, "request.json"), join(path, "scratch", "linked-request.json"));
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+    const script = join(SCRIPTS_DIR, "session-critic-finalizer.mjs");
+    for (const action of ["admit", "finalize"]) {
+      const canonical = `node '${script}' ${action} --root '${path}' --request scratch/session-critic-finalization-request.json`;
+      assert.equal(isSanctionedLifecycleCommand(canonical, path), true);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(canonical), nonReady), { exitCode: 0, stderr: "" });
+      const skillCommand = `node '${script}' ${action} --root . --request scratch/session-critic-finalization-request.json`;
+      assert.equal(isSanctionedLifecycleCommand(skillCommand, path), true);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(skillCommand), nonReady), { exitCode: 0, stderr: "" });
+    }
+
+    for (const command of [
+      `node '${script}' inspect --root '${path}' --request scratch/session-critic-finalization-request.json`,
+      `node '${script}' admit --root '${path}' --request scratch/session-critic-finalization-request.json --force`,
+      `node '${script}' admit --root '${path}' --request scratch/linked-request.json`,
+      `node '${script}' finalize --root '${path}' --request scratch/session-critic-finalization-request.json --force`,
+      `node '${script}' finalize --root '${path}' --request '${join(outside, "request.json")}'`,
+      `node '${script}' finalize --root '${path}' --request ../request.json`,
+      `node '${script}' finalize --root '${path}' --request evidence/request.json`,
+      `node '${script}' finalize --root '${path}' --request scratch/request.txt`,
+      `node '${script}' finalize --root '${path}' --request scratch/linked-request.json`,
+      `node '${script}' finalize --root scratch --request scratch/session-critic-finalization-request.json`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
+ * runnable.md). Measured before this dispatch: `onboarding-init.mjs` was refused
+ * (`GUARD-LIFECYCLE-NOT-READY`) at every one of these five statuses, so the driver's own
+ * chaining behaviour was unreachable regardless of how good it was. Both halves are pinned
+ * in the SAME governed, injected-denial fixture the OBLIGROUTE-1 test above uses -- the
+ * exact admitted shape, near-miss shapes still refused -- plus a refused control
+ * (`touch output.txt`) at every status, so a fixture that failed open by construction
+ * (no governance marker) could never pass this test the way an earlier run of the
+ * measurement harness silently did.
+ */
+test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readiness status, in its exact argv shape and no wider one", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of [
+      "portable-seed-required", "runtime-initialization-required", "kickoff-required", "intake-required",
+      "bootstrap-binding-required",
+      "migration-required", "partial",
+    ]) {
+      const nonReady = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      };
+      const admit = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, `${status}: ${command}`);
+        assert.deepEqual(
+          evaluateLifecycleReadyGuard(bash(command), nonReady),
+          { exitCode: 0, stderr: "" },
+          `${status}: ${command}`,
+        );
+      };
+      const refuse = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), false, `${status}: ${command}`);
+        const result = evaluateLifecycleReadyGuard(bash(command), nonReady);
+        assert.equal(result.exitCode, 2, `${status}: ${command}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}: ${command}`);
+      };
+
+      // The exact admitted shape, and its flag-order-insensitive equivalents.
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}'`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner claude`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 10`);
+      admit(`node '${DRIVER_SCRIPT}' --step-cap 5 --root '${path}' --runner antigravity`);
+      for (const language of ["de", "en"]) {
+        admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language ${language} --advisor-export-consent declined`);
+        admit(`node '${DRIVER_SCRIPT}' --language ${language} --human-approval signature --advisor-export-consent approved --git-author-email fixture@example.invalid --runner codex --root '${path}' --git-author-name Fixture`);
+      }
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language fr --advisor-export-consent declined`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --language en --advisor-export-consent declined`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent unknown`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --language de`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --git-author-name Fixture`);
+      const externalDirectory = join(tmpdir(), "guard-first-anchor-directory");
+      const externalKey = join(tmpdir(), "guard-existing-po-key.pem");
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval signature --language de --advisor-export-consent declined --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+      for (const runner of ["claude", "codex", "antigravity"]) {
+        admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner ${runner} --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+        admit(`node '${DRIVER_SCRIPT}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none --runner ${runner} --root '${path}' --trust-anchor-directory '${externalDirectory}' --trust-anchor-mode new`);
+      }
+
+      // Near misses: no argv at all, wrong root, an out-of-set runner, a step-cap
+      // parseArgs() itself would refuse (zero, negative, non-numeric), a flag the driver's
+      // own parser does not accept at all, and a duplicated --root.
+      refuse(`node '${DRIVER_SCRIPT}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${join(path, "other")}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner human`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap 0`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap -1`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap abc`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --profile mini`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --root '${path}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --intent bootstrap`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode new --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode new --trust-anchor-directory '${join(path, "key-dir")}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 5 --trust-anchor-mode new --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+
+      // The control the backlog item's own measurement insists on: a fail-open fixture
+      // (no governance marker) would have admitted this too.
+      refuse("touch output.txt");
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDARGV-2. The repair script writes `--human-facing <de|en>` into the apply argv it
+ * emits itself, and the gate prints "add --human-facing <de|en>" as the operator's next
+ * step -- while the guard refused that exact command in the one state it is offered in.
+ *
+ * Everything asserted here is taken from the script rather than restated: the closed
+ * value set from its parser's own `SUPPORTED_LANGUAGES`, the apply argv from what `plan`
+ * actually emits. A change on either side therefore breaks this test rather than the
+ * operator's repair route. The refusals pin that the admission stayed positional and
+ * closed -- out-of-set, reordered, duplicated and padded variants must not ride along.
+ */
+test("non-ready Bash admits the repair script's own --human-facing argv, positionally and closed", () => {
+  const path = realpathSync(root());
+  const script = PO_PROFILE_REPAIR_SCRIPT;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "language:\n  human_facing: \"en\"\n");
+    writeFileSync(join(path, ".claude", "pipeline.yaml"), "language:\n  human_facing: en\n");
+    const declared = readFileSync(script, "utf8").match(/const SUPPORTED_LANGUAGES = (\[[^\]]*\]);/u);
+    assert.ok(declared, "the repair script still declares one closed language set");
+    const languages = JSON.parse(declared[1].includes("'") ? declared[1].replace(/'/gu, "\"") : declared[1]);
+    assert.deepEqual([...languages].sort(), ["de", "en"]);
+    const digest = "e".repeat(64);
+    const admit = (command) => {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" }, command);
+    };
+    const refuse = (command) => {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    };
+    for (const language of languages) {
+      admit(`node '${script}' plan --root '${path}' --human-facing ${language}`);
+      admit(`node '${script}' apply --root '${path}' --human-facing ${language} --plan-sha256 ${digest} --activate`);
+    }
+    // The pre-existing shapes stay admitted unchanged.
+    admit(`node '${script}' plan --root '${path}'`);
+    admit(`node '${script}' apply --root '${path}' --plan-sha256 ${digest} --activate`);
+    // The apply argv the script emits itself, taken from its own plan output.
+    const planned = spawnSync(
+      process.execPath,
+      [script, "plan", "--root", path, "--human-facing", "de"],
+      { encoding: "utf8" },
+    );
+    assert.equal(planned.status, 0, planned.stdout);
+    const emitted = JSON.parse(planned.stdout).applyAction.argv;
+    assert.deepEqual(emitted.slice(0, 5), [script, "apply", "--root", path, "--human-facing"]);
+    const word = (value) => (/^[A-Za-z0-9_.:=-]+$/u.test(value) ? value : `'${value}'`);
+    admit(`node ${emitted.map(word).join(" ")}`);
+    for (const command of [
+      `node '${script}' plan --root '${path}' --human-facing fr`,
+      `node '${script}' plan --root '${path}' --human-facing DE`,
+      `node '${script}' plan --root '${path}' --human-facing`,
+      `node '${script}' plan --root '${path}' --human-facing de --human-facing de`,
+      `node '${script}' plan --human-facing de --root '${path}'`,
+      `node '${script}' plan --root '${path}' --human-facing de --activate`,
+      `node '${script}' plan --root '${path}' --human-facing de --plan-sha256 ${digest} --activate`,
+      `node '${script}' apply --root '${path}' --human-facing fr --plan-sha256 ${digest} --activate`,
+      `node '${script}' apply --root '${path}' --plan-sha256 ${digest} --human-facing de --activate`,
+      `node '${script}' apply --root '${path}' --human-facing de --human-facing en --plan-sha256 ${digest} --activate`,
+      `node '${script}' apply --root '${path}' --human-facing de --plan-sha256 ${digest} --activate --bypass`,
+      `node '${script}' apply --root '${path}' --human-facing de --plan-sha256 zz --activate`,
+      `node '${script}' apply --root '${path}' --human-facing de --plan-sha256 ${digest}`,
+      `node '${script}' apply --root /tmp/other --human-facing de --plan-sha256 ${digest} --activate`,
+      `node '${script}' plan --root '${path}' --human-facing de && touch bypass`,
+      `node '${script}' repair --root '${path}' --human-facing de`,
+      `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' plan --root '${path}' --human-facing de`,
+    ]) refuse(command);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * ADR-0059 Decision 4, `signature` mode's decisive final step (NOVA-HGOSIG-TRUST-1 D1).
+ *
+ * The guard prints `authorize-by-signature ...` as the next command whenever
+ * gates.push_approval is `signature` (this repository's committed value) -- see the
+ * continuation assertion at "signature mode offers authorize-by-signature" further down --
+ * and `sanctionedHumanOverrideArgs()` then had to admit it. It did not: its base check
+ * matched `args[0] === "authorize"` by strict equality, so the offered route dead-ended at
+ * its last step. Positive and negative shapes are asserted in ONE test on purpose: the
+ * mutations alone pass against the unfixed code (which refuses everything), so only the
+ * admission assertion proves the branch exists, and only the mutations prove it did not
+ * arrive as a blanket allowance.
+ */
+test("signature plan's prepare-for-signature action remains admitted during lifecycle recovery", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const request = "f".repeat(64);
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const action = `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-for-signature --repo '${path}' --request-sha256 ${request}`;
+    for (const command of [action, `${action} --author-source-root '${authorRoot}'`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      `${action} --activate`,
+      `${action} --author-source-root /tmp/other`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-for-signature --repo '${path}' --request-sha256 ${"g".repeat(64)}`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-for-signature --request-sha256 ${request} --repo '${path}'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("signature mode's authorize-by-signature is admitted in exactly its printed shape and refused when mutated", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-proof-"));
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const request = "f".repeat(64);
+    const plan = "a".repeat(64);
+    const proof = join(external, "proof.json");
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const signature = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${proof}'`;
+    const signatureAuthor = `${signature} --author-source-root '${authorRoot}'`;
+    for (const command of [signature, signatureAuthor]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      // wrong flag order
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --plan-sha256 ${plan} --request-sha256 ${request} --proof '${proof}'`,
+      // non-hex and short digests
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${"g".repeat(64)} --plan-sha256 ${plan} --proof '${proof}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${"a".repeat(63)} --proof '${proof}'`,
+      // extra trailing word
+      `${signature} --bypass`,
+      `${signature} --activate`,
+      `${signatureAuthor} --activate`,
+      // wrong --repo
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo /tmp/other --request-sha256 ${request} --plan-sha256 ${plan} --proof '${proof}'`,
+      // wrong --author-source-root
+      `${signature} --author-source-root /tmp/other`,
+      // the trust anchor is not caller-supplied: --authority is no shape at all
+      `${signature} --authority '${join(external, "authority.json")}'`,
+      // --proof is bounded structurally: in-repository, relative, traversing,
+      // non-JSON and empty paths are all refused
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${join(path, "proof.json")}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof proof.json`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${external}/../proof.json'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${join(external, "proof.txt")}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof ''`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
+  }
+});
+
+test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      "plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback",
+      "plan-source-recovery", "plan-manifest-repair",
+    ]) {
+      // Regression pin: this is the exact 7-token argv shape lifecycleArgv(argv, runner, intent)
+      // emits at project-onboarding-v3.mjs:1300-1303 whenever intent !== "onboarding" — --runner
+      // is appended first, --intent afterward, so --runner sits second-to-last, not trailing.
+      for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+        for (const runner of ["claude", "codex"]) {
+          const withIntent = `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner ${runner} --intent ${intent}`;
+          assert.equal(isSanctionedLifecycleCommand(withIntent, path), true, withIntent);
+        }
+      }
+      // No-regression pin: the pre-existing default-intent shape (trailing --runner, no
+      // --intent) must keep working exactly as before the generalization.
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner claude`, path), true);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner codex`, path), true);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}'`, path), true);
+    }
+    for (const command of [
+      // invalid intent value
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent unknown`,
+      // invalid runner value
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner windows --intent session`,
+      // malformed / wrong-length argv
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --goal session`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDALLOW-1 (backlog: 2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md).
+ * `plan-partial-authority` is a real, read-only onboarding subcommand (scripts/
+ * project-onboarding-v3.mjs: absent from APPLY_SHAPED_COMMANDS) that a partial-authority
+ * inspection prescribes verbatim as its `nextAction` (lib/project-onboarding-v3.mjs:3436,
+ * 3717, via the same lifecycleArgv(argv, runner, intent) helper as its plan* siblings) --
+ * yet the allowlist refused it because it was absent from the plan* array, blocking every
+ * consumer project stuck in `partial` state from ever completing bootstrap. This mirrors
+ * the "plan-runtime family" test above, scoped to the one added subcommand, plus a negative
+ * case proving an unlisted, made-up plan-shaped subcommand is still refused (fail-closed
+ * default preserved).
+ */
+test("GUARDALLOW-1: plan-partial-authority is admitted with the same shape as its plan* siblings", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+      for (const runner of ["claude", "codex"]) {
+        const withIntent = `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner ${runner} --intent ${intent}`;
+        assert.equal(isSanctionedLifecycleCommand(withIntent, path), true, withIntent);
+      }
+    }
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner codex`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}'`, path), true);
+    for (const command of [
+      // invalid intent value
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --intent unknown`,
+      // invalid runner value
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner windows --intent session`,
+      // malformed / wrong-length argv
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --intent`,
+      // --profile/--source are valid CLI-level flags for this command (usage text), but the
+      // guard admits only the exact nextAction shape the inspection actually emits -- never
+      // the wider human-invoked shape -- so these still fall through to refusal.
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --profile epic --source canonical-fresh-v3`,
+      // apply-partial-authority is a separate, mutating, apply-shaped command and is
+      // deliberately out of scope for this fix -- it must stay refused.
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --runner claude --plan-sha256 ${"a".repeat(64)} --activate`,
+      // an unlisted, made-up plan-shaped subcommand must stay refused (fail-closed default).
+      `node '${ONBOARDING_SCRIPT}' plan-partial-recovery --root '${path}'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDDERIVE-1 (backlog:
+ * 2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md).
+ * The guard's admitted plan* NAME set is now derived from ONBOARDING_SUBCOMMANDS -- the
+ * onboarding CLI's own registered subcommand table -- instead of the hand-maintained array
+ * that had gone stale three separate times against that CLI (backlog items 2026-08-08,
+ * 2026-08-09, 2026-08-16). These three tests pin the three things that fix depends on:
+ * the derived set is exactly what the guard admits, the derivation keys on the DECLARED
+ * properties rather than the `plan` name prefix, and the table itself stays well-formed
+ * so a newly registered subcommand cannot arrive without an explicit decision.
+ */
+test("GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivation, and admits exactly that set", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const derived = automatedLifecycleArgvCommands();
+    // Regression pin against a silent widening OR narrowing: this is the exact set the
+    // hand-maintained array carried at the moment it was replaced. A future entry may
+    // legitimately extend it, but never by accident -- this assertion has to be edited
+    // deliberately alongside the table.
+    assert.deepEqual([...derived].sort(), [
+      "bootstrap-bind-plan", "intake-generate-plan", "intake-spec-marker-plan", "plan", "plan-enrollment-git-creation", "plan-manifest-repair", "plan-partial-authority",
+      "plan-readback", "plan-reinstall", "plan-repair", "plan-runtime", "plan-source-recovery",
+    ]);
+    // Every derived name really is admitted by the real guard in the bare lifecycleArgv
+    // shape -- the derivation is load-bearing, not decoration.
+    for (const command of derived) {
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}'`, path), true, command);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner codex --intent session`, path), true, command);
+      // ...and the SHAPE stays as narrow as before: only the exact automated nextAction
+      // argv, never the wider human-invoked CLI surface these same commands accept.
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --profile epic --source canonical-fresh-v3`, path), false, command);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --activate`, path), false, command);
+    }
+    // Conversely: a registered subcommand the derivation does NOT select gets no bare
+    // lifecycleArgv admission from this branch. `inspect` is excluded from the sweep
+    // because it has its own separate, older admission branch of the same shape, which
+    // this change deliberately leaves byte-identical rather than folding in.
+    for (const entry of ONBOARDING_SUBCOMMANDS) {
+      if (derived.includes(entry.name) || entry.name === "inspect") continue;
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${entry.name} --root '${path}'`, path), false, entry.name);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${entry.name} --root '${path}' --runner claude --intent session`, path), false, entry.name);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("SUMMARYADMIT-1: only intake-generate-plan accepts the optional boolean summary flag", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const invoke = (subcommand, tail = "") => `node '${ONBOARDING_SCRIPT}' ${subcommand} --root '${path}' --runner codex --intent session${tail}`;
+    assert.equal(isSanctionedLifecycleCommand(invoke("intake-generate-plan"), path), true);
+    assert.equal(isSanctionedLifecycleCommand(invoke("intake-generate-plan", " --summary"), path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-generate-plan --summary --intent session --runner codex --root '${path}'`, path), true);
+    for (const tail of [" --summary --summary", " --summary true", " --summary false", " --summary=true", " --summary --unknown"]) {
+      assert.equal(isSanctionedLifecycleCommand(invoke("intake-generate-plan", tail), path), false, tail);
+    }
+    for (const subcommand of [...automatedLifecycleArgvCommands().filter((name) => name !== "intake-generate-plan"), "inspect", "intake-generate-apply"]) {
+      assert.equal(isSanctionedLifecycleCommand(invoke(subcommand, " --summary"), path), false, subcommand);
+    }
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-generate-plan --root '${path}-foreign' --runner codex --intent session --summary`, path), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("GUARDDERIVE-1: the derivation keys on the declared properties, never on the plan name prefix", () => {
+  // The correctness hazard the backlog item names explicitly: a future WRITING subcommand
+  // that happens to share the `plan` prefix must not be admitted just for matching the
+  // naming convention -- and a read-only command whose automated invocation is not the
+  // bare lifecycle argv must not be admitted either. Driven through a synthetic table so
+  // the real registration is untouched.
+  const synthetic = [
+    { name: "plan-writes-things", flat: true, mutates: true, automatedArgvShape: "lifecycle" },
+    { name: "plan-no-automated-shape", flat: true, mutates: false, automatedArgvShape: null },
+    { name: "plan-legitimate", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+    // No `plan` prefix at all: selection follows the declared properties, so this IS chosen.
+    { name: "diagnose-legitimate", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  ];
+  assert.deepEqual(automatedLifecycleArgvCommands(synthetic), ["plan-legitimate", "diagnose-legitimate"]);
+  // Both declared properties are required, and neither is inferred from the other.
+  assert.deepEqual(automatedLifecycleArgvCommands([{ name: "plan-x", flat: true, mutates: true, automatedArgvShape: null }]), []);
+  assert.deepEqual(automatedLifecycleArgvCommands([]), []);
+});
+
+test("GUARDDERIVE-1: every registered onboarding subcommand declares both properties explicitly", () => {
+  // A subcommand added to the CLI table without deciding these two fields must fail loudly
+  // here rather than defaulting into (or silently out of) the guard's admitted set. This is
+  // the mechanism that replaces "remember to also edit the guard".
+  const names = new Set();
+  for (const entry of ONBOARDING_SUBCOMMANDS) {
+    assert.equal(typeof entry.name, "string", JSON.stringify(entry));
+    assert.equal(names.has(entry.name), false, entry.name);
+    names.add(entry.name);
+    assert.equal(typeof entry.flat, "boolean", entry.name);
+    assert.equal(typeof entry.mutates, "boolean", entry.name);
+    assert.equal([null, "lifecycle"].includes(entry.automatedArgvShape), true, entry.name);
+    // A command that may write can never also declare the automated read-only shape the
+    // guard admits -- the two declarations would contradict each other.
+    assert.equal(entry.mutates === true && entry.automatedArgvShape === "lifecycle", false, entry.name);
+  }
+  assert.equal(names.size > 0, true);
+});
+
+/**
+ * NVA-LCGUARD-1 (backlog:
+ * 2026-08-17-lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote.md).
+ * `apply-partial-authority` is the mutating apply half of `plan-partial-authority`,
+ * constructed verbatim as the plan's own `applyAction` (lib/project-onboarding-v3.mjs:470):
+ * `--root <root> --profile <epic|feature|mini> --source <value> --plan-sha256 <hex>
+ * --activate`. The allowlist had no branch for it at all, so it was 100% unreachable -- the
+ * very next step after a successful plan-partial-authority refused by its own guard.
+ *
+ * NVA-LCGUARD-2: `--source` is now pinned to the exact literal `canonical-fresh-v3` --
+ * the one value `planProjectPartialAuthorityAdoption` (lib/project-onboarding-v3.mjs:439)
+ * ever lets reach this `applyAction` construction -- not merely checked loosely.
+ */
+test("NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shape and no wider one", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    for (const profile of ["epic", "feature", "mini"]) {
+      const command = `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile ${profile} --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    }
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so --source before --profile parses identically to the
+    // canonical order above -- pre-authorized to flip from refused to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --source canonical-fresh-v3 --profile epic --plan-sha256 ${sha} --activate`, path), true);
+    for (const command of [
+      // invalid --profile enum value
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile bogus --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
+      // malformed / short / non-hex --plan-sha256
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${"g".repeat(64)} --activate`,
+      // missing --activate (shorter argv)
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha}`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate --extra flag`,
+      // missing --source pair entirely
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --plan-sha256 ${sha} --activate`,
+      // empty --source value
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source '' --plan-sha256 ${sha} --activate`,
+      // flag-shaped --source value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source --bogus --plan-sha256 ${sha} --activate`,
+      // NVA-LCGUARD-2: non-empty, non-flag-shaped --source value that is NOT the one
+      // value planProjectPartialAuthorityAdoption ever lets reach applyAction -- was
+      // previously wrongly admitted by the old loose (non-empty, not flag-shaped) check.
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source some-other-source --plan-sha256 ${sha} --activate`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root /tmp/other --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
+      // plan-partial-authority stays refused for this wider shape too (regression pin)
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-LCGUARD-1 (same backlog item). `adopt-remote plan`/`adopt-remote apply` are
+ * constructed verbatim by lib/project-onboarding-v3.mjs:4198 and :4111 as the documented
+ * onboarding-recovery.md path for portable-seed-required when an existing remote+branch is
+ * supplied. The allowlist had no adopt-remote handling at all, so the entire recovery path
+ * was 100% unreachable for any not-ready project.
+ *
+ * NVA-LCGUARD-2: --remote stays checked loosely (non-empty, not flag-shaped) -- genuinely
+ * caller-chosen at both construction sites. --ref is now pinned to the exact
+ * refs/heads/<branch> format lib/project-onboarding-v3.mjs:3988's REMOTE_REF_RE already
+ * enforces before either command is ever constructed, not merely checked loosely.
+ */
+test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and no third subcommand", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const planCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main`;
+    assert.equal(isSanctionedLifecycleCommand(planCommand, path), true, planCommand);
+    const applyCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(applyCommand, path), true, applyCommand);
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so --ref before --remote parses identically to the
+    // canonical order above -- pre-authorized to flip from refused to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --ref refs/heads/main --remote origin`, path), true);
+    for (const command of [
+      // wrong length: extra trailing arg on plan
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main --extra flag`,
+      // wrong length: missing --activate on apply (shorter argv)
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha}`,
+      // missing --activate, wrong trailing word instead (same length as apply)
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --bypass`,
+      // malformed / non-hex --plan-sha256 on apply
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${"g".repeat(64)} --activate`,
+      // empty --remote / --ref value
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote '' --ref refs/heads/main`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref ''`,
+      // flag-shaped --remote value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote --ref --ref refs/heads/main`,
+      // an unlisted third adopt-remote subcommand
+      `node '${ONBOARDING_SCRIPT}' adopt-remote status --root '${path}' --remote origin --ref refs/heads/main`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root /tmp/other --remote origin --ref refs/heads/main`,
+      // the plan subcommand does not smuggle in the apply tail
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --activate`,
+      // NVA-LCGUARD-2: non-empty, non-flag-shaped --ref value that is NOT refs/heads/-
+      // prefixed -- was previously wrongly admitted by the old loose (non-empty, not
+      // flag-shaped) check. The bare form these positive fixtures used to pass.
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main`,
+      // NVA-LCGUARD-2: non-empty, non-flag-shaped --ref value with a refs/ prefix that is
+      // NOT refs/heads/ -- also previously wrongly admitted.
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/tags/v1`,
+      // NVA-LCGUARD-2 round 2 (Critic F-B): --ref shapes that match REMOTE_REF_RE but that
+      // validRemoteAdoptionRequest (lib/project-onboarding-v3.mjs:3988-3990) still refuses --
+      // ".." traversal, a doubled slash, a trailing slash, and a ".lock" suffix.
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/a..b`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/a//b`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/a/`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main.lock`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-W5-GUARDADMIT-1 (backlog:
+ * 2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
+ * `intake-consent-apply`, `intake-capture-apply`, and `intake-design-questions-apply` are
+ * `mutates: true, automatedArgvShape: null` entries in ONBOARDING_SUBCOMMANDS (Wave 4 onboarding
+ * coordinator, NVA-W4-COORD-1) -- GUARDDERIVE-1's derived admission never covers them, so a
+ * Bash-invoked automated call to any of the three was refused with GUARD-LIFECYCLE-NOT-READY
+ * despite being a registered, mutating onboarding subcommand exactly like every sibling that
+ * already has its own hand-written admission branch. Each admits exactly ONE narrow, positional
+ * shape (see the guard's own comment beside these branches for why the shape was chosen).
+ */
+test("NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle shape and no wider one", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const language of ["de", "en"]) {
+      for (const profile of ["epic", "feature", "mini"]) {
+        const command = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language ${language} --profile ${profile} --activate`;
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      }
+    }
+    // NVA-BOOTADMIT-2: applyOnboardingIntakeConsent (onboarding-continuity.mjs:5276-5300)
+    // requires only --granted/--activate unconditionally; gitAuthor/language/profile each
+    // default null and merge as base.values.X ?? X, so a caller may omit any subset of the
+    // four value flags, including none -- pre-authorized to flip from refused to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --language en --profile epic --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --activate`, path), true);
+    // NVA-BOOTADMIT-2: and, independently, project-onboarding-v3.mjs parse() (lines 195-250)
+    // is a flat, order-insensitive flag walk, so --git-author-email before --git-author-name
+    // parses identically to the canonical order -- pre-authorized to flip too.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-email 'po@example.com' --git-author-name 'PO Name' --language en --profile epic --activate`, path), true);
+    for (const command of [
+      // missing --granted entirely
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic`,
+      // invalid --language enum value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language fr --profile epic --activate`,
+      // invalid --profile enum value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile bogus --activate`,
+      // empty --git-author-name value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name '' --git-author-email 'po@example.com' --language en --profile epic --activate`,
+      // flag-shaped --git-author-email value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email --bogus --language en --profile epic --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root /tmp/other --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-V10B-INTAKEONEROUND: a PO who answers the onboarding questions AND supplies their first
+ * chunk of project material in the same message can have both recorded by ONE call --
+ * intake-consent-apply optionally accepts the same --text/--text-file material
+ * intake-capture-apply accepts. This pins the guard's admission of those two new optional
+ * flags (added to MUTATING_ONBOARDING_ARGV_SHAPES's intake-consent-apply entry) and nothing
+ * wider than that: every near-miss/refuse case the two tests above already pin keeps refusing,
+ * unaffected by this widening.
+ */
+test("NVA-V10B-INTAKEONEROUND: intake-consent-apply admits the same optional --text/--text-file material intake-capture-apply accepts, order-insensitively with the other four optional flags, and refuses a duplicated or malformed value", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const withText = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text 'the PO already described the project' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withText, path), true, withText);
+    const withTextFile = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file 'scratch/design-input.md' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withTextFile, path), true, withTextFile);
+    // Order-insensitive alongside every other optional value flag, same invariant NVA-BOOTADMIT-2
+    // already pins for the original four.
+    const withEverything = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --activate --profile epic --text 'the PO already described the project' --language en --granted --git-author-email 'po@example.com' --git-author-name 'PO Name'`;
+    assert.equal(isSanctionedLifecycleCommand(withEverything, path), true, withEverything);
+    // Both text routes present at once IS admitted here: the guard's flag-SET admission has no
+    // cross-flag "at most one" concept (unlike intake-capture-apply's requiredValueOneOf) -- the
+    // caller-error rejection for supplying both lives CLI-side, in resolveIntakeCaptureText()
+    // (project-onboarding-v3.mjs), not in this guard.
+    const withBoth = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text 'material' --text-file 'scratch/design-input.md' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withBoth, path), true, withBoth);
+    for (const bad of [
+      // duplicated --text
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text 'material' --text 'material' --activate`,
+      // duplicated --text-file
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file 'scratch/design-input.md' --text-file 'scratch/design-input.md' --activate`,
+      // empty --text value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text '' --activate`,
+      // whitespace-only --text value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text '   ' --activate`,
+      // empty --text-file value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file '' --activate`,
+      // flag-shaped --text-file value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file --bogus --activate`,
+      // missing --granted -- still required, unaffected by the new optional flags
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --text 'material' --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-VERIFYGREEN-1: regression test for an observed autonomous-onboarding failure. A live
+ * Antigravity run supplied consent alone -- --granted/--activate only, none of the four
+ * individually-optional value flags (--git-author-name/--git-author-email/--language/
+ * --profile) -- and was refused, even though applyOnboardingIntakeConsent
+ * (onboarding-continuity.mjs) never requires any of the four (NVA-BOOTADMIT-2 above already
+ * widened the branch to admit this shape; this pins it against regression). The test above
+ * ("intake-consent-apply admits exactly the full-bundle shape...") only ever omits a SUBSET
+ * of the four together with the other two present -- never all four omitted at once, which is
+ * the exact shape the live run sent.
+ */
+test("NVA-VERIFYGREEN-1: intake-consent-apply admits consent alone (--granted/--activate, no optional value flags) and refuses a duplicated flag", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const consentAlone = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --activate`;
+    assert.equal(isSanctionedLifecycleCommand(consentAlone, path), true, consentAlone);
+    // Flag order is insensitive here too (NVA-BOOTADMIT-2), so the two bare flags in either
+    // order both admit -- proving the admission is not an accidental side effect of position.
+    const consentAloneReordered = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --activate --granted`;
+    assert.equal(isSanctionedLifecycleCommand(consentAloneReordered, path), true, consentAloneReordered);
+    // NVA-VERIFYGREEN-1: the exactness invariant matchFlagSpec() upholds beyond the target
+    // parsers it gates -- both project-onboarding-v3.mjs's parse() and
+    // runner-profile-migration-v3.mjs's parseArgs() below let a duplicated flag silently win
+    // last (last-write-wins on the parsed value/boolean); matchFlagSpec() refuses a duplicate
+    // outright instead of matching either target's leniency here. The undeclared-flag, wrong
+    // --root, and out-of-set --language/--profile negatives for this branch are already pinned
+    // by the "full-bundle shape" test directly above (the "extra trailing arg" case there is an
+    // undeclared-flag negative; "wrong --root" and the invalid --language/--profile enum cases
+    // are pinned by name) -- not duplicated here.
+    for (const command of [
+      // duplicated --granted
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --granted --activate`,
+      // duplicated --activate
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --activate --activate`,
+      // duplicated --root
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --root '${path}' --granted --activate`,
+      // duplicated optional value flag (--language), even though it validates the same value twice
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --activate --language en --language en`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-VERIFYGREEN-1: regression test for an observed autonomous-onboarding failure. A live
+ * Antigravity run invoked runner-profile-migration-v3.mjs's `apply` with `--activate` before
+ * `--root <root>` (flags transposed relative to `apply --root <root> --activate`) and was
+ * refused, even though runner-profile-migration-v3.mjs's own parseArgs() (a flat,
+ * order-insensitive flag walk) accepts either order identically. sanctionedMigrationArgs()
+ * (guard-lifecycle-ready.mjs) had never had a single test in this file before this dispatch --
+ * RUNNER_PROFILE_MIGRATION_SCRIPT above is the first reference to it.
+ */
+test("NVA-VERIFYGREEN-1: runner-profile-migration apply admits --activate before --root, and stays exact everywhere else", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const canonical = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(canonical, path), true, canonical);
+    // The regression shape itself: --activate before --root.
+    const transposed = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --activate --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(transposed, path), true, transposed);
+    // The optional --initialize-missing-runtime flag, in either position relative to the rest.
+    const withInit = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --initialize-missing-runtime --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withInit, path), true, withInit);
+    const withInitTransposed = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --activate --initialize-missing-runtime --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(withInitTransposed, path), true, withInitTransposed);
+    // The bare read-only inspect/plan shapes are unaffected by this dispatch; pinned here since
+    // this is this file's first-ever coverage of sanctionedMigrationArgs() at all.
+    assert.equal(isSanctionedLifecycleCommand(`node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' inspect --root '${path}'`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' plan --root '${path}'`, path), true);
+    // NVA-VERIFYGREEN-1: the exactness invariant -- runner-profile-migration-v3.mjs's own
+    // parseArgs() lets a duplicated flag silently win last (each recognized token just
+    // overwrites `parsed.root`/sets `parsed.activate = true` again); matchFlagSpec() refuses a
+    // duplicate outright instead. The apply branch declares no --language/--profile flags at
+    // all (only --root/--activate/--initialize-missing-runtime), so that half of the exactness
+    // sweep briefed for this piece does not apply to this branch structurally -- there is no
+    // such flag here to test.
+    for (const command of [
+      // duplicated --root
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --root '${path}' --activate`,
+      // duplicated --activate
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --activate --activate`,
+      // duplicated --initialize-missing-runtime
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --initialize-missing-runtime --initialize-missing-runtime --activate`,
+      // undeclared flag
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --activate --bogus`,
+      // wrong --root value
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root /tmp/other --activate`,
+      // missing --activate (apply requires it)
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}'`,
+      // vendor-sync is not a recognized subcommand for this script (unlike project-authority-migration.mjs)
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' vendor-sync --root '${path}' --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-GUARDADMIT-1: intake-capture-apply admits exactly the --text/--activate shape and no wider one", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text 'the PO said something material' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const bad of [
+      // missing --text entirely
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text 'material'`,
+      // empty --text value
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text '' --activate`,
+      // whitespace-only --text value
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text '   ' --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text 'material' --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root /tmp/other --text 'material' --activate`,
+      // an unrelated onboarding subcommand does not smuggle in this shape
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --text 'material' --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-GUARDADMIT-1: intake-design-questions-apply admits exactly the --answers-json/--activate shape and no wider one", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const answersJson = JSON.stringify([{ question: "Q1?", answer: "A1" }]);
+    const command = `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '${answersJson}' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const bad of [
+      // missing --answers-json entirely
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '${answersJson}'`,
+      // empty --answers-json value
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '' --activate`,
+      // flag-shaped --answers-json value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json --bogus --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '${answersJson}' --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root /tmp/other --answers-json '${answersJson}' --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// R5 (AC-30 / R5-3, answers-file design note case 13): the guard must admit the file route of the
+// two design-question commands -- `--answers-file <repo-relative path>` with an optional
+// `--answers-file-sha256 <64 lowercase hex>` -- and nothing wider. RED until the validators and the
+// shape table carry the two flags; the refusal pin carries a positive control so it cannot pass
+// merely because the unknown flag is refused today.
+for (const subcommand of ["intake-design-questions-apply", "intake-design-questions-replace"]) {
+  test(`R5-13 ${subcommand} admits --answers-file with and without --answers-file-sha256, in any argument order`, () => {
+    const path = root();
+    try {
+      markGovernedFixture(path);
+      writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+      const sha = "a".repeat(64);
+      const base = `node '${ONBOARDING_SCRIPT}' ${subcommand} --root '${path}'`;
+      for (const command of [
+        `${base} --answers-file 'scratch/a.json' --activate`,
+        `${base} --answers-file 'scratch/a.json' --answers-file-sha256 ${sha} --activate`,
+        `${base} --answers-file-sha256 ${sha} --answers-file 'scratch/a.json' --activate`,
+        `${base} --activate --answers-file 'scratch/a.json' --answers-file-sha256 ${sha}`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      }
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  });
+
+  test(`R5-13 ${subcommand} refuses a malformed, duplicated, conflicting or incomplete answers-file argv`, () => {
+    const path = root();
+    try {
+      markGovernedFixture(path);
+      writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+      const sha = "a".repeat(64);
+      const base = `node '${ONBOARDING_SCRIPT}' ${subcommand} --root '${path}'`;
+      const control = `${base} --answers-file 'scratch/a.json' --answers-file-sha256 ${sha} --activate`;
+      assert.equal(isSanctionedLifecycleCommand(control, path), true, `positive control: ${control}`);
+      for (const bad of [
+        `${base} --answers-file 'scratch/a.json' --answers-file-sha256 ${"A".repeat(64)} --activate`,
+        `${base} --answers-file 'scratch/a.json' --answers-file-sha256 abc123 --activate`,
+        `${base} --answers-file --bogus --activate`,
+        `${base} --answers-file '' --activate`,
+        `${base} --answers-file 'scratch/a.json' --answers-file 'scratch/b.json' --activate`,
+        `${base} --answers-json '[]' --answers-file 'scratch/a.json' --activate`,
+        `${base} --answers-file-sha256 ${sha} --activate`,
+        `${base} --answers-file 'scratch/a.json'`,
+        `${base} --answers-file 'scratch/a.json' --activate --extra flag`,
+        `node '${ONBOARDING_SCRIPT}' ${subcommand} --root /tmp/other --answers-file 'scratch/a.json' --activate`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+      }
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  });
+}
+
+test("NVA-W5-GUARDADMIT-1: intake-generate-apply admits exactly the --plan-sha256/--activate shape and no wider one", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const command = `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const bad of [
+      // missing --plan-sha256 entirely
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha}`,
+      // malformed / short / non-hex --plan-sha256
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${"g".repeat(64)} --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha} --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root /tmp/other --plan-sha256 ${sha} --activate`,
+      // intake-generate-plan (read-only, GUARDDERIVE-1-covered) does not smuggle in the apply shape
+      `node '${ONBOARDING_SCRIPT}' intake-generate-plan --root '${path}' --plan-sha256 ${sha} --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-COORD-STEP5-2: bootstrap-bind-apply admits exactly the --plan-sha256/--activate shape and no wider one, under exact session readiness", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    // The live nextAction promotionApplyAction() constructs for the coordinator-sourced branch
+    // (planBoundApplyAction(), onboarding-continuity.mjs) always carries a trailing
+    // `--runner <runner>` pair too; withoutRunnerFlag() strips the first matching pair before any
+    // branch runs, so both the runner-bearing and runner-less shapes below are admitted identically.
+    const command = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    const withRunner = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --runner codex --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withRunner, path), true, withRunner);
+    for (const bad of [
+      // missing --plan-sha256 entirely
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${sha}`,
+      // malformed / short / non-hex --plan-sha256
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${"g".repeat(64)} --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${sha} --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root /tmp/other --plan-sha256 ${sha} --activate`,
+      // bootstrap-bind-plan (read-only, GUARDDERIVE-1-covered) does not smuggle in the apply shape
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}' --plan-sha256 ${sha} --activate`,
+      // an unrelated onboarding subcommand does not smuggle in this shape
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha} --activate --extra bootstrap-bind-apply`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-COORD-STEP5-2: bootstrap-bind-plan admits the bare lifecycle argv via GUARDDERIVE-1's derived admission", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    const withRunner = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}' --runner codex`;
+    assert.equal(isSanctionedLifecycleCommand(withRunner, path), true, withRunner);
+    // an --activate-shaped call is never admitted for the plan half (mutates: false)
+    assert.equal(isSanctionedLifecycleCommand(
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}' --plan-sha256 ${"a".repeat(64)} --activate`,
+      path,
+    ), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CODEXARGV-1 (AC-3): the closure proof for MUTATING_ONBOARDING_ARGV_SHAPES -- the CLI's
+// OWN real argv-emission function (automatedMutatingApplyArgv(), scripts/project-onboarding-v3.mjs),
+// fed straight into the guard's OWN real admission function (isSanctionedLifecycleCommand()).
+// Never a hand-typed string on either side, so the two sides genuinely cannot silently drift
+// again: a shape change to MUTATING_ONBOARDING_ARGV_SHAPES that the emission side and the
+// admission side disagreed about would fail THIS test, not merely two independent hand-written
+// literal assertions that happen to agree today.
+test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is admitted by the guard's real admission function, for every declared mutating subcommand", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sampleValues = {
+      "intake-consent-apply": {
+        "--git-author-name": "PO Name", "--git-author-email": "po@example.com",
+        "--language": "en", "--profile": "feature",
+      },
+      "intake-capture-apply": { "--text": "requirement material" },
+      "intake-design-questions-apply": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+      },
+      "intake-design-questions-replace": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Correct it." }]),
+      },
+      "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
+      "intake-spec-marker-apply": { "--plan-sha256": "d".repeat(64) },
+      "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
+      "bootstrap-acknowledge-plan": {},
+      "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
+      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
+    };
+    assert.deepEqual(
+      Object.keys(sampleValues).sort(),
+      Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES).sort(),
+      "this test must cover every declared mutating subcommand, not a stale subset",
+    );
+    for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+      const argv = automatedMutatingApplyArgv(name, path, sampleValues[name]);
+      const command = `node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CODEXARGV-1 (AC-4): regression pin for the specific Antigravity failure the dispatch
+// briefing named -- the same emitted command, minus --activate, must stay refused. Built from
+// automatedMutatingApplyArgv() (the shared emission this dispatch adds) with "--activate"
+// filtered out, so this exercises the SAME generic admission loop the AC-3 test above exercises
+// -- proving the loop's own `required` handling for --activate, not a separate hand-typed shape.
+test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activate removed, stays refused for every declared subcommand", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sampleValues = {
+      "intake-consent-apply": { "--language": "en", "--profile": "feature" },
+      "intake-capture-apply": { "--text": "requirement material" },
+      "intake-design-questions-apply": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+      },
+      "intake-design-questions-replace": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Correct it." }]),
+      },
+      "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
+      "intake-spec-marker-apply": { "--plan-sha256": "d".repeat(64) },
+      "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
+      "bootstrap-acknowledge-plan": {},
+      "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
+      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
+    };
+    for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+      const argv = automatedMutatingApplyArgv(name, path, sampleValues[name]).filter((token) => token !== "--activate");
+      const command = `node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("bootstrap chat acknowledgement admits only its exact digest-bound non-ready recovery action", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-chat-apply --root '${path}' --plan-sha256 '${"c".repeat(64)}' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true);
+    const missingActivation = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-chat-apply --root '${path}' --plan-sha256 '${"c".repeat(64)}'`;
+    const changedDigest = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-chat-apply --root '${path}' --plan-sha256 '${"d".repeat(64)}' --activate --proof scratch/unexpected.json`;
+    assert.equal(isSanctionedLifecycleCommand(missingActivation, path), false);
+    assert.equal(isSanctionedLifecycleCommand(changedDigest, path), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-V4-PUSHDRIVER: push-init.mjs's own admission, mirroring DRIVER_SCRIPT's admit/refuse
+// pairs above exactly (isSanctionedLifecycleCommand() plus the full evaluateLifecycleReadyGuard()
+// path for a NOT-READY status, plus the fail-open control at the end).
+test("NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape and nothing wider", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of [
+      "portable-seed-required", "kickoff-required", "intake-required",
+      "migration-required", "partial",
+    ]) {
+      const nonReady = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      };
+      const admit = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, `${status}: ${command}`);
+        assert.deepEqual(
+          evaluateLifecycleReadyGuard(bash(command), nonReady),
+          { exitCode: 0, stderr: "" },
+          `${status}: ${command}`,
+        );
+      };
+      const refuse = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), false, `${status}: ${command}`);
+        const result = evaluateLifecycleReadyGuard(bash(command), nonReady);
+        assert.equal(result.exitCode, 2, `${status}: ${command}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}: ${command}`);
+      };
+
+      admit(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
+      admit(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --base 'HEAD~5'`);
+      // Flag-order-insensitive, same discipline as DRIVER_SCRIPT's own admit() pairs above.
+      admit(`node '${PUSH_INIT_SCRIPT}' --destination 'refs/heads/main' --by 'tester' --root '${path}' --remote 'origin'`);
+
+      // Near misses: no argv, wrong root, an empty/flag-shaped value, an unsafe --remote, a
+      // --destination outside refs/heads/*, a flag push-init.mjs's own parseArgs() does not
+      // accept at all, and a duplicated --root.
+      refuse(`node '${PUSH_INIT_SCRIPT}'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${join(path, "other")}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by '--remote' --remote 'origin' --destination 'refs/heads/main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin/nested' --destination 'refs/heads/main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/tags/v1'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --step-cap 5`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
+
+      refuse("touch output.txt");
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-V4-PUSHDRIVER: the closure proof for push-init.mjs's admission -- buildPushInitArgv()'s
+// OWN emitted argv (never a hand-typed copy) fed straight into the guard's real admission
+// function, mirroring NVA-CODEXARGV-1 (AC-3) above exactly.
+test("NVA-V4-PUSHDRIVER: buildPushInitArgv's own emitted argv is admitted by the guard's real admission function", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const base of [null, "HEAD~3"]) {
+      const argv = buildPushInitArgv({ root: path, by: "tester", remote: "origin", destination: "refs/heads/main", base });
+      const command = `node '${PUSH_INIT_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-V4-PUSHDRIVER: the single most important test in this package. The exact signature
+// command push-init.mjs presents (built from po-human-approval.mjs's OWN real
+// authorizeCriticalPushCommand(), the identical function push-prepare.mjs's `lines.authorize`
+// is rendered from with no override -- never hand-reconstructed here) is refused for an
+// agent's own Bash tool call, by this guard's dedicated human-signing lane
+// (isHumanPoSigningCommand -> externalPoSigningOnly()), REGARDLESS of lifecycle readiness --
+// this check runs before the ready/not-ready branch is even reached (evaluateLifecycleReadyGuard,
+// guard-lifecycle-ready.mjs). This is the guard-level backstop behind push-init.mjs's own
+// "THE SIGNATURE BOUNDARY" header comment and its absolute "never driver-satisfiable" property.
+test("NVA-V4-PUSHDRIVER: the presented authorize-critical signature command is refused for a Bash tool call, real argv from po-human-approval.mjs", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const authorize = authorizeCriticalPushCommand({
+      repoRoot: path,
+      directory: "/external/po-approval-dir",
+      featureId: "nva-v4-pushdriver",
+      plan: "specs/sprint-nova-epic/plans/nva-v4-pushdriver.md",
+      spec: "specs/sprint-nova-epic/spec.md",
+      subjectSha256: "a".repeat(64),
+      expiresAt: new Date("2026-08-29T00:00:00.000Z").toISOString(),
+    });
+    assert.equal(authorize.argv[0], PO_HUMAN_APPROVAL_SCRIPT, "must be the REAL script path, not a stand-in, or this test would prove nothing");
+    assert.equal(authorize.argv[1], "authorize-critical");
+    const command = `node '${authorize.argv[0]}' ${authorize.argv.slice(1).map((token) => `'${token}'`).join(" ")}`;
+
+    // Refused identically whether the session is ready or not -- the human-signing lane is
+    // checked before the readiness branch, so both dependency shapes below must agree.
+    for (const dependencies of [
+      { projectDir: path, requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }; } },
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } },
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), dependencies);
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /EXTERNAL ACTION REQUIRED/u, command);
+      assert.match(result.stderr, /human-terminal actions/u, command);
+      // Never the not-ready refusal -- this is a DIFFERENT, dedicated refusal reached before
+      // that branch, and the two must never be conflated.
+      assert.doesNotMatch(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
+    }
+
+    // Also refused by the narrower isSanctionedLifecycleCommand() lane on its own -- this
+    // command must never appear admitted there either, under any lifecycle status.
+    assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-
+ * shape.md). collectOperatorContinuityAuthorityAction() (lib/project-onboarding-v3.mjs)
+ * tells a session that gets `operator-authority-required` back from plan-repair to rerun
+ * plan-repair/apply-repair with --id --plan-path --prd-path --spec-path --language set to
+ * the PO's answers -- the exact five-field, all-or-none operator-confirmed continuity claim
+ * the CLI's own usage string documents. The allowlist had no branch admitting either shape,
+ * so a session that collected the operator's answers had no route forward at all.
+ */
+test("NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-authority shape", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const operatorTail = "--id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en";
+    const planCommand = `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail}`;
+    assert.equal(isSanctionedLifecycleCommand(planCommand, path), true, planCommand);
+    const applyCommand = `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(applyCommand, path), true, applyCommand);
+    for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+      const withIntentPlan = `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail} --intent ${intent}`;
+      assert.equal(isSanctionedLifecycleCommand(withIntentPlan, path), true, withIntentPlan);
+      const withIntentApply = `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha} --activate --intent ${intent}`;
+      assert.equal(isSanctionedLifecycleCommand(withIntentApply, path), true, withIntentApply);
+    }
+    // No-regression pins: the pre-existing bare-form plan-repair and digest-form
+    // apply-repair, with and without --intent, keep working exactly as before.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}'`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --intent session`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --intent session`, path), true);
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so reordering any of the five operator fields parses
+    // identically to the canonical order -- both pre-authorized to flip to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --plan-path specs/plan.md --id feat-1 --prd-path specs/plan.md --spec-path specs/spec.md --language en`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --language en --spec-path specs/spec.md`, path), true);
+    for (const command of [
+      // each of the five operator fields missing entirely (positions shift, so no branch matches)
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md`,
+      // flag-shaped values (e.g. --id --plan-path with no value)
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path --language en`,
+      // empty operator field values
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id '' --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      // invalid --language enum value
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language fr`,
+      // apply-repair is a separate, mutating command and does not admit the plan-repair
+      // operator shape without --plan-sha256/--activate
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail}`,
+      // incomplete apply-repair: operator fields present but --plan-sha256 missing
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --activate`,
+      // incomplete apply-repair: operator fields and digest present but --activate missing
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha}`,
+      // incomplete apply-repair: malformed digest
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${"a".repeat(63)} --activate`,
+      // plan-repair does not admit the apply-repair operator tail (--plan-sha256/--activate smuggled in)
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha} --activate`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root /tmp/other ${operatorTail}`,
+      // extra trailing argument
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail} --extra flag`,
+      // no other plan-repair sibling admits the operator-authority shape
+      `node '${ONBOARDING_SCRIPT}' plan --root '${path}' ${operatorTail}`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("continuity self-repair admission is exactly root plus digest, activation, and optional intent", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "b".repeat(64);
+    for (const command of [
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --intent session`,
+    ]) assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const command of [
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha}`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${"b".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --reason shared-close-evidence-path`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --intent invalid`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --plan-sha256 ${sha} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}/other' --plan-sha256 ${sha} --activate`,
+      `node '${path}/project-onboarding-v3.mjs' apply-repair --root '${path}' --plan-sha256 ${sha} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate && git status`,
+    ]) assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDFIX-1 (A). The apply half of the same defect the test above closed for the plan half.
+ *
+ * `plan-runtime --intent session` returns, verbatim, the argv built at
+ * lib/project-onboarding-v3.mjs:3608-3627 through `lifecycleArgv(argv, runner, intent)`
+ * (:1315-1318): `initialize-runtime --root <root> --plan-sha256 <hex> --activate --runner
+ * <runner> --intent <intent>` -- `--runner` appended first, `--intent` afterward and only
+ * when it differs from the "onboarding" default. The allowlist required `args.length === 6`
+ * after the runner strip, so the planner emitted a command its own guard refused and the
+ * printed recovery instruction pointed the operator back at the refusal.
+ *
+ * The accepted `--intent` values are written out here on purpose rather than imported or
+ * paraphrased: they are the CLI's own closed set (scripts/project-onboarding-v3.mjs:62), and
+ * a test that derived them from the guard could not fail when the guard drifts from the CLI.
+ *
+ * Positive and negative shapes in ONE test deliberately: the mutations alone pass against
+ * the unfixed code, which refuses everything, so only the admission proves the branch
+ * exists, and only the mutations prove it did not arrive as a blanket allowance.
+ */
+test("GUARDFIX-1: the apply family admits exactly the runner-plus-intent argv the planner returns and no wider shape", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const applyFamily = [
+      "apply-portable-seed", "apply-reinstall", "initialize-runtime", "apply-repair", "apply-readback",
+    ];
+    for (const command of applyFamily) {
+      for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+        for (const runner of ["claude", "codex"]) {
+          const returned = `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate --runner ${runner} --intent ${intent}`;
+          assert.equal(isSanctionedLifecycleCommand(returned, path), true, returned);
+          assert.deepEqual(evaluateLifecycleReadyGuard(bash(returned), {
+            projectDir: path,
+            requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
+          }), { exitCode: 0, stderr: "" }, returned);
+        }
+      }
+      // No-regression pins: every shape admitted before this fix stays admitted.
+      for (const unchanged of [
+        `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate`,
+        `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate --runner claude`,
+        `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate --runner codex`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(unchanged, path), true, unchanged);
+      }
+    }
+    const base = `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${sha} --activate`;
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so any reordering of --root/--plan-sha256/--activate/
+    // --intent parses identically to the canonical order (--runner is stripped before this
+    // shape is even checked, by the pre-existing withoutRunnerFlag scan) -- pre-authorized
+    // to flip from refused to admitted.
+    for (const reordered of [
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${sha} --intent session --activate --runner claude`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --activate --plan-sha256 ${sha} --runner claude --intent session`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --plan-sha256 ${sha} --root '${path}' --activate --runner claude --intent session`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(reordered, path), true, reordered);
+    }
+    for (const command of [
+      // an --intent value outside the CLI's closed set
+      `${base} --runner claude --intent onboarding-v2`,
+      `${base} --runner claude --intent implementation`,
+      `${base} --runner claude --intent ''`,
+      `${base} --intent session --runner windows`,
+      // a flag added to the returned argv
+      `${base} --runner claude --intent session --extra flag`,
+      `${base} --runner claude --intent session --activate`,
+      `${base} --runner claude --intent`,
+      // the digest and the root stay checked under the new length
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${"a".repeat(63)} --activate --runner claude --intent session`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root /tmp/other --plan-sha256 ${sha} --activate --runner claude --intent session`,
+      // the intent pair does not smuggle in a neighbouring subcommand's shape
+      `node '${ONBOARDING_SCRIPT}' apply-manifest-repair --root '${path}' --plan-sha256 ${sha} --activate --runner claude --intent session`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDFIX-1 (B). A denial code has to name what actually happened.
+ *
+ * `hasExternalOutputRedirect()` -- the fallback the cross-repository classifier uses for
+ * commands the closed grammar cannot parse -- read every `>` as an output redirect and
+ * refused the command as GUARD-CROSS-REPO-MUTATION whenever the target sat outside the
+ * project root. `/dev/null` sits outside every project root, so a composed read-only lookup
+ * carrying nothing but a stderr suppressor was reported as a mutation of another repository.
+ * The accepted-parse branch of the same function had exempted `2>/dev/null` since 2b56304;
+ * the two had simply drifted, and both now share isNullDeviceStderrRedirect().
+ *
+ * What this fix does NOT do is admit anything: every command below is still refused with
+ * exit code 2. Only the code changes, from a false one to the one the guard's own grammar
+ * rules already assign.
+ */
+test("GUARDFIX-1: a null-device stderr suppressor is never itself a cross-repository mutation while every real redirect keeps its own code", () => {
+  const path = root();
+  const deps = {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+  };
+  const code = (command) => {
+    const result = evaluateLifecycleReadyGuard(bash(command), deps);
+    assert.equal(result.exitCode, 2, command);
+    return (result.stderr.match(/GUARD-[A-Z-]+/u) ?? ["<none>"])[0];
+  };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    // The reported command. Already truthfully typed before this fix (its grammar parses,
+    // so it reached the accepted-parse branch that already exempted `2>/dev/null`); pinned
+    // so it cannot regress into the mutation code from either direction.
+    assert.equal(isForbiddenCrossRepositoryMutation("which a b c 2>/dev/null", path), false);
+    assert.equal(code("which a b c 2>/dev/null"), "GUARD-REDIRECT-UNAPPROVED");
+    // Changed by this fix: the parse-denied siblings, whose real fault is composition.
+    for (const command of [
+      "which a b c 2>/dev/null; which d",
+      "which a b c 2>/dev/null && which d",
+      "which a b c 2>NUL; which d",
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.equal(code(command), "GUARD-PARSE-UNSUPPORTED", command);
+    }
+    // A genuine cross-repository write is still refused as exactly that, parsed or not, and
+    // a suppressor standing next to one does not launder it: each redirect is judged alone.
+    for (const command of [
+      "cp /etc/hosts /tmp/elsewhere/hosts",
+      "printf implementation 2>/etc/passwd",
+      "printf implementation > /tmp/elsewhere/out.txt; printf done",
+      "printf implementation 2>/dev/null > /tmp/elsewhere/out.txt; printf done",
+      "printf implementation 2>/dev/null > /tmp/elsewhere/out.txt",
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+      assert.equal(code(command), "GUARD-CROSS-REPO-MUTATION", command);
+    }
+    // Narrowness of the exemption, pinned: descriptor 2 only, null device only. `&>` and a
+    // bare `>` to the null device are NOT stderr suppression and keep their prior code.
+    for (const command of [
+      "which a b c &>/dev/null",
+      "which a b c >/dev/null 2>&1",
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+      assert.equal(code(command), "GUARD-CROSS-REPO-MUTATION", command);
+    }
+    // A redirect that writes a file is still refused, under whichever code the grammar
+    // rules already give it -- "suppress stderr" did not become "redirects are fine".
+    assert.equal(code("printf implementation > out.txt"), "GUARD-REDIRECT-UNAPPROVED");
+    assert.equal(code("printf implementation >> out.txt"), "GUARD-PARSE-UNSUPPORTED");
+    assert.equal(code("printf implementation 2> out.txt"), "GUARD-REDIRECT-UNAPPROVED");
+    for (const command of [
+      "printf implementation > out.txt",
+      "printf implementation >> out.txt",
+      "printf implementation 2> out.txt",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("partial PO authority rebind admits only the exact read-only planner", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const planner = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-plan`;
+    const plannerWithArgument = `${planner} --unexpected`;
+    const partialRebind = {
+      schema: "pipeline.project-onboarding.v4",
+      status: "partial",
+      root: path,
+      intent: "session",
+      nextAction: {
+        kind: "command",
+        executable: "node",
+        argv: [PIPELINE_STATE_SCRIPT, "po-authority-rebind-plan"],
+        mutation: false,
+        requiresConfirmation: false,
+      },
+      diagnostics: [{ code: "po_authority_rebind_unavailable" }],
+    };
+    const denied = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+      inspectProjectOnboardingV3Fn() { return partialRebind; },
+    };
+    assert.equal(isSanctionedLifecycleCommand(planner, path), false);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(planner), denied), { exitCode: 0, stderr: "" });
+    assert.equal(evaluateLifecycleReadyGuard(bash(plannerWithArgument), denied).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"a".repeat(64)} --updated-at 2026-08-02T00:00:00.000Z --activate`), denied).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(planner), {
+      ...denied,
+      inspectProjectOnboardingV3Fn() {
+        return { ...partialRebind, nextAction: null, diagnostics: [{ code: "continuity_damaged" }] };
+      },
+    }).exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("non-ready cleanup recovery and privatization admit only exact closed argv", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const digest = "a".repeat(64);
+    const commands = [
+      `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' status --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-recovery --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-human-recovery --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' confirm-privatization --repo '${path}' --plan-sha256 ${digest} --accept`,
+      `node '${SESSION_CLEANUP_SCRIPT}' release-binding --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo '${path}' --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' cleanup --repo '${path}' --session-descriptor session-01 --expected-descriptor-sha256 ${digest}`,
+    ];
+    for (const command of commands) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 0, command);
+    }
+    for (const command of [
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo /tmp/other --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo '${path}' --plan-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo /tmp/other`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-human-recovery --repo /tmp/other`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' --session-descriptor session-private`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' --expected-descriptor-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo /tmp/other --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest.toUpperCase()} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest} --session-descriptor session-private --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest} --activate --bypass`,
+      `node '${SESSION_CLEANUP_SCRIPT}' confirm-privatization --repo '${path}' --plan-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' confirm-privatization --repo '${path}' --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' confirm-privatization --repo /tmp/other --plan-sha256 ${digest} --accept`,
+      `node '/tmp/other/scripts/session-cleanup.mjs' plan-privatization --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' && touch bypass`,
+      `node '${SESSION_CLEANUP_SCRIPT}' cleanup --repo '${path}' --session-descriptor ../foreign --expected-descriptor-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' start --repo /tmp/other`,
+      `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}' --force`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// GF-060 (backlog: 2026-08-09-guard-lifecycle-ready-runner-allowlist-incomplete.md).
+// session-cleanup.mjs's own USAGE text and arg-parsing table document and accept an
+// optional `--runner claude|codex` flag on every subcommand this allowlist covers, but
+// the allowlist demanded an exact closed argv with no room for it. Investigation for
+// this dispatch found the allowlist admitted it for NONE of these subcommands on this
+// branch's HEAD (an earlier attempt at the six-subcommand subset, GF-059, was never
+// merged -- abandoned worktree branch f3bbf275/20d562bf); this is therefore the first
+// landed coverage of the full documented surface, not an extension of an already-merged
+// subset. One comprehensive test rather than one per subcommand group, since the fix is
+// the same optional-tail predicate applied identically across all four branches.
+test("non-ready session-cleanup admits the documented optional --runner tail on every subcommand this allowlist covers", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const digest = "a".repeat(64);
+    const admitted = [
+      "start --repo '${path}'",
+      "status --repo '${path}'",
+      "release-binding --repo '${path}'",
+      "plan-recovery --repo '${path}'",
+      "plan-human-recovery --repo '${path}'",
+      "plan-privatization --repo '${path}'",
+      `confirm-privatization --repo '\${path}' --plan-sha256 ${digest} --accept`,
+      `apply-recovery --repo '\${path}' --plan-sha256 ${digest} --activate`,
+      `apply-privatization --repo '\${path}' --plan-sha256 ${digest} --activate`,
+      `cleanup --repo '\${path}' --session-descriptor session-01 --expected-descriptor-sha256 ${digest}`,
+    ];
+    for (const template of admitted) {
+      // eslint-disable-next-line no-template-curly-in-string -- intentional: `${path}` is
+      // substituted per-iteration below, after the fixture's own `path` is in scope.
+      const base = template.replaceAll("${path}", path);
+      for (const runner of ["claude", "codex"]) {
+        const invocation = `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner ${runner}`;
+        assert.equal(isSanctionedLifecycleCommand(invocation, path), true, invocation);
+        assert.equal(evaluateLifecycleReadyGuard(bash(invocation), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+        }).exitCode, 0, invocation);
+      }
+      for (const rejected of [
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner cursor`,
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner`,
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner claude --extra`,
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner claude --runner codex`,
+        `node '${SESSION_CLEANUP_SCRIPT}' --runner claude ${base}`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(rejected, path), false, rejected);
+        assert.equal(evaluateLifecycleReadyGuard(bash(rejected), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+        }).exitCode, 2, rejected);
+      }
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("partial lifecycle admits only exact rebase abort plus ordinary readback", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of ["git rebase --abort", `git -C '${path}' rebase --abort`]) {
+      assert.equal(isNarrowRepositoryRecoveryCommand(command, path), true, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("partial"); },
+      }).exitCode, 0, command);
+    }
+    for (const command of ["git status --short", "git diff --stat"]) {
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("partial"); },
+      }).exitCode, 0, command);
+    }
+    for (const command of [
+      "git rebase --continue",
+      "git rebase --skip",
+      "git rebase --abort --quiet",
+      "git -C .. rebase --abort",
+      "git rebase --abort && touch bypass",
+    ]) {
+      assert.equal(isNarrowRepositoryRecoveryCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("partial"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("restart-required admits bounded resume-hint capture and required readback", () => {
+  const path = root();
+  const inputPath = join(path, "project", ".resume-hint-input.json");
+  const capture = `node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${inputPath}' --consume-card`;
+  const inspect = `node '${RESUME_HINT_SCRIPT}' inspect --root '${path}'`;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const input of [bash(capture), bash(inspect), edit("project/.resume-hint-input.json"), write("project/.resume-hint-input.json")]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("restart-required"); },
+      }).exitCode, 0, input.tool_name);
+    }
+    for (const [input, status] of [
+      [bash(`${capture} --bypass`), "restart-required"],
+      [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${inputPath}'`), "restart-required"],
+      [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${join(path, "resume-card.json")}' --consume-card`), "restart-required"],
+      [bash(`${inspect} --feature-id bypass`), "restart-required"],
+      [bash(`node '${RESUME_HINT_SCRIPT}' inspect --root '${join(path, "other")}'`), "restart-required"],
+      [edit("project/resume-hint.json"), "restart-required"],
+      [write("project/.resume-hint-input.json"), "partial"],
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      }).exitCode, 2, `${status}/${input.tool_name}`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-cover-
+// restart-required.md): before this fix, a session stuck at restart-required had no route at
+// all to persist its own scratch/ throwaway notes -- contradicting the pipeline-start skill's
+// own claim that scratch/ is always safe, unlike every other PORG-NOT-READY status this file
+// already fixtures a scratch lane for (partial's narrower fixed-file lane above; the intake
+// statuses' general scratch/ lane in NVA-GF-SCRATCH below). Reuses
+// isIntakeLifecycleScratchWrite()/isIntakeLifecycleScratchMkdir() unmodified -- the shape of an
+// admitted scratch write does not differ by status, only which statuses reach it.
+test("RESTART_LIFECYCLE_SCRATCH_WRITE: restart-required admits any resolved scratch/ write and matching mkdir, nothing wider", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+
+    // AC-1: any Edit/Write/NotebookEdit write whose resolved path is inside scratch/, including
+    // a nested path -- matching the intake lane's own general scratch/ admission below.
+    for (const input of [
+      write("scratch/design.md"),
+      edit("scratch/design.md"),
+      write("scratch/nested/deep/notes.md"),
+      notebookEdit("scratch/analysis.ipynb"),
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, restartDeps).exitCode, 0, input.tool_name);
+    }
+
+    // AC-2: both admitted mkdir shapes, including a nested target.
+    for (const command of ["mkdir scratch", "mkdir -p scratch", "mkdir -p scratch/nested"]) {
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), restartDeps).exitCode, 0, command);
+    }
+
+    // AC-3: a write outside scratch/, and a sibling directory merely starting with "scratch",
+    // still refuse -- this is not a general readiness bypass.
+    for (const input of [write("src/other-file.mjs"), edit("docs/other-file.md"), write("scratch-evil/file.md")]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, input.tool_input.file_path);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_input.file_path);
+    }
+
+    // AC-4 (conflict B1 safety net): the resume-hint near-miss diagnostic (NVA-MICRO-1, below)
+    // is not silently swallowed by this wider, generic scratch lane -- a write to
+    // scratch/.resume-hint-input.json must still surface the specific near-miss hint naming the
+    // correct path, not a bare verdict(0) that would make the operator believe the write landed
+    // somewhere it is actually read from.
+    const nearMiss = evaluateLifecycleReadyGuard(write("scratch/.resume-hint-input.json"), restartDeps);
+    assert.equal(nearMiss.exitCode, 2);
+    assert.match(nearMiss.stderr, /The only path admitted is exactly project\/\.resume-hint-input\.json/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+// tmp-fallback.md): the write-side twin of isReadOnlyDiagnosticCommand()'s narrow read-only
+// lane -- a session stuck at `partial` today has no route at all to persist a report of its
+// own stuck state, not inside the project root (GUARD-LIFECYCLE-NOT-READY) and not outside
+// it (GUARD-CROSS-REPO-MUTATION). This proves the admission is exact by construction (no
+// other mkdir target, no other filename, no directory write) and scoped to
+// `lifecycleStatus === "partial"` only -- every OTHER PORG-NOT-READY status keeps refusing
+// both operations through THIS lane unchanged. (restart-required no longer belongs in that
+// "every other status" set as of RESTART_LIFECYCLE_SCRATCH_WRITE, below: both `mkdir scratch`
+// and a `scratch/incident-report.md` write are now ALSO admitted at restart-required, via that
+// separate, more general scratch lane -- not via this partial-only one. AC-6 below therefore
+// uses `continuity-damaged` as its unrelated-status comparator instead.)
+test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the fixed incident-report write, nothing wider", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+
+    // AC-1/AC-2: both admitted mkdir shapes.
+    for (const command of ["mkdir scratch", "mkdir -p scratch", "mkdir -p scratch/nested"]) {
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partialDeps).exitCode, 0, command);
+    }
+
+    // AC-3: exact, not substring/prefix-based -- a different target or any extra/reordered
+    // flag still refuses.
+    for (const command of [
+      "mkdir somethingelse",
+      "mkdir scratch extra",
+      "mkdir -p -v scratch",
+      "mkdir scratch -p",
+      "mkdir -pv scratch",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), partialDeps);
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
+    }
+
+    // AC-4: the one fixed incident-report write, admitted for both Write and Edit.
+    for (const input of [write("scratch/incident-report.md"), edit("scratch/incident-report.md")]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, partialDeps).exitCode, 0, input.tool_name);
+    }
+
+    // AC-5: exact, not a directory or a glob -- any other filename or path still refuses.
+    for (const input of [
+      write("incident-report.md"),
+      edit("incident-report.md"),
+      write("scratch"),
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, partialDeps);
+      assert.equal(result.exitCode, 2, `${input.tool_name}:${input.tool_input.file_path}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_input.file_path);
+    }
+
+    // AC-6: the lane is `partial`-only, not a general readiness bypass -- the identical
+    // admitted shapes stay refused under a different PORG-NOT-READY status this file already
+    // fixtures. Comparator is `continuity-damaged`, not `restart-required`: since
+    // RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-
+    // cover-restart-required.md), all four of these ARE admitted at restart-required via that
+    // separate, more general scratch lane -- restart-required stopped being an "unrelated
+    // status" for this comparison and would no longer prove lane scoping.
+    // `continuity-damaged` carries no scratch admission anywhere in this file, so it still
+    // proves the invariant these lines exist to pin.
+    const continuityDamagedDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("continuity-damaged"); } };
+    for (const input of [
+      bash("mkdir scratch"),
+      bash("mkdir -p scratch"),
+      write("scratch/incident-report.md"),
+      edit("scratch/incident-report.md"),
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, continuityDamagedDeps);
+      assert.equal(result.exitCode, 0, `continuity-damaged/${input.tool_name}`);
+    }
+
+    // AC-7: an exactly-ready session's behaviour for both operations is unchanged -- the new
+    // branch lives inside evaluateAfterGrammarAdmission()'s catch block, unreachable unless
+    // requireProjectOnboardingReadyFn() throws, so a ready session never enters it.
+    const readyDeps = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    };
+    for (const input of [bash("mkdir scratch"), write("scratch/incident-report.md")]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, readyDeps).exitCode, 0, input.tool_name ?? "Bash");
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-LCREADONLY-2 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+// tmp-fallback.md): the Critic-found major from NVA-LCREADONLY-1 -- the narrow diagnosis
+// lane above existed but was undiscoverable, because the denial a `partial` session actually
+// reads never named it. This proves the denial message itself now names both admitted
+// actions when, and only when, typedLifecycleStatus is exactly "partial" -- every other
+// status (restart-required and the untyped/null case) keeps the prior two-line message,
+// byte-for-byte, with no leaked mention of the diagnosis lane.
+test("NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses stay unchanged", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    // A denied write that does NOT match the admitted lane still refuses, but its own denial
+    // message must now also disclose the lane a stuck session could otherwise never find.
+    const partialResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(partialResult.exitCode, 2);
+    assert.match(partialResult.stderr, /Pipeline session readiness is partial\./u);
+    assert.match(
+      partialResult.stderr,
+      /Re-run the typed project-onboarding-v3 inspection with intent session/u,
+    );
+    assert.match(partialResult.stderr, /creating the repository's own scratch directory/u);
+    assert.match(partialResult.stderr, /writing exactly scratch\/incident-report\.md via Write or Edit/u);
+
+    // restart-required must keep exactly the prior two-line message -- no new text leaked in.
+    const restartResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("restart-required"); },
+    });
+    assert.equal(restartResult.exitCode, 2);
+    assert.match(restartResult.stderr, /Pipeline session readiness is restart-required\./u);
+    assert.doesNotMatch(restartResult.stderr, /scratch/u);
+    assert.doesNotMatch(restartResult.stderr, /incident-report/u);
+    assert.doesNotMatch(restartResult.stderr, /diagnosis lane/u);
+
+    // The untyped/null case (an unrecognized status, not in CONTROLLING_NON_READY_STATUSES)
+    // must also keep its own prior message unchanged, with no leaked mention either.
+    const nullResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("some-status-outside-the-registry"); },
+    });
+    assert.equal(nullResult.exitCode, 2);
+    assert.match(nullResult.stderr, /Pipeline-governed project writes require an exact V4 ready result for session intent\./u);
+    assert.doesNotMatch(nullResult.stderr, /scratch/u);
+    assert.doesNotMatch(nullResult.stderr, /incident-report/u);
+    assert.doesNotMatch(nullResult.stderr, /diagnosis lane/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-GF-SCRATCH (backlog: 2026-08-28-a-scratch-write-is-refused-during-intake-against-the-
+// documented-exemption.md): a fresh, not-yet-onboarded session sitting at `intake-required` or
+// `intake-design-questions-required` could write nothing at all, including its own scratch/
+// throwaway notes -- contradicting the pipeline-start skill's own claim that scratch/ is always
+// safe. Unlike the `partial` lane's single fixed file, this admits ANY path resolving inside
+// scratch/ (matching guard-devplan.mjs's own scratch/ prefix exemption). Proves the admission is
+// exact by construction (resolve + pathInside, never a substring/prefix-string match) and scoped
+// to the two intake statuses only.
+test("NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matching mkdir, nothing wider", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    for (const status of ["intake-required", "intake-design-questions-required"]) {
+      const intakeDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+
+      // AC-1: any Edit/Write/NotebookEdit write whose resolved path is inside scratch/,
+      // including nested paths -- unlike the `partial` lane, this is not one fixed filename.
+      for (const input of [
+        write("scratch/design.md"),
+        edit("scratch/design.md"),
+        write("scratch/nested/deep/notes.md"),
+        notebookEdit("scratch/analysis.ipynb"),
+      ]) {
+        assert.equal(evaluateLifecycleReadyGuard(input, intakeDeps).exitCode, 0, `${status}/${input.tool_name}`);
+      }
+
+      // AC-2: both admitted mkdir shapes, including a nested target (unlike the `partial`
+      // lane's mkdir admission, which refuses a nested target).
+      for (const command of ["mkdir scratch", "mkdir -p scratch", "mkdir -p scratch/nested"]) {
+        assert.equal(evaluateLifecycleReadyGuard(bash(command), intakeDeps).exitCode, 0, `${status}/${command}`);
+      }
+
+      // AC-3: exact by construction -- resolve + pathInside, never a substring/prefix-string
+      // match. A sibling directory merely starting with "scratch", a lexical escape back out of
+      // scratch/, the bare scratch/ directory itself as a write target, and any other path all
+      // still refuse.
+      for (const input of [
+        write("scratch-evil/file.md"),
+        write("scratch/../secret.md"),
+        write("scratch"),
+        write("src/other-file.mjs"),
+        edit("docs/other-file.md"),
+      ]) {
+        const result = evaluateLifecycleReadyGuard(input, intakeDeps);
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_input.file_path}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}/${input.tool_input.file_path}`);
+      }
+      for (const command of ["mkdir somethingelse", "mkdir -p /etc/scratch"]) {
+        const result = evaluateLifecycleReadyGuard(bash(command), intakeDeps);
+        assert.equal(result.exitCode, 2, `${status}/${command}`);
+      }
+
+      // AC-4: the refusal for a non-scratch write names the sanctioned scratch/ alternative.
+      const refused = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), intakeDeps);
+      assert.match(refused.stderr, new RegExp(`Pipeline session readiness is ${status}\\.`, "u"));
+      assert.match(refused.stderr, /A scratch write stays admitted during intake/u);
+    }
+
+    // AC-5: the lane is intake-only, not a general readiness bypass -- the identical admitted
+    // nested-scratch shape stays refused under a different PORG-NOT-READY status this file
+    // already fixtures (continuity-damaged, and partial's own narrower lane below).
+    // Comparator is `continuity-damaged`, not `restart-required`: since
+    // RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-
+    // cover-restart-required.md), both of these ARE admitted at restart-required via that
+    // separate, more general scratch lane -- restart-required stopped being an "unrelated
+    // status" for this comparison and would no longer prove lane scoping.
+    const continuityDamagedDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("continuity-damaged"); } };
+    for (const input of [write("scratch/design.md"), write("scratch/nested/deep/notes.md")]) {
+      const result = evaluateLifecycleReadyGuard(input, continuityDamagedDeps);
+      assert.equal(result.exitCode, 0, `continuity-damaged/${input.tool_input.file_path}`);
+    }
+    const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const partialNested = evaluateLifecycleReadyGuard(write("scratch/nested/deep/notes.md"), partialDeps);
+    assert.equal(partialNested.exitCode, 0, "partial/scratch/nested/deep/notes.md");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-BL-INTAKEBIND-1 (backlog: 2026-08-19-material-intake-bootstrap-bind-has-no-sanctioned-
+// path-to-a-passing-plan-gate.md): the narrow bootstrap-binding-required staging-authoring
+// admission -- proves it admits EXACTLY the two staging targets meant for hand-authored
+// review (prd_<featureId>.md, spec.md), never design-input.md (an immutable verbatim
+// capture), never a different path/tool/lifecycleStatus, and never widens any other lane.
+test("NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging PRD/spec authoring writes, nothing wider", () => {
+  const path = root();
+  const featureId = "onboarding-0123456789ab";
+  const prdPath = `project/.onboarding-staging/prd_${featureId}.md`;
+  const specPath = "project/.onboarding-staging/spec.md";
+  const designInputPath = "project/.onboarding-staging/design-input.md";
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const bindingDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+
+    // AC-1: both admitted staging targets, for both Edit and Write.
+    for (const input of [write(prdPath), edit(prdPath), write(specPath), edit(specPath)]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, bindingDeps).exitCode, 0, `${input.tool_name}:${input.tool_input.file_path}`);
+    }
+
+    // The staging window permits authoring and review, not the human-owned
+    // acknowledgement transition.  Direct Edit/Write payloads carrying the
+    // marker stay blocked; apply_patch carries the same fact through its
+    // translated Edit payload (covered in guard-apply-patch.test.mjs).
+    for (const input of [
+      { ...write(prdPath), tool_input: { file_path: prdPath, content: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+      { ...edit(prdPath), tool_input: { file_path: prdPath, old_string: "review", new_string: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
+      assert.equal(result.exitCode, 2, `marker transition:${input.tool_name}`);
+      assert.match(result.stderr, /GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u);
+    }
+
+    // AC-2: design-input.md is NEVER admitted -- it must stay an immutable verbatim capture.
+    for (const input of [write(designInputPath), edit(designInputPath)]) {
+      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
+      assert.equal(result.exitCode, 2, `${input.tool_name}:${input.tool_input.file_path}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    }
+
+    // AC-3: no other path, no glob, no directory-wide admission -- a malformed featureId
+    // shape, a nested path, and an unrelated staging-adjacent file all still refuse.
+    for (const filePath of [
+      "project/.onboarding-staging/prd_not-a-real-feature-id.md",
+      "project/.onboarding-staging/prd_onboarding-0123456789ab.md.bak",
+      "project/.onboarding-staging/nested/prd_onboarding-0123456789ab.md",
+      "project/.onboarding-staging/other.md",
+      "project/other-file.md",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), bindingDeps);
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, filePath);
+    }
+
+    // AC-4: never a tool other than Edit/Write -- NotebookEdit (a write tool, gated by the
+    // ordinary readiness lane exactly like Edit/Write for every non-admitted path) still
+    // refuses under GUARD-LIFECYCLE-NOT-READY.
+    const notebookResult = evaluateLifecycleReadyGuard(notebookEdit(prdPath), bindingDeps);
+    assert.equal(notebookResult.exitCode, 2, "NotebookEdit");
+    assert.match(notebookResult.stderr, /GUARD-LIFECYCLE-NOT-READY/u, "NotebookEdit");
+    // Bash (a write-shaped, non-read-only-diagnostic command, so it does not accidentally
+    // hit the unrelated read-only lane) also stays refused -- but, since NVA-STARNEEDLE-1,
+    // by the gate-strength SHELL lane itself, before readiness is ever evaluated, exactly
+    // like every OTHER GATE_STRENGTH_PATHS entry already refuses a matching shell command
+    // (GSSHELL-STAGE-1 pins the identical shape for GS-1). Before that fix, GS-15's shell
+    // needle was the bare wildcard character and never actually matched a real path under
+    // this directory, so this exact command fell all the way through to the generic
+    // readiness fallback instead -- a weaker, later refusal than every sibling entry gets,
+    // which was the surface of the bug this test file's own NVA-STARNEEDLE-1 tests fix.
+    const bashResult = evaluateLifecycleReadyGuard(bash(`rm ${prdPath}`), bindingDeps);
+    assert.equal(bashResult.exitCode, 2, "Bash");
+    assert.match(bashResult.stderr, /GUARD-GATE-STRENGTH-SHELL/u, "Bash");
+
+    // AC-5: never a lifecycleStatus other than bootstrap-binding-required -- the identical
+    // admitted shapes stay refused under a different PORG-NOT-READY status.
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+    for (const input of [write(prdPath), write(specPath)]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, input.tool_input.file_path);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_input.file_path);
+    }
+
+    // AC-6: an exactly-ready session's behaviour is unchanged -- the new branch lives inside
+    // evaluateAfterGrammarAdmission()'s catch block, unreachable unless
+    // requireProjectOnboardingReadyFn() throws.
+    const readyDeps = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    };
+    assert.equal(evaluateLifecycleReadyGuard(write(prdPath), readyDeps).exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-prefix.md):
+// a resume-hint-input write missing exactly the `project/` prefix (same basename, wrong
+// directory) is a narrow, diagnosable margin -- the denial must name the one correct path
+// directly, before falling through to the generic restart-required message, and must NOT
+// escalate to the external-operator ceremony (GUARD-LIFECYCLE-NOT-READY never routes there,
+// unlike the closed-shell-grammar/cross-repo-mutation codes this file's HGO wiring covers).
+// A near miss that is NOT diagnosable this way (a wholly different basename) still falls
+// through to the unchanged generic behaviour.
+test("NVA-MICRO-1: a near-miss resume-hint-input write names the correct path and does not escalate", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+
+    // AC-1: missing exactly the `project/` prefix -- same basename, wrong directory.
+    for (const input of [write(".resume-hint-input.json"), edit(".resume-hint-input.json")]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, input.tool_name);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_name);
+      assert.match(
+        result.stderr,
+        /The only path admitted is exactly project\/\.resume-hint-input\.json/u,
+        input.tool_name,
+      );
+      // No route to the external-operator ceremony leaks into this denial.
+      assert.doesNotMatch(result.stderr, /HGO-/u, input.tool_name);
+      assert.doesNotMatch(result.stderr, /attended-host-terminal/u, input.tool_name);
+    }
+
+    // AC-2: same basename, a different wrong directory -- still diagnosable, still named.
+    const nestedResult = evaluateLifecycleReadyGuard(write("scratch/.resume-hint-input.json"), restartDeps);
+    assert.equal(nestedResult.exitCode, 2);
+    assert.match(nestedResult.stderr, /The only path admitted is exactly project\/\.resume-hint-input\.json/u);
+
+    // AC-3: a wholly different basename is NOT diagnosable this way -- unchanged generic
+    // two-line message, no leaked mention of the near-miss hint (already exercised by this
+    // file's own restart-required fixture at "restart-required admits only the consumed
+    // bounded resume-hint input and capture", repeated here for the message-content contract).
+    const unrelatedResult = evaluateLifecycleReadyGuard(edit("project/resume-hint.json"), restartDeps);
+    assert.equal(unrelatedResult.exitCode, 2);
+    assert.match(unrelatedResult.stderr, /Pipeline session readiness is restart-required\./u);
+    assert.doesNotMatch(unrelatedResult.stderr, /The only path admitted is exactly/u);
+
+    // AC-4: the exact admitted path itself is unaffected -- still verdict(0), not routed
+    // through the near-miss hint at all.
+    assert.equal(
+      evaluateLifecycleReadyGuard(write("project/.resume-hint-input.json"), restartDeps).exitCode,
+      0,
+    );
+
+    // AC-5: the near-miss hint is restart-required-specific -- a `partial` denial for the
+    // identical near-miss path keeps its own existing message contract, no leaked hint text.
+    const partialResult = evaluateLifecycleReadyGuard(write(".resume-hint-input.json"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(partialResult.exitCode, 2);
+    assert.doesNotMatch(partialResult.stderr, /The only path admitted is exactly/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// GF-078 bug 1: Codex's own write-capable tool is `apply_patch`, whose tool_input carries
+// the whole patch envelope under `command`, never a Claude-shaped `file_path`. Before the
+// fix, isRestartResumeHintInputWrite() gated on WRITE_TOOLS (Edit/Write/NotebookEdit only)
+// and returned false unconditionally for this tool name -- this is a direct, exported unit
+// regression on that function's own decision, independent of whichever caller's own
+// tool-name allowlist a given wiring happens to apply further up the chain.
+test("isRestartResumeHintInputWrite recognizes an apply_patch write to the resume-hint input file", () => {
+  const path = root();
+  try {
+    const addPatch = "*** Begin Patch\n*** Add File: project/.resume-hint-input.json\n"
+      + "+{\"schema\":\"pipeline.resume-hint.v1\"}\n*** End Patch";
+    const updatePatch = "*** Begin Patch\n*** Update File: project/.resume-hint-input.json\n"
+      + "@@\n-{}\n+{\"schema\":\"pipeline.resume-hint.v1\"}\n*** End Patch";
+    for (const command of [addPatch, updatePatch]) {
+      assert.equal(
+        isRestartResumeHintInputWrite({ tool_name: "apply_patch", tool_input: { command } }, path),
+        true,
+        command,
+      );
+    }
+    for (const command of [
+      "*** Begin Patch\n*** Add File: project/other-file.json\n+{}\n*** End Patch",
+      "*** Begin Patch\n*** Delete File: project/.resume-hint-input.json\n*** End Patch",
+      "not a patch at all",
+    ]) {
+      assert.equal(
+        isRestartResumeHintInputWrite({ tool_name: "apply_patch", tool_input: { command } }, path),
+        false,
+        command,
+      );
+    }
+    // Unaffected: no other tool name gains a new admission, and a malformed tool_input
+    // still resolves to the same false a missing case already returned.
+    assert.equal(isRestartResumeHintInputWrite({ tool_name: "apply_patch", tool_input: {} }, path), false);
+    assert.equal(isRestartResumeHintInputWrite({ tool_name: "Bash", tool_input: { command: "printf x" } }, path), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("restart-process launcher is always rejected as an external user-copy-only action", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_LAUNCH_SCRIPT}' --root '${path}' --barrier-sha256 ${"d".repeat(64)} --activate`;
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /EXTERNAL ACTION REQUIRED/u);
+    assert.match(result.stderr, /external-terminal\/user-copy-only/u);
+    assert.match(result.stderr, /must never be executed through a Codex tool call/u);
+    assert.match(result.stderr, /launch\.copyCommand/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("every controlling non-ready status denies before the governed implementation write", () => {
+  const path = root();
+  let sideEffects = 0;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      for (const input of [edit(), bash()]) {
+        const result = evaluateLifecycleReadyGuard(input, {
+          projectDir: path,
+          requireProjectOnboardingReadyFn({ intent }) {
+            assert.equal(intent, "session");
+            deny(status);
+          },
+          implementationWriteFn() { sideEffects += 1; },
+        });
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}`);
+        assert.match(result.stderr, /guard-lifecycle-ready/u, `${status}/${input.tool_name}`);
+      }
+    }
+    assert.equal(sideEffects, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("guard exceptions and malformed ready receipts fail closed with sanitized output", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, ".claude", "pipeline.json"), "{}\n");
+    for (const requireProjectOnboardingReadyFn of [
+      () => { throw new Error("secret /private/root"); },
+      () => null,
+      () => ({ status: "ready", intent: "session" }),
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(), { projectDir: path, requireProjectOnboardingReadyFn });
+      assert.equal(result.exitCode, 2);
+      assert.equal(result.stderr.includes("secret"), false);
+      assert.equal(result.stderr.includes("/private/root"), false);
+      assert.equal(result.stderr.includes(path), false);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("every in-root Edit or Write requires readiness while outside targets stop before readiness", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const filePaths = [
+      "src/implementation.mjs",
+      "docs/state.md",
+      "DOCS/state.md",
+      "specs/feature/spec.md",
+      "Specs/feature/spec.md",
+      ".claude/pipeline.json",
+      ".CLAUDE/pipeline.json",
+      "backlog/item.md",
+      "BackLog/item.md",
+      join(tmpdir(), "outside-lifecycle-guard.txt"),
+    ];
+    for (const toolInput of [edit, write]) {
+      for (const filePath of filePaths) {
+        const result = evaluateLifecycleReadyGuard(toolInput(filePath), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() {
+            calls += 1;
+            deny();
+          },
+        });
+        assert.equal(result.exitCode, 2, `${toolInput().tool_name}: ${filePath}`);
+        assert.match(result.stderr, /guard-lifecycle-ready/u, `${toolInput().tool_name}: ${filePath}`);
+      }
+    }
+    assert.equal(calls, (filePaths.length - 1) * 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("H3 recovery commands admit only exact plugin-local argv and reject lookalikes", () => {
+  const path = root();
+  const digest = "a".repeat(64);
+  try {
+    const base = `node ${ONBOARDING_SCRIPT}`;
+    assert.equal(isSanctionedLifecycleCommand(`${base} plan-source-recovery --root ${path}`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} plan-manifest-repair --root ${path}`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} apply-manifest-repair --root ${path} --plan-sha256 ${digest} --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} plan-reinstall --root ${path}`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} apply-reinstall --root ${path} --plan-sha256 ${digest} --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node ${SESSION_CAPABILITY_DIAGNOSE_SCRIPT} --repo ${path}`, path), true);
+    for (const hostile of [
+      `${base} plan-manifest-repair --root ${path} --activate`,
+      `${base} apply-manifest-repair --root ${path} --plan-sha256 ${digest}`,
+      `${base} apply-manifest-repair --root ${path}/.. --plan-sha256 ${digest} --activate`,
+      `${base} apply-reinstall --root ${path} --plan-sha256 ${digest}`,
+      `node ${SESSION_CAPABILITY_DIAGNOSE_SCRIPT} --repo /tmp/other`,
+      `${base} plan-manifest-repair --root ${path}; touch ${path}/x`,
+      `node ${join(path, "plugins/pipeline-core/scripts/project-onboarding-v3.mjs")} plan-manifest-repair --root ${path}`,
+    ]) assert.equal(isSanctionedLifecycleCommand(hostile, path), false, hostile);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("main() reads --runner from its own argv and reaches the gate with codex even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority)", () => {
+  const path = root();
+  const had = Object.prototype.hasOwnProperty.call(process.env, "CLAUDECODE");
+  const previous = process.env.CLAUDECODE;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    // A Codex session spawned from inside a Claude Code Bash tool inherits
+    // CLAUDECODE=1 in its ambient environment; this must not change which
+    // runner's exemptions this invocation is admitted under.
+    process.env.CLAUDECODE = "1";
+    let seenRunner = null;
+    const exitCode = main(JSON.stringify(edit()), {
+      argv: ["--runner", "codex"],
+      projectDir: path,
+      requireProjectOnboardingReadyFn(options) {
+        seenRunner = options.runner;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+      writeErrorFn() {},
+    });
+    assert.equal(seenRunner, "codex");
+    assert.equal(exitCode, 0);
+  } finally {
+    if (had) process.env.CLAUDECODE = previous; else delete process.env.CLAUDECODE;
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("main() fails closed on an absent or invalid --runner without ever inspecting lifecycle readiness", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const argv of [[], ["--runner"], ["--runner", "claude-code"], ["--runner", ""], ["--runner", "windows"]]) {
+      let calls = 0;
+      const exitCode = main(JSON.stringify(edit()), {
+        argv,
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { calls += 1; },
+        writeErrorFn() {},
+      });
+      assert.equal(exitCode, 2, JSON.stringify(argv));
+      assert.equal(calls, 0, JSON.stringify(argv));
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-LCR-HGO-1 (ADR-0059 Decision 3/4): the three closed-shell-grammar denials now
+// always attempt the SAME generic, exact-command-bound Human-Guard-Override (HGO) route
+// the sibling guards already use. These fixtures need a real Git repository (topology()
+// requires one), unlike this file's other tests -- mirrors
+// guard-testpath-override.test.mjs's `fixture()`/`arm()` and
+// lib/human-guard-override.test.mjs's `fixtureSignature()`/`prepareSignedArming()`.
+
+const HGO_PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const HGO_OVERRIDE_SCRIPT = join(HGO_PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+const hgoSigPair = generateKeyPairSync("ed25519");
+const HGO_SIG_KEY_REFERENCE = "guard-lifecycle-ready-hgo-test-key";
+const hgoSigPublicKey = hgoSigPair.publicKey.export({ type: "spki", format: "pem" });
+const hgoSigPublicKeySha256 = createHash("sha256").update(hgoSigPublicKey).digest("hex");
+// The two fixed, content-independent sentinel digests authorizeHumanGuardOverrideBySignature()
+// itself names by exact source string -- reproduced independently, never imported, exactly
+// as lib/human-guard-override.test.mjs's own copy does.
+const HGO_SIGNATURE_INTENT_PLAN_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-plan.v1").digest("hex");
+const HGO_SIGNATURE_INTENT_SPEC_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-spec.v1").digest("hex");
+
+/** The exact denial reason text grammarOverrideRoute() builds for each grammar code. */
+const HGO_GRAMMAR_REASON = {
+  "GUARD-PARSE-UNSUPPORTED": "GUARD-PARSE-UNSUPPORTED: The command is outside the closed Pipeline shell grammar.",
+  "GUARD-OPERATOR-UNAPPROVED": "GUARD-OPERATOR-UNAPPROVED: The command contains an unapproved shell operator.",
+  "GUARD-REDIRECT-UNAPPROVED": "GUARD-REDIRECT-UNAPPROVED: The command contains an unapproved shell redirection.",
+};
+
+// NOVA-LCR-HGO-2: since a consumed grammar capability now falls through to the
+// LAUNCH_SCRIPT/readiness tail (evaluateAfterGrammarAdmission()) instead of returning
+// verdict(0) immediately, an "admitted all the way through" fixture must make that tail
+// admit too. hgoGitFixture() below is a bare git repo with no onboarding scaffolding, so
+// the exact V4 ready receipt is supplied directly via dependency injection rather than
+// engineering a full onboarding-ready checkout.
+const HGO_READY_RECEIPT = Object.freeze({
+  schema: "pipeline.project-onboarding-ready-gate.v1",
+  status: "ready",
+  intent: "session",
+});
+function hgoReadyDeps() {
+  return { requireProjectOnboardingReadyFn: () => ({ ...HGO_READY_RECEIPT }) };
+}
+
+/** `pipeline.user.yaml`, committed, decides the mode -- same "committed value wins" fixture shape as the sibling suites. */
+function hgoGitFixture(mode) {
+  const base = mkdtempSync(join(tmpdir(), "guard-lifecycle-hgo-"));
+  markGovernedFixture(base);
+  spawnSync("git", ["init", "-q", "-b", "main", base], { encoding: "utf8" });
+  spawnSync("git", ["-C", base, "config", "user.email", "fixture@example.invalid"], { encoding: "utf8" });
+  spawnSync("git", ["-C", base, "config", "user.name", "fixture"], { encoding: "utf8" });
+  writeFileSync(join(base, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`);
+  mkdirSync(join(base, "project"), { recursive: true });
+  writeFileSync(join(base, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push"],
+    trustAnchor: { keyReference: HGO_SIG_KEY_REFERENCE, publicKeySha256: hgoSigPublicKeySha256 },
+  }));
+  spawnSync("git", ["-C", base, "add", "pipeline.user.yaml", "project/critical-human-proof.json"], { encoding: "utf8" });
+  spawnSync("git", ["-C", base, "commit", "-qm", "fixture"], { encoding: "utf8" });
+  return base;
+}
+
+/** Arms a real one-time capability via the chat-mode in-session path (denial -> plan -> prepare-authorization -> authorize --activate). */
+function hgoArmByChat(root, toolInput, denials) {
+  const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
+  const recorded = recordHumanGuardDenial({ ...shared, toolName: "Bash", toolInput, denials });
+  assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+  const planned = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256 });
+  const reason = "NOVA-LCR-HGO-1 fixture arming";
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    ...shared, requestSha256: recorded.requestSha256, planSha256: planned.planSha256, reason,
+  });
+  const armed = authorizeHumanGuardOverride({
+    ...shared,
+    requestSha256: recorded.requestSha256,
+    planSha256: planned.planSha256,
+    selectionSha256: prepared.selectionSha256,
+    reason,
+    reasonSha256: prepared.reasonSha256,
+    activate: true,
+    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+  });
+  assert.equal(armed.status, "armed", `chat arm failed: ${JSON.stringify(armed)}`);
+}
+
+/**
+ * Arms a real one-time capability via a genuine detached Ed25519 proof (ADR-0059 Decision 1).
+ * `toolName` defaults to "Bash" -- every pre-existing caller arms a command -- and is passed
+ * explicitly by NOVA-XREPO-HGO-6, which arms an out-of-root Edit (ADR-0059 Decision 6's
+ * "cross-repository-target" class is reached through a write target, not a command).
+ */
+function hgoArmBySignature(root, toolInput, denials, toolName = "Bash") {
+  const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
+  const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
+  assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+  const planned = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256 });
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    ...shared, requestSha256: recorded.requestSha256, planSha256: planned.planSha256, reason: HGO_SIGNATURE_REASON,
+  });
+  const intent = createPoApprovalIntent({
+    kind: "guard-override",
+    featureId: "human-guard-override",
+    planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+    specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+    candidate: { commit: planned.repository.head, tree: planned.repository.tree },
+    policyRevision: "human-guard-override-signature-v1",
+    subjectSha256: prepared.selectionSha256,
+    decision: "authorize",
+  });
+  const proof = {
+    schema: PO_APPROVAL_PROOF_SCHEMA,
+    intentSha256: intent.sha256,
+    keyReference: HGO_SIG_KEY_REFERENCE,
+    publicKey: hgoSigPublicKey,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), hgoSigPair.privateKey).toString("base64"),
+  };
+  const armed = authorizeHumanGuardOverrideBySignature({
+    rootDir: root,
+    pluginRoot: HGO_PLUGIN_ROOT,
+    requestSha256: recorded.requestSha256,
+    planSha256: planned.planSha256,
+    proof,
+    scriptPath: HGO_OVERRIDE_SCRIPT,
+  });
+  assert.equal(armed.status, "armed", `signature arm failed: ${JSON.stringify(armed)}`);
+}
+
+test("NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar command, for all three codes", () => {
+  const roots = [];
+  try {
+    const cases = [
+      ["rg -n lifecycle . && touch output.txt", "GUARD-PARSE-UNSUPPORTED"],
+      ["rg -n lifecycle . | tee output.txt", "GUARD-OPERATOR-UNAPPROVED"],
+      ["rg -n lifecycle . > output.txt | head -n 20", "GUARD-REDIRECT-UNAPPROVED"],
+    ];
+    for (const [command, code] of cases) {
+      const chatRoot = hgoGitFixture("chat");
+      roots.push(chatRoot);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot }).exitCode, 2, `precondition: ${command}`);
+      const toolInput = { command };
+      const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON[code] }];
+      hgoArmByChat(chatRoot, toolInput, denials);
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+      assert.equal(result.exitCode, 0, `chat-armed did not admit ${command}: ${result.stderr}`);
+      assert.match(result.stderr, /\[pipeline-human-override\] guard-lifecycle-ready/u, command);
+      assert.match(result.stderr, /capability consumed/u, command);
+      // single-use: the same command is refused again
+      const second = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
+      assert.equal(second.exitCode, 2, `capability was reusable for ${command}`);
+    }
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-1: a signature-armed capability admits the denied grammar command, regardless of the committed mode", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-PARSE-UNSUPPORTED"] }];
+    for (const mode of ["signature", "chat"]) {
+      const sigRoot = hgoGitFixture(mode);
+      roots.push(sigRoot);
+      hgoArmBySignature(sigRoot, toolInput, denials);
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot, ...hgoReadyDeps() });
+      assert.equal(result.exitCode, 0, `signature-armed did not admit under mode=${mode}: ${result.stderr}`);
+      assert.match(result.stderr, /capability consumed/u, mode);
+    }
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appropriate next command (ADR-0059 Decision 4)", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+
+    const chatRoot = hgoGitFixture("chat");
+    roots.push(chatRoot);
+    markGovernedFixture(chatRoot);
+    const chatResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
+    assert.equal(chatResult.exitCode, 2);
+    assert.match(chatResult.stderr, /Human override available for this exact command/u);
+    assert.match(chatResult.stderr, /guard-human-override\.mjs/u);
+    assert.match(chatResult.stderr, /Step: plan/u);
+    assert.match(chatResult.stderr, /mode-specific nextAction/u);
+    assert.match(chatResult.stderr, /chat is attribution, not proof/u);
+    assert.doesNotMatch(chatResult.stderr, /Step: prepare-authorization|Step: authorize-by-signature|human-held Ed25519 key/u);
+    assert.doesNotMatch(chatResult.stderr, /capability consumed/u);
+
+    const sigRoot = hgoGitFixture("signature");
+    roots.push(sigRoot);
+    markGovernedFixture(sigRoot);
+    const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
+    assert.equal(sigResult.exitCode, 2);
+    assert.match(sigResult.stderr, /Human override available for this exact command/u);
+    assert.match(sigResult.stderr, /Step: plan/u);
+    assert.match(sigResult.stderr, /mode-specific nextAction/u);
+    assert.match(sigResult.stderr, /human-held Ed25519 key in an attended external terminal/u);
+    assert.match(sigResult.stderr, /this session only prepares digests and verifies the proof/u);
+    assert.doesNotMatch(sigResult.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
+    assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("signature-mode HGO guidance resolves the configured key directory without disclosing its private path", () => {
+  const projectRoot = hgoGitFixture("signature");
+  try {
+    const directory = "/mnt/c/Users/Andre/OneDrive/Documents/06_Dev/agent-pipeline-key";
+    const result = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), {
+      projectDir: projectRoot,
+      ...hgoReadyDeps(),
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /human-held Ed25519 key in an attended external terminal/u);
+    assert.doesNotMatch(result.stderr, new RegExp(directory.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+    assert.doesNotMatch(result.stderr, /--directory/u);
+  } finally { rmSync(projectRoot, { recursive: true, force: true }); }
+});
+
+// NVA-B-DENIALBOILER-1: this test used to assert POSIX+PowerShell unconditionally for BOTH
+// modes. That was the pre-existing shape, not a deliberate "every step needs every platform"
+// requirement -- scratch/strip-boilerplate.md measured it as pure duplication cost. The code
+// now distinguishes a determined shell (an in-session step, re-run through the SAME tool
+// that produced this denial -- here always Bash, via bash()) from a genuinely unknown one
+// (sign-intent, which a human runs later on a machine this code never observes).
+// Chat mode has no out-of-session step; signature mode's attended command is
+// emitted by the later prepare-for-signature action. The first denial in both
+// modes carries only the in-session plan action in the current tool's dialect.
+test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determined command block without an unsafe primary command or rendering prerequisite", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+    for (const mode of ["signature", "chat"]) {
+      const projectRoot = hgoGitFixture(mode);
+      roots.push(projectRoot);
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: projectRoot });
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, /Step: plan\nPOSIX:/u);
+      assert.match(result.stderr, /eval "\$CMD"/u);
+      assert.match(result.stderr, /mode-specific nextAction/u);
+      assert.doesNotMatch(result.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
+      assert.doesNotMatch(result.stderr, /PowerShell:|Invoke-Expression \$CMD/u);
+      assert.doesNotMatch(result.stderr, /available on demand|render-copy-safe/u);
+      assert.doesNotMatch(
+        result.stderr,
+        /^(?:node|\S*node) .*guard-human-override\.mjs .*--repo /mu,
+        "the default output must not print a flat primary command",
+      );
+      const commandLines = result.stderr.split(/\r?\n/u).filter((line) =>
+        /^(?:Step: |POSIX:|PowerShell:|cmd\.exe:|CMD=|\$CMD (?:=|\+=) |set "CMD=|eval "\$CMD"|Invoke-Expression \$CMD|%CMD%)/u.test(line));
+      assert.ok(commandLines.length >= 3, result.stderr);
+      assert.equal(commandLines.every((line) => line.length <= 72), true, commandLines.join("\n"));
+    }
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+// NVA-B-DENIALBOILER-1: each remediation command appears exactly ONCE in a denial whose
+// ceremony steps are all in-session (chat mode) -- the DoD's own measured claim, pinned as a
+// regression guard rather than left to the prose assertions above alone.
+test("NVA-B-DENIALBOILER-1: chat-mode denial renders its exact plan command once", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+    const projectRoot = hgoGitFixture("chat");
+    roots.push(projectRoot);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: projectRoot });
+    assert.equal(result.exitCode, 2);
+    const first = result.stderr.indexOf("Step: plan");
+    assert.notEqual(first, -1);
+    assert.equal(result.stderr.indexOf("Step: plan", first + 1), -1);
+    assert.doesNotMatch(result.stderr, /Step: prepare-authorization|Step: authorize\n/u);
+    assert.doesNotMatch(result.stderr, /cmd\.exe:/u);
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n"); // no git repo at all
+    const result = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(result.stderr, /Human override available/u);
+    assert.doesNotMatch(result.stderr, /guard-human-override\.mjs/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-XREPO-HGO-1 (ADR-0059 Decision 6, 2026-08-08): the cross-repository half of the
+// former NOVA-LCR-HGO-1 pin is INVERTED here, deliberately. That pin asserted
+// "GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY stay outside HGO (regression,
+// ADR-0059 Decision 5)". Decision 6 reverses Decision 5 for the cross-repository class
+// only -- "That is reversed. A cross-repository mutation is now liftable by a signed human
+// override, through exactly the same always-attempt-consume-first mechanism every other
+// liftable class uses." The pin was therefore encoding a decision that no longer holds, and
+// its cross-repo half is rewritten as a positive assertion of the new contract. This is a
+// contract correction under a superseding ADR, not a test bent to fit code: the
+// GUARD-LIFECYCLE-NOT-READY half is kept, unchanged in force, in every test below.
+//
+// Measured boundary, pinned in NOVA-XREPO-HGO-6 rather than left as prose. This boundary
+// MOVED in b108b3e, and the pin moved with it. Until then, HGO's own eligibility() refused
+// ANY target outside the physical project root as HGO-NONOVERRIDABLE-CROSS-BOUNDARY, so no
+// capability could be armed for one; NOVA-XREPO-HGO-6 pinned exactly that, as "refused, and
+// told why no route exists". b108b3e closed that residual gap -- Decision 6's reversal is
+// pointless if the class it makes liftable cannot be classified -- by adding the
+// "cross-repository-target" eligible class. An out-of-root target is therefore now REFUSED
+// BUT ROUTABLE, on explicitly narrowed terms: the plan carries a scopeAttestation naming
+// what the override does NOT prove (the out-of-root target's identity, existence, git
+// status, or freedom from a symlink swap), because HGO's physical-identity model cannot
+// reach outside this repository's own root.
+//
+// What did NOT move, and is what NOVA-XREPO-HGO-6 now pins as the no-route half: a
+// candidate that safePath() refuses for a reason OTHER than escaping root -- above all an
+// in-root symlink escaping root, and any target matching the sensitive-path pattern -- is
+// still HGO-NONOVERRIDABLE-CROSS-BOUNDARY, still unarmable, and still gets the typed
+// "no route, and why" line rather than silence. crossBoundaryTarget() rescues a genuine
+// cross-repository target, never an attack on the in-root symlink-safety walk.
+
+/** Cross-repository denials whose tool input HGO can classify, so a capability can actually be armed. */
+const XREPO_COMMAND = "codex plugin add pipeline-core@agent-pipeline-local";
+const XREPO_OTHER_COMMAND = "codex plugin remove pipeline-core";
+const XREPO_REASON = "GUARD-CROSS-REPO-MUTATION: A governed consumer session may write only inside its own physical project root.";
+const xrepoDenials = () => [{ guard: "guard-lifecycle-ready.mjs", reason: XREPO_REASON }];
+
+test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, and names the mode-appropriate next command", () => {
+  const roots = [];
+  try {
+    const sigRoot = hgoGitFixture("signature");
+    roots.push(sigRoot);
+    const sig = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(sig.exitCode, 2, "an unarmed agent gained admission");
+    assert.match(sig.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(sig.stderr, /capability consumed/u);
+    assert.match(sig.stderr, /Human override available for this exact command/u);
+    assert.match(sig.stderr, /Step: plan/u);
+    assert.match(sig.stderr, /mode-specific nextAction/u);
+    assert.match(sig.stderr, /human-held Ed25519 key in an attended external terminal/u);
+    assert.doesNotMatch(sig.stderr, /Step: prepare-authorization|Step: sign-intent|Step: authorize-by-signature/u);
+    assert.doesNotMatch(sig.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
+
+    const chatRoot = hgoGitFixture("chat");
+    roots.push(chatRoot);
+    const chat = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(chat.exitCode, 2, "an unarmed agent gained admission");
+    assert.match(chat.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.match(chat.stderr, /Step: plan/u);
+    assert.match(chat.stderr, /chat is attribution, not proof/u);
+    assert.doesNotMatch(chat.stderr, /Step: authorize-by-signature/u);
+    assert.doesNotMatch(chat.stderr, /Step: emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
+    assert.doesNotMatch(chat.stderr, /Step: sign-intent|human-held Ed25519 key/u,
+      "chat mode must not advertise the external signing step");
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-2: a signature-armed capability admits the exact cross-repo command, and only once", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    hgoArmBySignature(sigRoot, { command: XREPO_COMMAND }, xrepoDenials());
+    const first = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(first.exitCode, 0, `signature-armed did not admit: ${first.stderr}`);
+    assert.match(
+      first.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-CROSS-REPO-MUTATION: exact one-time capability consumed/u,
+    );
+    const second = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(second.exitCode, 2, "a consumed capability admitted a second run");
+    assert.doesNotMatch(second.stderr, /capability consumed/u);
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-3: a chat-armed capability admits the exact cross-repo command in a chat-mode repository", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    hgoArmByChat(chatRoot, { command: XREPO_COMMAND }, xrepoDenials());
+    const result = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 0, `chat-armed did not admit: ${result.stderr}`);
+    assert.match(result.stderr, /capability consumed/u);
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-4: a capability armed for a different command does not admit this one", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    hgoArmBySignature(sigRoot, { command: XREPO_OTHER_COMMAND }, xrepoDenials());
+    const result = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 2, "a capability bound to another command admitted this one");
+    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(result.stderr, /capability consumed/u);
+    // The armed capability is untouched: it still admits exactly the command it was bound to.
+    const bound = evaluateLifecycleReadyGuard(bash(XREPO_OTHER_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(bound.exitCode, 0, `the bound command was not admitted: ${bound.stderr}`);
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-5: GUARD-LIFECYCLE-NOT-READY is never liftable, armed capability or not", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    // No route is offered for a readiness denial at all.
+    const plain = evaluateLifecycleReadyGuard(edit("docs/notes.md"), {
+      projectDir: sigRoot,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(plain.exitCode, 2);
+    assert.match(plain.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(plain.stderr, /Human override available/u);
+    assert.doesNotMatch(plain.stderr, /guard-human-override\.mjs/u);
+    assert.doesNotMatch(plain.stderr, /No human override route/u);
+
+    // And a genuine, matching cross-repo capability does not buy past readiness either:
+    // it clears the cross-repository objection only, is spent doing so, and says so.
+    hgoArmBySignature(sigRoot, { command: XREPO_COMMAND }, xrepoDenials());
+    const armed = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), {
+      projectDir: sigRoot,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(armed.exitCode, 2, "an armed cross-repo capability bypassed the readiness gate");
+    assert.match(armed.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.match(armed.stderr, /capability consumed/u, "a spent capability vanished silently");
+    const second = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(second.exitCode, 2, "a downstream-refused capability was still reusable");
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-6: an out-of-root target is refused but routable on narrowed terms, while a still-unroutable one reports why instead of falling silent", () => {
+  const sigRoot = hgoGitFixture("signature");
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-hgo-outside-"));
+  try {
+    const target = join(outside, "outside.mjs");
+
+    // (a) Liftable is not the same as allowed: unarmed, the write is still refused.
+    const unarmed = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(unarmed.exitCode, 2, "an unarmed agent gained admission to an out-of-root target");
+    assert.match(unarmed.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(unarmed.stderr, /capability consumed/u);
+    // ... and it now NAMES a route, where it previously reported that none existed.
+    assert.match(unarmed.stderr, /Human override available for this exact write/u);
+    assert.doesNotMatch(unarmed.stderr, /No human override route is offered/u);
+
+    // (b) The route is classified into its own eligible class, and the record a human reads
+    //     before signing states what this class cannot prove -- the honesty Decision 6 requires
+    //     of it, asserted against the persisted plan rather than trusted as prose.
+    const recorded = recordHumanGuardDenial({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      toolName: "Edit",
+      toolInput: { file_path: target },
+      denials: xrepoDenials(),
+    });
+    assert.equal(recorded.status, "planned", `an out-of-root target was not plannable: ${JSON.stringify(recorded)}`);
+    const planned = planHumanGuardOverride({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      scriptPath: HGO_OVERRIDE_SCRIPT,
+      requestSha256: recorded.requestSha256,
+    });
+    assert.equal(planned.commandClass, "cross-repository-target");
+    const attestation = planned.preview.scopeAttestation;
+    assert.equal(attestation.schema, "pipeline.human-guard-override-scope-attestation.v1");
+    assert.ok(
+      attestation.doesNotProve.some((entry) => /identity, existence, or git status of the out-of-root target/u.test(entry)),
+      `the plan did not state that the out-of-root target's identity is unproven: ${JSON.stringify(attestation)}`,
+    );
+    assert.ok(
+      attestation.doesNotProve.some((entry) => /symlink-safety walk/u.test(entry)),
+      `the plan did not state that no symlink-safety walk runs out of root: ${JSON.stringify(attestation)}`,
+    );
+
+    // (c) A genuine signature-armed capability admits the exact out-of-root write, once.
+    hgoArmBySignature(sigRoot, { file_path: target }, xrepoDenials(), "Edit");
+    const armed = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(armed.exitCode, 0, `a signature-armed out-of-root write was not admitted: ${armed.stderr}`);
+    assert.match(armed.stderr, /GUARD-CROSS-REPO-MUTATION: exact one-time capability consumed/u);
+    const replay = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(replay.exitCode, 2, "a consumed capability admitted a second out-of-root write");
+    assert.doesNotMatch(replay.stderr, /capability consumed/u);
+
+    // (d) The no-route half, on the boundary that did NOT move: a sensitive out-of-root
+    //     target is refused by crossBoundaryTarget()'s own hardBoundaryPath() check, so no
+    //     capability can be armed for it -- and that refusal still says WHY, in typed
+    //     tokens, rather than printing a bare denial.
+    const sensitive = join(outside, "secrets.txt");
+    const noRoute = evaluateLifecycleReadyGuard(edit(sensitive), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(noRoute.exitCode, 2);
+    assert.match(noRoute.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(noRoute.stderr, /capability consumed/u);
+    assert.doesNotMatch(noRoute.stderr, /Human override available/u);
+    assert.match(noRoute.stderr, /No human override route is offered for this exact write/u);
+    assert.match(
+      noRoute.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-PROJECT-BOUNDARY \(/u,
+    );
+    const refused = recordHumanGuardDenial({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      toolName: "Edit",
+      toolInput: { file_path: sensitive },
+      denials: xrepoDenials(),
+    });
+    assert.equal(refused.status, "external-operator-required");
+  } finally {
+    rmSync(sigRoot, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admission path here", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    const prohibited = [
+      "git push --force origin main",
+      "git push --force-with-lease origin main",
+      "git filter-branch --force",
+      "git commit --no-verify -m fixture",
+      "git branch -D main",
+      "git tag -d v1.0.0",
+    ];
+    for (const command of prohibited) {
+      // This guard is not the union's enforcer (plugins/pipeline-core/hooks/git-guard-union
+      // is, and is untouched by this change) -- what is asserted here is that the change
+      // introduced no override admission for these shapes: nothing is consumed, and nothing
+      // offers to arm anything.
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot, ...hgoReadyDeps() });
+      assert.doesNotMatch(result.stderr, /capability consumed/u, command);
+      assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    }
+    // A raw push is not even plannable as an override: HGO refuses to classify it.
+    const recorded = recordHumanGuardDenial({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      toolName: "Bash",
+      toolInput: { command: "git push --force origin main" },
+      denials: xrepoDenials(),
+    });
+    assert.notEqual(recorded.status, "planned");
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-BL-75 (backlog: guard-reclassification-changed-what-a-signature-can-lift): override
+// REACHABILITY as its own measured axis.
+//
+// GUARDFIX-1 above measures exitCode and denial code. That is the right instrument for
+// "this change admits nothing" and completely silent on "this change moved a command
+// between override classes" -- which is what 88d316d actually did, and why it took a Critic
+// round rather than a test to notice. A denial code is also an override class: whether a
+// human with a private key may subsequently authorize the exact command, and under which
+// eligible class. A reclassification can leave every verdict untouched and still move that.
+//
+// So this corpus pins the PAIR (denial code, override reachability) per command, derived
+// from the planner itself -- recordHumanGuardDenial()'s status/code and, where it plans, the
+// persisted plan's own commandClass -- and cross-checked against what the refusal TELLS the
+// operator. Prose in a plan is not the measurement; the plan's typed fields are.
+//
+// A red here is the signal, not the problem. It means some change altered who may authorize
+// a command, and the answer is a decision (and a note in the record) -- not re-pinning the
+// expected value until it matches. The expectations below are measured at HEAD, and record
+// the state of the boundary; they are not an endorsement of any single row.
+
+/** The exact denial reason text each refusal prints; the capability binds to it verbatim. */
+/**
+ * NVA-BL-76: the exact denial reason text the read-scope refusal binds into its HGO request.
+ * Kept out of HGO_GRAMMAR_REASON on purpose -- GUARD-READ-SCOPE-OUTSIDE-ROOT is not a grammar
+ * code, and the grammar remedy text is precisely what it must not print.
+ */
+const HGO_READ_SCOPE_REASON =
+  "GUARD-READ-SCOPE-OUTSIDE-ROOT: The bounded read-only diagnostic pipeline reads a path outside the project root.";
+
+const REACHABILITY_REASONS = {
+  ...HGO_GRAMMAR_REASON,
+  "GUARD-CROSS-REPO-MUTATION": XREPO_REASON,
+  "GUARD-READ-SCOPE-OUTSIDE-ROOT": HGO_READ_SCOPE_REASON,
+};
+
+/**
+ * One command on the reachability axis: not "was it admitted", but "who, if anyone, could
+ * subsequently admit it". Returns a flat, comparable pair so a diff names the axis that moved.
+ */
+function overrideReachability(command, projectDir) {
+  const result = evaluateLifecycleReadyGuard(bash(command), { projectDir, ...hgoReadyDeps() });
+  if (result.exitCode === 0) return { code: "<admitted>", reach: "admitted" };
+  const code = (result.stderr.match(/GUARD-[A-Z-]+/u) ?? ["<none>"])[0];
+  const reason = REACHABILITY_REASONS[code];
+  if (reason === undefined) {
+    // A code that never calls the planner at all (GUARD-LIFECYCLE-NOT-READY).
+    assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    assert.doesNotMatch(result.stderr, /Step: sign-intent|human-held Ed25519 key/u, command);
+    return { code, reach: "never-liftable:not-routed" };
+  }
+  const recorded = recordHumanGuardDenial({
+    rootDir: projectDir,
+    pluginRoot: HGO_PLUGIN_ROOT,
+    toolName: "Bash",
+    toolInput: { command },
+    denials: [{ guard: "guard-lifecycle-ready.mjs", reason }],
+  });
+  if (recorded.status !== "planned") {
+    // The operator must be told exactly what the planner concluded -- a class that cannot be
+    // armed and a refusal that implies one can be are two different failures.
+    assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    assert.doesNotMatch(result.stderr, /Step: sign-intent|human-held Ed25519 key/u, command);
+    assert.match(result.stderr, /No human override route is offered/u, command);
+    return { code, reach: `never-liftable:${recorded.status}:${recorded.code ?? "<none>"}` };
+  }
+  assert.match(result.stderr, /Human override available for this exact command/u, command);
+  assert.match(result.stderr, /Step: plan/u, command);
+  assert.match(result.stderr, /mode-specific nextAction/u, command);
+  const planned = planHumanGuardOverride({
+    rootDir: projectDir,
+    pluginRoot: HGO_PLUGIN_ROOT,
+    scriptPath: HGO_OVERRIDE_SCRIPT,
+    requestSha256: recorded.requestSha256,
+  });
+  return { code, reach: `liftable-by-signature:${planned.commandClass}` };
+}
+
+test("NVA-BL-75: the guard-classification corpus measures override reachability, not only the verdict", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    for (const [command, code, reach] of [
+      // Admitted outright: no denial, so no override class to reach for.
+      ["which a b c", "<admitted>", "admitted"],
+      // The shape 88d316d is about, in its parseable form: refused by the grammar, and
+      // liftable -- the exemption's whole point is that the reason it is refused is truthful.
+      ["which a b c 2>/dev/null", "GUARD-REDIRECT-UNAPPROVED", "liftable-by-signature:closed-shell-exact"],
+      // The three shapes the reclassification actually moved (cross-repo -> parse). Their
+      // reachability did NOT move with them: an unparseable command carrying `>` is refused
+      // by HGO's own eligibility before any class is assigned, under either denial code.
+      ["which a b c 2>/dev/null; which d", "GUARD-PARSE-UNSUPPORTED", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["which a b c 2>/dev/null && which d", "GUARD-PARSE-UNSUPPORTED", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["which a b c 2>NUL; which d", "GUARD-PARSE-UNSUPPORTED", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      // Narrowness controls: neither is stderr suppression, so both stay cross-repository.
+      ["which a b c &>/dev/null", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["which a b c >/dev/null 2>&1", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      // Genuine writes outside the root via a non-redirect argument (cp): still
+      // cross-repository, and (ADR-0059 Decision 6) routable through the narrowed class
+      // whose plan states what it cannot prove.
+      ["cp /etc/hosts /tmp/elsewhere/hosts", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:cross-repository-target"],
+      // PO decision 2026-08-18 #7 (backlog/items/2026-08-12-cross-repository-redirect-
+      // eligibility-does-not-consult-the-sensitive-path-boundary.md): a Bash REDIRECT
+      // target is not a permitted target type for the cross-repository-target liftable
+      // class at all (tool-based allowlist, not a broader path-content heuristic) -- so
+      // BOTH rows below moved from liftable to never-liftable, regardless of whether the
+      // specific target happens to match hardBoundaryPath()'s sensitive-pattern regex.
+      ["printf implementation 2>/etc/passwd", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-PROJECT-BOUNDARY"],
+      ["printf implementation 2>/dev/null > /tmp/elsewhere/out.txt", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-PROJECT-BOUNDARY"],
+      // A suppressor standing next to a real external write launders neither the code nor the
+      // class: composition removes the route the same command would otherwise have had.
+      ["printf implementation 2>/dev/null > /tmp/elsewhere/out.txt; printf done", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["codex plugin add pipeline-core@agent-pipeline-local", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:exact-command"],
+    ]) {
+      const measured = overrideReachability(command, sigRoot);
+      assert.deepEqual(
+        measured,
+        { code, reach },
+        `override reachability changed for ${JSON.stringify(command)}: expected ${code} / ${reach}, `
+          + `measured ${measured.code} / ${measured.reach}. Who may authorize this command moved. `
+          + "Record the decision (ADR-0059 Decision 3/4/5/6) before touching this expectation.",
+      );
+    }
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NVA-BL-75: the reachability labels are proven against a real capability, not read off the message", () => {
+  const liftable = hgoGitFixture("signature");
+  const unliftable = hgoGitFixture("signature");
+  try {
+    // "liftable-by-signature" means a real signed capability reaches this denial. Whether the
+    // lifted command then survives the checks HGO may not clear is NOVA-LCR-HGO-2's subject,
+    // deliberately not re-asserted here: the axis under test is reach, not the tail.
+    const grammarDenials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-REDIRECT-UNAPPROVED"] }];
+    hgoArmBySignature(liftable, { command: "which a b c 2>/dev/null" }, grammarDenials);
+    const admitted = evaluateLifecycleReadyGuard(bash("which a b c 2>/dev/null"), { projectDir: liftable, ...hgoReadyDeps() });
+    assert.match(
+      admitted.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-REDIRECT-UNAPPROVED: exact one-time capability consumed/u,
+      "a class measured as liftable-by-signature did not consume a genuine signed capability",
+    );
+
+    // "never-liftable" means no capability can be armed at all -- proven by the planner
+    // refusing to classify the command, not by the absence of a line in the message.
+    const composed = "which a b c 2>/dev/null; which d";
+    for (const reason of [HGO_GRAMMAR_REASON["GUARD-PARSE-UNSUPPORTED"], XREPO_REASON]) {
+      const recorded = recordHumanGuardDenial({
+        rootDir: unliftable,
+        pluginRoot: HGO_PLUGIN_ROOT,
+        toolName: "Bash",
+        toolInput: { command: composed },
+        denials: [{ guard: "guard-lifecycle-ready.mjs", reason }],
+      });
+      assert.equal(recorded.status, "external-operator-required", `a capability became armable for ${composed}`);
+    }
+    const refused = evaluateLifecycleReadyGuard(bash(composed), { projectDir: unliftable, ...hgoReadyDeps() });
+    assert.equal(refused.exitCode, 2, composed);
+    assert.doesNotMatch(refused.stderr, /capability consumed/u, composed);
+  } finally {
+    rmSync(liftable, { recursive: true, force: true });
+    rmSync(unliftable, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-LCR-HGO-2 (ADR-0059 Decision 5): a consumed grammar capability clears ONLY the
+// shell-grammar objection -- every other check in evaluateLifecycleReadyGuard() still
+// applies to the lifted command, in particular the LAUNCH_SCRIPT external-restart
+// refusal and the GUARD-LIFECYCLE-NOT-READY onboarding-readiness gate, neither of which
+// HGO is authorized to clear. Before this fix the guard returned verdict(0) the instant
+// grammarOverrideRoute() reported a consumed capability (:1045/:1056), so
+// `<otherwise-unliftable command> && true` turned an unliftable readiness denial into a
+// liftable grammar one.
+//
+// Fixtures below deliberately combine an ABSOLUTE path with a RELATIVE one in the same
+// command, carried inside a `--flag=value` token so HGO's own eligibility()
+// (lib/human-guard-override.mjs, read-only to this dispatch) never has to resolve it as
+// a bare path argument -- that classification is orthogonal to the control-flow fix
+// under test here, and a `--flag=<path>` token is skipped by eligibility()'s absolute-
+// path/protected-path checks (they only run for tokens not starting with "-").
+
+test("NOVA-LCR-HGO-2: a consumed grammar capability admits the composed command only once the readiness tail also admits it", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const absMarker = join(chatRoot, "abs-marker.txt");
+    const command = `rg -n lifecycle --marker=${absMarker} relative-notes.txt | tee output.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 0, `armed + ready did not admit: ${result.stderr}`);
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYCLE-NOT-READY", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const absMarker = join(chatRoot, "abs-marker-b.txt");
+    const command = `rg -n readiness --marker=${absMarker} relative-notes-b.txt | tee output-b.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: chatRoot,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2, `armed + not-ready wrongly admitted: ${result.stderr}`);
+    assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    // Design decision (NOVA-LCR-HGO-2): a capability consumed here and then refused
+    // downstream stays spent (consumeHumanGuardOverride() already marked it "consumed"
+    // on disk, irreversibly, before this denial was even constructed) -- but its
+    // consumption must not vanish silently, so the audit line still surfaces here,
+    // alongside the readiness refusal that actually decided the outcome.
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+    // Single-use: the spent capability is gone even though it was refused downstream --
+    // it was never "returned" for being refused.
+    const second = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(second.exitCode, 2, "a downstream-refused capability was still reusable");
+    assert.doesNotMatch(second.stderr, /capability consumed/u);
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-HGOSIG-ROUTE-1 (ADR-0059 Decision 4): a denial that cannot offer a route must say
+// that it could not, and why. grammarOverrideRoute() used to set overrideGuidance only when
+// recordHumanGuardDenial() answered `planned`, and wrapped the call in a bare
+// `catch { /* no route offered */ }` -- so two paths printed a denial with no next step AND
+// no word that a route had even been attempted, indistinguishable from a denial that was
+// never eligible for one. That silence is the single outcome Decision 4's "every denial
+// reports its next step" does not allow, and it was observed in the field, not theorised
+// (a grammar denial against a path outside the repository root).
+//
+// The two outcomes are reported distinguishably, because they mean different things: a
+// non-`planned` status is the route machinery ANSWERING ("not this way"), a throw is the
+// route machinery being unable to answer at all.
+//
+// The originally observed fixture no longer reproduces, and the check was re-pointed rather
+// than relaxed. b108b3e (ADR-0059 Decision 6) made a path outside the repository root an
+// eligible "cross-repository-target", so the exact field case above now returns `planned`
+// and prints a route -- it can no longer stand in for "planning answered, but not with a
+// route". It is replaced below by a fixture that still genuinely produces a planner ANSWER,
+// and deliberately by the one Decision 6 left untouched on purpose: an IN-ROOT symlink that
+// escapes root. crossBoundaryTarget() rescues a genuine cross-repository target, never a
+// candidate safePath() refused for failing its in-root symlink-safety walk, so that case is
+// still HGO-NONOVERRIDABLE-CROSS-BOUNDARY and still yields exactly the status/code pair this
+// check has always pinned. The property under test is unchanged: a refusal that cannot offer
+// a route says so, and says why.
+//
+// What the reason may disclose is bounded by construction, not by care --
+// humanGuardRouteUnavailableReason() in lib/human-guard-override.mjs renders a typed status
+// and a typed code and nothing else. The tests below assert that bound positively (against
+// injected hostile outcomes) rather than by listing forbidden strings.
+
+const ROUTE_REASON_HEADLINE = "No human override route is offered for this exact command;";
+
+/** The added block only: the headline through the end of the denial. */
+function routeReasonBlock(stderr) {
+  const index = stderr.indexOf(ROUTE_REASON_HEADLINE);
+  assert.notEqual(index, -1, `no route-unavailable reason was printed:\n${stderr}`);
+  return stderr.slice(index).trim();
+}
+
+/**
+ * The disclosure bound. Stated positively: the whole added block is exactly two lines and
+ * contains no path separator at all, so it cannot spell an absolute host path on either
+ * platform, and cannot carry a stack frame (every frame carries one).
+ */
+function assertReasonDisclosesNothing(stderr, projectDir) {
+  const block = routeReasonBlock(stderr);
+  assert.equal(block.split("\n").length, 2, `the reason must be exactly two lines:\n${block}`);
+  assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
+  assert.ok(!block.includes(projectDir), `the reason leaked the repository root:\n${block}`);
+  assert.doesNotMatch(
+    block,
+    /\bat\s+\S+\s+\(|node:internal|\.mjs:\d+|Error:/u,
+    `the reason leaked a stack frame or an exception message:\n${block}`,
+  );
+}
+
+test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning throws prints a typed reason, not silence", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n"); // governed, but no git repository at all
+    const result = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    // Names the observed failure, and says the planner FAILED rather than answered.
+    assert.match(result.stderr, /Reason: planning the route failed with code=HGO-GIT\./u);
+    assert.doesNotMatch(result.stderr, /the override planner returned status=/u);
+    // ... and still offers no route, because there is none to offer.
+    assert.doesNotMatch(result.stderr, /Human override available/u);
+    assert.doesNotMatch(result.stderr, /guard-human-override\.mjs/u);
+    assert.doesNotMatch(result.stderr, /--request-sha256/u);
+    assertReasonDisclosesNothing(result.stderr, path);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-planned status reports that status", () => {
+  const roots = [];
+  try {
+    const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-outside-"));
+    roots.push(outside);
+
+    // (a) A path that reaches outside the repository root through an IN-ROOT SYMLINK. HGO
+    // classifies this as a project-boundary crossing and never plans it: safePath() refuses
+    // it on its symlink-safety walk, and crossBoundaryTarget() does not rescue it, because
+    // the candidate itself does not escape root -- only what it points at does. (The plain
+    // out-of-root path this case used before b108b3e is now a plannable
+    // "cross-repository-target"; NOVA-XREPO-HGO-6 pins that new contract.)
+    const crossRoot = hgoGitFixture("signature");
+    roots.push(crossRoot);
+    symlinkSync(outside, join(crossRoot, "escape"), "dir");
+    const cross = evaluateLifecycleReadyGuard(
+      bash(`rg -n lifecycle ${join(crossRoot, "escape", "notes.txt")} | tee output.txt`),
+      { projectDir: crossRoot },
+    );
+    assert.equal(cross.exitCode, 2);
+    assert.match(cross.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.match(
+      cross.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-PROJECT-BOUNDARY \(/u,
+    );
+    assert.doesNotMatch(cross.stderr, /planning the route failed/u,
+      "a planner ANSWER must not be reported as a planner FAILURE");
+    assert.doesNotMatch(cross.stderr, /Human override available/u);
+    assert.doesNotMatch(cross.stderr, /--request-sha256/u);
+    assertReasonDisclosesNothing(cross.stderr, crossRoot);
+
+    // (b) A structurally different non-planned code from the same guard, so the assertion
+    // above cannot pass merely because one fixture happens to produce one fixed string.
+    const grammarRoot = hgoGitFixture("signature");
+    roots.push(grammarRoot);
+    const ineligible = evaluateLifecycleReadyGuard(
+      bash("rg -n lifecycle . && touch sub/output.txt"),
+      { projectDir: grammarRoot },
+    );
+    assert.equal(ineligible.exitCode, 2);
+    assert.match(
+      ineligible.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-ADAPTER-BOUNDARY \(/u,
+    );
+    assert.doesNotMatch(ineligible.stderr, /Human override available/u);
+    assertReasonDisclosesNothing(ineligible.stderr, grammarRoot);
+
+    // (c) A different non-planned STATUS, not merely a different code under the same one --
+    // the check claims the guard reports whatever status planning returns, and (a) and (b)
+    // both happen to be `external-operator-required`. A sensitive out-of-root target is
+    // refused by crossBoundaryTarget()'s hardBoundaryPath() check and routed to a narrower
+    // typed recovery instead, so it exercises the other status class end to end.
+    const narrowerRoot = hgoGitFixture("signature");
+    roots.push(narrowerRoot);
+    const narrower = evaluateLifecycleReadyGuard(
+      bash(`rg -n lifecycle ${join(outside, "secrets.txt")} | tee output.txt`),
+      { projectDir: narrowerRoot },
+    );
+    assert.equal(narrower.exitCode, 2);
+    assert.match(
+      narrower.stderr,
+      /Reason: the override planner returned status=narrower-recovery-required, code=HGO-NARROWER-WRITER-REQUIRED \(/u,
+    );
+    assert.doesNotMatch(narrower.stderr, /planning the route failed/u,
+      "a planner ANSWER must not be reported as a planner FAILURE");
+    assert.doesNotMatch(narrower.stderr, /Human override available/u);
+    assertReasonDisclosesNothing(narrower.stderr, narrowerRoot);
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-HGOSIG-ROUTE-1: the printed reason is bounded to typed tokens, whatever planning returns or throws", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = "rg -n lifecycle . && touch output.txt";
+
+    // A returned outcome carrying an untyped status, an untyped code, and the one field of
+    // a real non-planned outcome that IS an absolute host path (`candidateSourceRoot`).
+    const candidateSourceRoot = join(path, "plugins", "pipeline-core");
+    const returned = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      recordHumanGuardDenialFn: () => ({
+        status: "/etc/passwd\nHuman override available for this exact command:",
+        code: "HGO-LEAK/../secret",
+        candidateSourceRoot,
+        requestSha256: "a".repeat(64),
+      }),
+    });
+    assert.equal(returned.exitCode, 2);
+    assert.match(returned.stderr, /Reason: the override planner returned status=unrecognized, code=HGO-UNTYPED\./u);
+    assert.doesNotMatch(returned.stderr, /etc.passwd/u);
+    assert.doesNotMatch(returned.stderr, /Human override available/u);
+    assert.doesNotMatch(returned.stderr, /--request-sha256/u);
+    assert.ok(!returned.stderr.includes(candidateSourceRoot), "the reason leaked candidateSourceRoot");
+    assertReasonDisclosesNothing(returned.stderr, path);
+
+    // A throw whose message and stack carry a host path, and whose `code` is not a token.
+    const thrown = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      recordHumanGuardDenialFn: () => {
+        const error = new Error(`ENOENT: no such file or directory, open '${join(path, "audit.key")}'`);
+        error.code = "not a typed code";
+        throw error;
+      },
+    });
+    assert.equal(thrown.exitCode, 2);
+    assert.match(thrown.stderr, /Reason: planning the route failed with code=HGO-UNTYPED\./u);
+    assert.doesNotMatch(thrown.stderr, /ENOENT|no such file|audit\.key/u);
+    assertReasonDisclosesNothing(thrown.stderr, path);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_SCRIPT still requires externalRestartOnly()", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const command = `rg -n lifecycle --note=${ONBOARDING_LAUNCH_SCRIPT} relative-notes.txt | tee output.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 2, `armed LAUNCH_SCRIPT command was wrongly admitted: ${result.stderr}`);
+    assert.match(result.stderr, /EXTERNAL ACTION REQUIRED/u);
+    assert.match(result.stderr, /restart-process is external-terminal\/user-copy-only/u);
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+// MEMPATH-1 (PO decision, 2026-08-08 -- backlog/items/2026-07-29-guard-lifecycle-ready-
+// blocks-claude-memory-writes.md). Claude Code's own PreToolUse payload carries
+// `transcript_path`; `dirname(transcript_path)/memory/` is admitted, and NOTHING else --
+// never a `~/.claude/**` prefix, never a path the agent's own tool call or environment
+// supplies. The readiness gate below it (evaluateAfterGrammarAdmission) is unaffected: an
+// admitted memory write still needs an exact session-ready receipt like any other write.
+
+test("MEMPATH-1: a governed session admits its own derived Claude memory directory, and only that directory", () => {
+  const path = root();
+  const { sessionDir, transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const memoryFile = join(memoryDir, "learned-preferences.md");
+    for (const build of [editWithTranscript, writeWithTranscript]) {
+      assert.deepEqual(evaluateLifecycleReadyGuard(build(memoryFile, transcriptPath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, build.name);
+    }
+    assert.equal(isClaudeSessionMemoryWritePath(memoryFile, { transcript_path: transcriptPath }), true);
+    assert.equal(claudeSessionMemoryDirectory({ transcript_path: transcriptPath }), realpathSync(memoryDir));
+    // A relative file_path is never how Edit/Write actually calls this tool -- the CLI
+    // always supplies an absolute path -- and the derivation refuses to guess through one.
+    assert.equal(isClaudeSessionMemoryWritePath("learned-preferences.md", { transcript_path: transcriptPath }), false);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: the derived memory admission still requires session readiness, not a substitute for it", () => {
+  const path = root();
+  const { sessionDir, transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const memoryFile = join(memoryDir, "learned-preferences.md");
+    const result = evaluateLifecycleReadyGuard(editWithTranscript(memoryFile, transcriptPath), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: a symlink planted inside the derived memory directory cannot redirect a write outside it", () => {
+  const path = root();
+  const { sessionDir, transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-memory-escape-"));
+  let readinessCalls = 0;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(outside, join(memoryDir, "escape"));
+    const escapedTarget = join(memoryDir, "escape", "evil.md");
+    assert.equal(isClaudeSessionMemoryWritePath(escapedTarget, { transcript_path: transcriptPath }), false);
+    const result = evaluateLifecycleReadyGuard(editWithTranscript(escapedTarget, transcriptPath), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: an absent, empty, relative, or not-yet-materialized transcript_path fails closed rather than guessing", () => {
+  const notCreated = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-session-uncreated-"));
+  const arbitraryAbsoluteTarget = join(tmpdir(), "guard-lifecycle-mempath-unrelated-notes.md");
+  try {
+    const cases = [
+      { label: "absent field", input: {} },
+      { label: "empty string", input: { transcript_path: "" } },
+      { label: "relative path", input: { transcript_path: "relative/session/abc.jsonl" } },
+      { label: "session directory exists but memory/ was never created", input: { transcript_path: join(notCreated, "abc.jsonl") } },
+      { label: "session directory itself does not exist", input: { transcript_path: join(notCreated, "does-not-exist", "abc.jsonl") } },
+      { label: "null byte", input: { transcript_path: `${join(notCreated, "abc")}\0.jsonl` } },
+    ];
+    for (const { label, input } of cases) {
+      assert.equal(claudeSessionMemoryDirectory(input), null, label);
+      assert.equal(isClaudeSessionMemoryWritePath(arbitraryAbsoluteTarget, input), false, label);
+    }
+  } finally { rmSync(notCreated, { recursive: true, force: true }); }
+});
+
+test("MEMPATH-1: a not-yet-materialized memory directory is refused end to end by the guard, not just by the helper", () => {
+  const path = root();
+  const notCreated = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-session-uncreated-"));
+  const transcriptPath = join(notCreated, "abc.jsonl");
+  let readinessCalls = 0;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const target = join(notCreated, "memory", "learned-preferences.md");
+    const result = evaluateLifecycleReadyGuard(editWithTranscript(target, transcriptPath), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(notCreated, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: every other standard-Claude-path shape stays refused -- settings, agents, plugins, marketplace, another repository, and a merely-similarly-named directory", () => {
+  const path = root();
+  // A synthetic home layout standing in for `~/.claude/**` and the marketplace beside it --
+  // never the real `$HOME`, and this session's OWN derived memory directory sits inside it
+  // too, exactly as it does on a real machine, so the containment check is exercised against
+  // realistic siblings rather than an isolated fixture.
+  const home = mkdtempSync(join(tmpdir(), "guard-lifecycle-synthetic-home-"));
+  const sessionDir = join(home, ".claude", "projects", "-synthetic-project");
+  mkdirSync(join(sessionDir, "memory"), { recursive: true });
+  const transcriptPath = join(sessionDir, "9f86d081-884c-4d30-8c19-ffcaa4c07bd1.jsonl");
+  mkdirSync(join(home, ".claude", "agents"), { recursive: true });
+  mkdirSync(join(home, ".claude", "plugins"), { recursive: true });
+  mkdirSync(join(home, "agent-pipeline-local-marketplace", "plugins", "pipeline-core"), { recursive: true });
+  writeFileSync(join(home, ".claude", "settings.json"), "{}\n");
+  const otherRepo = mkdtempSync(join(tmpdir(), "guard-lifecycle-other-repo-"));
+  // A second, differently-hashed project directory whose OWN memory dir merely shares the
+  // leaf name "memory" with the derived one -- the exact "contains the segment but is not
+  // the derived directory" case the DoD names.
+  const otherProjectMemory = join(home, ".claude", "projects", "-synthetic-other-project", "memory");
+  mkdirSync(otherProjectMemory, { recursive: true });
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const targets = [
+      ["settings.json", join(home, ".claude", "settings.json")],
+      ["agents/", join(home, ".claude", "agents", "malicious.toml")],
+      ["plugins/", join(home, ".claude", "plugins", "malicious.json")],
+      ["local marketplace directory", join(home, "agent-pipeline-local-marketplace", "plugins", "pipeline-core", "marketplace.json")],
+      ["another repository", join(otherRepo, "src", "file.mjs")],
+      ["sibling dir merely named similarly", join(sessionDir, "memory-lookalike", "note.md")],
+      ["a different project's own memory directory", join(otherProjectMemory, "note.md")],
+    ];
+    for (const [label, target] of targets) {
+      assert.equal(isClaudeSessionMemoryWritePath(target, { transcript_path: transcriptPath }), false, label);
+      let readinessCalls = 0;
+      const result = evaluateLifecycleReadyGuard(editWithTranscript(target, transcriptPath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+      });
+      assert.equal(result.exitCode, 2, label);
+      assert.match(result.stderr, /only inside its own physical project root/u, label);
+      assert.equal(readinessCalls, 0, label);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(otherRepo, { recursive: true, force: true });
+  }
+});
+
+// MACHPATH-1 (specs/sprint-nova-epic/plans/nova-setup-bootstrap.md SS6a, "Where the machine
+// plane lives", PO decision 2026-08-08). The second write surface this guard admits outside
+// the project root: exactly one file, `<homedir>/.agent-pipeline/machine.json`, derived only
+// from an injected `homedirFn` -- never tool_input, never process.env, never repository
+// config. Fixtures below stand in for the home directory under the repository's own
+// gitignored scratch/ tree (machinePlaneHomeFixture()), never system tmpdir and never the
+// real $HOME, per the briefing's field-4 constraint.
+
+test("MACHPATH-1: a governed session admits the exact machine-plane file, for every write-capable tool", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const build of [edit, write, notebookEdit]) {
+      assert.deepEqual(evaluateLifecycleReadyGuard(build(target), {
+        projectDir: path,
+        homedirFn: () => home,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, build.name);
+    }
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), true);
+    assert.equal(machinePlaneFilePath({ homedirFn: () => home }), target);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: nothing else under the derived home directory is admitted -- the directory itself, a sibling, a nested file, a similarly-named neighbour, and a bare-home file", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  const agentPipelineDir = dirname(target);
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const targets = [
+      ["the .agent-pipeline directory itself", agentPipelineDir],
+      ["sibling file", join(agentPipelineDir, "other.json")],
+      ["deeper nested file", join(agentPipelineDir, "sub", "machine.json")],
+      ["similarly-named neighbour directory", join(home, ".agent-pipeline-backup", "machine.json")],
+      ["bare home directory file", join(home, "machine.json")],
+    ];
+    for (const [label, candidate] of targets) {
+      assert.equal(isMachinePlaneWritePath(candidate, { homedirFn: () => home }), false, label);
+      let readinessCalls = 0;
+      const result = evaluateLifecycleReadyGuard(edit(candidate), {
+        projectDir: path,
+        homedirFn: () => home,
+        requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+      });
+      assert.equal(result.exitCode, 2, label);
+      assert.match(result.stderr, /only inside its own physical project root/u, label);
+      assert.equal(readinessCalls, 0, label);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: a lexical escape through the derived file path is refused", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const escapeTarget = `${target}/../../.claude/settings.json`;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    assert.equal(isMachinePlaneWritePath(escapeTarget, { homedirFn: () => home }), false);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(edit(escapeTarget), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() {
+        readinessCalls += 1;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: a symlinked .agent-pipeline ancestor cannot redirect the write outside the derived home directory", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const outside = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-machine-escape-"));
+  let readinessCalls = 0;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(outside, dirname(target));
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), false);
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() {
+        readinessCalls += 1;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// Pinned, not aspirational: unlike the escape-outside-home case just above, a symlinked
+// `.agent-pipeline` that redirects to another location still INSIDE the same realpathed home
+// directory is accepted by the walk rooted there, exactly as isMachinePlaneWritePath()'s own
+// doctrine comment now states plainly rather than implies. The redirected write still lands at
+// a leaf literally named `machine.json`, since only `.agent-pipeline` can be a symlink here.
+test("MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same home directory is a pinned, accepted limit -- the write is admitted, not refused", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const insideElsewhere = mkdtempSync(join(home, "guard-lifecycle-machine-inside-"));
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(insideElsewhere, dirname(target));
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    }), { exitCode: 0, stderr: "" });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// Closed, not pinned: unlike the directory-redirect case just above, `machine.json` ITSELF
+// already existing as a symlink is refused unconditionally, whatever it points at -- the
+// shared containment walk alone cannot catch this (it only climbs when the candidate does not
+// yet exist), so isMachinePlaneWritePath() checks the leaf explicitly before that walk runs.
+test("MACHPATH-1: machine.json planted as a symlink to another existing file inside the same home directory is refused -- closed, not pinned", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  mkdirSync(dirname(target), { recursive: true });
+  const otherExistingFile = join(home, "settings.json");
+  writeFileSync(otherExistingFile, "{}\n");
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(otherExistingFile, target);
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), false);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: machine.json planted as a symlink to a path outside the home directory is refused -- closed, not pinned", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  mkdirSync(dirname(target), { recursive: true });
+  const outsideDir = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-machine-leaf-escape-"));
+  const outsideFile = join(outsideDir, "settings.json");
+  writeFileSync(outsideFile, "{}\n");
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(outsideFile, target);
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), false);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: an absent, empty, relative, or unresolvable home directory fails closed rather than guessing", () => {
+  const arbitraryAbsoluteTarget = join(SCRATCH_ROOT, "guard-lifecycle-machine-unrelated-notes.md");
+  const cases = [
+    { label: "homedirFn returns undefined", homedirFn: () => undefined },
+    { label: "homedirFn returns empty string", homedirFn: () => "" },
+    { label: "homedirFn returns a relative path", homedirFn: () => "relative/home" },
+    { label: "homedirFn throws", homedirFn: () => { throw new Error("no home"); } },
+    // A value that does not itself exist on disk is equally unusable -- fails closed rather
+    // than admitting a guessed, never-realpathed anchor.
+    {
+      label: "homedirFn names a directory that does not exist",
+      homedirFn: () => join(SCRATCH_ROOT, "guard-lifecycle-machine-home-does-not-exist"),
+    },
+  ];
+  for (const { label, homedirFn } of cases) {
+    assert.equal(machinePlaneFilePath({ homedirFn }), null, label);
+    assert.equal(isMachinePlaneWritePath(arbitraryAbsoluteTarget, { homedirFn }), false, label);
+  }
+});
+
+test("MACHPATH-1: the machine-plane admission still requires session readiness, not a substitute for it", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: the shell lane stays unchanged -- a Bash write to the same machine-plane path is still refused as a cross-repository mutation, with the same code as before this change", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `touch ${target}`;
+    assert.equal(isForbiddenCrossRepositoryMutation(command, path), true);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() {
+        readinessCalls += 1;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// AC-10: the wiring, not the mechanism. A test that only exercised each side
+// separately (the guard's own admission function in isolation, the library's own
+// resolver in isolation) would not catch the two drifting apart if a future edit gave
+// the guard a second, independent derivation. This test instead writes a real plane
+// through the LIBRARY's own writer, resolves the path independently through the
+// LIBRARY's own resolver (never the guard's re-export), and then asserts the GUARD
+// admits a write at exactly that path -- so the guard's admission and the writer's
+// destination are proven to be the same file, not merely the same function reference.
+test("MACHPATH-1/AC-10: the path the guard admits is exactly the path the machine-plane writer writes to -- proven via the library's own writer and resolver, not the guard's re-export", () => {
+  const path = root();
+  const { home } = machinePlaneHomeFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const dependencies = { homedirFn: () => home };
+    const libPath = libMachinePlaneFilePath(dependencies);
+    const plane = {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: null,
+      pushApprovalDefault: "chat",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+    writeMachinePlane(plane, dependencies);
+    assert.equal(existsSync(libPath), true, "the library writer must have created its own resolved path");
+    assert.equal(isMachinePlaneWritePath(libPath, dependencies), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(edit(libPath), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    }), { exitCode: 0, stderr: "" });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+/**
+ * GSSHELL-STAGE-1. Staging is not a content change, so the gate-strength shell rule
+ * has no business refusing it.
+ *
+ * Measured on 2026-08-09: `git add … pipeline.user.yaml` was refused in the PO's
+ * greenfield Codex run, the agent shrank the publication scope around the refusal,
+ * and the pushed branch silently lost every Pipeline artifact. Neither greenfield
+ * repository has a commit at all. The refusal even told the reader to "use the Edit
+ * or Write tool instead", which answers a different question -- those change the
+ * bytes, `git add` cannot.
+ *
+ * Both directions, because an admission test alone would pass just as happily on a
+ * rule that had stopped refusing the writes too. Every verb that CAN put different
+ * bytes in the working tree stays refused, and the content path is untouched:
+ * writing this file still goes through guard-gate-strength.mjs and its ceremony.
+ */
+test("GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, while every verb that can rewrite it stays refused", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-gsstage-"));
+  // The rule only defends a repository the Pipeline governs, so the fixture must
+  // carry the marker -- without it every assertion below passes vacuously, which is
+  // how the first version of this test was green while proving nothing.
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      "git add pipeline.user.yaml",
+      "git add README.md game.js pipeline.user.yaml specs",
+      `git -C ${path} add pipeline.user.yaml`,
+      "git commit -m 'chore: record pipeline.user.yaml'",
+      "git rm --cached pipeline.user.yaml",
+      "git status --short pipeline.user.yaml",
+      "git add project/guard-config.json",
+    ]) {
+      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+    for (const command of [
+      "git checkout HEAD -- pipeline.user.yaml",
+      "git restore pipeline.user.yaml",
+      "git restore --source=HEAD pipeline.user.yaml",
+      "git stash pop pipeline.user.yaml",
+      // NVA-LCGUARD-4 gap 1: was "git apply pipeline.user.yaml.patch" -- a DIFFERENT,
+      // unrelated file that merely had the protected name as a prefix of its own longer
+      // name. The gate-strength shell rule now requires an exact/path-boundary match
+      // (see the dedicated NVA-LCGUARD-4 gap 1 test below), so that derivative filename
+      // is correctly no longer swept in here; this line keeps testing the same thing the
+      // test intends -- `git apply` naming the real protected file stays refused.
+      "git apply pipeline.user.yaml",
+      "git reset --hard -- pipeline.user.yaml",
+      "git clean -fd pipeline.user.yaml",
+      "git rm pipeline.user.yaml",
+      "sed -i s/a/b/ pipeline.user.yaml",
+      "cp other.yaml pipeline.user.yaml",
+      "printf x > pipeline.user.yaml",
+    ]) {
+      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL|GUARD-/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-LCGUARD-4 gap 1 (backlog: 2026-08-17-two-guards-block-an-unrelated-file-via-substring-
+ * name-matching.md, part A). `gateStrengthShellRefusal()` matched a protected basename as a
+ * raw substring anywhere in the command text, so a file that only shares the protected name
+ * as a PREFIX of its own longer, unrelated name -- a backup copy such as
+ * `pipeline.user.yaml.bak` -- was refused as if it were the real protected file. Fixed to
+ * require the needle to appear as a whole filename/path segment (bounded on both sides by
+ * anything that could not itself continue the same filename token), not a raw `.includes()`.
+ *
+ * Both directions, for the same reason GSSHELL-STAGE-1 above checks both: an admission-only
+ * test would pass just as happily on a rule that had stopped refusing the real file too.
+ */
+test("NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a substring is admitted, while the real protected file stays refused", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-gsshell-bak-"));
+  // The rule only defends a repository the Pipeline governs, so the fixture must carry the
+  // marker -- see GSSHELL-STAGE-1 above for why an unmarked fixture would pass vacuously.
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      "rm project/pipeline.user.yaml.bak",
+      "rm project\\pipeline.user.yaml.bak",
+      "sed -i s/a/b/ pipeline.user.yaml.bak",
+      "cp pipeline.user.yaml.bak restored.yaml",
+    ]) {
+      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+    for (const command of [
+      // the real protected file itself, by its bare name and by an absolute-looking path --
+      // this positive case must stay refused; the fix narrows the match, it does not remove it.
+      "sed -i s/a/b/ pipeline.user.yaml",
+      "rm project/pipeline.user.yaml",
+      "rm project\\pipeline.user.yaml",
+      "cp other.yaml pipeline.user.yaml",
+    ]) {
+      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-STARNEEDLE-1 (backlog: 2026-08-27-gate-strength-shell-lane-refuses-any-command-
+// containing-a-quoted-wildcard.md). GS-15's path is `project/.onboarding-staging/*`, whose
+// basename() is the bare wildcard character "*" -- a needle that then matched ANY quoted
+// "*" anywhere in a command's text, whatever the command actually targeted. Fixed to derive
+// the needle from the DIRECTORY a glob-suffixed entry describes, mirroring
+// guard-gate-strength.mjs's own write-lane gateStrengthRuleFor() (which already strips the
+// trailing "/*" and matches the directory prefix), plus a general, entry-agnostic filter
+// that a needle carrying no alphanumeric character can never be produced at all.
+// ---------------------------------------------------------------------------------
+
+/**
+ * NVA-STARNEEDLE-1 AC-2. Both measured reproductions from the defect record: a scratch-note
+ * append whose text documents a hook-matcher literal "*", and an rg diagnostic searching for
+ * the literal character, piped to a non-bounded sink (`wc -l`) so it is not already
+ * exempted by the read-only classifier above. Neither command names a gate-strength path.
+ */
+test("NVA-STARNEEDLE-1: a command whose text merely quotes an asterisk is never refused by this lane", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-starneedle-fp-"));
+  // The rule only defends a repository the Pipeline governs, so the fixture must carry the
+  // marker -- see GSSHELL-STAGE-1 above for why an unmarked fixture would pass vacuously.
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      // Append to a gitignored scratch note whose text quotes an asterisk as a documented
+      // hook-matcher literal.
+      "printf '%s\\n' 'matcher: \"*\"' >> scratch/hook-notes.md",
+      // An rg diagnostic searching for a literal "*" character, piped to a sink this
+      // guard's own bounded-pipeline classifier does not admit -- so it is not already
+      // exempted as read-only before ever reaching the needle match this test pins.
+      "rg -n \"a literal * character\" backlog/items | wc -l",
+    ]) {
+      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-STARNEEDLE-1 AC-1. The glob-suffixed GS-15 entry now contributes a needle that
+ * matches its DIRECTORY (".onboarding-staging"), never the bare wildcard -- and a shell
+ * command naming a REAL file under that directory stays refused exactly as before the fix,
+ * both by its bare relative path and by an absolute-looking one.
+ */
+test("NVA-STARNEEDLE-1: a shell command naming a real file under the GS-15 staging directory stays refused", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-starneedle-gs15-"));
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  mkdirSync(join(path, "project", ".onboarding-staging"), { recursive: true });
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    for (const command of [
+      "sed -i s/a/b/ project/.onboarding-staging/prd_test.md",
+      "rm project/.onboarding-staging/prd_test.md",
+      `rm ${join(path, "project", ".onboarding-staging", "prd_test.md")}`,
+    ]) {
+      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-STARNEEDLE-1 AC-3. Every entry of GATE_STRENGTH_PATHS (imported straight from
+ * guard-gate-strength.mjs, the single shared definition -- TPSHELL-5's own discipline)
+ * still refuses a shell command naming a real instance of it. Iterates the live table
+ * rather than spot-checking one entry, so a future entry cannot silently drop out of this
+ * lane's coverage the way GS-15 did.
+ */
+test("NVA-STARNEEDLE-1 AC-3: every configured gate-strength path still refuses a shell command naming a real instance of it", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-starneedle-ac3-"));
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.ok(GATE_STRENGTH_PATHS.length > 0, "fixture check: the shared table must not be empty");
+    for (const rule of GATE_STRENGTH_PATHS) {
+      const instancePath = rule.path.endsWith("/*") ? `${rule.path.slice(0, -2)}/example.md` : rule.path;
+      assert.match(run(`rm ${instancePath}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u, `${rule.id}: ${instancePath}`);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-STARNEEDLE-1 AC-4. The derivation rule pinned directly, independent of today's
+ * specific GATE_STRENGTH_PATHS table: a glob-suffixed path's needle is its directory's own
+ * basename, never the wildcard segment; a non-glob path's needle is unchanged (basename of
+ * the path itself); and the general filter excludes any needle carrying no alphanumeric
+ * character at all -- so a future glob-suffixed entry gets the same treatment automatically
+ * and can never silently reintroduce a punctuation-only needle.
+ */
+test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter, pinned directly", () => {
+  assert.equal(gateStrengthShellNeedleFor("project/.onboarding-staging/*"), ".onboarding-staging");
+  assert.equal(gateStrengthShellNeedleFor("pipeline.user.yaml"), "pipeline.user.yaml");
+  assert.equal(gateStrengthShellNeedleFor(".claude/policy-lock.json"), "policy-lock.json");
+  // A hypothetical future glob-suffixed entry with a longer directory name gets the
+  // identical treatment, automatically, by shape -- never by naming a specific rule id.
+  assert.equal(gateStrengthShellNeedleFor("project/.future-staging-dir/*"), ".future-staging-dir");
+  // The defensive filter: only a needle carrying at least one alphanumeric character is
+  // ever admitted into the match set. A bare wildcard, a lone punctuation character, or an
+  // empty string can never pass -- this is the rule that makes this whole class
+  // unreintroducible, independent of which entry produced the degenerate needle.
+  assert.equal(isMeaningfulGateStrengthShellNeedle("*"), false);
+  assert.equal(isMeaningfulGateStrengthShellNeedle("."), false);
+  assert.equal(isMeaningfulGateStrengthShellNeedle(""), false);
+  assert.equal(isMeaningfulGateStrengthShellNeedle(".onboarding-staging"), true);
+  assert.equal(isMeaningfulGateStrengthShellNeedle("pipeline.user.yaml"), true);
+  // Every needle GATE_STRENGTH_PATHS actually derives today passes the filter -- the live
+  // table has nothing degenerate in it once the derivation rule above is applied.
+  for (const rule of GATE_STRENGTH_PATHS) {
+    const needle = gateStrengthShellNeedleFor(rule.path);
+    assert.ok(isMeaningfulGateStrengthShellNeedle(needle), `${rule.id} produced a non-meaningful needle: ${JSON.stringify(needle)}`);
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
+// Passive read commands may name host-visible paths. Mutation and execution
+// remain governed by their separate closed grammar and scope checks.
+// ---------------------------------------------------------------------------------
+
+function readScopeFixture() {
+  const projectDir = hgoGitFixture("signature");
+  markGovernedFixture(projectDir);
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-read-scope-outside-"));
+  const outsideFile = join(outside, "pipeline-greenfield-review.md");
+  writeFileSync(outsideFile, "# User report\nOverall pass\n");
+  writeFileSync(join(projectDir, "verify-latest.json"), "{\"Overall\":\"pass\"}\n");
+  return { projectDir, outside, outsideFile };
+}
+
+function readScopeRun(command, projectDir, { lifecycleStatus = "ready" } = {}) {
+  const readiness = lifecycleStatus === "ready"
+    ? hgoReadyDeps()
+    : { requireProjectOnboardingReadyFn() { deny(lifecycleStatus); } };
+  return evaluateLifecycleReadyGuard(bash(command), { projectDir, ...readiness });
+}
+
+function transcriptReadFixture() {
+  const { transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  writeFileSync(transcriptPath, "{\"type\":\"user\",\"message\":\"fixture\"}\n");
+  return { transcriptPath: realpathSync(transcriptPath), memoryDir: realpathSync(memoryDir) };
+}
+
+function bashWithTranscript(command, transcriptPath) {
+  return { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath };
+}
+
+test("registered plugin diagnostic scope admits bounded reads but rejects private paths and aliases", () => {
+  const { projectDir } = readScopeFixture();
+  const pluginRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-registered-plugin-read-"));
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-registered-plugin-outside-"));
+  const publicFile = join(pluginRoot, "hooks", "diagnostic.mjs");
+  const gitFile = join(pluginRoot, ".git", "config");
+  const secretFile = join(pluginRoot, "secrets", "private-note.md");
+  const outsideFile = join(outside, "public.md");
+  const movingLink = join(pluginRoot, "hooks", "moving.mjs");
+  const outsideAlias = join(outside, "plugin-alias");
+  mkdirSync(dirname(publicFile), { recursive: true });
+  mkdirSync(dirname(gitFile), { recursive: true });
+  mkdirSync(dirname(secretFile), { recursive: true });
+  writeFileSync(publicFile, "export const diagnostic = true;\n");
+  writeFileSync(gitFile, "[remote origin]\n");
+  writeFileSync(secretFile, "private\n");
+  writeFileSync(outsideFile, "outside\n");
+  const deps = {
+    projectDir,
+    registeredPluginReadScopeRootsFn: () => [realpathSync(pluginRoot)],
+  };
+  const read = file => evaluateLifecycleReadyGuard({ tool_name: "Read", tool_input: { file_path: file } }, deps);
+  const grep = path => evaluateLifecycleReadyGuard({ tool_name: "Grep", tool_input: { path } }, deps);
+  const glob = (path, pattern = "*.mjs") => evaluateLifecycleReadyGuard({ tool_name: "Glob", tool_input: { path, pattern } }, deps);
+  try {
+    assert.equal(read(publicFile).exitCode, 0);
+    assert.equal(grep(publicFile).exitCode, 0);
+    assert.equal(grep(pluginRoot).exitCode, 0);
+    assert.equal(glob(pluginRoot).exitCode, 0);
+    assert.equal(read(gitFile).exitCode, 2);
+    assert.equal(grep(secretFile).exitCode, 2);
+    assert.equal(glob(join(pluginRoot, ".git"), "config").exitCode, 2);
+    symlinkSync(publicFile, movingLink);
+    assert.equal(read(movingLink).exitCode, 0);
+    rmSync(movingLink);
+    symlinkSync(outsideFile, movingLink);
+    assert.equal(read(movingLink).exitCode, 2);
+    symlinkSync(pluginRoot, outsideAlias);
+    assert.equal(grep(outsideAlias).exitCode, 2);
+    const symlinkRoot = join(outside, "registered-root-alias");
+    symlinkSync(pluginRoot, symlinkRoot);
+    const aliasedRootDeps = { ...deps, registeredPluginReadScopeRootsFn: () => [symlinkRoot] };
+    assert.equal(evaluateLifecycleReadyGuard({ tool_name: "Grep", tool_input: { path: symlinkRoot } }, aliasedRootDeps).exitCode, 2);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(pluginRoot, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("Claude task output is an exact session-bound passive read file, never a directory or executable scope", () => {
+  const { projectDir, outside } = readScopeFixture();
+  const taskDirectory = mkdtempSync(join("/var/tmp", "guard-lifecycle-task-output-"));
+  const taskId = "task_123";
+  const sessionId = "session_current";
+  const toolUseId = "toolu_123";
+  const transcriptPath = join(outside, "session.jsonl");
+  const taskOutputPath = join(taskDirectory, `${taskId}.output`);
+  const siblingPath = join(taskDirectory, "other.output");
+  writeFileSync(transcriptPath, "{}\n");
+  writeFileSync(taskOutputPath, "bounded task result\n");
+  writeFileSync(siblingPath, "another task result\n");
+  const readClaudeTaskOutputReadScopeFn = ({ sessionId: requestedSession, requestedPath }) => (
+    requestedSession === sessionId && requestedPath === taskOutputPath
+      ? {
+        status: "available", path: taskOutputPath, taskId, sessionId,
+        toolUseId, authorizedTaskDirectory: taskDirectory,
+      }
+      : { status: "absent", code: "CLAUDE-TASK-OUTPUT-SCOPE-ABSENT" }
+  );
+  const dependencies = { projectDir, ...hgoReadyDeps(), readClaudeTaskOutputReadScopeFn };
+  const event = (toolName, toolInput, requestedSession = sessionId) => ({
+    tool_name: toolName, tool_input: toolInput, session_id: requestedSession, transcript_path: transcriptPath,
+  });
+  try {
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("Grep", { path: taskOutputPath, pattern: "result" }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: siblingPath }), dependencies).exitCode, 2,
+      "a sibling task's output has no capability");
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }, "another_session"), dependencies).exitCode, 2,
+      "the task binding is current-session-specific");
+    assert.equal(evaluateLifecycleReadyGuard(event("Glob", { path: taskDirectory, pattern: "*.output" }), dependencies).exitCode, 2,
+      "task output authorization never grants directory or Glob scope");
+    assert.equal(evaluateLifecycleReadyGuard(event("Bash", { command: `cat ${taskOutputPath}` }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("Bash", { command: `cat ${taskOutputPath} ${siblingPath}` }), dependencies).exitCode, 2,
+      "the exact shell route cannot add sibling output paths");
+    assert.equal(isReadOnlyDiagnosticCommand(`node ${taskOutputPath}`, projectDir), false,
+      "the output is never an executable-input read root");
+    assert.equal(evaluateLifecycleReadyGuard(event("PowerShell", { command: `Get-Content -Path ${taskOutputPath}` }), dependencies).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(event("PowerShell", { command: `Get-Content ${taskDirectory}` }), dependencies).exitCode, 2);
+
+    const alias = join(taskDirectory, "alias.output");
+    symlinkSync(taskOutputPath, alias);
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: alias }), dependencies).exitCode, 2,
+      "a symlink alias is not the recorded physical task file");
+    const hardlink = join(taskDirectory, "hardlink.output");
+    linkSync(taskOutputPath, hardlink);
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }), dependencies).exitCode, 2,
+      "a multiply-linked task output is not a private exact file");
+    rmSync(hardlink);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+    rmSync(taskDirectory, { recursive: true, force: true });
+  }
+});
+
+test("standalone head and tail accept only bounded counts and passive file operands", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  const missing = join(outside, "missing-report.md");
+  const credential = join(outside, "id_ed25519");
+  const escaping = join(outside, "escaping-system-link");
+  writeFileSync(credential, "synthetic credential sentinel\n");
+  symlinkSync("/etc/hosts", escaping);
+  try {
+    for (const command of [
+      "head -n 1 " + outsideFile, "head -500 " + outsideFile,
+      "tail -n 1 " + outsideFile, "tail -500 " + outsideFile,
+      "head -n 5 " + outsideFile, "tail -n 5 " + outsideFile,
+      "head -n 5", "tail -500", // Existing no-path compatibility from the simple-command authority.
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
+    for (const command of [
+      "head -n 0 " + outsideFile, "tail -0 " + outsideFile,
+      "head -n 0500 " + outsideFile, "tail -501 " + outsideFile,
+      "head -f " + outsideFile, "tail --follow " + outsideFile,
+      "head -c 10 " + outsideFile, "tail -q " + outsideFile,
+      "head -n 5 " + missing, "tail -5 " + missing,
+      "head -n 5 " + credential, "tail -5 " + escaping,
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("read-only diagnostics accept host-visible external roots in every supported shell shape", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    for (const command of [
+      `cat ${outsideFile}`,
+      `head -n 5 ${outsideFile}`,
+      `rg -n Overall ${outsideFile}`,
+      `cat ${outsideFile} | head -n 5`,
+      `git log ${outsideFile} | head -n 5`,
+      `rg -n Overall ${outsideFile} | head -n 5`,
+      `rg -n Overall ${outsideFile} && git status`,
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
+      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+    }
+    assert.equal(readScopeRun("cat verify-latest.json", projectDir).exitCode, 0);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("external reports stay readable while key files and effectful read options are refused", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    const key = join(outside, "po-private.pem");
+    writeFileSync(key, "fixture key\n");
+    assert.equal(readScopeRun(`cat ${outsideFile}`, projectDir).exitCode, 0);
+    assert.equal(readScopeRun(`cat ${key}`, projectDir).exitCode, 2);
+    assert.equal(readScopeRun(`rg --pre sh fixture ${outsideFile}`, projectDir).exitCode, 2);
+    assert.equal(readScopeRun("grep -R fixture .", projectDir).exitCode, 2);
+    assert.equal(readScopeRun("git diff --output scratch/escaped.txt", projectDir).exitCode, 2);
+    assert.equal(readScopeRun("node --test-reporter-destination scratch/escaped.txt --test", projectDir).exitCode, 2);
+    writeFileSync(join(projectDir, "po-private.pem"), "fixture key\n");
+    assert.equal(readScopeRun("rg fixture", projectDir).exitCode, 2);
+    assert.equal(readScopeRun("rg --hidden --no-ignore fixture .", projectDir).exitCode, 2);
+    const priorConfig = process.env.RIPGREP_CONFIG_PATH;
+    try {
+      process.env.RIPGREP_CONFIG_PATH = join(outside, "rg.conf");
+      writeFileSync(process.env.RIPGREP_CONFIG_PATH, "--hidden\n--no-ignore\n");
+      assert.equal(isReadOnlyDiagnosticCommand("rg fixture .", projectDir), false);
+      assert.equal(isReadOnlyDiagnosticCommand("rg --files", projectDir), false);
+    } finally {
+      if (priorConfig === undefined) delete process.env.RIPGREP_CONFIG_PATH;
+      else process.env.RIPGREP_CONFIG_PATH = priorConfig;
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("host-provided transcript, memory and sibling paths share passive read behavior", () => {
+  const projectDir = hgoGitFixture("signature");
+  const { transcriptPath, memoryDir } = transcriptReadFixture();
+  const memoryFile = join(memoryDir, "learned.md");
+  const sibling = join(dirname(transcriptPath), "other-session.jsonl");
+  writeFileSync(memoryFile, "note\n");
+  writeFileSync(sibling, "other\n");
+  try {
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir, [transcriptPath]), true);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${transcriptPath}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${memoryFile} | head -n 5`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${sibling}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
+test("PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories agree across read routes under active enrollment", (t) => {
+  const fixture = mkdtempSync(join("/var/tmp", "passive-read-root-interop-"));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const projectDir = join(fixture, "repo"), homeDir = join(fixture, "home");
+  const sessionDir = join(fixture, "session"), memoryDir = join(sessionDir, "memory");
+  const transcriptPath = join(sessionDir, "session.jsonl");
+  const memoryFile = join(memoryDir, "learned.md"), sibling = join(sessionDir, "sibling.md");
+  for (const directory of [projectDir, homeDir, sessionDir, memoryDir]) mkdirSync(directory);
+  for (const file of [transcriptPath, memoryFile, sibling]) writeFileSync(file, "fixture\n");
+  const script = `
+    import assert from "node:assert/strict";
+    import { spawnSync } from "node:child_process";
+    const { createGovernanceScopeController } = await import(process.env.GOVERNANCE_SCOPE_MODULE);
+    const projectDir = process.env.PASSIVE_FIXTURE_PROJECT;
+    const transcriptPath = process.env.PASSIVE_FIXTURE_TRANSCRIPT;
+    const memoryDir = process.env.PASSIVE_FIXTURE_MEMORY;
+    const memoryFile = process.env.PASSIVE_FIXTURE_MEMORY_FILE;
+    const sibling = process.env.PASSIVE_FIXTURE_SIBLING;
+    const initialized = spawnSync("git", ["init", "-q"], { cwd: projectDir, encoding: "utf8" });
+    assert.equal(initialized.status, 0, initialized.stderr);
+    const scope = createGovernanceScopeController();
+    const before = scope.observe({ rootDir: projectDir });
+    assert.equal(before.state, "inactive");
+    assert.equal(before.requiresEnforcement, false);
+    const plan = scope.planDecision({ rootDir: projectDir, decision: "enroll", by: "passive-read-fixture" });
+    const enrolled = scope.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    assert.equal(enrolled.state, "active");
+    assert.equal(enrolled.requiresEnforcement, true);
+    const guard = await import(process.env.LIFECYCLE_GUARD_MODULE);
+    const roots = [transcriptPath, memoryDir];
+    const deps = {
+      projectDir,
+      requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }),
+    };
+    const readTranscript = guard.evaluateLifecycleReadyGuard({
+      tool_name: "Read", tool_input: { file_path: transcriptPath }, transcript_path: transcriptPath,
+    }, deps);
+    assert.equal(readTranscript.exitCode, 0, "Read admits the exact session transcript");
+    const grepMemory = guard.evaluateLifecycleReadyGuard({
+      tool_name: "Grep", tool_input: { path: memoryFile }, transcript_path: transcriptPath,
+    }, deps);
+    assert.equal(grepMemory.exitCode, 0, "Grep admits a file under the current memory directory");
+    const globMemory = guard.evaluateLifecycleReadyGuard({
+      tool_name: "Glob", tool_input: { path: memoryDir, pattern: "*.md" }, transcript_path: transcriptPath,
+    }, deps);
+    assert.equal(globMemory.exitCode, 0, "Glob admits bounded inventory in the current memory directory");
+    const command = (value) => ({ tool_name: "Bash", tool_input: { command: value }, transcript_path: transcriptPath });
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + memoryFile, projectDir, roots), true,
+      "single cat admits the same approved memory file");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + memoryFile + " | head -n 5", projectDir, roots), true,
+      "cat pipeline admits the same approved memory file");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("rg -n fixture " + transcriptPath, projectDir, roots), true,
+      "single recursive-grammar rg admits the exact transcript file");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("rg --files " + memoryDir + " | rg learned", projectDir, roots), true,
+      "rg pipeline admits bounded memory inventory despite the file root");
+    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + sibling), deps).exitCode, 2,
+      "the transcript file does not authorize its directory sibling");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + sibling, projectDir, roots), false,
+      "single-command policy also refuses a session sibling");
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: projectDir,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      HOME: homeDir,
+      CLAUDE_PROJECT_DIR: projectDir,
+      GOVERNANCE_SCOPE_MODULE: new URL("../lib/governance-scope.mjs", import.meta.url).href,
+      LIFECYCLE_GUARD_MODULE: new URL("./guard-lifecycle-ready.mjs", import.meta.url).href,
+      PASSIVE_FIXTURE_PROJECT: projectDir,
+      PASSIVE_FIXTURE_TRANSCRIPT: transcriptPath,
+      PASSIVE_FIXTURE_MEMORY: memoryDir,
+      PASSIVE_FIXTURE_MEMORY_FILE: memoryFile,
+      PASSIVE_FIXTURE_SIBLING: sibling,
+    },
+  });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test("runner session paths are ordinary host-visible passive read targets", () => {
+  const projectDir = hgoGitFixture("signature");
+  const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-home-"));
+  const sessionsDir = join(codexHome, "sessions");
+  const prior = join(sessionsDir, "2026", "09", "prior-rollout.jsonl");
+  mkdirSync(dirname(prior), { recursive: true });
+  writeFileSync(prior, "{\"cwd\":\"fixture\"}\n");
+  try {
+    const deps = { projectDir, ...hgoReadyDeps(), runner: "codex", env: { CODEX_HOME: codexHome } };
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), { ...deps, runner: "claude" }).exitCode, 0);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(codexHome, { recursive: true, force: true });
+  }
+});
+
+test("the dedicated Codex transcript recovery routes stay exact before readiness", () => {
+  const projectDir = hgoGitFixture("signature");
+  const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-recovery-home-"));
+  const prior = join(codexHome, "sessions", "2026", "09", "prior-rollout.jsonl");
+  mkdirSync(dirname(prior), { recursive: true });
+  writeFileSync(prior, "{\"type\":\"session_meta\",\"payload\":{\"cwd\":\"fixture\",\"session_id\":\"prior\"}}\n");
+  const command = `node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex --exclude-session current-session`;
+  const list = `node ${TRANSCRIPT_RECOVERY_SCRIPT} list --root ${projectDir} --runner codex --exclude-session current-session`;
+  const read = `node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session --session-id prior-session`;
+  try {
+    const nonReady = { projectDir, runner: "codex", env: { CODEX_HOME: codexHome }, requireProjectOnboardingReadyFn() { deny("intake-required"); } };
+    assert.equal(isSanctionedLifecycleCommand(command, projectDir), true);
+    assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 0);
+    assert.equal(isSanctionedLifecycleCommand(list, projectDir), true);
+    assert.equal(evaluateLifecycleReadyGuard(bash(list), nonReady).exitCode, 0);
+    assert.equal(isSanctionedLifecycleCommand(read, projectDir), true);
+    assert.equal(evaluateLifecycleReadyGuard(bash(read), nonReady).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} list --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session --session-id prior-session --extra no`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), nonReady).exitCode, 0);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(codexHome, { recursive: true, force: true });
+  }
+});
+
+test("a sibling transcript path follows the same passive read policy", () => {
+  const projectDir = hgoGitFixture("signature");
+  const claudeHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-home-"));
+  const current = join(claudeHome, "projects", "current-project", "current.jsonl");
+  const prior = join(claudeHome, "projects", "other-project", "prior.jsonl");
+  mkdirSync(dirname(current), { recursive: true });
+  mkdirSync(dirname(prior), { recursive: true });
+  writeFileSync(current, "{\"cwd\":\"fixture\"}\n");
+  writeFileSync(prior, "{\"cwd\":\"prior\"}\n");
+  try {
+    const deps = { projectDir, ...hgoReadyDeps(), runner: "claude" };
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), { ...deps, runner: "codex" }).exitCode, 0);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(claudeHome, { recursive: true, force: true });
+  }
+});
+
+test("passive reads accept leading tilde and symlink paths", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  const linkPath = join(projectDir, "linked-outside.json");
+  symlinkSync(outsideFile, linkPath);
+  const tildeFile = `~/${relative(homedir(), outsideFile)}`;
+  try {
+    for (const command of [
+      "cat ~/.ssh/id_rsa",
+      "cat ~/.ssh/id_rsa | head -n 5",
+      "git log ~/.ssh/id_rsa | head -n 5",
+      "rg private ~/.ssh/id_rsa | head -n 5",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      assert.equal(readScopeRun(command, projectDir).exitCode, 2, command);
+    }
+    for (const command of [
+      `cat ${tildeFile}`,
+      `cat ${tildeFile} | head -n 5`,
+      `git log ${tildeFile} | head -n 5`,
+      `rg private ${tildeFile} | head -n 5`,
+      `cat ${linkPath}`,
+      `cat ${linkPath} | head -n 5`,
+      `rg private ${linkPath} | head -n 5`,
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
+      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("passive reads accept host-resolved symlink-plus-dotdot paths", () => {
+  const projectDir = hgoGitFixture("signature");
+  const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-dotdot-outside-"));
+  const targetDir = join(outsideRoot, "target");
+  const siblingDir = join(outsideRoot, "sibling");
+  const secret = join(siblingDir, "secret.txt");
+  mkdirSync(targetDir);
+  mkdirSync(siblingDir);
+  writeFileSync(secret, "outside\n");
+  const link = join(projectDir, "linked-outside");
+  symlinkSync(targetDir, link);
+  const escaped = link + "/../sibling/secret.txt";
+  try {
+    for (const command of [
+      "cat " + escaped,
+      "cat " + escaped + " | head -n 5",
+      "rg outside " + escaped + " | head -n 5",
+      "git log " + escaped + " | head -n 5",
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});
+
+test("read-boundary resolution fails closed when the filesystem cannot establish containment", () => {
+  assert.equal(
+    isRealpathedWithinBoundary("/fixture/root/child", "/fixture/root", {
+      existsSyncFn: () => true,
+      realpathSyncFn() { throw new Error("fixture realpath failure"); },
+    }),
+    false,
+  );
+});
+
+test("a leading-tilde mutation is classified as a cross-repository target in every commandPath call-site class", () => {
+  const projectDir = root();
+  markGovernedFixture(projectDir);
+  try {
+    // Make this fixture a Pipeline source root so the cachebuster classifier reaches its
+    // target-containment decision instead of refusing merely because the source markers are
+    // absent. These are marker files only; no command below is executed.
+    writeFileSync(join(projectDir, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+    mkdirSync(join(projectDir, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    mkdirSync(join(projectDir, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(projectDir, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), "{}\n");
+    writeFileSync(join(projectDir, "harness", "scripts", "verify.mjs"), "// marker\n");
+
+    const commands = [
+      "printf x > ~/nva-commandpath-output.txt",
+      "python3 /tools/update_plugin_cachebuster.py ~/nva-commandpath-plugin",
+      "git -C ~/nva-commandpath-sibling commit -m mutation",
+      "cp in-root.txt ~/nva-commandpath-copy.txt",
+      "sed -i s/old/new/ ~/nva-commandpath-edit.txt",
+    ];
+    for (const command of commands) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, projectDir), true, command);
+      const refused = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir,
+        ...hgoReadyDeps(),
+        consumeHumanGuardOverrideFn() { return { status: "absent" }; },
+        recordHumanGuardDenialFn() { return { status: "unavailable" }; },
+      });
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-CROSS-REPO-MUTATION/u, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("a leading-tilde read is admitted in the rg pipeline lane", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    const report = `rg x ${outsideFile} | head -n 5`;
+    assert.equal(isReadOnlyDiagnosticCommand(report, projectDir), true);
+    assert.equal(readScopeRun(report, projectDir).exitCode, 0);
+    for (const marker of ["~", "~/.ssh/id_rsa"]) {
+      const command = `rg x ${marker} | head -n 5`;
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      assert.equal(readScopeRun(command, projectDir).exitCode, 2, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("ordinary in-root passive reads remain available", () => {
+  const { projectDir, outside } = readScopeFixture();
+  try {
+    for (const command of ["cat verify-latest.json", "rg -n 'Overall' verify-latest.json | head -n 5", "git log | head -n 3"]) {
+      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  const dependencies = {
+    projectDir,
+    requireProjectOnboardingReadyFn() { deny("partial"); },
+    consumeHumanGuardOverrideFn() { return { status: "absent" }; },
+    recordHumanGuardDenialFn() { return { status: "unavailable" }; },
+  };
+  try {
+    for (const [command, code] of [
+      [`cat ${outsideFile} > captured.json`, "GUARD-REDIRECT-UNAPPROVED"],
+      ["cat $(printf test)", "GUARD-PARSE-UNSUPPORTED"],
+      [`sed -i s/pass/fail/ ${outsideFile}`, "GUARD-CROSS-REPO-MUTATION"],
+      [`find ${outside} -delete`, "GUARD-LIFECYCLE-NOT-READY"],
+      [`git -C ${outside} commit -m mutation`, "GUARD-CROSS-REPO-MUTATION"],
+      ["node -e 'process.exit(0)'", "GUARD-LIFECYCLE-NOT-READY"],
+      ["python -c 'print(1)'", "GUARD-LIFECYCLE-NOT-READY"],
+      ["sh -c 'printf x'", "GUARD-LIFECYCLE-NOT-READY"],
+      [`touch ${join(outside, "created.json")}`, "GUARD-CROSS-REPO-MUTATION"],
+      [`cat ${outsideFile} | wc -l`, "GUARD-OPERATOR-UNAPPROVED"],
+      [`rg -n Overall ${outsideFile} | head -n 5 > ${join(outside, "captured.json")}`, "GUARD-CROSS-REPO-MUTATION"],
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      const refused = evaluateLifecycleReadyGuard(bash(command), dependencies);
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, new RegExp(code, "u"), command);
+    }
+
+    const writeRefused = evaluateLifecycleReadyGuard(edit(join(outside, "write.json")), {
+      projectDir,
+      ...hgoReadyDeps(),
+      consumeHumanGuardOverrideFn() { return { status: "absent" }; },
+      recordHumanGuardDenialFn() { return { status: "unavailable" }; },
+    });
+    assert.equal(writeRefused.exitCode, 2);
+    assert.match(writeRefused.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// TPSHELL-* (backlog: 2026-08-08-an-authority-gate-is-bypassable-by-choosing-a-different-
+// write-tool.md). guard-testpath.mjs is wired for Edit|Write|NotebookEdit only, so a Bash
+// or PowerShell write to a TP-protected path passed unclaimed -- measured, not inferred: a
+// briefed dispatch hit TP-5, could not clear it, wrote the same bytes through Bash/Node
+// `fs`, and reported it as a deviation. guardrails/global.md GL-09 calls this gate
+// authority-bearing, so its coverage must not depend on tool choice. The rule now travels
+// the shell lane out of the same definition, here, beside GUARD-GATE-STRENGTH-SHELL.
+// ---------------------------------------------------------------------------------
+const TPSHELL_TARGET = "plugins/pipeline-core/hooks/guard-push.test.mjs";
+const TPSHELL_RULES = [
+  {
+    id: "TP-1",
+    pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$",
+    reason: "guard-git test suite gates the git-guard union.",
+  },
+  {
+    id: "TP-5",
+    pattern: "(?:plugins/pipeline-core/hooks/guard-push(?:-v2)?|harness/scripts/pipeline-state)\\.test\\.mjs$",
+    reason: "guard-push test suite gates the release/deploy push-enforcement hook.",
+  },
+];
+
+/** A governed, READY fixture whose guard-config sits wherever the resolver actually looks. */
+function tpShellFixture(protectedTestPaths = TPSHELL_RULES, { base = null } = {}) {
+  const path = base ?? mkdtempSync(join(tmpdir(), "guard-lifecycle-tpshell-"));
+  if (base === null) {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  }
+  const configPath = resolveGuardConfigPath(path);
+  mkdirSync(dirname(configPath), { recursive: true });
+  writeFileSync(configPath, JSON.stringify({ protectedTestPaths }, null, 2));
+  return path;
+}
+
+const TPSHELL_READY = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+function tpShellRun(path, command, toolName = "Bash") {
+  return evaluateLifecycleReadyGuard(
+    { tool_name: toolName, tool_input: { command } },
+    { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } },
+  );
+}
+
+/**
+ * TPSHELL-1. Both directions in one test, for the reason GSSHELL-STAGE-1 states one
+ * function up: a refusal-only test would pass just as happily on a rule that had started
+ * refusing `node --test <suite>` too -- and unlike the gate-strength paths, these files
+ * EXIST to be run, so an over-refusal here would break the very verification the guard's
+ * own header prescribes. The fixture is READY, so every admission below is a real exit 0
+ * rather than a different guard's refusal standing in for one.
+ */
+test("TPSHELL-1: a shell write to a protected test path is refused, while reading and running it stay admitted", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      // the exact shape the reported bypass used
+      `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`,
+      // …and the same idea with the path assembled from a literal basename
+      `node -e "writeFileSync(join(dir,'guard-push.test.mjs'),'x')"`,
+      `python3 -c "open('${TPSHELL_TARGET}','w').write('x')"`,
+      `printf x > ${TPSHELL_TARGET}`,
+      `printf x >> ${TPSHELL_TARGET}`,
+      `cp scratch/fake.mjs ${TPSHELL_TARGET}`,
+      `mv scratch/fake.mjs ${TPSHELL_TARGET}`,
+      `rm ${TPSHELL_TARGET}`,
+      `truncate -s 0 ${TPSHELL_TARGET}`,
+      `tee ${TPSHELL_TARGET}`,
+      `sed -i s/a/b/ ${TPSHELL_TARGET}`,
+      `git checkout HEAD -- ${TPSHELL_TARGET}`,
+      `git apply ${TPSHELL_TARGET}`,
+      // a second configured rule, and its non-plugin sibling path
+      "rm plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "rm harness/scripts/pipeline-state.test.mjs",
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted a shell write: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    mkdirSync(dirname(join(path, TPSHELL_TARGET)), { recursive: true });
+    writeFileSync(join(path, TPSHELL_TARGET), "// benign passive-read fixture\n");
+    for (const command of [
+      `node --test ${TPSHELL_TARGET}`,
+      `node ${TPSHELL_TARGET}`,
+      `cat ${TPSHELL_TARGET}`,
+      `rg -n describe ${TPSHELL_TARGET}`,
+      `git add ${TPSHELL_TARGET}`,
+      `git diff ${TPSHELL_TARGET}`,
+      `git log ${TPSHELL_TARGET}`,
+      // a differently-named neighbour that merely carries the protected name as a prefix
+      `rm ${TPSHELL_TARGET}.bak`,
+      // an unprotected suite, written freely
+      "cp a.mjs src/other.test.mjs",
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a read/run/unrelated command: ${command} -- ${result.stderr}`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-REBASE-EXEC (round-K finding F2). `git rebase`'s own operands are revisions and
+ * yield no candidates by design (NVA-B-GITARGV, Requirement 3) -- but `--exec`'s argument is
+ * an opaque shell payload, a different token class in the same argv, and Requirement 4 of the
+ * same item lists `exec` among the shapes that must stay refused. The classifier-level proof
+ * lives in `lib/protected-test-paths.test.mjs`; this is the END-TO-END guard verdict the
+ * finding recorded as its own scope limit, so the gap is closed here rather than inherited:
+ * a candidate that never reaches a denial is not a refusal.
+ */
+test("TPSHELL-REBASE-EXEC: a git rebase --exec payload naming a protected test path is refused, while ordinary rebase steps are not claimed", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      `git rebase --exec "sed -i s/a/b/ ${TPSHELL_TARGET}" main`,
+      `git rebase --exec="sed -i s/a/b/ ${TPSHELL_TARGET}" main`,
+      `git rebase -x "rm ${TPSHELL_TARGET}" main`,
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted an --exec payload write: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    // The other direction, asserted on the LANE rather than on exit 0: an ordinary rebase step
+    // must not be claimed by this gate, and no revision may be turned into a file candidate.
+    for (const command of [
+      "git rebase --continue",
+      "git rebase main",
+      "git rebase --show-current-patch",
+      "git -c core.editor=true rebase --continue",
+      `git rebase --exec "sed -i s/a/b/ scratch/other.test.mjs" main`,
+    ]) {
+      assert.doesNotMatch(
+        tpShellRun(path, command).stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command,
+      );
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-REBASE-ABBREV (round-L finding F1). git's `parse-options` resolves any unambiguous
+ * PREFIX of a long option, so `TPSHELL-REBASE-EXEC`'s byte-identical `--exec` coverage was a
+ * bypass one abbreviation wide: `--exe` misses the payload table, `rebase` yields no operand
+ * candidates by design, and nothing is left to refuse.
+ *
+ * Measured against real git 2.53.0 in a throwaway fixture repository before this test existed
+ * (`scratch/nva-roundl/measure-f1.mjs`): `--exe`, `--ex` and their `=`-glued forms each exited
+ * 0 and executed the payload. This is the END-TO-END guard verdict for that measurement; the
+ * classifier-level proof lives in `lib/protected-test-paths.test.mjs`.
+ */
+test("TPSHELL-REBASE-ABBREV: an abbreviated or unenumerated rebase option carrying a write payload is refused", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      `git rebase --exe "sed -i s/a/b/ ${TPSHELL_TARGET}" main`,
+      `git rebase --ex="rm ${TPSHELL_TARGET}" main`,
+      // Not a prefix of `--exec` at all: the fail-closed direction for the NEXT unknown spelling.
+      `git rebase --frobnicate "rm ${TPSHELL_TARGET}" main`,
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted an abbreviated/unknown-option payload: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    // Unchanged in the other direction: ordinary rebase steps, including abbreviated spellings
+    // of options that carry no shell code, stay unclaimed by this gate.
+    for (const command of [
+      "git rebase --continue",
+      "git rebase --cont",
+      "git rebase main",
+      "git rebase --onto upstream topic",
+      "git -c core.editor=true rebase --continue",
+    ]) {
+      assert.doesNotMatch(
+        tpShellRun(path, command).stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command,
+      );
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-OPAQUEMENTION (NVA-B-OPAQUELANE-1, backlog:
+ * 2026-09-02-the-opaque-payload-lane-refuses-a-mention-not-a-write.md). The END-TO-END guard
+ * verdict for resolution 1: this lane's own denial text claimed a mention was admitted and only
+ * a detected write refused; that was false for exactly this lane. The classifier-level proof
+ * lives in `lib/protected-test-paths.test.mjs`; this proves the real guard actually admits/
+ * refuses these shapes, not merely that the classifier's candidate list is correct in isolation
+ * (the same distinction TPSHELL-REBASE-EXEC's own header states for its sibling finding).
+ */
+test("TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      // The round-L case itself: prose written to an unprotected scratch note happens to name
+      // the protected suite. The write target is scratch/note.txt, not the protected path.
+      `node -e "require('fs').writeFileSync('scratch/note.txt','mentions ${TPSHELL_TARGET}')"`,
+      `python3 -c "open('scratch/note.txt','w').write('mentions ${TPSHELL_TARGET}')"`,
+      // Reading a protected suite through python's open() (no write-capable mode) stays admitted.
+      `python3 -c "open('${TPSHELL_TARGET}').read()"`,
+      // Running a protected suite via git rebase --exec carries no eval flag -- it is a run, not
+      // a write, exactly like the already-admitted `node --test <suite>` shape TPSHELL-1 pins.
+      `git rebase --exec "node --test ${TPSHELL_TARGET}" main`,
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a mention/run command: ${command} -- ${result.stderr}`);
+    }
+    // A realistic bypass attempt this lane genuinely cannot follow: the protected path is
+    // assigned to a variable before the write call, so it is never itself a recognised call's
+    // own literal argument -- fail-closed, still refused, and the denial names the route forward.
+    const indirect = tpShellRun(
+      path, `node -e "var p='${TPSHELL_TARGET}'; require('fs').writeFileSync(p,'x')"`,
+    );
+    assert.equal(indirect.exitCode, 2, "an unresolved indirection was silently admitted");
+    assert.match(indirect.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
+    assert.match(
+      indirect.stderr, /cannot parse arbitrary interpreter code/u,
+      "the denial text does not name the opaque-lane caveat / route forward",
+    );
+    // The caveat is scoped to the opaque-interpreter-code lane -- an ordinary shell writer's
+    // refusal must not carry it (the claim "only a detected write is refused" IS true there).
+    const plain = tpShellRun(path, `rm ${TPSHELL_TARGET}`);
+    assert.equal(plain.exitCode, 2);
+    assert.doesNotMatch(plain.stderr, /cannot parse arbitrary interpreter code/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("IR-4 incident replay: a read-only inventory index probe mentioning a protected suite needs no signature", () => {
+  const path = tpShellFixture();
+  try {
+    const command = `node -e "const inventory=JSON.parse(require('fs').readFileSync('docs/product-capability-inventory.json','utf8')); console.log(inventory.suites.indexOf('${TPSHELL_TARGET}'))"`;
+    const result = tpShellRun(path, command);
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /GUARD-TESTPATH-SHELL|human-guard-override|signature/iu);
+
+    const hiddenWrite = tpShellRun(path,
+      `node -e "const p='${TPSHELL_TARGET}'; require('fs').writeFileSync(p,'x')"`);
+    assert.equal(hiddenWrite.exitCode, 2, "variable-indirected protected write must remain denied");
+    assert.match(hiddenWrite.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-B-UNPARSED-CAVEAT-1: a protected-path mention in an unparsed command is conservatively refused without echoing the raw command", () => {
+  const path = tpShellFixture();
+  try {
+    // The command is input to the guard only, never executed: rm names a writer for
+    // scratch/note.txt while the protected path is merely printf content after `;`.
+    const mention = `rm scratch/note.txt; printf '%s' ${TPSHELL_TARGET}`;
+    const refused = tpShellRun(path, mention);
+    assert.equal(refused.exitCode, 2, "the conservative fallback was silently admitted");
+    assert.match(refused.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
+    assert.match(refused.stderr, /possible shell write/u);
+    assert.match(refused.stderr, /cannot parse arbitrary interpreter code or command structure/u);
+    assert.doesNotMatch(refused.stderr, /rm scratch\/note\.txt/u, "denial echoed raw command text");
+
+    const resolved = tpShellRun(path, `rm ${TPSHELL_TARGET}`);
+    assert.equal(resolved.exitCode, 2, "resolved protected write was admitted");
+    assert.match(resolved.stderr, /Detected as a shell write/u);
+    assert.doesNotMatch(resolved.stderr, /possible shell write/u);
+
+    const opaqueKnownWrite = tpShellRun(
+      path, `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`,
+    );
+    assert.equal(opaqueKnownWrite.exitCode, 2, "structured opaque protected write was admitted");
+    assert.doesNotMatch(opaqueKnownWrite.stderr, /possible shell write/u);
+
+    // The old basename fallback searched all regions per rule. Retain that priority while
+    // carrying the new per-region classification: TP-1's later-region basename wins over
+    // TP-5's earlier dynamic write expression.
+    const priority = tpShellRun(
+      path, "node -e \"require('fs').writeFileSync(join(dir,'guard-push.test.mjs'),'x'); guard-git.test.mjs\"",
+    );
+    assert.equal(priority.exitCode, 2);
+    assert.match(priority.stderr, /TP-1/u);
+    assert.match(priority.stderr, /possible shell write/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-2. The lane is config-driven exactly like the write lane: a project that
+ * protects nothing gets nothing new refused. Without this, TPSHELL-1 could be green on a
+ * rule that refused those commands unconditionally.
+ */
+test("TPSHELL-2: with no protectedTestPaths configured the shell lane claims nothing", () => {
+  const path = tpShellFixture([]);
+  try {
+    for (const command of [
+      `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`,
+      `cp scratch/fake.mjs ${TPSHELL_TARGET}`,
+      `rm ${TPSHELL_TARGET}`,
+    ]) {
+      assert.doesNotMatch(tpShellRun(path, command).stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-3. PowerShell is wired into the SAME PreToolUse matcher as Bash and returns
+ * early from every POSIX check below the gate-strength lane -- the exact asymmetry that
+ * left `Set-Content project/guard-config.json` unclaimed for the sibling gate. The
+ * test-path lane runs before that early return, so it covers both shells.
+ */
+test("TPSHELL-3: a PowerShell write cmdlet naming a protected test path is refused, Get-Content is not", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      `Set-Content ${TPSHELL_TARGET} "x"`,
+      `Add-Content ${TPSHELL_TARGET} "x"`,
+      `Remove-Item ${TPSHELL_TARGET}`,
+      `Copy-Item other.mjs ${TPSHELL_TARGET}`,
+    ]) {
+      const result = tpShellRun(path, command, "PowerShell");
+      assert.equal(result.exitCode, 2, `admitted a PowerShell write: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    mkdirSync(dirname(join(path, TPSHELL_TARGET)), { recursive: true });
+    writeFileSync(join(path, TPSHELL_TARGET), "// benign passive-read fixture\n");
+    assert.equal(tpShellRun(path, `Get-Content ${TPSHELL_TARGET}`, "PowerShell").exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-4. The half that decides whether this closes the gap or relocates it. The
+ * reported bypass happened because the SANCTIONED route was closed before the unsanctioned
+ * one was taken, so a refusal with no lift would reproduce the same outcome one layer over.
+ * Per the item's own triage (PO, 2026-08-11: "human override muss möglich sein per Signatur
+ * oder Chat je Config") this refusal carries the same audited chat-or-signature ceremony the
+ * write lane already offers -- not a new mechanism. Both modes are armed for real here, and
+ * the capability's single use is checked, because an override that stayed armed would be a
+ * standing hole rather than one audited action.
+ */
+test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signature-armed capability, once", () => {
+  for (const mode of ["chat", "signature"]) {
+    const path = tpShellFixture(TPSHELL_RULES, { base: hgoGitFixture(mode) });
+    try {
+      const command = `cp scratch/fake.mjs ${TPSHELL_TARGET}`;
+      const first = tpShellRun(path, command);
+      assert.equal(first.exitCode, 2, `precondition (${mode}): the shell lane must refuse first`);
+      assert.match(first.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), mode);
+      // ADR-0059 Decision 4: the denial names the CURRENTLY CONFIGURED mode's next command.
+      if (mode === "chat") {
+        assert.match(first.stderr, /Step: plan/u);
+        assert.match(first.stderr, /chat is attribution, not proof/u);
+        assert.doesNotMatch(first.stderr, /Step: authorize-by-signature/u, "chat denial must not name signature's step");
+        assert.doesNotMatch(first.stderr, /Step: sign-intent|human-held Ed25519 key/u,
+          "chat denial must not advertise an external signing step");
+      } else {
+        assert.match(first.stderr, /Step: plan/u);
+        assert.match(first.stderr, /human-held Ed25519 key in an attended external terminal/u);
+        assert.match(first.stderr, /mode-specific nextAction/u);
+        assert.doesNotMatch(first.stderr, /--activate/u, "signature denial must not offer in-session activation");
+      }
+
+      const denials = [{
+        guard: "guard-lifecycle-ready.mjs",
+        reason: `${TESTPATH_SHELL_DENIAL_CODE}: TP-5: ${TPSHELL_RULES[1].reason}`,
+      }];
+      if (mode === "chat") hgoArmByChat(path, { command }, denials);
+      else hgoArmBySignature(path, { command }, denials);
+
+      const admitted = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
+      });
+      assert.equal(admitted.exitCode, 0, `${mode}-armed capability did not admit the exact command: ${admitted.stderr}`);
+      assert.match(
+        admitted.stderr,
+        new RegExp(`\\[pipeline-human-override\\] guard-lifecycle-ready ${TESTPATH_SHELL_DENIAL_CODE}: exact one-time capability consumed`, "u"),
+        mode,
+      );
+      assert.equal(tpShellRun(path, command).exitCode, 2, `the ${mode} capability was reusable`);
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  }
+});
+
+/**
+ * TPSHELL-5. One definition, two lanes. If the shell lane ever grew its own copy of the
+ * rule list, the two lanes could silently disagree about which paths are protected -- the
+ * failure this whole item is about, rebuilt inside the fix. Asserted against THIS
+ * repository's real committed guard-config rather than a fixture, so a rule added there and
+ * not reachable from the shell lane fails here.
+ */
+test("TPSHELL-5: the shell lane and the write lane resolve the same rules from the same committed config", () => {
+  const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
+  const { rules } = loadProtectedTestPathRules({ rootDir: repoRoot });
+  assert.ok(rules.length > 0, "this repository must have protectedTestPaths configured for this test to mean anything");
+  for (const rule of rules) {
+    assert.ok(typeof rule.id === "string" && rule.id !== "", "every rule carries an id the denial can name");
+  }
+  // Every configured rule is reachable from the shell lane through at least one write shape.
+  const guardGit = rules.find((rule) => rule.re.test("plugins/pipeline-core/hooks/guard-git.test.mjs"));
+  assert.ok(guardGit, "TP-1 must be resolvable from the shared loader");
+  const hit = protectedTestPathShellHit({
+    command: "rm plugins/pipeline-core/hooks/guard-git.test.mjs",
+    rules,
+    root: repoRoot,
+  });
+  assert.equal(hit?.rule.id, guardGit.id);
+});
+
+/**
+ * TPSHELL-6. The narrower literal-basename lane exists so opaque interpreter code that
+ * assembles a path (`join(dir, "guard-push.test.mjs")`) is still caught. It derives its
+ * needles FROM the configured patterns, so it cannot drift -- but a derivation that
+ * silently produced nothing would leave that lane inert while every other assertion above
+ * stayed green, which is exactly how the first version of it behaved.
+ */
+test("TPSHELL-6: literal basenames are derived from the configured patterns, alternation included", () => {
+  const { rules } = loadProtectedTestPathRules({
+    rootDir: fileURLToPath(new URL("../../../", import.meta.url)),
+  });
+  const needles = protectedTestPathBasenameNeedles(rules).map((entry) => entry.needle);
+  assert.ok(needles.includes("guard-git.test.mjs"), `plain pattern yielded no needle: ${needles.join(", ")}`);
+  // TP-5 is an alternation with a nested optional group -- and it guards the very file the
+  // reported bypass wrote to, so "too clever to reduce" is not an acceptable outcome here.
+  for (const needle of ["guard-push.test.mjs", "guard-push-v2.test.mjs", "pipeline-state.test.mjs"]) {
+    assert.ok(needles.includes(needle), `alternation pattern yielded no needle for ${needle}: ${needles.join(", ")}`);
+  }
+});
+
+/**
+ * TPSHELL-7 (Critic finding, backlog: 2026-08-08-an-authority-gate-is-bypassable-by-choosing-
+ * a-different-write-tool.md). GL-09's own verification clause: "Each authority-bearing gate
+ * carries a fault-injection test that raises inside the blocking path and asserts the block
+ * exit code -- not merely that a catch is present." The pre-fix code caught any classifier
+ * exception and returned null (fail OPEN, admitting the command unseen); this asserts the
+ * fixed behavior fails CLOSED instead, and that a command the classifier genuinely could not
+ * evaluate is never silently admitted alongside a command it could.
+ */
+test("TPSHELL-7: a classifier fault fails closed (GL-09), never silently admits the command", () => {
+  const path = tpShellFixture();
+  try {
+    const command = `cp scratch/fake.mjs ${TPSHELL_TARGET}`;
+    const faulting = () => { throw new Error("synthetic classifier fault"); };
+    const result = evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
+        protectedTestPathShellHitFn: faulting,
+      },
+    );
+    assert.equal(result.exitCode, 2, "a classifier fault must block, not admit");
+    assert.match(result.stderr, new RegExp(`${TESTPATH_SHELL_DENIAL_CODE}-FAULT`, "u"));
+    assert.match(result.stderr, /synthetic classifier fault/u, "the fault reason is surfaced, not swallowed silently");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// DEVPLANSHELL-* : the shell lane of the Dev-Plan lifecycle gate (GUARD-DEVPLAN-SHELL),
+// mirroring TPSHELL-* immediately above -- see that block's own header for the shared
+// rationale (GL-09 authority-bearing coverage must not depend on tool choice). This gate
+// has no separate rules-config file of its own to load -- `devPlanGateVerdict()` reads the
+// manifest/State directly -- so there is no TPSHELL-5/TPSHELL-6-style "shared config
+// source" / "literal-basename derivation" pair to mirror here; both were specific to the
+// protected-test-path gate's own rules loader.
+// ---------------------------------------------------------------------------------
+const DEVPLANSHELL_TARGET = "src/app.js";
+const DEVPLANSHELL_MANIFEST_BLOCKING =
+  "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n";
+const DEVPLANSHELL_UNAPPROVED_STATE = {
+  schema: "pipeline.state.v0",
+  activeFeature: { id: "devplanshell-feature", planPath: ".claude/plans/devplanshell.md", phase: "design" },
+  planApproved: false,
+};
+
+/** A governed, READY fixture with the dev-plan gate blocking and an unapproved feature -- the
+ * same DP07 shape guard-devplan.test.mjs uses for its own "block" case, at the LEGACY_STATE /
+ * LEGACY_MANIFEST paths (`.claude/pipeline.yaml`, `.claude/pipeline-state.json`) devPlanGateVerdict()
+ * actually reads. Explicit fixture-local consent establishes governance independently
+ * of the manifest used to exercise dev-plan enforcement.
+ */
+function devPlanShellFixture() {
+  const path = mkdtempSync(join(tmpdir(), "guard-lifecycle-devplanshell-"));
+  mkdirSync(join(path, ".claude"), { recursive: true });
+  markGovernedFixture(path);
+  writeFileSync(join(path, ".claude", "pipeline.yaml"), DEVPLANSHELL_MANIFEST_BLOCKING);
+  writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify(DEVPLANSHELL_UNAPPROVED_STATE));
+  return path;
+}
+
+function devPlanShellRun(path, command, toolName = "Bash") {
+  return evaluateLifecycleReadyGuard(
+    { tool_name: toolName, tool_input: { command } },
+    { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } },
+  );
+}
+
+/**
+ * DEVPLANSHELL-1. Both directions in one test, for the same reason TPSHELL-1 states: a
+ * refusal-only test would pass just as happily on a rule that had started refusing reads too.
+ */
+test("DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted", () => {
+  const path = devPlanShellFixture();
+  try {
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    writeFileSync(join(path, "scratch", "probe.mjs"),
+      "import { writeFileSync } from 'node:fs';\nwriteFileSync('game.js', 'script side effect');\n");
+    writeFileSync(join(path, "scratch", "probe.test.mjs"),
+      "import { writeFileSync } from 'node:fs';\nwriteFileSync('game.js', 'test side effect');\n");
+    writeFileSync(join(path, "scratch", "probe.py"),
+      "from pathlib import Path\nPath('game.js').write_text('python side effect')\n");
+    writeFileSync(join(path, "scratch", "probe.sh"),
+      "printf shell-side-effect > game.js\n");
+    for (const command of [
+      `printf x > ${DEVPLANSHELL_TARGET}`,
+      `printf x >> ${DEVPLANSHELL_TARGET}`,
+      `cp scratch/fake.js ${DEVPLANSHELL_TARGET}`,
+      `mv scratch/fake.js ${DEVPLANSHELL_TARGET}`,
+      `rm ${DEVPLANSHELL_TARGET}`,
+      `tee ${DEVPLANSHELL_TARGET}`,
+      `sed -i s/a/b/ ${DEVPLANSHELL_TARGET}`,
+      `node -e "require('fs').writeFileSync('${DEVPLANSHELL_TARGET}','x')"`,
+      `node scratch/probe.mjs`,
+      `node --test scratch/probe.test.mjs`,
+      `python scratch/probe.py`,
+      `bash scratch/probe.sh`,
+      `npm init -y`,
+      `npm install`,
+      `npx prettier --version`,
+      `pip install example-package`,
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted a shell write: ${command}`);
+      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+      if (command.includes("node -e")) {
+        assert.match(result.stderr, new RegExp(`File: ${DEVPLANSHELL_TARGET.replaceAll("/", "\\/")}`, "u"), command);
+        assert.doesNotMatch(result.stderr, /File: (?:-e|\.)\n/u, command);
+      }
+    }
+    mkdirSync(dirname(join(path, DEVPLANSHELL_TARGET)), { recursive: true });
+    writeFileSync(join(path, DEVPLANSHELL_TARGET), "// benign passive-read fixture\n");
+    for (const command of [
+      `cat ${DEVPLANSHELL_TARGET}`,
+      `rg -n foo ${DEVPLANSHELL_TARGET}`,
+      `git add ${DEVPLANSHELL_TARGET}`,
+      `git diff ${DEVPLANSHELL_TARGET}`,
+      `git log ${DEVPLANSHELL_TARGET}`,
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a read/unrelated command: ${command} -- ${result.stderr}`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("DEVPLANSHELL-5: indirect script/package writes and the hook-disable setting are covered independently of the Claude harness", () => {
+  const path = devPlanShellFixture();
+  const settingsPath = join(path, ".claude", "settings.json");
+  const hooks = { PreToolUse: [{ matcher: "Write", hooks: [{ command: "node guard.mjs" }] }] };
+  try {
+    mkdirSync(dirname(settingsPath), { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify({ hooks, permissions: { allow: [] } }));
+    const directWrite = evaluateLifecycleReadyGuard({
+      tool_name: "Write",
+      tool_input: { file_path: settingsPath, content: '{"disableAllHooks":true}\n' },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(directWrite.exitCode, 2);
+    assert.match(directWrite.stderr, /PIPELINE-HOOKS-DISABLE-FORBIDDEN/u);
+
+    const replacesHooks = evaluateLifecycleReadyGuard({
+      tool_name: "Write",
+      tool_input: { file_path: settingsPath, content: JSON.stringify({ permissions: { allow: ["Bash"] } }) },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(replacesHooks.exitCode, 2);
+    assert.match(replacesHooks.stderr, /PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN/u);
+
+    const partialEdit = evaluateLifecycleReadyGuard({
+      tool_name: "Edit",
+      tool_input: { file_path: settingsPath, old_string: '"hooks"', new_string: '"hooks":null' },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(partialEdit.exitCode, 2);
+    assert.match(partialEdit.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u);
+
+    for (const command of [
+      `cp scratch/settings.json .claude/settings.json`,
+      `node -e "require('fs').writeFileSync('.claude/settings.json','{\\\"disableAllHooks\\\":true}')"`,
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u, command);
+    }
+
+    const powershellDisable = devPlanShellRun(
+      path,
+      `Set-Content -Path .claude/settings.json -Value '{"disableAllHooks":true}'`,
+      "PowerShell",
+    );
+    assert.equal(powershellDisable.exitCode, 2);
+    assert.match(powershellDisable.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u);
+
+    const powershellEmailValue = devPlanShellRun(
+      path,
+      `Set-Content -Path src/app.js -Value 'ops@example.test'`,
+      "PowerShell",
+    );
+    assert.equal(powershellEmailValue.exitCode, 2);
+    assert.match(powershellEmailValue.stderr, /File: src\/app\.js/u);
+    assert.doesNotMatch(powershellEmailValue.stderr, /File: (?:-Path|ops@example\.test)/u);
+
+    const quotedPowerShellPath = devPlanShellRun(
+      path,
+      `Set-Content -Path 'src/with spaces.js' -Value 'ops@example.test'`,
+      "PowerShell",
+    );
+    assert.equal(quotedPowerShellPath.exitCode, 2);
+    assert.match(quotedPowerShellPath.stderr, /File: src\/with spaces\.js/u);
+    assert.doesNotMatch(quotedPowerShellPath.stderr, /File: (?:-Path|ops@example\.test)/u);
+
+    const inlineSettings = devPlanShellRun(
+      path,
+      `node -e "require('fs').writeFileSync('.claude/settings.json','{\\\"disableAllHooks\\\":true}')"`,
+    );
+    assert.equal(inlineSettings.exitCode, 2);
+    assert.match(inlineSettings.stderr, /PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER/u);
+    assert.doesNotMatch(inlineSettings.stderr, /File: (?:-e|\.)\n/u);
+
+    const unchanged = evaluateLifecycleReadyGuard({
+      tool_name: "Write",
+      tool_input: { file_path: settingsPath, content: JSON.stringify({ hooks, permissions: { allow: ["Bash"] }, disableAllHooks: false }) },
+    }, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+    assert.equal(unchanged.exitCode, 0, unchanged.stderr);
+    assert.equal(devPlanShellRun(path, "node --test scratch/example.test.mjs").exitCode, 2);
+    assert.equal(devPlanShellRun(path, "node --check scratch/probe.test.mjs").exitCode, 0);
+    assert.equal(devPlanShellRun(path, "npm --version").exitCode, 0);
+    assert.equal(devPlanShellRun(path, "npx --version").exitCode, 0);
+    assert.equal(devPlanShellRun(path, "pip list").exitCode, 0);
+
+    const onboardingNode = process.execPath.replaceAll("\\", "/");
+    const onboardingScript = ONBOARDING_SCRIPT.replaceAll("\\", "/");
+    const powershellConsent = `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`;
+    assert.equal(devPlanShellRun(path, powershellConsent, "PowerShell").exitCode, 0, powershellConsent);
+    const stateScript = PIPELINE_STATE_SCRIPT.replaceAll("\\", "/");
+    const powershellInspect = `& '${onboardingNode}' '${stateScript}' inspect`;
+    const powershellInspectResult = devPlanShellRun(path, powershellInspect, "PowerShell");
+    assert.equal(powershellInspectResult.exitCode, 0, `${powershellInspect}: ${powershellInspectResult.stderr}`);
+    for (const rejected of [
+      `${powershellConsent}; Remove-Item game.js`,
+      `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email $env:EMAIL --activate`,
+      `& @node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`,
+      `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate & Remove-Item game.js`,
+      `& '${onboardingNode}' '${stateScript}' inspect --root '${path}'`,
+    ]) assert.equal(devPlanShellRun(path, rejected, "PowerShell").exitCode, 2, rejected);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * DEVPLANSHELL-2. `DEFAULT_EXEMPT_PREFIXES` iterated straight from the module the gate itself
+ * exports, not retyped here -- the same single-source discipline TPSHELL-5 pins for the
+ * test-path gate's rules loader, applied to this gate's exempt-prefix list instead.
+ */
+test("DEVPLANSHELL-2: a target under an exempt prefix is not blocked by this lane", () => {
+  const path = devPlanShellFixture();
+  try {
+    for (const prefix of DEFAULT_EXEMPT_PREFIXES) {
+      const target = `${prefix}devplanshell-probe.js`;
+      // A non-redirect write shape (as TPSHELL-2 itself uses) -- a `>` redirect is subject
+      // to its own, unrelated grammar-approval check further down the guard, which would
+      // otherwise contaminate this lane's own "not blocked" signal with a different denial.
+      const command = `cp scratch/fake.js ${target}`;
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 0, `blocked an exempt-prefix target: ${command} -- ${result.stderr}`);
+      assert.doesNotMatch(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * DEVPLANSHELL-3. PowerShell is wired into the SAME PreToolUse matcher as Bash, exactly per
+ * TPSHELL-3's own header for its sibling gate: both the test-path AND dev-plan shell lanes
+ * sit inside the same `SHELL_TOOLS.includes(toolName)` block above the POSIX-only early
+ * return, so both cover PowerShell too.
+ */
+test("DEVPLANSHELL-3: a PowerShell write cmdlet naming a dev-plan-gated path is refused, Get-Content is not", () => {
+  const path = devPlanShellFixture();
+  try {
+    for (const command of [
+      `Set-Content ${DEVPLANSHELL_TARGET} "x"`,
+      `Add-Content ${DEVPLANSHELL_TARGET} "x"`,
+      `Remove-Item ${DEVPLANSHELL_TARGET}`,
+      `Copy-Item other.js ${DEVPLANSHELL_TARGET}`,
+    ]) {
+      const result = devPlanShellRun(path, command, "PowerShell");
+      assert.equal(result.exitCode, 2, `admitted a PowerShell write: ${command}`);
+      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+    mkdirSync(dirname(join(path, DEVPLANSHELL_TARGET)), { recursive: true });
+    writeFileSync(join(path, DEVPLANSHELL_TARGET), "// benign passive-read fixture\n");
+    assert.equal(devPlanShellRun(path, `Get-Content ${DEVPLANSHELL_TARGET}`, "PowerShell").exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * DEVPLANSHELL-4 (mirrors TPSHELL-7). GL-09's own verification clause: a fault-injection test
+ * that raises inside the blocking path and asserts the block exit code, never merely that a
+ * catch is present. The pre-existing shell-lane pattern already fails CLOSED (see
+ * devPlanShellRefusalHit()'s own doc comment); this pins that a command the classifier
+ * genuinely could not evaluate is never silently admitted alongside one it could.
+ */
+test("DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently admits the command", () => {
+  const path = devPlanShellFixture();
+  try {
+    const command = `cp scratch/fake.js ${DEVPLANSHELL_TARGET}`;
+    const faulting = () => { throw new Error("synthetic devplan classifier fault"); };
+    const result = evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
+        devPlanGateVerdictFn: faulting,
+      },
+    );
+    assert.equal(result.exitCode, 2, "a classifier fault must block, not admit");
+    assert.match(result.stderr, new RegExp(`${DEVPLAN_SHELL_DENIAL_CODE}-FAULT`, "u"));
+    assert.match(result.stderr, /synthetic devplan classifier fault/u, "the fault reason is surfaced, not swallowed silently");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-B-GITARGV case 5 (backlog:
+ * 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md,
+ * Requirement 3, positive case 5): `git rebase --show-current-patch` stays read-only and is
+ * not blocked as a dev-plan write. Under the PRE-FIX classifier, `rebase`'s own subcommand
+ * token survived whole-argv `operands()` as an invented candidate `"rebase"`, which
+ * `devPlanGateVerdict()` then blocked (it does not start with any exempt prefix) -- exactly
+ * the live incident's shape, reproduced here with the same unapproved/draft fixture
+ * DEVPLANSHELL-1 uses, so this test genuinely goes red against the unfixed classifier.
+ */
+test("NVA-B-GITARGV case 5: git rebase --show-current-patch is not blocked as a dev-plan write", () => {
+  const path = devPlanShellFixture();
+  try {
+    for (const command of [
+      "git rebase --show-current-patch",
+      "git rebase --continue",
+      "git -c core.editor=true rebase --continue",
+      // A bare ref target, so this line specifically pins the "rebase never yields a pathspec
+      // candidate" rule -- the flag-only commands above stay candidate-free even without that
+      // rule (a leading "-" already excludes them from the generic operand walk).
+      "git rebase main",
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 0, `blocked a repository-wide mutator with no real pathspec: ${command} -- ${result.stderr}`);
+      assert.doesNotMatch(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------------
+// NVA-BOOTRECEIPT-1: makes a dispatched subagent's preflight obligation mechanically
+// checkable. Fixtures below build REAL directories (never an in-memory fake store) so the
+// governance-marker check (`existsSyncFn` at the project root) and the bootstrap-receipt
+// gate (the same dependency key, at the fake `<git-common-dir>`) both resolve against real
+// disk without a fixture collision.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * A real dispatched-subagent transcript: parent directory literally named `subagents`,
+ * with the sibling `<stem>.meta.json` `subagentIdentity()` (guard-dispatch-budget.mjs)
+ * requires -- matching that module's own empirically observed on-disk shape, never a
+ * guessed layout. `agentType: null` omits the meta.json sibling entirely, for the
+ * unresolved-identity fixtures below.
+ */
+function subagentTranscript(agentId = "abc123", agentType = "pipeline-core:goldfish-deep", spawnDepth = 1) {
+  const sessionDir = mkdtempSync(join(tmpdir(), "guard-lifecycle-subagent-session-"));
+  const subagentsDir = join(sessionDir, "subagents");
+  mkdirSync(subagentsDir, { recursive: true });
+  const transcriptPath = join(subagentsDir, `agent-${agentId}.jsonl`);
+  writeFileSync(transcriptPath, "");
+  if (agentType !== null) {
+    writeFileSync(join(subagentsDir, `agent-${agentId}.meta.json`), JSON.stringify({
+      agentType, description: "test", toolUseId: "t1", spawnDepth,
+    }));
+  }
+  return transcriptPath;
+}
+
+/** A real, throwaway directory standing in for `<git-common-dir>` -- never a real `.git`. */
+function bootstrapCommonDirFixture() {
+  return mkdtempSync(join(tmpdir(), "guard-lifecycle-bootstrap-common-"));
+}
+
+function bootstrapReceiptPathFixture(commonDir, agentId) {
+  return join(commonDir, "agent-pipeline", "bootstrap-receipt", `${agentId}.json`);
+}
+
+function bootstrapObservationsPathFixture(commonDir) {
+  return join(commonDir, "agent-pipeline", "bootstrap-receipt", "observations.jsonl");
+}
+
+function subagentInput(toolName, transcriptPath, toolInput) {
+  return { tool_name: toolName, tool_input: toolInput, transcript_path: transcriptPath };
+}
+
+function bootstrapGovernedRoot() {
+  const path = root();
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  return path;
+}
+
+test("isSanctionedStartPreflightInvocation: matches only the exact zero-argument preflight invocation, never a looser shape", () => {
+  const path = root();
+  try {
+    assert.equal(isSanctionedStartPreflightInvocation(`node '${START_PREFLIGHT_SCRIPT}'`, path), true);
+    // Near misses: this is the case NVA-BOOTRECEIPT-1's whole design turns on.
+    assert.equal(isSanctionedStartPreflightInvocation("pwd", path), false);
+    assert.equal(isSanctionedStartPreflightInvocation(`node '${START_PREFLIGHT_SCRIPT}' --extra`, path), false);
+    assert.equal(isSanctionedStartPreflightInvocation(`node '${ONBOARDING_SCRIPT}'`, path), false);
+    assert.equal(isSanctionedStartPreflightInvocation("echo not-node", path), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-BOOTRECEIPT-1: a subagent's sanctioned preflight Bash call writes a receipt, and a subsequent Edit then passes", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript();
+  try {
+    const bashResult = evaluateLifecycleReadyGuard(
+      subagentInput("Bash", transcriptPath, { command: `node "${START_PREFLIGHT_SCRIPT}"` }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => deny() },
+    );
+    assert.equal(bashResult.exitCode, 0, "the sanctioned preflight command itself must still be admitted");
+
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "abc123");
+    assert.ok(existsSync(receiptPath), "a receipt file must exist after the sanctioned preflight ran");
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    assert.equal(receipt.agentId, "abc123");
+    assert.equal(receipt.agentType, "pipeline-core:goldfish-deep");
+
+    const editResult = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: join(path, "src", "implementation.mjs") }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(editResult.exitCode, 0, "an Edit from the same subagent must pass once its receipt exists");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-GL09-ACTIVATE-1: measured runtime agent keys produce and consume one same-agent receipt", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const { sessionDir, transcriptPath } = claudeMemorySessionFixture();
+  const runtimeSubagent = (toolName, toolInput, agentId = "runtime-agent-a") => ({
+    tool_name: toolName,
+    tool_input: toolInput,
+    transcript_path: transcriptPath,
+    agent_id: agentId,
+    agent_type: "pipeline-core:goldfish-deep",
+  });
+  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(), nowFn: () => "1970-01-01T00:00:00.000Z" };
+  try {
+    for (const [toolName, toolInput] of [
+      ["Edit", { file_path: "src/implementation.mjs" }],
+      ["Write", { file_path: join(path, "src", "implementation.mjs") }],
+      ["NotebookEdit", { notebook_path: "src/implementation.ipynb" }],
+    ]) {
+      const denied = evaluateLifecycleReadyGuard(runtimeSubagent(toolName, toolInput), deps);
+      assert.equal(denied.exitCode, 2, toolName);
+      assert.match(denied.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u, toolName);
+    }
+    assert.equal(evaluateLifecycleReadyGuard(runtimeSubagent("Bash", { command: `node "${START_PREFLIGHT_SCRIPT}"` }), deps).exitCode, 0);
+    assert.ok(existsSync(bootstrapReceiptPathFixture(commonDir, "runtime-agent-a")));
+    assert.deepEqual(JSON.parse(readFileSync(bootstrapReceiptPathFixture(commonDir, "runtime-agent-a"), "utf8")), {
+      schema: "pipeline.bootstrap-receipt.v1",
+      agentId: "runtime-agent-a",
+      agentType: "pipeline-core:goldfish-deep",
+      observedAt: "1970-01-01T00:00:00.000Z",
+    });
+    assert.equal(evaluateLifecycleReadyGuard(runtimeSubagent("Edit", { file_path: "src/implementation.mjs" }), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(runtimeSubagent("Edit", { file_path: "src/implementation.mjs" }, "runtime-agent-b"), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard({ tool_name: "Edit", tool_input: { file_path: "src/implementation.mjs" }, transcript_path: transcriptPath }, deps).exitCode, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-GL09-ACTIVATE-1: invalid transcript paths stay fail-closed and unsafe runtime keys stay visible unresolved", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(), nowFn: () => "1970-01-01T00:00:00.000Z" };
+  try {
+    const relative = evaluateLifecycleReadyGuard({
+      tool_name: "Edit", tool_input: { file_path: "src/implementation.mjs" }, transcript_path: "relative/session.jsonl",
+      agent_id: "runtime-agent-a", agent_type: "pipeline-core:goldfish-deep",
+    }, deps);
+    assert.equal(relative.exitCode, 2);
+    assert.match(relative.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u);
+    for (const [agent_id, agent_type] of [["runtime-agent-a", undefined], ["../traversal", "pipeline-core:goldfish-deep"], ["runtime-agent-a", "../traversal"]]) {
+      const result = evaluateLifecycleReadyGuard({
+        tool_name: "Edit", tool_input: { file_path: "src/implementation.mjs" }, transcript_path: "/parent/session.jsonl", agent_id, agent_type,
+      }, deps);
+      assert.equal(result.exitCode, 0);
+    }
+    const records = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    assert.equal(records.filter((record) => record.decision === "fail-open-unresolved-identity" && record.reason === "runtime-agent-identity-invalid").length, 3);
+    assert.equal(existsSync(join(commonDir, "agent-pipeline", "bootstrap-receipt", "..", "traversal.json")), false);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: near-miss Bash commands do not write a receipt", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("nearmiss1");
+  try {
+    for (const command of ["pwd", `node "${START_PREFLIGHT_SCRIPT}" --extra`]) {
+      evaluateLifecycleReadyGuard(
+        subagentInput("Bash", transcriptPath, { command }),
+        { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => deny() },
+      );
+    }
+    assert.equal(existsSync(bootstrapReceiptPathFixture(commonDir, "nearmiss1")), false, "a near-miss command must never write a receipt");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: a subagent's first Edit/Write/NotebookEdit with no receipt is denied, naming the exact preflight command", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  try {
+    for (const [toolName, toolInput] of [
+      ["Edit", { file_path: "src/implementation.mjs" }],
+      ["Write", { file_path: join(path, "src", "implementation.mjs") }], // absolute path fixture
+      ["NotebookEdit", { notebook_path: "src/implementation.ipynb" }],
+    ]) {
+      const transcriptPath = subagentTranscript(`deny-${toolName}`);
+      try {
+        const result = evaluateLifecycleReadyGuard(
+          subagentInput(toolName, transcriptPath, toolInput),
+          { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+        );
+        assert.equal(result.exitCode, 2, toolName);
+        assert.match(result.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u, toolName);
+        assert.match(result.stderr, new RegExp(`node "${START_PREFLIGHT_SCRIPT.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}"`, "u"), toolName);
+      } finally { rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true }); }
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+// pipeline.identity-attestation-fail-closed-fallback (2026-08-29): a
+// transcript_path that IS PRESENT but not a usable absolute path (the shape
+// observed 17 times in one audited run, docs/pipeline-audit-claude-session.md
+// §3.1) must fail CLOSED here (GL-09), never share "unresolved"'s ambiguous
+// fail-open fate -- exercised through the real, unmodified
+// evaluateLifecycleReadyGuard/evaluateBootstrapReceiptGate chain, not a mock.
+test("NVA-BOOTRECEIPT-1 / pipeline.identity-attestation-fail-closed-fallback: a transcript_path that is present but relative is denied, never fail-open", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const relativeTranscriptPath = "relative/session/subagents/agent-x.jsonl";
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", relativeTranscriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+    );
+    assert.equal(result.exitCode, 2, "a present-but-relative transcript_path must fail closed, not open");
+    assert.match(result.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: a subagent's Edit WITH a receipt is allowed", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("hasreceipt1");
+  try {
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "hasreceipt1");
+    mkdirSync(dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, JSON.stringify({ schema: "pipeline.bootstrap-receipt.v1", agentId: "hasreceipt1" }));
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: the orchestrating session is never gated, whatever the receipt state", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const { transcriptPath } = claudeMemorySessionFixture(); // parent dir NOT named `subagents`
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0);
+    assert.equal(existsSync(bootstrapObservationsPathFixture(commonDir)), false, "the orchestrator must never be logged by this gate either");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: Read, Grep and Glob are never gated for a subagent with no receipt", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("readonly1");
+  try {
+    mkdirSync(join(path, "src"), { recursive: true });
+    writeFileSync(join(path, "src", "implementation.mjs"), "// native read fixture\n");
+    const toolInputs = {
+      Read: { file_path: "src/implementation.mjs" },
+      Grep: { path: "src/implementation.mjs", pattern: "native read fixture" },
+      Glob: { path: "src", pattern: "implementation.mjs" },
+    };
+    for (const toolName of ["Read", "Grep", "Glob"]) {
+      const result = evaluateLifecycleReadyGuard(
+        subagentInput(toolName, transcriptPath, toolInputs[toolName]),
+        { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+      );
+      assert.deepEqual(result, { exitCode: 0, stderr: "" }, toolName);
+    }
+    assert.equal(existsSync(bootstrapObservationsPathFixture(commonDir)), false, "a non-write, non-shell tool must never reach this gate at all");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: an unresolved subagent identity (missing meta.json) allows the call and appends an observation line", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("unresolved1", null); // no meta.json sibling written
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0, "an unresolvable identity must fail open, never closed");
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "fail-open-unresolved-identity" && record.reason === "meta-file-missing"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: an unreadable/corrupt receipt file allows the call and appends an observation line", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("corrupt1");
+  try {
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "corrupt1");
+    mkdirSync(dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, "not valid json {{{");
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0, "an unreadable receipt must fail open, never closed");
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "fail-open-unreadable-receipt" && record.agentId === "corrupt1"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: a thrown filesystem error while checking the receipt allows the call and appends an observation line", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("faulterr1");
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      {
+        projectDir: path,
+        resolveGitCommonDirFn: () => commonDir,
+        requireProjectOnboardingReadyFn: () => readyStub(),
+        existsSyncFn(target) {
+          if (target === bootstrapReceiptPathFixture(commonDir, "faulterr1")) throw new Error("synthetic disk fault");
+          return existsSync(target);
+        },
+      },
+    );
+    assert.equal(result.exitCode, 0, "a thrown error while resolving the receipt must fail open, never closed");
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "fail-open-error" && record.agentId === "faulterr1"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: every gate decision is observed, and the guard writes nothing outside bootstrap-receipt/", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const denyTranscript = subagentTranscript("obs-deny");
+  const allowTranscript = subagentTranscript("obs-allow");
+  try {
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "obs-allow");
+    mkdirSync(dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, JSON.stringify({ schema: "pipeline.bootstrap-receipt.v1", agentId: "obs-allow" }));
+
+    evaluateLifecycleReadyGuard(
+      subagentInput("Edit", denyTranscript, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+    );
+    evaluateLifecycleReadyGuard(
+      subagentInput("Edit", allowTranscript, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+    );
+
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "deny-no-receipt" && record.agentId === "obs-deny"));
+    assert.ok(records.some((record) => record.decision === "allow-receipt-present" && record.agentId === "obs-allow"));
+
+    // Every entry written under commonDir must live under agent-pipeline/bootstrap-receipt/.
+    const pipelineDirEntries = readdirSync(join(commonDir, "agent-pipeline"));
+    assert.deepEqual(pipelineDirEntries, ["bootstrap-receipt"]);
+    const receiptDirEntries = readdirSync(join(commonDir, "agent-pipeline", "bootstrap-receipt")).sort();
+    assert.deepEqual(receiptDirEntries, ["obs-allow.json", "observations.jsonl"]);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(denyTranscript)), { recursive: true, force: true });
+    rmSync(dirname(dirname(allowTranscript)), { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-INTAKEARGV-1. The loop that was never closed.
+//
+// NVA-CODEXARGV-1 pinned the CLI's emitted argv against this guard's admission -- two
+// machine components -- and the suite was green. The third consumer was the
+// `nextAction.guidance` string, the ONLY one an agent actually reads, and it was
+// hand-written prose that named no `--activate` while every shape here requires it.
+// Measured 2026-08-27 on a live Codex greenfield run: the agent followed the guidance
+// exactly, this guard refused the result as GUARD-LIFECYCLE-NOT-READY, and the refusal's
+// own recovery pointed back at the inspection that re-emitted the same guidance. Onboarding
+// could not be completed at all. A suite that proves two of three consumers agree does not
+// prove the flow works; these two cases close guidance->guard directly.
+// ---------------------------------------------------------------------------------
+
+test("NVA-INTAKEARGV-1: the agent-facing command hint names every flag its own shape requires", () => {
+  // The direct regression on the outage: `--activate` (and every other mandatory flag)
+  // must appear in the text handed to the agent, for every mutating subcommand -- derived
+  // from the shape, never asserted against a hand-copied expected string.
+  for (const [name, shape] of Object.entries(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+    const hint = mutatingApplyCommandHint(name);
+    assert.ok(hint.startsWith(`${name} `), `${name}: hint does not name its own subcommand`);
+    for (const flag of shape.required) {
+      assert.ok(hint.includes(flag), `${name}: mandatory ${flag} missing from the agent-facing hint`);
+    }
+    for (const flag of shape.requiredValue) {
+      assert.ok(hint.includes(flag), `${name}: mandatory ${flag} missing from the agent-facing hint`);
+    }
+    for (const flag of shape.requiredValueOneOf ?? []) {
+      assert.ok(hint.includes(flag), `${name}: one-of alternative ${flag} missing from the agent-facing hint`);
+    }
+  }
+});
+
+test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, and every mandatory flag is load-bearing", () => {
+  // Same admission seam as NVA-CODEXARGV-1 AC-3/AC-4 above (isSanctionedLifecycleCommand,
+  // each token quoted) -- deliberately not the whole guard, because a command missing
+  // --activate is not write-shaped at all and would be admitted for an unrelated reason,
+  // which says nothing about the admission being tested here.
+  //
+  // What this adds beyond AC-3/AC-4: the `--text` / `--text-file` one-of group, and EVERY
+  // mandatory flag rather than only --activate. Without the "exactly one" half, a second
+  // text route could silently decay into an alias accepted alongside the first.
+  const path = root();
+  const values = {
+    "--text": "one captured PO message",
+    "--text-file": "scratch/design-input.md",
+    "--text-turn-ref": JSON.stringify({
+      schema: "pipeline.claude-intake-prompt-reference.v1", captureId: "c".repeat(48), sessionId: "cli-session-test",
+      transcriptPathSha256: "b".repeat(64), promptSha256: "d".repeat(64), byteLength: 42,
+    }),
+    "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+    "--answers-file": "scratch/design-answers.json",
+    "--plan-sha256": "a".repeat(64),
+    "--proof": "scratch/bootstrap-plan-acknowledgement-proof-test.json",
+    "--git-author-name": "PO Name",
+    "--git-author-email": "po@example.com",
+    "--language": "en",
+    "--profile": "feature",
+  };
+  const admits = (argv) =>
+    isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`, path);
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const [name, shape] of Object.entries(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+      const oneOf = shape.requiredValueOneOf ?? [];
+      for (const alternative of oneOf.length > 0 ? oneOf : [null]) {
+        const supplied = { ...values };
+        if (alternative !== null) for (const other of oneOf) if (other !== alternative) delete supplied[other];
+        assert.equal(admits(automatedMutatingApplyArgv(name, path, supplied)), true,
+          `${name}${alternative === null ? "" : ` via ${alternative}`} was refused`);
+      }
+      if (oneOf.length > 1) {
+        // Both alternatives at once, and neither -- each must fail the "exactly one" check.
+        const single = { ...values };
+        for (const other of oneOf) if (other !== oneOf[0]) delete single[other];
+        const both = [...automatedMutatingApplyArgv(name, path, single), oneOf[1], values[oneOf[1]]];
+        assert.equal(admits(both), false, `${name}: two one-of alternatives were admitted together`);
+        // Every pair of alternatives together (covers the three-way group), each refused.
+        for (let i = 0; i < oneOf.length; i += 1) {
+          for (let j = i + 1; j < oneOf.length; j += 1) {
+            // The builder itself refuses two alternatives, so build with one and append the other.
+            const baseSupplied = { ...values };
+            for (const other of oneOf) if (other !== oneOf[i]) delete baseSupplied[other];
+            const pair = [...automatedMutatingApplyArgv(name, path, baseSupplied), oneOf[j], values[oneOf[j]]];
+            assert.equal(admits(pair), false,
+              `${name}: ${oneOf[i]} and ${oneOf[j]} were admitted together`);
+          }
+        }
+        const neither = automatedMutatingApplyArgv(name, path, single)
+          .filter((token, index, argv) => token !== oneOf[0] && argv[index - 1] !== oneOf[0]);
+        assert.equal(admits(neither), false, `${name}: admitted with no one-of alternative at all`);
+      }
+      // Every mandatory bare flag is load-bearing, not just --activate.
+      const complete = { ...values };
+      for (const other of oneOf.slice(1)) delete complete[other];
+      for (const flag of shape.required) {
+        assert.equal(admits(automatedMutatingApplyArgv(name, path, complete).filter((token) => token !== flag)), false,
+          `${name}: admitted without its mandatory ${flag}`);
+      }
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("greenfield Claude acknowledgement argv: emitted session intent is admitted narrowly", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const cases = [
+      ["bootstrap-acknowledge-plan", {}],
+      ["bootstrap-acknowledge-apply", { "--plan-sha256": "a".repeat(64), "--proof": "scratch/ack-proof.json" }],
+    ];
+    for (const [name, values] of cases) {
+      const argv = automatedMutatingApplyArgv(name, path, { ...values, "--intent": "session" });
+      const command = (tokens) => `node '${ONBOARDING_SCRIPT}' ${tokens.map((token) => `'${token}'`).join(" ")} '--runner' 'claude'`;
+      assert.equal(isSanctionedLifecycleCommand(command(argv), path), true, name);
+      assert.equal(isSanctionedLifecycleCommand(command([...argv, "--intent", "session"]), path), false,
+        `${name}: duplicate intent admitted`);
+      const altered = [...argv];
+      altered[altered.indexOf("--intent") + 1] = "other";
+      assert.equal(isSanctionedLifecycleCommand(command(altered), path), false,
+        `${name}: unknown intent admitted`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("greenfield scratch recovery: ordinary contained writes and mkdir survive every readiness status", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+      for (const input of [write("scratch/nested/trace.md"), edit("scratch/nested/trace.md"), bash("mkdir -p scratch/nested")]) {
+        assert.equal(evaluateLifecycleReadyGuard(input, deps).exitCode, 0, `${status}/${input.tool_name}`);
+      }
+      assert.equal(evaluateLifecycleReadyGuard(write("scratch/../src/escape.md"), deps).exitCode, 2, `${status}/escape`);
+    }
+    const unavailable = { projectDir: path, requireProjectOnboardingReadyFn() { throw new Error("unavailable"); } };
+    assert.equal(evaluateLifecycleReadyGuard(write("scratch/nested/trace.md"), unavailable).exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("greenfield passive PowerShell and native reads accept host-visible paths", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "read-scope-fixture-"));
+  try {
+    markGovernedFixture(path);
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "in-root.md"), "safe\n");
+    mkdirSync(join(path, "scratch"));
+    writeFileSync(join(outside, "pipeline-greenfield-review.md"), "fixture\n");
+    symlinkSync(outside, join(path, "escape"));
+    const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+    const ps = (command) => evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, deps);
+    assert.equal(ps("Get-Content -LiteralPath in-root.md").exitCode, 0);
+    for (const command of [
+      `Get-ChildItem -LiteralPath '${outside}'`,
+      `Get-Content -LiteralPath '${join(outside, "pipeline-greenfield-review.md")}'`,
+      "Get-ChildItem -LiteralPath escape",
+      "Get-Content -LiteralPath C:\\Users\\Synthetic\\key",
+    ]) {
+      const allowed = command.startsWith("Get-Content -LiteralPath '");
+      assert.equal(ps(command).exitCode, allowed ? 0 : 2, command);
+    }
+    assert.equal(ps(`Get-ChildItem -LiteralPath '${outside}' -Name`).exitCode, 0);
+    assert.match(ps("New-Item -Path src/escaped.md -ItemType File").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
+    assert.match(ps("Get-Content $env:SECRET").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const stateDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+      const action = (command) => evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, stateDeps);
+      assert.equal(action("New-Item -Path scratch/nested -ItemType Directory -Force").exitCode, 0, status);
+      assert.equal(action("Set-Content -LiteralPath scratch/nested/report.md -Value report").exitCode, 0, status);
+      if (process.platform === "win32") {
+        assert.equal(action(`New-Item -Path '${join(path, "scratch", "native-report.md")}' -ItemType File`).exitCode, 0, status);
+      }
+    }
+    for (const command of [
+      "New-Item -Path src/not-scratch -ItemType File",
+      "New-Item -Path scratch/../src/escape -ItemType File",
+      "New-Item -Path scratch/escape/* -ItemType File",
+      "Set-Content -LiteralPath escape/escaped.md -Value report",
+      "Set-Content -LiteralPath scratch/../outside.md -Value report",
+    ]) assert.match(ps(command).stderr, /GUARD-POWERSHELL-GRAMMAR/u, command);
+    const returnedInspect = `node '${ONBOARDING_SCRIPT}' inspect --root '${path}' --runner claude --intent session`;
+    assert.equal(ps(returnedInspect).exitCode, 0, "the documented PowerShell lane must admit returned lifecycle inspection");
+    const returnedAcknowledgePlan = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-plan --root '${path}' --activate --runner claude --intent session`;
+    assert.equal(ps(returnedAcknowledgePlan).exitCode, 0, "PowerShell must admit the exact returned acknowledgement plan");
+
+    const native = (tool_name, tool_input) => evaluateLifecycleReadyGuard({ tool_name, tool_input }, deps);
+    assert.equal(native("Read", { file_path: "in-root.md" }).exitCode, 0);
+    assert.equal(native("Grep", { pattern: "safe", path: "in-root.md" }).exitCode, 0);
+    assert.equal(native("Glob", { pattern: "**/*.md", path: "." }).exitCode, 0);
+    assert.equal(native("Read", { file_path: join(outside, "pipeline-greenfield-review.md") }).exitCode, 0);
+    for (const input of [
+      ["Grep", { pattern: "fixture", path: outside }],
+      ["Glob", { pattern: "**/*", path: "escape" }],
+      ["Glob", { pattern: "../outside/*", path: "." }],
+    ]) assert.equal(native(...input).exitCode, 2, input[0]);
+
+    const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
+    assert.ok(manifest.hooks.PreToolUse.some((entry) =>
+      entry.matcher?.includes("PowerShell") && ["Read", "Grep", "Glob"].every((tool) => entry.matcher.includes(tool))
+      && entry.hooks?.some((hook) => hook.command?.includes("guard-lifecycle-ready.mjs"))));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-INTAKESPECS-1. The design package is generated straight into `specs/<featureId>/`
+ * (ADR-0045's own location) instead of a `project/.onboarding-staging/` holding area. The
+ * holding area created a second, parallel notion of "the design documents", which is what let
+ * the plan-approval route bind a document whose own banner said it must not be bound, and what
+ * forced GS-15 to protect that directory from the very agent whose job was to author it.
+ *
+ * The admission got NARROWER in the move: the containing directory must itself be a generated
+ * feature id, and a `prd_<id>.md` is admitted only when that id matches its own directory -- a
+ * property the flat staging directory could not express at all.
+ */
+test("NVA-INTAKESPECS-1: the bootstrap-binding authoring admission covers specs/<featureId>/, and a PRD in a foreign feature's directory is refused", () => {
+  const path = root();
+  const featureId = "onboarding-0123456789ab";
+  const otherId = "onboarding-ba9876543210";
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const bindingDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+    const admits = (input) => evaluateLifecycleReadyGuard(input, bindingDeps).exitCode === 0;
+
+    // Admitted: exactly the two hand-authored targets of THIS feature, for both write tools.
+    for (const filePath of [`specs/${featureId}/prd_${featureId}.md`, `specs/${featureId}/spec.md`]) {
+      for (const input of [edit(filePath), write(filePath)]) {
+        assert.equal(admits(input), true, `${input.tool_name}:${filePath}`);
+      }
+    }
+
+    // Refused, in the same repository state. design-input.md stays an immutable verbatim
+    // capture; a PRD naming a DIFFERENT feature id than its own directory is the case the old
+    // flat layout could not distinguish; a nested path is not the package directory; and
+    // NotebookEdit is never an authoring tool for these.
+    for (const filePath of [
+      `specs/${featureId}/design-input.md`,
+      `specs/${featureId}/prd_${otherId}.md`,
+      `specs/${featureId}/other.md`,
+      `specs/${featureId}/nested/spec.md`,
+      "specs/not-a-generated-feature-id/spec.md",
+      "specs/spec.md",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), bindingDeps);
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, filePath);
+    }
+    const notebook = evaluateLifecycleReadyGuard(notebookEdit(`specs/${featureId}/spec.md`), bindingDeps);
+    assert.equal(notebook.exitCode, 2, "NotebookEdit");
+    assert.match(notebook.stderr, /GUARD-LIFECYCLE-NOT-READY/u, "NotebookEdit");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-GREENFIELD-SCRATCH-1: bootstrap-binding-required admits only contained scratch Edit/Write while preserving staging and lifecycle boundaries", () => {
+  const path = root();
+  const featureId = "onboarding-0123456789ab";
+  let outside = null;
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    outside = mkdtempSync(join(tmpdir(), "bootstrap-binding-scratch-outside-"));
+    mkdirSync(join(path, "scratch"));
+    symlinkSync(outside, join(path, "scratch", "outside-link"));
+    const bindingDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+
+    for (const input of [
+      write("scratch/bootstrap-note.md"),
+      edit("scratch/bootstrap-note.md"),
+      write("scratch/nested/holding.md"),
+      edit(join(path, "scratch", "absolute-note.md")),
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, bindingDeps).exitCode, 0, input.tool_input.file_path);
+    }
+
+    // The generated PRD/spec lane remains exact and independent of the new scratch lane.
+    for (const filePath of [`specs/${featureId}/prd_${featureId}.md`, `specs/${featureId}/spec.md`]) {
+      assert.equal(evaluateLifecycleReadyGuard(write(filePath), bindingDeps).exitCode, 0, filePath);
+    }
+
+    for (const input of [
+      write("scratch-evil/file.md"),
+      edit("scratch/../outside.md"),
+      write("scratch"),
+      write(join(tmpdir(), "outside-bootstrap-scratch.md")),
+      write("scratch/outside-link/escaped.md"),
+      write(".claude/pipeline-state.json"),
+      write("scratch/.resume-hint-input.json"),
+      notebookEdit("scratch/bootstrap.ipynb"),
+      write(`specs/${featureId}/design-input.md`),
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
+      assert.equal(result.exitCode, 2, `${input.tool_name}:${input.tool_input.file_path ?? input.tool_input.notebook_path}`);
+    }
+
+    // Existing intake/restart admissions remain, while capability failure does not inherit a
+    // bootstrap scratch escape hatch.
+    for (const status of ["intake-required", "intake-design-questions-required", "restart-required"]) {
+      const result = evaluateLifecycleReadyGuard(write("scratch/retained-behavior.md"), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      });
+      assert.equal(result.exitCode, 0, status);
+    }
+    const unavailable = evaluateLifecycleReadyGuard(write("scratch/capability-unavailable.md"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("session-capability-unavailable"); },
+    });
+    assert.equal(unavailable.exitCode, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    if (outside !== null) rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-CAPABILITY-PHASE-1: native lifecycle denial includes only the closed failed session-probe phase", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const denied = (lifecycleStatus, sessionCapabilityFailurePhase) => evaluateLifecycleReadyGuard(write("src/blocked.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn({ intent }) {
+        throw new ProjectOnboardingReadyError("PORG-NOT-READY", "fixture", { intent, lifecycleStatus, sessionCapabilityFailurePhase });
+      },
+    });
+    const phased = denied("session-capability-unavailable", "descriptor-retirement");
+    assert.equal(phased.exitCode, 2);
+    assert.match(phased.stderr, /Pipeline session readiness is session-capability-unavailable \(failed session probe phase: descriptor-retirement\)\./u);
+    const invalid = denied("session-capability-unavailable", "raw-error-must-not-escape");
+    assert.equal(invalid.exitCode, 2);
+    assert.doesNotMatch(invalid.stderr, /raw-error-must-not-escape|failed session probe phase/u);
+    const nonSession = denied("worktree-capability-unavailable", "descriptor-retirement");
+    assert.equal(nonSession.exitCode, 2);
+    assert.doesNotMatch(nonSession.stderr, /failed session probe phase/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes require physical scratch containment", () => {
+  const statuses = ["intake-required", "intake-design-questions-required", "restart-required", "bootstrap-binding-required"];
+  for (const status of statuses) {
+    const path = root();
+    let external = null;
+    try {
+      markGovernedFixture(path);
+      writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+      const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+
+      // First creation has no existing scratch ancestor to realpath. It remains bounded by the
+      // physical project root and must stay admitted for a legitimate nested scratch path.
+      const firstCreationInputs = [
+        write("scratch/nested/first-note.md"),
+        write(join(path, "scratch", "nested", "absolute-first-note.md")),
+      ];
+      // Bootstrap binding deliberately grants its bounded scratch lane only to document
+      // authoring tools; its Bash mkdir boundary stays denied by the ordinary lifecycle gate.
+      if (status !== "bootstrap-binding-required") firstCreationInputs.push(bash("mkdir -p scratch/nested"));
+      for (const input of firstCreationInputs) {
+        assert.equal(evaluateLifecycleReadyGuard(input, deps).exitCode, 0, `${status}/first creation/${input.tool_name}`);
+      }
+
+      mkdirSync(join(path, "scratch"));
+      mkdirSync(join(path, "src"));
+      mkdirSync(join(path, ".claude"), { recursive: true });
+      external = mkdtempSync(join(tmpdir(), "physical-scratch-external-"));
+      symlinkSync(join(path, "src"), join(path, "scratch", "to-product"), "dir");
+      assert.equal(isPhysicalScratchTarget("scratch/to-product/escaped.mjs", { rootDir: path, liveRoots: [] }), false);
+      symlinkSync(join(path, ".claude"), join(path, "scratch", "to-authority"), "dir");
+      symlinkSync(external, join(path, "scratch", "to-external"), "dir");
+      symlinkSync(join(path, "src", "not-yet-created.mjs"), join(path, "scratch", "dangling-product.mjs"), "file");
+
+      for (const input of [
+        write("scratch/to-product/escaped.mjs"),
+        edit(join(path, "scratch", "to-authority", "escaped.json")),
+        write("scratch/to-external/escaped.md"),
+        write("scratch/dangling-product.mjs"),
+        bash("mkdir -p scratch/to-product/nested"),
+      ]) {
+        const result = evaluateLifecycleReadyGuard(input, deps);
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}/${input.tool_input?.file_path ?? input.tool_input?.command ?? ""}`);
+        assert.match(result.stderr, /GUARD-(?:LIFECYCLE-NOT-READY|CROSS-REPO-MUTATION)/u, `${status}/${input.tool_name}`);
+      }
+
+      rmSync(join(path, "scratch"), { recursive: true, force: true });
+      symlinkSync(join(path, "src"), join(path, "scratch"), "dir");
+      for (const input of [write("scratch/root-escape.mjs"), bash("mkdir -p scratch/nested")]) {
+        const result = evaluateLifecycleReadyGuard(input, deps);
+        assert.equal(result.exitCode, 2, `${status}/symlinked scratch root/${input.tool_name}`);
+      }
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+      if (external !== null) rmSync(external, { recursive: true, force: true });
+    }
+  }
+});
+
+test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: only ENOENT permits first creation; scratch inspection faults fail closed", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "scratch"));
+    const scratchRoot = join(path, "scratch");
+    const nested = join(scratchRoot, "nested");
+    for (const code of ["EACCES", "EIO"]) {
+      const fault = () => Object.assign(new Error(`simulated ${code}`), { code });
+      const rootFault = evaluateLifecycleReadyGuard(write("scratch/nested/note.md"), {
+        projectDir: path,
+        lstatSyncFn(target) { if (target === scratchRoot) throw fault(); return lstatSync(target); },
+        requireProjectOnboardingReadyFn() { deny("intake-required"); },
+      });
+      assert.equal(rootFault.exitCode, 2, `${code}/scratch root`);
+      assert.match(rootFault.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${code}/scratch root`);
+      const ancestorFault = evaluateLifecycleReadyGuard(write("scratch/nested/note.md"), {
+        projectDir: path,
+        lstatSyncFn(target) { if (target === nested) throw fault(); return lstatSync(target); },
+        requireProjectOnboardingReadyFn() { deny("intake-required"); },
+      });
+      assert.equal(ancestorFault.exitCode, 2, `${code}/scratch ancestor`);
+      assert.match(ancestorFault.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${code}/scratch ancestor`);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// NVA-I-GRAMMAR DoD 1: the three live reproductions from backlog/items/2026-08-27-shell-
+// grammar-reads-quoted-content-as-shell-syntax.md, each paired with a genuinely-composed
+// control that must stay refused. The quote-aware tokenizer itself (guard-command-grammar.mjs,
+// out of this dispatch's scope) already read all three correctly by the time this dispatch
+// started -- this pins that fact as a regression test rather than leaving it undiscovered.
+// Only repro 3 (head -N for the grep/cat sinks) needed a real fix in this file.
+test("NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, never as shell syntax, for all three backlog reproductions", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    // Repro 1: a ternary inside a quoted `node -e` script.
+    const ternary = `node -e 'const x = 1; console.log(x ? "yes" : "no")'`;
+    const ternaryParsed = parseGuardCommand(ternary, path);
+    assert.equal(ternaryParsed.parseStatus, "accepted", ternary);
+    assert.equal(ternaryParsed.operators.length, 0, ternary);
+    assert.equal(ternaryParsed.redirects.length, 0, ternary);
+    // Genuinely-composed control: a REAL, unquoted pipe between two `node -e` calls.
+    const ternaryControl = "node -e 'console.log(1)' | node -e 'process.exit(0)'";
+    assert.equal(isReadOnlyDiagnosticCommand(ternaryControl, path), false, ternaryControl);
+    const ternaryControlResult = evaluateLifecycleReadyGuard(bash(ternaryControl), { projectDir: path });
+    assert.equal(ternaryControlResult.exitCode, 2, ternaryControl);
+    assert.match(ternaryControlResult.stderr, /GUARD-OPERATOR-UNAPPROVED/u, ternaryControl);
+
+    // Repro 2: `\|` alternation inside a quoted grep pattern.
+    mkdirSync(join(path, "some"), { recursive: true });
+    writeFileSync(join(path, "some", "file.mjs"), "const X = 1;\n");
+    const alternation = `grep -n "^const X\\|^export function Y" some/file.mjs`;
+    const alternationParsed = parseGuardCommand(alternation, path);
+    assert.equal(alternationParsed.parseStatus, "accepted", alternation);
+    assert.equal(alternationParsed.operators.length, 0, alternation);
+    assert.equal(isReadOnlyDiagnosticCommand(alternation, path), true, alternation);
+    // Genuinely-composed control: a REAL, unquoted `||`.
+    const alternationControl = "grep -n X some/file.mjs || rm some/file.mjs";
+    assert.equal(isReadOnlyDiagnosticCommand(alternationControl, path), false, alternationControl);
+    const alternationControlResult = evaluateLifecycleReadyGuard(bash(alternationControl), { projectDir: path });
+    assert.equal(alternationControlResult.exitCode, 2, alternationControl);
+    assert.match(alternationControlResult.stderr, /GUARD-PARSE-UNSUPPORTED/u, alternationControl);
+
+    // Repro 3: `head -40` refused where `head -n 40` is admitted, for the grep sink (the rg
+    // sink already accepted both forms before this dispatch, per GF-078 bug 2).
+    writeFileSync(join(path, "probe.txt"), "needle\n");
+    const headCombined = "grep -n needle probe.txt | head -40";
+    assert.equal(isReadOnlyDiagnosticCommand(headCombined, path), true, headCombined);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(headCombined), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    }), { exitCode: 0, stderr: "" });
+    // Genuinely-composed control: a THIRD pipeline stage, outside the bounded two-segment
+    // shape -- must stay refused regardless of the head -N fix.
+    const headControl = "grep -n needle probe.txt | head -40 | wc -l";
+    assert.equal(isReadOnlyDiagnosticCommand(headControl, path), false, headControl);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-I-GRAMMAR DoD 2: the identical bounded read, refused only because of which command
+// sourced it, now accepts `head -N` for every sink family, not only rg-to-head.
+test("NVA-I-GRAMMAR DoD 2: head -N is admitted wherever head -n N is, for grep-to-head and cat-to-head, with the same 1..500 bound", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "probe.txt"), "alpha\nbeta\n");
+    for (const [combined, twoToken] of [
+      ["grep -n alpha probe.txt | head -40", "grep -n alpha probe.txt | head -n 40"],
+      ["cat probe.txt | head -40", "cat probe.txt | head -n 40"],
+      ["grep -n alpha probe.txt | head -500", "grep -n alpha probe.txt | head -n 500"],
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(combined, path), isReadOnlyDiagnosticCommand(twoToken, path), combined);
+      assert.equal(isReadOnlyDiagnosticCommand(combined, path), true, combined);
+    }
+    // The bound is unchanged, both spellings: 0 and 501 stay refused either way.
+    for (const outOfBound of ["grep -n alpha probe.txt | head -0", "grep -n alpha probe.txt | head -501"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(outOfBound, path), false, outOfBound);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-I-GRAMMAR DoD 5: the refusal text can never drift from the grammar it describes, because
+// this test runs what it prints -- every ADMITTED_GRAMMAR_SHAPES example is both (a) present
+// verbatim in a real refusal's remedy text and (b) independently admitted when submitted.
+test("NVA-I-GRAMMAR DoD 5: every admitted-grammar-shape example is printed in the refusal AND independently admitted when submitted", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "probe.txt"), "alpha\nbeta\n");
+    const refusal = evaluateLifecycleReadyGuard(bash("git status ; git log"), { projectDir: path });
+    assert.equal(refusal.exitCode, 2);
+    assert.match(refusal.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.ok(ADMITTED_GRAMMAR_SHAPES.length > 0);
+    for (const shape of ADMITTED_GRAMMAR_SHAPES) {
+      assert.ok(shape.example, `table entry missing a runnable example: ${shape.spelling}`);
+      assert.ok(refusal.stderr.includes(shape.example), `refusal text missing example: ${shape.example}`);
+      assert.equal(isReadOnlyDiagnosticCommand(shape.example, path), true, shape.example);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-I-GRAMMAR DoD 6 -- THE DELIVERABLE (per this dispatch's own briefing, the && support is
+// not): drives every admitted-operator shape (the bounded rg/grep/cat pipelines and the
+// &&-chain union) and asserts that no mutating, protected-path, or cross-repo-mutating segment
+// ever becomes admitted merely by riding along BEFORE or AFTER a segment that IS independently
+// admitted -- the union rule (isChainSegmentAdmitted) must never let one admitted segment's
+// verdict leak onto its neighbour.
+test("NVA-I-GRAMMAR DoD 6: negative regression -- no mutating, protected-path, or cross-repo-mutating segment is admitted by composition with an admitted one", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-negative-"));
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "probe.txt"), "alpha\n");
+    const admittedSegments = [
+      "git status",
+      "rg -n alpha probe.txt",
+      "grep -n alpha probe.txt | head -5",
+      "cat probe.txt | grep -n alpha",
+    ];
+    const forbiddenSegments = [
+      "rm -rf probe.txt", // mutating
+      "git commit -m x", // mutating
+      "touch new-file.txt", // mutating
+      "sed -i s/x/y/ probe.txt", // mutating (write flag)
+      `mkdir -p ${outside}`, // cross-repo-mutating (outside project root)
+      "mkdir -p guardrails/critic-probe", // in-repo write outside the chain-eligible prefixes
+    ];
+    for (const admitted of admittedSegments) {
+      assert.equal(isReadOnlyDiagnosticCommand(admitted, path), true, admitted);
+      for (const forbidden of forbiddenSegments) {
+        assert.equal(isReadOnlyDiagnosticCommand(forbidden, path), false, forbidden);
+        for (const chain of [`${admitted} && ${forbidden}`, `${forbidden} && ${admitted}`]) {
+          assert.equal(isReadOnlyDiagnosticCommand(chain, path), false, chain);
+          const result = evaluateLifecycleReadyGuard(bash(chain), { projectDir: path });
+          assert.equal(result.exitCode, 2, chain);
+          assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u, chain);
+        }
+      }
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------------
+// NVA-B-DENIALTRIM: a second grammar denial of the SAME class within one session renders
+// shorter than the first, per-session state living under `<git-common-dir>/agent-pipeline/
+// guard-denial-classes/` -- the exact sibling tree bootstrap-receipt/ (NVA-BOOTRECEIPT-1)
+// already established. `bootstrapCommonDirFixture()` is reused unmodified: a real, throwaway
+// directory standing in for `<git-common-dir>`, injected via `resolveGitCommonDirFn`.
+// ---------------------------------------------------------------------------------------
+
+function bashWithSession(command, sessionId) {
+  const input = { tool_name: "Bash", tool_input: { command } };
+  if (sessionId !== null) input.session_id = sessionId;
+  return input;
+}
+
+function guardDenialClassesPathFixture(commonDir, sessionId) {
+  return join(commonDir, "agent-pipeline", "guard-denial-classes", `${sessionId}.json`);
+}
+
+test("NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session renders shorter, the first stays full, and both stay actionable", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  try {
+    const sessionId = "denialtrim-session-1";
+    const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+    const command = "rg -n lifecycle . | tee output.txt"; // GUARD-OPERATOR-UNAPPROVED
+
+    const first = evaluateLifecycleReadyGuard(bashWithSession(command, sessionId), deps);
+    assert.equal(first.exitCode, 2);
+    assert.match(first.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    // AC-2: the first denial of a class in a session still renders the full remedy text,
+    // including the admitted-grammar listing.
+    assert.match(first.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.match(first.stderr, /rg -n needle probe\.txt/u);
+
+    const second = evaluateLifecycleReadyGuard(bashWithSession(command, sessionId), deps);
+    assert.equal(second.exitCode, 2, "the decision itself must never be weakened by the trim");
+    assert.match(second.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    // AC-1: measured on RENDERED LENGTH, never a marker-string grep.
+    assert.ok(
+      second.stderr.length < first.stderr.length,
+      `expected the second denial (${second.stderr.length} chars) to be shorter than the first (${first.stderr.length} chars)`,
+    );
+    // The short form must not carry the full admitted-grammar listing (that is what shrank).
+    assert.doesNotMatch(second.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    // AC-3: still names what was rejected (the code, and the rejected-element line -- both
+    // unchanged in both forms) and still names a route forward (the one-simple-command
+    // constraint, plus where to find the full listing again).
+    assert.match(second.stderr, /Rejected element: the operator "\|"\./u);
+    assert.match(second.stderr, /Use one simple shell command per tool call/u);
+    assert.match(second.stderr, /already printed on the earlier denial of this kind this session/u);
+    // Everything besides the grammar-shape listing stays present and unchanged: the typed
+    // retryActions envelope and (in this "nothing armed" fixture) the human-override guidance.
+    assert.match(second.stderr, /"schema":"pipeline\.guard-retry-actions\.v1"/u);
+    assert.match(second.stderr, /No human override route is offered|Human override available/u);
+
+    // A THIRD call with a DIFFERENT session id for the SAME command is full-length again.
+    const differentSession = evaluateLifecycleReadyGuard(bashWithSession(command, "denialtrim-session-2"), deps);
+    assert.equal(differentSession.exitCode, 2);
+    assert.match(differentSession.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(differentSession.stderr.length, first.stderr.length);
+
+    // A call with a DIFFERENT code under the SAME session id is still full-length (AC-3's
+    // "class" is the grammar denial code, not the whole session).
+    const differentCode = evaluateLifecycleReadyGuard(
+      bashWithSession('git commit -m "line one\n\nline two"', sessionId), deps,
+    );
+    assert.equal(differentCode.exitCode, 2);
+    assert.match(differentCode.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(differentCode.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-DENIALTRIM AC-4: with no resolvable session identity, the guard renders full text every time and never throws", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  try {
+    const command = "rg -n lifecycle . | tee output.txt"; // GUARD-OPERATOR-UNAPPROVED
+
+    // (a) sessionId is null (never set on the tool_input at all).
+    const noSessionDeps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+    const noSessionFirst = evaluateLifecycleReadyGuard(bashWithSession(command, null), noSessionDeps);
+    const noSessionSecond = evaluateLifecycleReadyGuard(bashWithSession(command, null), noSessionDeps);
+    assert.equal(noSessionFirst.exitCode, 2);
+    assert.equal(noSessionSecond.exitCode, 2);
+    assert.match(noSessionFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.match(noSessionSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(noSessionSecond.stderr.length, noSessionFirst.stderr.length);
+    // Fail-open must never write a state file either -- there is no session id to key one on.
+    assert.equal(existsSync(join(commonDir, "agent-pipeline", "guard-denial-classes")), false);
+
+    // (b) a real session id, but the state directory is unwritable/unresolvable
+    // (resolveGitCommonDirFn returns null, mirroring evaluateBootstrapReceiptGate()'s own
+    // fail-open convention).
+    const unresolvableDeps = { projectDir: path, resolveGitCommonDirFn: () => null };
+    const unresolvableFirst = evaluateLifecycleReadyGuard(
+      bashWithSession(command, "denialtrim-unresolvable"), unresolvableDeps,
+    );
+    const unresolvableSecond = evaluateLifecycleReadyGuard(
+      bashWithSession(command, "denialtrim-unresolvable"), unresolvableDeps,
+    );
+    assert.equal(unresolvableFirst.exitCode, 2);
+    assert.equal(unresolvableSecond.exitCode, 2);
+    assert.match(unresolvableFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.match(unresolvableSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(unresolvableSecond.stderr.length, unresolvableFirst.stderr.length);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-DENIALTRIM AC-6: per-session denial-class state is written under the git common dir's agent-pipeline/ tree, never scratch/ or the working tree", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  try {
+    const sessionId = "denialtrim-session-ac6";
+    const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+
+    evaluateLifecycleReadyGuard(bashWithSession("rg -n lifecycle . | tee output.txt", sessionId), deps);
+    const statePath = guardDenialClassesPathFixture(commonDir, sessionId);
+    assert.ok(existsSync(statePath), "expected a per-session denial-class state file under the common dir");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(state.schema, "pipeline.guard-denial-classes-seen.v1");
+    assert.deepEqual(state.seenClasses, ["GUARD-OPERATOR-UNAPPROVED"]);
+
+    // Nothing was written to the project working tree or to its scratch/ directory.
+    assert.equal(existsSync(join(path, "scratch")), false);
+    assert.equal(existsSync(join(path, "agent-pipeline")), false);
+
+    // A second, different-class denial in the same session appends rather than replaces.
+    evaluateLifecycleReadyGuard(bashWithSession('git commit -m "line one\n\nline two"', sessionId), deps);
+    const updated = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.deepEqual(updated.seenClasses, ["GUARD-OPERATOR-UNAPPROVED", "GUARD-PARSE-UNSUPPORTED"]);
+
+    // Only the expected sibling directory exists under agent-pipeline/ -- proven the same way
+    // NVA-BOOTRECEIPT-1's own "every gate decision is observed" test proves its own tree.
+    const pipelineDirEntries = readdirSync(join(commonDir, "agent-pipeline"));
+    assert.deepEqual(pipelineDirEntries, ["guard-denial-classes"]);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------------
+// NVA-B-TRIMKEY (backlog/items/2026-09-01-the-denial-trim-state-is-keyed-per-session-not-per-
+// agent-as-its-comment-claims.md): a dispatched subagent's PreToolUse payload carries its
+// orchestrating session's OWN session_id, never one of its own (measured live -- see this
+// item's resolution note). Pinning that a fresh subagent identity still gets the full text
+// on ITS OWN first denial of a class, even when the shared session_id already saw that class
+// via the orchestrator (or a sibling subagent).
+// ---------------------------------------------------------------------------------------
+
+test("NVA-B-TRIMKEY AC-4: a subagent's own first denial of a class renders full text even though its orchestrating session already saw that class", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  const subagentTranscriptPath = subagentTranscript("trimkey-fresh-agent");
+  try {
+    const sharedSessionId = "trimkey-shared-session";
+    const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+    const command = "rg -n lifecycle . | tee output.txt"; // GUARD-OPERATOR-UNAPPROVED
+
+    // The orchestrator's own first denial of this class under the shared session id -- no
+    // transcript_path at all, the same "unresolved identity, fall back to session_id" shape
+    // `bashWithSession()` already uses throughout this suite.
+    const orchestratorFirst = evaluateLifecycleReadyGuard(bashWithSession(command, sharedSessionId), deps);
+    assert.equal(orchestratorFirst.exitCode, 2);
+    assert.match(orchestratorFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+
+    // A second denial under the identical (session-id-only) scope DOES trim -- establishing,
+    // before the subagent call below, that this session id is genuinely already "seen".
+    const orchestratorSecond = evaluateLifecycleReadyGuard(bashWithSession(command, sharedSessionId), deps);
+    assert.equal(orchestratorSecond.exitCode, 2);
+    assert.doesNotMatch(orchestratorSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+
+    // A freshly dispatched subagent, carrying the SAME session id but its OWN resolvable
+    // transcript_path/agentId, hits the identical denial class for the first time in ITS OWN
+    // scope. Asserted on measured rendered length, never a marker-string grep (AC-4).
+    const subagentInputPayload = {
+      tool_name: "Bash",
+      tool_input: { command },
+      transcript_path: subagentTranscriptPath,
+      session_id: sharedSessionId,
+    };
+    const subagentFirst = evaluateLifecycleReadyGuard(subagentInputPayload, deps);
+    assert.equal(subagentFirst.exitCode, 2);
+    assert.match(subagentFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(
+      subagentFirst.stderr.length,
+      orchestratorFirst.stderr.length,
+      "a fresh subagent's first denial of a class must render exactly as full as any other " +
+        "first denial, even though its orchestrator's session already saw this class",
+    );
+
+    // A second denial for that SAME subagent identity now trims, exactly like any other
+    // repeat within one scope.
+    const subagentSecond = evaluateLifecycleReadyGuard(subagentInputPayload, deps);
+    assert.equal(subagentSecond.exitCode, 2);
+    assert.ok(subagentSecond.stderr.length < subagentFirst.stderr.length);
+
+    // The two identities persist under DIFFERENT state files -- the orchestrator's own
+    // session-id-keyed file, and the subagent's own agentId-keyed file.
+    assert.ok(existsSync(guardDenialClassesPathFixture(commonDir, sharedSessionId)));
+    assert.ok(existsSync(join(commonDir, "agent-pipeline", "guard-denial-classes", "agent-trimkey-fresh-agent.json")));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(subagentTranscriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-GL09-ACTIVATE-1: runtime-keyed subagent denial trim is independent of its parent session", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  const { sessionDir, transcriptPath } = claudeMemorySessionFixture();
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+  const command = "rg -n lifecycle . | tee output.txt";
+  const session_id = "runtime-trim-shared-session";
+  try {
+    const parentFirst = evaluateLifecycleReadyGuard(bashWithSession(command, session_id), deps);
+    assert.match(parentFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    const parentSecond = evaluateLifecycleReadyGuard(bashWithSession(command, session_id), deps);
+    assert.doesNotMatch(parentSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    const runtimeSubagent = { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath, session_id, agent_id: "runtime-trim-agent", agent_type: "pipeline-core:goldfish-deep" };
+    const first = evaluateLifecycleReadyGuard(runtimeSubagent, deps);
+    assert.match(first.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    const second = evaluateLifecycleReadyGuard(runtimeSubagent, deps);
+    assert.ok(second.stderr.length < first.stderr.length);
+    assert.ok(existsSync(join(commonDir, "agent-pipeline", "guard-denial-classes", "agent-runtime-trim-agent.json")));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+// =========================================================================================
+// NVA-B-REBWIRE-1 — the rebase authority, wired into the guards
+//
+// backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md
+//
+// WHY THESE CASES BUILD A REAL REPOSITORY
+//   `lib/rebase-authority.test.mjs` drives the resolver through injected dependencies only,
+//   and says so in its own header: it proves the resolver's logic and refusals, but it does
+//   NOT prove that real `.git/rebase-merge` filenames match the ones its fake serves. Every
+//   case below runs against a genuine `git rebase` stopped on a genuine conflict, in a
+//   throwaway repository under `scratch/`, driving the actual hook entry points —
+//   `evaluateLifecycleReadyGuard()` in-process for the Bash lane, and `guard-devplan.mjs`
+//   spawned over stdin for the Edit/Write lane, which is that hook's only real entry point.
+//
+//   Both lanes are exercised from this one file because the fixture builder can live in
+//   exactly one tracked place: `scratch/` is git-ignored here, so a shared helper module
+//   under it would be missing for every other checkout.
+//
+// EVERY POSITIVE CARRIES A CONTROL IN ITS OWN FIXTURE
+//   A positive that passes because the gate never fired proves nothing, so each admission
+//   below is asserted next to a refusal in the SAME repository: the working tree of the
+//   partially replayed rebase genuinely carries `planApproved: false`, which is the live
+//   incident's state, so the dev-plan gate really is armed while these commands are admitted.
+// =========================================================================================
+
+import {
+  approveSubmittedPlan,
+  derivePlanLifecycle as rbDerivePlanLifecycle,
+  enterPlanImplementation,
+  sha256CanonicalJson,
+  submitPlan,
+} from "../lib/plan-spec-state-v2.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE } from "../lib/project-authority.mjs";
+import { REBASE_AUTHORITY_SURFACE_SCHEMA } from "../lib/guard-devplan-policy.mjs";
+
+const REBWIRE_DEVPLAN_GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
+const REBWIRE_REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const REBWIRE_SHAPE_CODE = "GUARD-REBASE-AUTHORITY-SHAPE";
+const REBWIRE_RETRY_SCHEMA = "pipeline.guard-retry-actions.v1";
+const REBWIRE_PLAN_PATH = "specs/feature/prd.md";
+const REBWIRE_SPEC_PATH = "specs/feature/spec.md";
+const REBWIRE_PLAN_BYTES = "# approved plan, as it stands at the original tip\n";
+const REBWIRE_SPEC_BYTES = "# approved spec, as it stands at the original tip\n";
+const REBWIRE_CONFLICT_PATH = "src/conflicted.mjs";
+const REBWIRE_UNTOUCHED_PATH = "src/untouched.mjs";
+const REBWIRE_MANIFEST = "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n";
+const REBWIRE_READY_RECEIPT = Object.freeze({
+  intent: "session",
+  schema: "pipeline.project-onboarding-ready-gate.v1",
+  status: "ready",
+});
+const REBWIRE_FIXTURES = [];
+
+function rbSha256(value) {
+  return createHash("sha256").update(Buffer.from(value, "utf8")).digest("hex");
+}
+
+const REBWIRE_AUTHORITY = {
+  schema: "pipeline.po-gate-authority.v2",
+  humanFacing: "en",
+  sourceSha256: "4".repeat(64),
+  runtimeSha256: "5".repeat(64),
+  receiptSha256: "6".repeat(64),
+  repositoryFingerprint: "7".repeat(64),
+  planPath: REBWIRE_PLAN_PATH,
+  planSha256: rbSha256(REBWIRE_PLAN_BYTES),
+  specPath: REBWIRE_SPEC_PATH,
+  specSha256: rbSha256(REBWIRE_SPEC_BYTES),
+};
+
+function rbContinuity() {
+  return {
+    schema: "pipeline.continuity.v0",
+    featureId: "rebwire-feature",
+    revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: {
+      prd: { path: REBWIRE_PLAN_PATH, sha256: "8".repeat(64) },
+      spec: { path: REBWIRE_SPEC_PATH, sha256: "9".repeat(64) },
+      result: null,
+    },
+    queueHead: {
+      packageId: "rebwire",
+      actionId: "review-active-feature",
+      nextAction: "review",
+      productRetryCount: 0,
+      environmentRerouteCount: 0,
+      dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    closeTransition: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+}
+
+/** The draft state a partially replayed working tree shows — the live incident's condition. */
+function rbDraftState() {
+  return {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "rebwire-feature", planPath: REBWIRE_PLAN_PATH, phase: "design" },
+    planApproved: false,
+    continuity: rbContinuity(),
+  };
+}
+
+/** The validly approved, in-implementation state that must live at `orig-head`. */
+function rbImplementingState() {
+  const initial = rbDraftState();
+  const submitted = submitPlan({
+    state: initial,
+    expectedStateSha256: sha256CanonicalJson(initial),
+    poGateAuthority: REBWIRE_AUTHORITY,
+    // The fixture exercises rebase admission, not the epic design-workflow package contract.
+    profile: "mini",
+    profileSha256: "3".repeat(64),
+    by: "Coordinator",
+    at: "2026-09-01T20:00:00.000Z",
+  });
+  assert.equal(submitted.ok, true, JSON.stringify(submitted));
+  const approved = approveSubmittedPlan({
+    state: submitted.state,
+    expectedStateSha256: sha256CanonicalJson(submitted.state),
+    expectedSubmissionSha256: rbDerivePlanLifecycle(submitted.state).submissionSha256,
+    poGateAuthority: REBWIRE_AUTHORITY,
+    profileSha256: "3".repeat(64),
+    designAdvisorAdmissionSha256: "4".repeat(64),
+    by: "PO",
+    at: "2026-09-01T20:05:00.000Z",
+  });
+  assert.equal(approved.ok, true, JSON.stringify(approved));
+  const implementing = enterPlanImplementation({
+    state: approved.state,
+    expectedStateSha256: sha256CanonicalJson(approved.state),
+    at: "2026-09-01T20:30:00.000Z",
+  });
+  assert.equal(implementing.ok, true, JSON.stringify(implementing));
+  return implementing.state;
+}
+
+function rbScratchBase() {
+  const candidate = join(REBWIRE_REPO_ROOT, "scratch");
+  try {
+    mkdirSync(candidate, { recursive: true });
+    return realpathSync(candidate);
+  } catch {
+    return realpathSync(tmpdir());
+  }
+}
+
+/**
+ * pipeline.rebwire-req5-2-supplies-its-own-true (backlog/items/2026-09-02-the-ci-path-allowlist-omits-
+ * the-editor-the-guards-own-continuation-names.md, Route 2): a directory containing an executable
+ * `true`, for the one real (non-guard-mediated) spawn below that actually needs `core.editor=true`
+ * to resolve. `.github/workflows/verify.yml`'s "Runner-free
+ * offline Core Verify" step runs this whole suite under a synthetic `PATH` admitting only
+ * node/git/bash/sh/openssl/uname -- `true` is deliberately not among them, so a bare `git rebase
+ * --continue` there cannot start its editor and the spawn fails with "cannot run true: No such file
+ * or directory". The assertion under test is that the guard's own PUBLISHED continuation really
+ * finishes a rebase, not that the host provides coreutils, so the fix supplies `true` to the spawn's
+ * own `PATH` rather than widening the workflow's allowlist -- the command string handed to git stays
+ * byte-identical to the continuation the guard published. The shim's shebang names the exact running
+ * Node binary (`process.execPath`) directly, never a bare `env`/`sh` name resolved through PATH, so it
+ * has no dependency of its own on what the caller's PATH admits. Cached module-wide: content never
+ * varies by fixture.
+ */
+let rbTrueShimDirCache;
+function rbTrueShimDir() {
+  if (rbTrueShimDirCache !== undefined) return rbTrueShimDirCache;
+  const bin = mkdtempSync(join(rbScratchBase(), "rebwire-true-"));
+  REBWIRE_FIXTURES.push(bin);
+  writeFileSync(join(bin, "true"), `#!${process.execPath}\nprocess.exit(0);\n`, { mode: 0o755 });
+  rbTrueShimDirCache = bin;
+  return bin;
+}
+
+/**
+ * A throwaway repository standing in a genuine, conflicted `git rebase`.
+ *
+ * History, deliberately shaped so exactly ONE path conflicts:
+ *   A (main)     everything, including the pipeline State
+ *   B (feature)  changes only the conflicting file           <- becomes `orig-head`
+ *   C (main)     changes the same file, and (approved variant) rewrites the State to draft
+ * Rebasing B onto C stops on the single conflict, with a working tree whose State says
+ * `planApproved: false` while `orig-head` says the feature is approved and implementing.
+ *
+ * @param {{approvedAtOrigHead?: boolean}} options `false` builds negative case 7's repository:
+ *   the true starting point itself is not validly approved.
+ */
+function rbFixture({ approvedAtOrigHead = true } = {}) {
+  const dir = mkdtempSync(join(rbScratchBase(), "rebwire-"));
+  REBWIRE_FIXTURES.push(dir);
+  const run = (...args) => {
+    const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    assert.equal(result.status, 0, `git ${args.join(" ")} failed: ${result.stderr}`);
+    return result.stdout;
+  };
+  const put = (relative, contents) => {
+    mkdirSync(dirname(join(dir, relative)), { recursive: true });
+    writeFileSync(join(dir, relative), contents);
+  };
+
+  run("init");
+  run("config", "user.name", "Rebase Fixture");
+  run("config", "user.email", "rebase-fixture@example.invalid");
+  run("config", "commit.gpgsign", "false");
+  run("checkout", "-b", "main");
+
+  markGovernedFixture(dir);
+  put(".claude/pipeline.yaml", REBWIRE_MANIFEST);
+  put(REBWIRE_PLAN_PATH, REBWIRE_PLAN_BYTES);
+  put(REBWIRE_SPEC_PATH, REBWIRE_SPEC_BYTES);
+  put(REBWIRE_CONFLICT_PATH, "export const value = \"base\";\n");
+  put(REBWIRE_UNTOUCHED_PATH, "export const untouched = true;\n");
+  put(LEGACY_STATE, JSON.stringify(approvedAtOrigHead ? rbImplementingState() : rbDraftState()));
+  run("add", "-A");
+  run("commit", "-m", "base");
+
+  run("checkout", "-b", "feat/rebwire");
+  put(REBWIRE_CONFLICT_PATH, "export const value = \"feature\";\n");
+  run("commit", "-a", "-m", "feature change");
+
+  run("checkout", "main");
+  put(REBWIRE_CONFLICT_PATH, "export const value = \"upstream\";\n");
+  // The approved variant additionally moves the WORKING-TREE State back to draft, which is
+  // exactly what a partial replay shows and what made the live gate refuse every step.
+  if (approvedAtOrigHead) put(LEGACY_STATE, JSON.stringify(rbDraftState()));
+  run("commit", "-a", "-m", "upstream change");
+
+  run("checkout", "feat/rebwire");
+  const rebase = spawnSync("git", ["-c", "core.editor=true", "rebase", "main"], { cwd: dir, encoding: "utf8" });
+  assert.notEqual(rebase.status, 0, "the fixture rebase was expected to stop on a conflict");
+  assert.ok(
+    existsSync(join(dir, ".git", "rebase-merge")),
+    `this git built no .git/rebase-merge state (backend: ${existsSync(join(dir, ".git", "rebase-apply")) ? "rebase-apply" : "unknown"}); `
+      + "the resolver supports only the merge backend, so these cases cannot run here",
+  );
+  // The working tree really does look like a draft while the rebase is standing.
+  assert.equal(JSON.parse(readFileSync(join(dir, LEGACY_STATE), "utf8")).planApproved, false);
+  return dir;
+}
+
+function rbDeps(dir) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: () => REBWIRE_READY_RECEIPT };
+}
+
+/** The Bash lane, through the guard's real evaluation entry point. */
+function rbBash(dir, command) {
+  return evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, rbDeps(dir));
+}
+
+/** The Edit/Write lane, through `guard-devplan.mjs`'s real stdin entry point. */
+function rbDevplan(dir, toolName, filePath) {
+  const result = spawnSync(process.execPath, [REBWIRE_DEVPLAN_GUARD], {
+    input: JSON.stringify({ tool_name: toolName, tool_input: { file_path: filePath, old_string: "a", new_string: "b" } }),
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+  });
+  return { exitCode: result.status, stderr: result.stderr ?? "" };
+}
+
+function rbJsonLines(stderr, schema) {
+  const found = [];
+  for (const line of String(stderr).split("\n")) {
+    let value;
+    try { value = JSON.parse(line); } catch { continue; }
+    if (value !== null && typeof value === "object" && value.schema === schema) found.push(value);
+  }
+  return found;
+}
+
+function rbSurface(stderr) {
+  return rbJsonLines(stderr, REBASE_AUTHORITY_SURFACE_SCHEMA)[0] ?? null;
+}
+
+function rbRetryActions(stderr) {
+  return rbJsonLines(stderr, REBWIRE_RETRY_SCHEMA).flatMap((envelope) => envelope.retryActions ?? []);
+}
+
+test("rebwire fixture: a real conflicted rebase, and the guard reads its real .git/rebase-merge", () => {
+  const dir = rbFixture();
+  // Filenames the resolver depends on, observed on a repository this git actually built.
+  for (const name of ["head-name", "orig-head", "onto", "git-rebase-todo"]) {
+    assert.ok(existsSync(join(dir, ".git", "rebase-merge", name)), name);
+  }
+  const denial = rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH);
+  assert.equal(denial.exitCode, 2);
+  const surface = rbSurface(denial.stderr);
+  assert.ok(surface !== null, denial.stderr);
+  const observed = spawnSync("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: dir, encoding: "utf8" });
+  assert.equal(observed.status, 0);
+  assert.deepEqual(
+    surface.conflictPaths,
+    observed.stdout.split("\n").map((line) => line.trim()).filter(Boolean).sort(),
+  );
+  assert.deepEqual(surface.conflictPaths, [REBWIRE_CONFLICT_PATH]);
+  assert.equal(surface.headName, "refs/heads/feat/rebwire");
+  assert.match(surface.origHead, /^[0-9a-f]{40}$/u);
+  assert.equal(surface.origHead, readFileSync(join(dir, ".git", "rebase-merge", "orig-head"), "utf8").trim());
+  // No absolute machine path may reach a denial text.
+  assert.equal(denial.stderr.includes(dir), false, "the denial leaked the repository's absolute path");
+});
+
+test("rebwire positive-1: the exact continuations are admitted mid-rebase, with the gate armed", () => {
+  const dir = rbFixture();
+  for (const command of ["git -c core.editor=true rebase --continue", "git rebase --continue"]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
+  }
+  // The control, in the same repository: the dev-plan gate genuinely refuses here.
+  assert.equal(rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`).exitCode, 2);
+  assert.equal(rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH).exitCode, 2);
+});
+
+test("rebwire positive-2: an Edit/Write resolving a conflicted path is admitted, relative and absolute", () => {
+  const dir = rbFixture();
+  for (const [tool, path] of [
+    ["Edit", REBWIRE_CONFLICT_PATH],
+    ["Write", join(dir, "src", "conflicted.mjs")],
+    ["Edit", `./${REBWIRE_CONFLICT_PATH}`],
+  ]) {
+    const result = rbDevplan(dir, tool, path);
+    assert.equal(result.exitCode, 0, `${tool} ${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] dev-plan gate suspended for this write/u);
+  }
+  // Control, same repository, both path forms: an untouched implementation file stays refused.
+  assert.equal(rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH).exitCode, 2);
+  assert.equal(rbDevplan(dir, "Write", join(dir, "src", "untouched.mjs")).exitCode, 2);
+});
+
+test("rebwire positive-3: git checkout --ours on a real conflict path is admitted, relative and absolute", () => {
+  const dir = rbFixture();
+  for (const path of [REBWIRE_CONFLICT_PATH, join(dir, "src", "conflicted.mjs")]) {
+    const result = rbBash(dir, `git checkout --ours -- ${path}`);
+    assert.equal(result.exitCode, 0, `${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] dev-plan gate suspended for this command/u);
+    // The Requirement 3 misclassification is gone: no operand is reported as a file.
+    assert.equal(result.stderr.includes("core.editor=true"), false);
+  }
+  assert.equal(rbBash(dir, `git checkout --theirs -- ${REBWIRE_CONFLICT_PATH}`).exitCode, 0);
+  assert.equal(rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`).exitCode, 2);
+});
+
+test("rebwire positive-4: git rebase --show-current-patch is admitted during an active rebase", () => {
+  const dir = rbFixture();
+  assert.equal(rbBash(dir, "git rebase --show-current-patch").exitCode, 0);
+  // And it is one of the read-only diagnostics a mid-rebase denial actually hands back.
+  const actions = rbRetryActions(rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH).stderr);
+  assert.ok(
+    actions.some((action) => action.executable === "git" && action.argv.join(" ") === "rebase --show-current-patch"),
+    JSON.stringify(actions),
+  );
+});
+
+test("rebwire positive-5: git rebase --abort keeps its own recovery lane, independent of this authority", () => {
+  for (const approvedAtOrigHead of [true, false]) {
+    const dir = rbFixture({ approvedAtOrigHead });
+    for (const command of ["git rebase --abort", `git -C ${dir} rebase --abort`]) {
+      assert.equal(rbBash(dir, command).exitCode, 0, `${command} (approved=${approvedAtOrigHead})`);
+    }
+  }
+});
+
+test("rebwire negative-1: a file outside the conflict set stays blocked while a rebase is active", () => {
+  const dir = rbFixture();
+  const denial = rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH);
+  assert.equal(denial.exitCode, 2);
+  assert.match(denial.stderr, /BLOCKED \(guard-devplan/u);
+  const surface = rbSurface(denial.stderr);
+  assert.deepEqual(surface.conflictPaths, [REBWIRE_CONFLICT_PATH]);
+  assert.equal(surface.conflictPaths.includes(REBWIRE_UNTOUCHED_PATH), false);
+  // ...and the same file under a nested, never-conflicted directory is refused too.
+  assert.equal(rbDevplan(dir, "Write", "src/nested/other.mjs").exitCode, 2);
+});
+
+test("rebwire negative-2 / negative-3: --edit-todo, --exec and --skip are refused under active authority", () => {
+  const dir = rbFixture();
+  for (const command of [
+    "git rebase --edit-todo",
+    "git rebase --exec 'touch marker'",
+    "git rebase --exec=./run.sh",
+    "git rebase --skip",
+    "git rebase --continue --autostash",
+  ]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    // Refused by a TYPED code, never by silence, and never by an admission this authority
+    // granted. `git rebase --exec '<shell payload>'` is refused one lane earlier than the
+    // others: `extractShellWriteTargets()` classifies the payload as opaque interpreter code,
+    // so the stricter GUARD-DEVPLAN-SHELL lane speaks first. Asserting the disjunction here
+    // rather than pinning one code keeps this case about the property Requirement 4 states —
+    // the shape is refused — instead of about which sibling gate happened to reach it first.
+    assert.ok(
+      result.stderr.includes(REBWIRE_SHAPE_CODE) || result.stderr.includes(DEVPLAN_SHELL_DENIAL_CODE),
+      `${command}: ${result.stderr}`,
+    );
+    assert.equal(result.stderr.includes("[rebase-authority] dev-plan gate suspended"), false, command);
+    // Requirement 5 again: even this refusal names the way on.
+    assert.ok(rbRetryActions(result.stderr).length > 0, command);
+    assert.ok(result.stderr.includes(rbSurface(result.stderr).nextCommand), command);
+  }
+  // The two shapes that reach this dispatch's own refusal are pinned to its typed code, so a
+  // later change that silently routes them elsewhere is visible rather than absorbed.
+  for (const command of ["git rebase --edit-todo", "git rebase --skip"]) {
+    assert.ok(rbBash(dir, command).stderr.includes(REBWIRE_SHAPE_CODE), command);
+  }
+});
+
+test("rebwire negative-4: only -c core.editor=true is admitted, never an arbitrary -c", () => {
+  const dir = rbFixture();
+  for (const command of [
+    "git -c core.hooksPath=none rebase --continue",
+    "git -ccore.editor=true rebase --continue",
+    "git -c core.editor=true -c core.hooksPath=none rebase --continue",
+    "git -c core.editor=true rebase --show-current-patch",
+  ]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    assert.ok(result.stderr.includes(REBWIRE_SHAPE_CODE), `${command}: ${result.stderr}`);
+  }
+  assert.equal(rbBash(dir, "git -c core.editor=true rebase --continue").exitCode, 0);
+  // ...and the prohibition is exactly "no arbitrary -c", never "no global git option": a read
+  // that was admitted a moment before the rebase started is still admitted during it.
+  for (const command of ["git --no-pager status", "git --no-pager log", "git -p log"]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 0, `${command} was over-refused: ${result.stderr}`);
+  }
+});
+
+test("rebwire negative-5: no push authority is granted, implied or represented anywhere", () => {
+  const dir = rbFixture();
+  const denial = rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`);
+  assert.equal(denial.exitCode, 2);
+  const surface = rbSurface(denial.stderr);
+  assert.equal(surface.pushAuthority, false);
+  assert.equal(surface.remoteAuthority, false);
+  assert.equal(surface.sessionWide, false);
+  assert.match(denial.stderr, /grants no push and no force-push/u);
+  for (const advertised of [...surface.permittedContinuations, ...surface.resolutionShapes, surface.nextCommand]) {
+    assert.equal(/(?:^|\s)push(?:\s|$)/u.test(advertised), false, advertised);
+  }
+  for (const action of rbRetryActions(denial.stderr)) {
+    assert.equal(action.argv.includes("push"), false, action.argv.join(" "));
+    assert.equal(action.mutation, false);
+  }
+  // A push command receives no admission from this authority — it never lifts anything for it.
+  for (const command of ["git push origin HEAD", "git push --force origin main", "git push --force-with-lease"]) {
+    assert.equal(rbBash(dir, command).stderr.includes("[rebase-authority] dev-plan gate suspended"), false, command);
+  }
+});
+
+test("rebwire negative-6: a conflict command whose pathspec lies outside the surface is refused", () => {
+  const dir = rbFixture();
+  for (const command of [
+    `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`,
+    `git checkout --ours -- ${REBWIRE_CONFLICT_PATH} ${REBWIRE_UNTOUCHED_PATH}`,
+    `git restore --ours -- ${REBWIRE_UNTOUCHED_PATH}`,
+    `git checkout --ours ${REBWIRE_CONFLICT_PATH}`,
+  ]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    assert.equal(result.stderr.includes("[rebase-authority] dev-plan gate suspended"), false, command);
+  }
+});
+
+test("rebwire negative-7: a rebase whose orig-head is not validly approved gets no authority at all", () => {
+  const dir = rbFixture({ approvedAtOrigHead: false });
+  const write = rbDevplan(dir, "Edit", REBWIRE_CONFLICT_PATH);
+  assert.equal(write.exitCode, 2);
+  assert.equal(rbSurface(write.stderr), null, write.stderr);
+  assert.equal(write.stderr.includes("[rebase-authority]"), false, write.stderr);
+
+  const command = rbBash(dir, `git checkout --ours -- ${REBWIRE_CONFLICT_PATH}`);
+  assert.equal(command.exitCode, 2);
+  assert.equal(command.stderr.includes("[rebase-authority]"), false, command.stderr);
+
+  // The Requirement 4 shape refusals are scoped to a resolved authority: with none, this
+  // guard's behaviour is exactly what it was before the wiring existed.
+  assert.equal(rbBash(dir, "git rebase --edit-todo").stderr.includes(REBWIRE_SHAPE_CODE), false);
+});
+
+test("rebwire req5-1: a mid-rebase denial carries a non-empty read-only envelope naming the surface", () => {
+  const dir = rbFixture();
+  for (const denial of [
+    rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`),
+    rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH),
+    rbBash(dir, "git rebase --edit-todo"),
+  ]) {
+    assert.equal(denial.exitCode, 2);
+    const actions = rbRetryActions(denial.stderr);
+    assert.ok(actions.length > 0, "an empty retryActions array during an active rebase is itself a defect");
+    for (const action of actions) {
+      assert.equal(action.mutation, false, action.argv.join(" "));
+      assert.equal(action.requiresConfirmation, false, action.argv.join(" "));
+      assert.equal(action.argv.includes("--continue"), false, action.argv.join(" "));
+    }
+    // The surface, and the exact continuation stated verbatim in the prose.
+    const surface = rbSurface(denial.stderr);
+    assert.deepEqual(surface.conflictPaths, [REBWIRE_CONFLICT_PATH]);
+    assert.ok(denial.stderr.includes(REBWIRE_CONFLICT_PATH));
+    assert.equal(surface.nextCommand, "git -c core.editor=true rebase --continue");
+    assert.ok(denial.stderr.includes(surface.nextCommand), denial.stderr);
+    assert.ok(actions.some((action) => action.argv.includes("--diff-filter=U")));
+  }
+});
+
+test("rebwire req5-2: an uninformed session reaches a finished rebase by following only the denials", () => {
+  const dir = rbFixture();
+  // The session has never heard of this authority: no flag, no environment variable, no prior
+  // call. Its first move is an ordinary implementation edit, and it is refused.
+  const first = rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH);
+  assert.equal(first.exitCode, 2);
+  const surface = rbSurface(first.stderr);
+  assert.ok(surface !== null, "the refusal named no route at all");
+  const actions = rbRetryActions(first.stderr);
+
+  // 1. Run a diagnostic the refusal itself handed back — through the guard, then for real.
+  const listing = actions.find((action) => action.argv.includes("--diff-filter=U"));
+  assert.ok(listing !== undefined, JSON.stringify(actions));
+  assert.equal(rbBash(dir, [listing.executable, ...listing.argv].join(" ")).exitCode, 0);
+  const observed = spawnSync(listing.executable, listing.argv, { cwd: dir, encoding: "utf8" });
+  assert.equal(observed.status, 0, observed.stderr);
+  const conflicted = observed.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+  assert.deepEqual(conflicted.sort(), [...surface.conflictPaths].sort());
+
+  // 2. Resolve exactly the paths the refusal named. The guard now admits those writes.
+  for (const path of conflicted) {
+    assert.equal(rbDevplan(dir, "Edit", path).exitCode, 0, path);
+    writeFileSync(join(dir, path), "export const value = \"resolved by the session\";\n");
+  }
+
+  // 3. Stage them through a resolution shape the refusal listed, with the placeholder filled
+  //    from the surface it published.
+  const stageShape = surface.resolutionShapes.find((shape) => shape.startsWith("git add "));
+  assert.ok(stageShape !== undefined, JSON.stringify(surface.resolutionShapes));
+  for (const path of conflicted) {
+    const stage = stageShape.replace(surface.conflictPathPlaceholder, path);
+    assert.equal(rbBash(dir, stage).exitCode, 0, stage);
+    const staged = spawnSync("git", ["add", "--", path], { cwd: dir, encoding: "utf8" });
+    assert.equal(staged.status, 0, staged.stderr);
+  }
+
+  // 4. Run the exact continuation the refusal stated verbatim — admitted, then executed. Only
+  //    the spawn's own PATH is widened (with a self-supplied `true`, see rbTrueShimDir); the argv
+  //    reaching git is byte-identical to the continuation the guard published.
+  assert.ok(first.stderr.includes(surface.nextCommand));
+  assert.equal(rbBash(dir, surface.nextCommand).exitCode, 0);
+  const continued = spawnSync("git", ["-c", "core.editor=true", "rebase", "--continue"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${rbTrueShimDir()}${delimiter}${process.env.PATH ?? ""}` },
+  });
+  assert.equal(continued.status, 0, continued.stderr);
+  // The rebase really finished, and no fresh human signature was involved anywhere above.
+  assert.equal(existsSync(join(dir, ".git", "rebase-merge")), false);
+  assert.equal(
+    spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, encoding: "utf8" }).stdout.trim(),
+    "feat/rebwire",
+  );
+});
+
+test("rebwire regression: with no rebase in progress the guard's output is unchanged", () => {
+  const path = root();
+  markGovernedFixture(path);
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "gates: {}\n");
+    const denial = evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command: "echo hi > out.txt" } },
+      { projectDir: path, runner: "claude" },
+    );
+    assert.equal(denial.exitCode, 2);
+    assert.equal(denial.stderr.includes("[rebase-authority]"), false);
+    assert.equal(rbSurface(denial.stderr), null);
+    assert.equal(denial.stderr.includes(REBWIRE_SHAPE_CODE), false);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// =========================================================================================
+// NVA-REBDEAD-1 (backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md): the conflict path IS the lifecycle state
+// file itself, and readiness is a REAL function rather than a constant.
+//
+// WHY A SECOND FIXTURE, RATHER THAN REUSING rbFixture()
+//   rbFixture() conflicts on REBWIRE_CONFLICT_PATH -- an ordinary implementation file, never
+//   NEUTRAL_STATE -- and every rbDeps() caller stubs readiness to the constant
+//   REBWIRE_READY_RECEIPT. Both choices are exactly why the fourteen rebwire cases above all
+//   pass while the reported deadlock is fully live (spec Finding 4): the writer-owned-State
+//   refusal (Finding 1) only fires for Edit/Write on project/pipeline-state.json or
+//   .claude/pipeline-state.json, which rbFixture() never touches; and the readiness
+//   circularity (Finding 2) can only be observed with a readiness function that actually
+//   reads the CONFLICTED working tree, which the constant stub never does.
+//
+// WHY THE EDIT/WRITE LANE GOES THROUGH evaluateLifecycleReadyGuard() DIRECTLY
+//   rbDevplan() above spawns guard-devplan.mjs, a SEPARATE hook whose own rebase relief
+//   (guard-devplan.mjs lines 540-543) was already correct and proves nothing about this fix.
+//   Every case below drives THIS guard's real entry point instead.
+// =========================================================================================
+
+/** Same shape as rbDraftState()/rbImplementingState() above, plus one field derivePlanLifecycle
+ * never inspects -- so B and C can each edit the SAME line differently and force a real merge
+ * conflict on NEUTRAL_STATE without touching anything the resolver's Requirement 1 checks. */
+function rbdMarkedState(marker) {
+  const draft = {
+    schema: "pipeline.state.v0",
+    // NOTE: rbContinuity() above hardcodes featureId "rebwire-feature" -- activeFeature.id
+    // here has to match it exactly, or submitPlan() refuses with PLAN-SUBMIT-CONTINUITY-INVALID.
+    activeFeature: { id: "rebwire-feature", planPath: REBWIRE_PLAN_PATH, phase: "design" },
+    planApproved: false,
+    continuity: rbContinuity(),
+    _rebdeadMarker: marker,
+  };
+  const submitted = submitPlan({
+    state: draft, expectedStateSha256: sha256CanonicalJson(draft), poGateAuthority: REBWIRE_AUTHORITY,
+    // This fixture tests rebase recovery, not the epic design-workflow admission contract.
+    // `mini` is the only profile whose plan approval intentionally has no workflow package.
+    profile: "mini", profileSha256: "3".repeat(64), by: "Coordinator", at: "2026-09-01T20:00:00.000Z",
+  });
+  assert.equal(submitted.ok, true, JSON.stringify(submitted));
+  const approved = approveSubmittedPlan({
+    state: submitted.state, expectedStateSha256: sha256CanonicalJson(submitted.state),
+    expectedSubmissionSha256: rbDerivePlanLifecycle(submitted.state).submissionSha256,
+    poGateAuthority: REBWIRE_AUTHORITY, profileSha256: "3".repeat(64),
+    designAdvisorAdmissionSha256: "4".repeat(64), by: "PO", at: "2026-09-01T20:05:00.000Z",
+  });
+  assert.equal(approved.ok, true, JSON.stringify(approved));
+  const implementing = enterPlanImplementation({
+    state: approved.state, expectedStateSha256: sha256CanonicalJson(approved.state), at: "2026-09-01T20:30:00.000Z",
+  });
+  assert.equal(implementing.ok, true, JSON.stringify(implementing));
+  return implementing.state;
+}
+
+/**
+ * A real conflicted rebase whose ONLY conflict path is `statePath`, with a validly approved
+ * `orig-head`. History shape mirrors rbFixture(): A (base) / B (feature, becomes orig-head) /
+ * C (upstream) -- but here EVERY commit edits statePath's marker line, so B and C's edits
+ * collide and git stops with real conflict markers in the JSON, exactly the live incident's
+ * own precondition.
+ *
+ * NVA-REBDEAD-F8: parameterised over which lifecycle state file conflicts -- NEUTRAL_STATE
+ * (`project/pipeline-state.json`, the default) or LEGACY_STATE (`.claude/pipeline-state.json`)
+ * -- rather than a second, drifting copy of this fixture. The resolved rebase authority
+ * decides admission by `conflictPaths` membership, never a fixed path
+ * (lib/rebase-authority.mjs `rebaseAuthorityPermitsPath`), so the two lifecycle state files
+ * are meant to be interchangeable here; this parameter is how that symmetry gets proven
+ * rather than assumed.
+ *
+ * @param {string} statePath NEUTRAL_STATE (default) or LEGACY_STATE.
+ */
+function rbdFixture(statePath = NEUTRAL_STATE) {
+  const dir = mkdtempSync(join(rbScratchBase(), "rebdead-"));
+  REBWIRE_FIXTURES.push(dir);
+  const run = (...args) => {
+    const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    assert.equal(result.status, 0, `git ${args.join(" ")} failed: ${result.stderr}`);
+    return result.stdout;
+  };
+  const put = (relative, contents) => {
+    mkdirSync(dirname(join(dir, relative)), { recursive: true });
+    writeFileSync(join(dir, relative), contents);
+  };
+
+  run("init");
+  run("config", "user.name", "Rebdead Fixture");
+  run("config", "user.email", "rebdead-fixture@example.invalid");
+  run("config", "commit.gpgsign", "false");
+  run("checkout", "-b", "main");
+
+  markGovernedFixture(dir);
+  put(".claude/pipeline.yaml", REBWIRE_MANIFEST);
+  put(REBWIRE_PLAN_PATH, REBWIRE_PLAN_BYTES);
+  put(REBWIRE_SPEC_PATH, REBWIRE_SPEC_BYTES);
+  put(statePath, `${JSON.stringify(rbdMarkedState("base"), null, 2)}\n`);
+  run("add", "-A");
+  run("commit", "-m", "base");
+
+  run("checkout", "-b", "feat/rebdead");
+  put(statePath, `${JSON.stringify(rbdMarkedState("feature"), null, 2)}\n`);
+  run("commit", "-a", "-m", "feature change");
+
+  run("checkout", "main");
+  put(statePath, `${JSON.stringify(rbdMarkedState("upstream"), null, 2)}\n`);
+  run("commit", "-a", "-m", "upstream change");
+
+  run("checkout", "feat/rebdead");
+  const rebase = spawnSync("git", ["-c", "core.editor=true", "rebase", "main"], { cwd: dir, encoding: "utf8" });
+  assert.notEqual(rebase.status, 0, "the fixture rebase was expected to stop on a conflict");
+  assert.ok(existsSync(join(dir, ".git", "rebase-merge")));
+  const conflicted = spawnSync("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: dir, encoding: "utf8" }).stdout.trim();
+  assert.equal(conflicted, statePath, "the fixture must conflict on the lifecycle state file itself");
+  // The live incident's own precondition: real conflict markers, not valid JSON.
+  assert.throws(() => JSON.parse(readFileSync(join(dir, statePath), "utf8")));
+  return dir;
+}
+
+/**
+ * Mirrors requireProjectOnboardingReady()'s actual failure mode for the given lifecycle state
+ * file -- reads the real working-tree state file and fails closed exactly as the production
+ * gate does on invalid JSON -- instead of the unconditional-constant stub every rbDeps()
+ * caller above uses. That constant is precisely why the deadlock this section reproduces went
+ * uncaught.
+ *
+ * NVA-REBDEAD-F8: parameterised over `statePath` (NEUTRAL_STATE default, or LEGACY_STATE) for
+ * the same reason rbdFixture() above is -- the mirrored LEGACY_STATE fixture needs the
+ * readiness stub to genuinely observe the file that is actually conflicted, not to pass only
+ * because NEUTRAL_STATE happens to be absent from that fixture's working tree.
+ *
+ * NVA-REBDEAD-F5B: throws "continuity-observation-unavailable", not "continuity-damaged" --
+ * unparseable bytes make parseJsonObject() raise KICKOFF-READ-MALFORMED
+ * (lib/onboarding-continuity.mjs), observeDetailed()'s own catch returns
+ * continuity.status = "unavailable", and lib/project-onboarding-v3.mjs's branch order
+ * (:2885 requires "damaged"; :2904 catches everything else that is not "valid") yields
+ * lifecycleStatus "continuity-observation-unavailable" for that continuity status -- this is
+ * the exact status the live incident (real conflict markers) produces. Measured in
+ * backlog/evidence/2026-09-02-nva-rebdead-f5-lifecycle-status-measurement.json.
+ * "continuity-damaged" is a SEPARATE, genuinely reachable lane -- a state file that parses
+ * but fails its own projection -- covered by rbdContinuityDamagedReadinessFn below.
+ */
+function rbdReadinessFnFor(statePath) {
+  return function rbdReadinessFn({ rootDir, intent }) {
+    let bytes = null;
+    try { bytes = readFileSync(join(rootDir, statePath), "utf8"); } catch { /* absent */ }
+    let ok = false;
+    if (bytes !== null) { try { JSON.parse(bytes); ok = true; } catch { /* real conflict markers */ } }
+    if (!ok) {
+      throw new ProjectOnboardingReadyError(
+        "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
+        { intent, lifecycleStatus: "continuity-observation-unavailable" },
+      );
+    }
+    return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent };
+  };
+}
+
+function rbdDeps(dir, statePath = NEUTRAL_STATE) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdReadinessFnFor(statePath) };
+}
+
+/** NVA-REBDEAD-F5B: an unconditional stub proving the relief also admits "continuity-damaged"
+ * -- the PARSEABLE-but-inconsistent lane (continuity.status === "damaged" in
+ * lib/project-onboarding-v3.mjs, reachable when the state file parses but fails its own
+ * projection), distinct from the unparseable lane rbdReadinessFn above mirrors. */
+function rbdContinuityDamagedReadinessFn({ intent }) {
+  throw new ProjectOnboardingReadyError(
+    "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
+    { intent, lifecycleStatus: "continuity-damaged" },
+  );
+}
+
+function rbdContinuityDamagedDeps(dir) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdContinuityDamagedReadinessFn };
+}
+
+/** The Bash lane, through the guard's real evaluation entry point -- the readiness stub
+ * stands in for rbBash()'s constant. `statePath` (NVA-REBDEAD-F8) defaults to NEUTRAL_STATE,
+ * matching every pre-existing caller unchanged; the LEGACY_STATE mirror passes it explicitly. */
+function rbdBash(dir, command, statePath = NEUTRAL_STATE) {
+  return evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, rbdDeps(dir, statePath));
+}
+
+/** The Edit/Write lane, through THIS guard directly (never guard-devplan.mjs -- see the
+ * section header above). `statePath` (NVA-REBDEAD-F8) defaults to NEUTRAL_STATE, matching
+ * every pre-existing caller unchanged; the LEGACY_STATE mirror passes it explicitly. */
+function rbdEdit(dir, toolName, filePath, statePath = NEUTRAL_STATE) {
+  return evaluateLifecycleReadyGuard(
+    { tool_name: toolName, tool_input: { file_path: filePath, old_string: "a", new_string: "b" } },
+    rbdDeps(dir, statePath),
+  );
+}
+
+test("rebdead positive-1: Edit/Write on the exact conflict path (the lifecycle state file itself) is admitted, relative and absolute", () => {
+  const dir = rbdFixture();
+  for (const [tool, path] of [
+    ["Edit", NEUTRAL_STATE],
+    ["Write", join(dir, NEUTRAL_STATE)],
+    ["Edit", `./${NEUTRAL_STATE}`],
+  ]) {
+    const result = rbdEdit(dir, tool, path);
+    assert.equal(result.exitCode, 0, `${tool} ${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] the protected-State writer-only refusal is suspended for this write/u);
+    // SEC/no-machine-paths: the absolute form must never leak the fixture's own absolute root.
+    assert.equal(result.stderr.includes(dir), false, result.stderr);
+  }
+});
+
+// NVA-REBDEAD-R2F2 (round-2 Critic finding F2 against the package): acceptance criterion 2
+// names three tools -- Edit, Write, apply_patch -- and positive-1 above only locks the first
+// two. Coverage for apply_patch existed briefly (10d11e58), was reverted alongside the code
+// it accompanied (43413349), and nothing replaced it; guard-apply-patch.test.mjs pins the
+// SAME architectural invariant generically (against an arbitrary governed path) but never
+// against this suite's own rebase-conflict fixture. This asserts the property the acceptance
+// criterion names -- admission -- not the mechanism: a raw, untranslated apply_patch call
+// reaches evaluateLifecycleReadyGuard's outer tool-name gate (~line 4281), which recognizes
+// only SHELL_TOOLS/WRITE_TOOLS and returns verdict(0) for anything else, before either rebase
+// relief is ever reached. guard-apply-patch.mjs documents why production never sends this raw
+// shape (it translates apply_patch into a per-path `{tool_name: "Edit", tool_input:
+// {file_path}}` call instead) -- that per-path translation is the real enforcement boundary
+// for apply_patch, and is out of scope for this test on purpose. What this test pins is the
+// premise that translation relies on: the outer gate itself must keep admitting apply_patch
+// unconditionally, on this suite's own conflict-path fixture, not just on an arbitrary path.
+test("rebdead positive-1 (apply_patch): a raw apply_patch call naming the conflict path is admitted, through the guard's real evaluation entry point, because the outer tool-name gate does not recognize apply_patch at all", () => {
+  const dir = rbdFixture();
+  const patch = `*** Begin Patch\n*** Update File: ${NEUTRAL_STATE}\n@@\n-a\n+b\n*** End Patch`;
+  const result = evaluateLifecycleReadyGuard(
+    { tool_name: "apply_patch", tool_input: { command: patch } },
+    rbdDeps(dir),
+  );
+  assert.equal(result.exitCode, 0, `apply_patch naming the conflict path: ${result.stderr}`);
+});
+
+test("rebdead positive-2: checkout --ours/--theirs and restore are admitted on the conflict path", () => {
+  const dir = rbdFixture();
+  for (const command of [
+    `git checkout --ours -- ${NEUTRAL_STATE}`,
+    `git checkout --theirs -- ${NEUTRAL_STATE}`,
+    `git restore --ours -- ${NEUTRAL_STATE}`,
+    `git restore --theirs -- ${NEUTRAL_STATE}`,
+    `git restore --worktree --ours -- ${NEUTRAL_STATE}`,
+  ]) {
+    const result = rbdBash(dir, command);
+    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] the onboarding-readiness gate is suspended for this command/u);
+  }
+});
+
+test("rebdead positive-3: git add on the conflict path is admitted", () => {
+  const dir = rbdFixture();
+  const result = rbdBash(dir, `git add -- ${NEUTRAL_STATE}`);
+  assert.equal(result.exitCode, 0, result.stderr);
+});
+
+test("rebdead positive-4: git rebase --continue is admitted, and once the conflict path is actually resolved and staged the rebase genuinely finishes", () => {
+  const dir = rbdFixture();
+  // Admitted even before resolution -- this guard's job is admission, not re-deriving git's
+  // own precondition for a real continue.
+  assert.equal(rbdBash(dir, "git rebase --continue").exitCode, 0);
+  assert.equal(rbdBash(dir, "git -c core.editor=true rebase --continue").exitCode, 0);
+
+  assert.equal(rbdEdit(dir, "Edit", NEUTRAL_STATE).exitCode, 0);
+  writeFileSync(join(dir, NEUTRAL_STATE), `${JSON.stringify(rbdMarkedState("resolved"), null, 2)}\n`);
+  assert.equal(rbdBash(dir, `git add -- ${NEUTRAL_STATE}`).exitCode, 0);
+  const staged = spawnSync("git", ["add", "--", NEUTRAL_STATE], { cwd: dir, encoding: "utf8" });
+  assert.equal(staged.status, 0, staged.stderr);
+
+  assert.equal(rbdBash(dir, "git -c core.editor=true rebase --continue").exitCode, 0);
+  const continued = spawnSync("git", ["-c", "core.editor=true", "rebase", "--continue"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${rbTrueShimDir()}${delimiter}${process.env.PATH ?? ""}` },
+  });
+  assert.equal(continued.status, 0, continued.stderr);
+  assert.equal(existsSync(join(dir, ".git", "rebase-merge")), false);
+});
+
+test("rebdead positive-5: all three read-only diagnostics are reachable despite the invalid conflict JSON", () => {
+  const dir = rbdFixture();
+  assert.equal(rbdBash(dir, "git status --short").exitCode, 0);
+  assert.equal(rbdBash(dir, "git diff --name-only --diff-filter=U").exitCode, 0);
+  // The one of the three that actually needed this fix (spec Finding 3).
+  assert.equal(rbdBash(dir, "git rebase --show-current-patch").exitCode, 0);
+});
+
+test("rebdead positive-6: continuity-damaged (the parseable-but-inconsistent lane) also receives the rebase relief", () => {
+  const dir = rbdFixture();
+  const editResult = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: NEUTRAL_STATE, old_string: "a", new_string: "b" } },
+    rbdContinuityDamagedDeps(dir),
+  );
+  assert.equal(editResult.exitCode, 0, editResult.stderr);
+  assert.match(editResult.stderr, /\[rebase-authority\] the protected-State writer-only refusal is suspended for this write/u);
+
+  const addResult = evaluateLifecycleReadyGuard(
+    { tool_name: "Bash", tool_input: { command: `git add -- ${NEUTRAL_STATE}` } },
+    rbdContinuityDamagedDeps(dir),
+  );
+  assert.equal(addResult.exitCode, 0, addResult.stderr);
+  assert.match(addResult.stderr, /\[rebase-authority\] the onboarding-readiness gate is suspended for this command/u);
+});
+
+test("rebdead negative-1: a path outside conflictPaths stays refused, including the OTHER lifecycle state file", () => {
+  const dir = rbdFixture();
+  // The discriminating case for decision 1: a rebase conflicting on NEUTRAL_STATE must not
+  // make LEGACY_STATE writable.
+  const other = rbdEdit(dir, "Edit", LEGACY_STATE);
+  assert.equal(other.exitCode, 2);
+  assert.match(other.stderr, /Pipeline State is writer-owned/u);
+  assert.equal(other.stderr.includes("is suspended for this"), false, other.stderr);
+
+  const outside = rbdEdit(dir, "Edit", "src/genuinely-unrelated.mjs");
+  assert.equal(outside.exitCode, 2);
+  assert.equal(outside.stderr.includes("is suspended for this"), false, outside.stderr);
+});
+
+// =========================================================================================
+// NVA-REBDEAD-F8 (Critic finding against 10d11e58): the pair above (positive-1/negative-1)
+// only proves the relief for NEUTRAL_STATE as the conflict path. The guard's own admission
+// checks membership in the resolved authority's `conflictPaths`, never a fixed path -- see
+// guard-lifecycle-ready.mjs ~4429-4443 and rebaseAuthorityPermitsPath() in
+// lib/rebase-authority.mjs -- so the SAME relief must also admit LEGACY_STATE
+// (.claude/pipeline-state.json) when IT is the conflict path, with NEUTRAL_STATE refused as
+// the mirrored discriminating case. Only the pair below is a symmetry proof, not either half
+// alone. rbdFixture()/rbdReadinessFnFor() are parameterised (not duplicated) for exactly this.
+// =========================================================================================
+
+test("rebdead positive-1 (LEGACY_STATE conflict): Edit/Write on the exact conflict path is admitted, relative and absolute -- the same relief on the OTHER lifecycle state file", () => {
+  const dir = rbdFixture(LEGACY_STATE);
+  for (const [tool, path] of [
+    ["Edit", LEGACY_STATE],
+    ["Write", join(dir, LEGACY_STATE)],
+    ["Edit", `./${LEGACY_STATE}`],
+  ]) {
+    const result = rbdEdit(dir, tool, path, LEGACY_STATE);
+    assert.equal(result.exitCode, 0, `${tool} ${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] the protected-State writer-only refusal is suspended for this write/u);
+    // SEC/no-machine-paths: the absolute form must never leak the fixture's own absolute root.
+    assert.equal(result.stderr.includes(dir), false, result.stderr);
+  }
+});
+
+test("rebdead negative-1 (LEGACY_STATE conflict): NEUTRAL_STATE stays refused in the same fixture -- the exact mirror of rebdead negative-1", () => {
+  const dir = rbdFixture(LEGACY_STATE);
+  // The discriminating case, mirrored: a rebase conflicting on LEGACY_STATE must not make
+  // NEUTRAL_STATE writable.
+  const other = rbdEdit(dir, "Edit", NEUTRAL_STATE, LEGACY_STATE);
+  assert.equal(other.exitCode, 2);
+  assert.match(other.stderr, /Pipeline State is writer-owned/u);
+  assert.equal(other.stderr.includes("is suspended for this"), false, other.stderr);
+});
+
+test("rebdead negative-2: --skip, --edit-todo, --exec, an arbitrary -c, push and force-push all stay refused", () => {
+  const dir = rbdFixture();
+  for (const command of [
+    "git rebase --skip",
+    "git rebase --edit-todo",
+    "git rebase --exec 'touch marker'",
+    "git -c core.hooksPath=none rebase --continue",
+    "git push origin HEAD",
+    "git push --force origin main",
+  ]) {
+    const result = rbdBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    assert.equal(result.stderr.includes("is suspended for this"), false, `${command}: ${result.stderr}`);
+  }
+});
+
+test("rebdead negative-3: the admission disappears entirely once the rebase is aborted", () => {
+  const dir = rbdFixture();
+  assert.equal(rbdEdit(dir, "Edit", NEUTRAL_STATE).exitCode, 0);
+  const abort = spawnSync("git", ["rebase", "--abort"], { cwd: dir, encoding: "utf8" });
+  assert.equal(abort.status, 0, abort.stderr);
+
+  const after = rbdEdit(dir, "Edit", NEUTRAL_STATE);
+  assert.equal(after.exitCode, 2);
+  assert.equal(after.stderr.includes("[rebase-authority]"), false, after.stderr);
+  // The two pre-existing read-only diagnostics never depended on this relief in the first
+  // place -- proven here with no authority resolved at all.
+  assert.equal(rbdBash(dir, "git status --short").exitCode, 0);
+  assert.equal(rbdBash(dir, "git diff --name-only --diff-filter=U").exitCode, 0);
+});
+
+test("rebdead negative-4: no human signature is demanded anywhere in the admitted path", () => {
+  const dir = rbdFixture();
+  for (const result of [
+    rbdEdit(dir, "Edit", NEUTRAL_STATE),
+    rbdBash(dir, `git checkout --ours -- ${NEUTRAL_STATE}`),
+    rbdBash(dir, `git add -- ${NEUTRAL_STATE}`),
+    rbdBash(dir, "git rebase --continue"),
+    rbdBash(dir, "git rebase --show-current-patch"),
+  ]) {
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.equal(/signature/iu.test(result.stderr), false, result.stderr);
+  }
+  const requestsDir = join(dir, ".git", "agent-pipeline", "human-guard-overrides", "requests");
+  assert.equal(existsSync(requestsDir), false);
+});
+
+/** NVA-REBDEAD-F5: an unconditional stub standing in for a `restart-required` session -- the
+ * narrower sibling exemption's own status -- never the `continuity-observation-unavailable`
+ * an unparseable lifecycle state file actually produces (rbdReadinessFn above). */
+function rbdRestartRequiredReadinessFn({ intent }) {
+  throw new ProjectOnboardingReadyError(
+    "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
+    { intent, lifecycleStatus: "restart-required" },
+  );
+}
+
+function rbdRestartRequiredDeps(dir) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdRestartRequiredReadinessFn };
+}
+
+test("rebdead negative-5: a restart-required session with a validly-resolved active rebase does not receive the rebase relief, only its own narrower sibling exemption where it applies", () => {
+  const dir = rbdFixture();
+  const deps = rbdRestartRequiredDeps(dir);
+
+  // The READINESS-GATE relief (the one widened here) admits Edit on the conflict path for
+  // continuity-observation-unavailable (positive-1) and continuity-damaged (positive-6); it
+  // must NOT admit it for restart-required, even though the same validly-resolved rebase
+  // exists and the SEPARATE, independent protected-State writer-only relief
+  // (guard-lifecycle-ready.mjs ~4443, keyed only on conflictPaths membership, never on
+  // lifecycleStatus, and out of this fix's scope) still lifts its own, different refusal --
+  // its notice text can legitimately survive inside an overall denial. The readiness gate's OWN
+  // admission phrase must be absent, and the overall write must stay refused.
+  const conflictWrite = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: NEUTRAL_STATE, old_string: "a", new_string: "b" } },
+    deps,
+  );
+  assert.equal(conflictWrite.exitCode, 2, conflictWrite.stderr);
+  assert.equal(/the onboarding-readiness gate is suspended/u.test(conflictWrite.stderr), false, conflictWrite.stderr);
+
+  // Same for the Bash lane (git add on the conflict path is admitted for
+  // continuity-observation-unavailable in positive-3; it must stay refused here).
+  const addResult = evaluateLifecycleReadyGuard(
+    { tool_name: "Bash", tool_input: { command: `git add -- ${NEUTRAL_STATE}` } },
+    deps,
+  );
+  assert.equal(addResult.exitCode, 2, addResult.stderr);
+  assert.equal(/the onboarding-readiness gate is suspended/u.test(addResult.stderr), false, addResult.stderr);
+
+  // restart-required's OWN narrower sibling exemption (guard-lifecycle-ready.mjs:4074-4081)
+  // still admits the one resume-hint-input write it exists for.
+  const resumeHintWrite = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: "project/.resume-hint-input.json", old_string: "a", new_string: "b" } },
+    deps,
+  );
+  assert.equal(resumeHintWrite.exitCode, 0, resumeHintWrite.stderr);
+});
+
+
+test("EVIDENCE-HOST-PATH: isEvidenceArtifactPath matches evidence targets and rejects non-evidence paths", () => {
+  assert.equal(isEvidenceArtifactPath("backlog/evidence/foo.md"), true);
+  assert.equal(isEvidenceArtifactPath("backlog/evidence/nested/bar.txt"), true);
+  assert.equal(isEvidenceArtifactPath("specs/sprint-nova-epic/evidence/repro.txt"), true);
+  assert.equal(isEvidenceArtifactPath("specs/feature-x/evidence/capture.log"), true);
+  assert.equal(isEvidenceArtifactPath("evidence/dispatch-record-01.json"), true);
+  assert.equal(isEvidenceArtifactPath("./backlog/evidence/foo.md"), true);
+  assert.equal(isEvidenceArtifactPath("backlog/items/2026-09-04-item.md"), false);
+  assert.equal(isEvidenceArtifactPath("src/pipeline.js"), false);
+  assert.equal(isEvidenceArtifactPath("docs/operating-model.md"), false);
+  assert.equal(isEvidenceArtifactPath(null), false);
+  assert.equal(isEvidenceArtifactPath(""), false);
+});
+
+test("EVIDENCE-HOST-PATH: extractWritePayload extracts content across tools", () => {
+  assert.equal(extractWritePayload({ content: "hello" }, "Write"), "hello");
+  assert.equal(extractWritePayload({ new_string: "world" }, "Edit"), "world");
+  assert.equal(extractWritePayload({ CodeContent: "code" }, "write_to_file"), "code");
+  assert.equal(extractWritePayload({ ReplacementContent: "replacement" }, "replace_file_content"), "replacement");
+  assert.equal(extractWritePayload(null, "Write"), "");
+});
+
+test("EVIDENCE-HOST-PATH: writing an absolute host path into evidence is blocked and diagnostic redacts path", () => {
+  const path = root();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const writeCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "backlog/evidence/2026-09-18-host-path-test.md",
+        content: "Execution trace: failed at /home/developer/src/agent-pipeline/test.js:10\n",
+      },
+    };
+    const result = evaluateLifecycleReadyGuard(writeCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-EVIDENCE-HOST-PATH/u);
+    assert.match(result.stderr, /Matched pattern: posix-home/u);
+    // Diagnostic must not leak the matched sensitive host path itself
+    assert.equal(result.stderr.includes("/home/developer/src/agent-pipeline"), false);
+
+    // Clean relative/placeholder write to same target is admitted
+    const cleanWrite = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "backlog/evidence/2026-09-18-host-path-test.md",
+        content: "Execution trace: failed at <repo-root>/test.js:10\n",
+      },
+    };
+    const cleanResult = evaluateLifecycleReadyGuard(cleanWrite, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(cleanResult.exitCode, 0, cleanResult.stderr);
+
+    // Edit tool with host path in new_string is also blocked
+    const editCall = {
+      tool_name: "Edit",
+      tool_input: {
+        file_path: "specs/sprint-nova-epic/evidence/test.log",
+        old_string: "old",
+        new_string: "Error at C:\\Users\\Administrator\\AppData\\Local\\Temp\\run.log",
+      },
+    };
+    const editResult = evaluateLifecycleReadyGuard(editCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(editResult.exitCode, 2);
+    assert.match(editResult.stderr, /GUARD-EVIDENCE-HOST-PATH/u);
+    assert.match(editResult.stderr, /Matched pattern: windows-drive-letter/u);
+    assert.equal(editResult.stderr.includes("C:\\Users\\Administrator"), false);
+
+    // Writing a host path into a non-evidence file is not blocked under this code
+    const nonEvidenceCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "scratch/test-log.txt",
+        content: "Error at /home/developer/test.log",
+      },
+    };
+    const nonEvidenceResult = evaluateLifecycleReadyGuard(nonEvidenceCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(nonEvidenceResult.exitCode, 0, nonEvidenceResult.stderr);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+
+test("DISPATCH-RECORD-COLLISION: checkDispatchRecordCollision detects completed record overwrite and git history collisions", () => {
+  const path = root();
+  try {
+    const evidenceDir = join(path, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+
+    // 1. File exists with terminal outcome: opening write is rejected
+    const existingFile = join(evidenceDir, "dispatch-record-TASK-COMPLETED.json");
+    writeFileSync(existingFile, JSON.stringify({
+      taskId: "TASK-COMPLETED",
+      outcome: "completed",
+      candidateCommit: "a".repeat(40),
+    }), "utf8");
+
+    const hitTerminal = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-TASK-COMPLETED.json",
+      requested: existingFile,
+      payload: JSON.stringify({ taskId: "TASK-COMPLETED", outcome: "in-progress" }),
+      root: path,
+    });
+    assert.ok(hitTerminal !== null);
+    assert.equal(hitTerminal.taskId, "TASK-COMPLETED");
+    assert.match(hitTerminal.reason, /already been used by a completed dispatch/);
+
+    // 2. Fresh task ID with no file and no git commit: allowed
+    const hitFresh = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-FRESH-TASK.json",
+      requested: join(evidenceDir, "dispatch-record-FRESH-TASK.json"),
+      payload: JSON.stringify({ taskId: "FRESH-TASK", outcome: "in-progress" }),
+      root: path,
+      dependencies: { gitCommitForTaskIdFn: () => null },
+    });
+    assert.equal(hitFresh, null);
+
+    // 3. Updating an in-progress record to terminal: allowed
+    const inProgressFile = join(evidenceDir, "dispatch-record-TASK-RUNNING.json");
+    writeFileSync(inProgressFile, JSON.stringify({
+      taskId: "TASK-RUNNING",
+      outcome: "in-progress",
+    }), "utf8");
+    const hitFinalize = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-TASK-RUNNING.json",
+      requested: inProgressFile,
+      payload: JSON.stringify({ taskId: "TASK-RUNNING", outcome: "completed" }),
+      root: path,
+    });
+    assert.equal(hitFinalize, null);
+
+    // 4. Opening write with task ID already in git history: rejected
+    const hitGitHistory = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-PRIOR-TASK.json",
+      requested: join(evidenceDir, "dispatch-record-PRIOR-TASK.json"),
+      payload: JSON.stringify({ taskId: "PRIOR-TASK", outcome: "in-progress" }),
+      root: path,
+      dependencies: { gitCommitForTaskIdFn: () => "f262a5c712345678" },
+    });
+    assert.ok(hitGitHistory !== null);
+    assert.equal(hitGitHistory.taskId, "PRIOR-TASK");
+    assert.match(hitGitHistory.reason, /already bound to commit f262a5c71234 in git history/);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("DISPATCH-RECORD-COLLISION: evaluateLifecycleReadyGuard blocks tool writes colliding on task IDs", () => {
+  const path = root();
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const evidenceDir = join(path, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+
+    // Pre-populate completed record
+    const recordPath = join(evidenceDir, "dispatch-record-DONE-TASK.json");
+    writeFileSync(recordPath, JSON.stringify({
+      taskId: "DONE-TASK",
+      outcome: "completed",
+    }), "utf8");
+
+    const writeCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "evidence/dispatch-record-DONE-TASK.json",
+        content: JSON.stringify({ taskId: "DONE-TASK", outcome: "in-progress" }, null, 2),
+      },
+    };
+
+    const result = evaluateLifecycleReadyGuard(writeCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-DISPATCH-RECORD-COLLISION/u);
+    assert.match(result.stderr, /already been used by a completed dispatch/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+function markerQuotationFixture(t){
+  const root=mkdtempSync(join(tmpdir(),'scratch-marker-quotation-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  mkdirSync(join(root,'scratch'));
+  markGovernedFixture(root);
+  writeFileSync(join(root,'pipeline.user.yaml'),'marker\n');
+  return root;
+}
+function markerQuotationInput(path,translated=false,tool='Write'){
+  return {tool_name:tool,tool_input:{file_path:path,
+    ...(translated?{patchContainsAcknowledgementMarker:true}:
+      {[tool==='Edit'?'new_string':'content']:'Quoted fixture evidence: '+PO_PLAN_ACKNOWLEDGEMENT_MARKER})}};
+}
+test('proposed marker quotation permits native and translated inert scratch across readiness outcomes',t=>{
+  const root=markerQuotationFixture(t);
+  for(const state of ['bootstrap-binding-required','intake-required','restart-required','partial','malformed',null]){
+    const deps={projectDir:root,requireProjectOnboardingReadyFn(){
+      if(state===null)return {status:'ready'};
+      if(state==='malformed')throw new Error('fixture readiness unavailable');
+      throw new ProjectOnboardingReadyError('PORG-NOT-READY','fixture',{intent:'session',lifecycleStatus:state});
+    }};
+    for(const tool of ['Write','Edit'])for(const translated of [false,true]){
+      const result=evaluateLifecycleReadyGuard(markerQuotationInput('scratch/quotation.txt',translated,tool),deps);
+      assert.equal(result.exitCode,0,state+': '+result.stderr);
+    }
+  }
+});
+test('proposed marker quotation still refuses real authority, aliases and traversal',t=>{
+  const root=markerQuotationFixture(t);
+  mkdirSync(join(root,'specs','onboarding-abcd1234'),{recursive:true});
+  const authority=join(root,'specs','onboarding-abcd1234','prd_onboarding-abcd1234.md');
+  writeFileSync(authority,'authority\n');
+  symlinkSync(authority,join(root,'scratch','symlink.txt'));
+  linkSync(authority,join(root,'scratch','hardlink.txt'));
+  symlinkSync(join(root,'specs'),join(root,'scratch','directory'));
+  for(const path of ['specs/onboarding-abcd1234/prd_onboarding-abcd1234.md',
+    'project/pipeline-state.json','scratch/symlink.txt','scratch/hardlink.txt',
+    'scratch/directory/new.md','scratch/../project/pipeline-state.json']){
+    for(const translated of [false,true]){
+      const result=evaluateLifecycleReadyGuard(markerQuotationInput(path,translated),{projectDir:root});
+      assert.equal(result.exitCode,2,path);
+      assert.match(result.stderr,/GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u,path);
+    }
+  }
+});
+test('proposed marker quotation refuses an active plugin physically installed under scratch',t=>{
+  const root=markerQuotationFixture(t),live=join(root,'scratch','active-plugin');
+  mkdirSync(join(live,'hooks'),{recursive:true});
+  mkdirSync(join(live,'.claude-plugin'));
+  writeFileSync(join(live,'.claude-plugin','plugin.json'),'{}\n');
+  const prior=process.env.CLAUDE_PLUGIN_ROOT;
+  try {
+    process.env.CLAUDE_PLUGIN_ROOT=live;
+    const result=evaluateLifecycleReadyGuard(markerQuotationInput('scratch/active-plugin/hooks/quotation.mjs',true),{projectDir:root});
+    assert.equal(result.exitCode,2);
+    assert.match(result.stderr,/GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u);
+  } finally {
+    if(prior===undefined)delete process.env.CLAUDE_PLUGIN_ROOT;
+    else process.env.CLAUDE_PLUGIN_ROOT=prior;
+  }
+});
+
+process.on("exit", () => {
+  for (const dir of REBWIRE_FIXTURES) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* a throwaway fixture */ }
+  }
+});
+
+
+test("SIGNED-AGENT closed enforcing origin and filesystem grammar", async (t) => {
+  const mod = await import("./guard-lifecycle-ready.mjs");
+  const admit = mod.signedQualityPackageCommandAdmission ?? (() => false);
+  const path = realpathSync(root());
+  try {
+    mkdirSync(join(path,"project"));
+    const intent=join(path,"intent.json"), proof=join(path,"proof.json"), policy=join(path,"project/critical-human-proof.json");
+    for (const p of [intent,proof,policy]) writeFileSync(p,"{}");
+    const script=realpathSync(fileURLToPath(new URL("../scripts/quality-package-materializer.mjs",import.meta.url)));
+    const args=[path,intent,proof,policy,"verify"];
+    const command=(words)=>words.map(w=>JSON.stringify(w)).join(" ");
+    for(const mode of ["verify","apply","authorize-commit"]) assert.equal(admit(command([process.execPath,script,...args.slice(0,4),mode]),path),true,mode);
+    const good=command([process.execPath,script,...args]);
+    const nativeSep=process.platform==="win32"?"\\":"/";
+    // A host that cannot create a symlink (win32 without the privilege) skips ONLY the sub-case that needs one, as a node:test SUBTEST
+    // with an explicit skip reason. A top-level t.skip() would mark the whole test skipped and, measured on this host, make any later
+    // assertion failure exit 0 (scratch/qp3/instrument-run.log), so it is deliberately not used.
+    const tryLink=(target,file)=>{try{symlinkSync(target,file);return true;}catch(error){if(error?.code!=="EPERM"&&error?.code!=="EACCES")throw error;return false;}};
+    const noLinkReason="symlink creation not permitted on this host";
+    const variants=[good+" extra",good+" ; echo x",good+" > result",good+" && echo x",good+" | cat",
+      command([process.execPath,script,...args.slice(0,4),"VERIFY"]),
+      command([process.execPath,"--import",script,...args]),command(["env",process.execPath,script,...args]),
+      command([process.execPath,script,...args.slice(0,3),intent,"verify"]),
+      command([process.execPath,script,path,path+"/./intent.json",proof,policy,"verify"]),
+      command([process.execPath,script,path,path+"/../intent.json",proof,policy,"verify"]),
+      command([process.execPath,script,path,path+nativeSep+"."+nativeSep+"intent.json",proof,policy,"verify"]),
+      command([process.execPath,script,path,path+nativeSep+".."+nativeSep+"intent.json",proof,policy,"verify"])];
+    for(const bad of variants){assert.notEqual(bad,good,"every refusal variant must differ from the sanctioned command: "+bad);assert.equal(admit(bad,path),false,bad);}
+    const copied=join(path,"copied.mjs");writeFileSync(copied,readFileSync(script));
+    const vendored=join(path,"plugins/pipeline-core/scripts");mkdirSync(vendored,{recursive:true});writeFileSync(join(vendored,"quality-package-materializer.mjs"),readFileSync(script));
+    assert.equal(admit(command([process.execPath,copied,...args]),path),false);
+    assert.equal(admit(command([process.execPath,join(vendored,"quality-package-materializer.mjs"),...args]),path),false);
+    const link=join(path,"linked.mjs");const linked=tryLink(script,link);
+    await t.test("SIGNED-AGENT symlinked script is refused",{skip:!linked&&noLinkReason},()=>{assert.equal(admit(command([process.execPath,link,...args]),path),false);});
+    const inputLink=join(path,"link.json");const inputLinked=tryLink(intent,inputLink);
+    await t.test("SIGNED-AGENT symlinked input is refused",{skip:!inputLinked&&noLinkReason},()=>{assert.equal(admit(command([process.execPath,script,path,inputLink,proof,policy,"verify"]),path),false);});
+    rmSync(inputLink,{force:true});linkSync(intent,inputLink);
+    assert.equal(admit(good,path),false,"hardlinked input");rmSync(inputLink);
+    writeFileSync(proof," ".repeat(32769));assert.equal(admit(good,path),false,"bounded proof");
+  } finally {rmSync(path,{recursive:true,force:true});}
+});
+
+test("SIGNED-AGENT basename admission retains lifecycle denial", () => {
+  const path=realpathSync(activeGitRoot());
+  try {
+    mkdirSync(join(path,"project"));
+    for(const p of ["intent.json","proof.json","project/critical-human-proof.json"])writeFileSync(join(path,p),"{}");
+    const script=realpathSync(fileURLToPath(new URL("../scripts/quality-package-materializer.mjs",import.meta.url)));
+    const command=[process.execPath,script,path,join(path,"intent.json"),join(path,"proof.json"),join(path,"project/critical-human-proof.json"),"verify"].map(w=>JSON.stringify(w)).join(" ");
+    let called=0;
+    const result=evaluateLifecycleReadyGuard({tool_name:"Bash",tool_input:{command}}, {projectDir:path,requireProjectOnboardingReadyFn(){called++;deny("partial");}});
+    assert.equal(called,1,"readiness still enforced");
+    assert.equal(result.exitCode,2);
+    assert.doesNotMatch(result.stderr,/GUARD-GATE-STRENGTH-SHELL/u);
+    assert.match(result.stderr,/partial/u);
+    for (const mode of ["verify", "apply", "authorize-commit"]) {
+      const readyCommand=command.replace('"verify"',JSON.stringify(mode));
+      const ready=evaluateLifecycleReadyGuard({tool_name:"Bash",tool_input:{command:readyCommand}}, {projectDir:path,requireProjectOnboardingReadyFn:readyStub});
+      assert.equal(ready.exitCode,0,mode+": "+ready.stderr);
+    }
+  } finally {rmSync(path,{recursive:true,force:true});}
+});
+
+// ALFRED-W0-4 (backlog 2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes):
+// a shape-invalid readiness OBSERVATION (PORG-INVALID-OBSERVATION, session intent) says nothing about the lifecycle,
+// so it must not strand a session that only wants to record a defect or a decision. The guard's record lane admits
+// Write/Edit/NotebookEdit to backlog/ and docs/ -- and ONLY there, never to a path the persisted pipeline state
+// records (bound PRD / Spec / design input / baseline), never through a hidden segment, a traversal, an absolute or
+// cross-drive spelling, a case variant or a link that leaves the record tree, and never when the state cannot be
+// read. These tests are the tracked regression fence for that lane (GL-09: a fault inside the lane blocks).
+// Cost note: every target OUTSIDE the project root pays the cross-repository check's git probe (about 6 s each on
+// the reference Windows host), so the outside-root spellings are kept to one tool and one state on purpose.
+const QW04_FIXTURES = [];
+process.on("exit", () => {
+  for (const dir of QW04_FIXTURES) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* a throwaway fixture */ }
+  }
+});
+
+const QW04_BOUND_PRD = "docs/prd-bound.md";
+const QW04_BOUND_SPEC = "specs/f/spec.md";
+const QW04_BOUND_DESIGN = "specs/f/design-input.md";
+const QW04_BASELINE = "docs/architecture/baseline.md";
+const QW04_MANIFEST = "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n";
+const QW04_FEATURE = { id: "f", planPath: QW04_BOUND_PRD, specPath: QW04_BOUND_SPEC, designInputPath: QW04_BOUND_DESIGN };
+const QW04_STATES = {
+  draft: { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "design" }, planApproved: false },
+  "awaiting-approval": { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "design" }, planApproved: false, planSubmitted: true },
+  approved: { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "design" }, planApproved: true },
+  implementing: { schema: "pipeline.state.v0", activeFeature: { ...QW04_FEATURE, phase: "implementation" }, planApproved: true },
+};
+const QW04_LANE_PATHS = ["backlog/items/qw04-defect.md", "docs/qw04-note.md", "docs/qw04/deeper/not-yet-created.md"];
+const QW04_OUTCOMES = {
+  invalid() { throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "raw observation message", { intent: "session" }); },
+  invalidBootstrapIntent() { throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "raw observation message", { intent: "bootstrap" }); },
+  partial() { deny("partial"); },
+  drift() { deny("projection-drift"); },
+};
+
+// `state`: an object (serialized), a string (written verbatim, for unparseable fixtures) or null (no state file).
+function qw04GuardRoot(state) {
+  const path = realpathSync(activeGitRoot());
+  QW04_FIXTURES.push(path);
+  writeFileSync(join(path, ".claude", "pipeline.yaml"), QW04_MANIFEST);
+  if (typeof state === "string") writeFileSync(join(path, ".claude", "pipeline-state.json"), state);
+  else if (state !== null) writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify(state));
+  return path;
+}
+
+function qw04Run(path, toolName, toolInput, outcome = "invalid") {
+  return evaluateLifecycleReadyGuard({ tool_name: toolName, tool_input: toolInput }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn: QW04_OUTCOMES[outcome],
+  });
+}
+
+function qw04AssertRefused(path, targets, label, tools = ["Write", "Edit"]) {
+  for (const toolName of tools) {
+    for (const target of targets) {
+      const result = qw04Run(path, toolName, { file_path: target });
+      assert.equal(result.exitCode, 2, `${label}/${toolName}: admitted ${target}`);
+      assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, `${label}/${toolName}/${target}`);
+    }
+  }
+}
+
+test("QW04-1 a PORG-INVALID-OBSERVATION (session) observation admits Write, Edit and NotebookEdit to backlog/ and docs/ records in every lifecycle status", () => {
+  for (const [status, state] of Object.entries(QW04_STATES)) {
+    const path = qw04GuardRoot(state);
+    for (const toolName of ["Write", "Edit"]) {
+      for (const target of QW04_LANE_PATHS) {
+        const result = qw04Run(path, toolName, { file_path: target });
+        assert.equal(result.exitCode, 0, `${status}/${toolName}/${target}: ${result.stderr}`);
+      }
+    }
+    for (const target of ["docs/qw04.ipynb", "backlog/items/qw04.ipynb"]) {
+      const result = qw04Run(path, "NotebookEdit", { notebook_path: target });
+      assert.equal(result.exitCode, 0, `${status}/NotebookEdit/${target}: ${result.stderr}`);
+    }
+  }
+});
+
+test("QW04-2 the bound PRD, Spec and design input stay refused in every spelling, while a sibling record is admitted", () => {
+  for (const [status, state] of Object.entries(QW04_STATES)) {
+    const path = qw04GuardRoot(state);
+    assert.equal(qw04Run(path, "Write", { file_path: "docs/prd-bound-notes.md" }).exitCode, 0, `${status}: sibling control`);
+    qw04AssertRefused(path, [
+      QW04_BOUND_PRD, "docs/Prd-Bound.md", "./docs/prd-bound.md", "docs//prd-bound.md", "docs\\prd-bound.md",
+      join(path, "docs", "prd-bound.md"), QW04_BOUND_SPEC, QW04_BOUND_DESIGN,
+    ], status);
+  }
+});
+
+test("QW04-3 a path the persisted state records anywhere (here a nested baseline) is refused, its sibling is admitted", () => {
+  const path = qw04GuardRoot({ ...QW04_STATES.approved, architecture: { design: { baseline: QW04_BASELINE } } });
+  assert.equal(qw04Run(path, "Write", { file_path: "docs/architecture/baseline-notes.md" }).exitCode, 0, "sibling control");
+  qw04AssertRefused(path, [QW04_BASELINE, "docs/Architecture/Baseline.md", "./docs/architecture/baseline.md"], "recorded baseline");
+});
+
+test("QW04-4 inside the project nothing outside backlog/ and docs/ is admitted: implementation, protected state and baselines, hidden segments, traversal, case variants", () => {
+  for (const status of ["approved", "implementing"]) {
+    const path = qw04GuardRoot(QW04_STATES[status]);
+    assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, `${status}: lane control`);
+    qw04AssertRefused(path, [
+      "src/app.js", "src/docs/x.md", "specs/other/prd.md",
+      ".claude/pipeline-state.json", ".claude/settings.json", ".claude/docs/x.md",
+      "project/pipeline-state.json", "project/pipeline.json", "project/docs/x.md", "evidence/x.json",
+      "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "docs/.hidden/x.md", "backlog/.hidden.md", "docs/.git/config", "docs/node_modules/x.md",
+      "backlog", "docs",
+      "docs/../src/app.js", "backlog/../project/pipeline-state.json",
+      "Docs/x.md", "BACKLOG/items/x.md",
+    ], status);
+  }
+});
+
+test("QW04-4b targets outside the project root (traversal, absolute and cross-drive spellings) are refused", () => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, "lane control");
+  qw04AssertRefused(path, [
+    "../docs/x.md", "docs/../../outside/docs/x.md", join(dirname(path), "outside", "docs", "x.md"), "Q:/elsewhere/docs/x.md",
+  ], "outside root", ["Write"]);
+});
+
+test("QW04-5 a junction or symlink under docs/ that leaves the record tree is refused", (t) => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  mkdirSync(join(path, "src"), { recursive: true });
+  mkdirSync(join(path, "docs"), { recursive: true });
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-qw04-out-")));
+  QW04_FIXTURES.push(outside);
+  try {
+    symlinkSync(join(path, "src"), join(path, "docs", "linked-src"), "junction");
+    symlinkSync(outside, join(path, "docs", "linked-out"), "junction");
+  } catch {
+    t.skip("junction creation not permitted on this host");
+    return;
+  }
+  assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, "lane control");
+  qw04AssertRefused(path, ["docs/linked-src/app.js", "docs/linked-src/new/dir/app.js"], "link into the project");
+  qw04AssertRefused(path, ["docs/linked-out/x.md"], "link out of the project", ["Write"]);
+});
+
+test("QW04-6 the lane fails closed when the persisted state is absent, empty, unparseable or unreadable", () => {
+  const valid = JSON.stringify(QW04_STATES.approved);
+  const fixtures = {
+    absent: qw04GuardRoot(null),
+    empty: qw04GuardRoot(""),
+    truncated: qw04GuardRoot(valid.slice(0, valid.length - 5)),
+    unreadable: qw04GuardRoot(null),
+    "corrupt project state": qw04GuardRoot(QW04_STATES.approved),
+  };
+  mkdirSync(join(fixtures.unreadable, ".claude", "pipeline-state.json"));
+  mkdirSync(join(fixtures["corrupt project state"], "project"), { recursive: true });
+  writeFileSync(join(fixtures["corrupt project state"], "project", "pipeline-state.json"), "{ not json");
+  for (const [label, path] of Object.entries(fixtures)) qw04AssertRefused(path, ["docs/qw04-note.md", "backlog/items/qw04-defect.md"], label);
+  const control = qw04GuardRoot(QW04_STATES.approved);
+  assert.equal(qw04Run(control, "Write", { file_path: "docs/qw04-note.md" }).exitCode, 0, "readable state control");
+});
+
+test("QW04-7 the lane exists only for PORG-INVALID-OBSERVATION with session intent: PORG-NOT-READY and a bootstrap-intent observation get nothing", () => {
+  for (const status of ["approved", "implementing"]) {
+    const path = qw04GuardRoot(QW04_STATES[status]);
+    assert.equal(qw04Run(path, "Write", { file_path: "docs/qw04-note.md" }, "invalid").exitCode, 0, `${status}: lane control`);
+    for (const outcome of ["partial", "drift", "invalidBootstrapIntent"]) {
+      for (const toolName of ["Write", "Edit"]) {
+        for (const target of QW04_LANE_PATHS) {
+          const result = qw04Run(path, toolName, { file_path: target }, outcome);
+          assert.equal(result.exitCode, 2, `${status}/${outcome}/${toolName}: admitted ${target}`);
+          assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, `${status}/${outcome}/${toolName}/${target}`);
+        }
+      }
+      assert.equal(qw04Run(path, "NotebookEdit", { notebook_path: "docs/qw04.ipynb" }, outcome).exitCode, 2, `${status}/${outcome}/NotebookEdit`);
+    }
+  }
+});
+
+test("QW04-8 GL-09 fault injection: an exception inside the record lane's own evaluation blocks the write and never admits it", () => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  const target = "docs/qw04-fault.md";
+  let armed = false;
+  let fired = 0;
+  const toolInput = {};
+  Object.defineProperty(toolInput, "file_path", {
+    enumerable: true,
+    configurable: true,
+    get() {
+      if (armed) {
+        const limit = Error.stackTraceLimit;
+        Error.stackTraceLimit = 200;
+        const stack = new Error("qw04 stack probe").stack ?? "";
+        Error.stackTraceLimit = limit;
+        // Throw only while the record lane itself is on the stack, so every other reader of the target
+        // (the scratch lane, the grammar, the cross-repository check) still sees a healthy value.
+        if (/w04IsNonAuthorityRecordWrite/u.test(stack)) {
+          fired += 1;
+          throw new Error("qw04 injected fault inside the record lane");
+        }
+      }
+      return target;
+    },
+  });
+  const control = qw04Run(path, "Write", toolInput);
+  assert.equal(control.exitCode, 0, `unarmed control must be admitted by the lane: ${control.stderr}`);
+  assert.equal(fired, 0, "the unarmed control injects nothing");
+  armed = true;
+  const faulted = qw04Run(path, "Write", toolInput);
+  assert.ok(fired >= 1, "the fault must actually fire inside the record lane (the injection point moved if this fails)");
+  assert.equal(faulted.exitCode, 2, `a throwing lane must block, not admit: ${faulted.stderr}`);
+  assert.match(faulted.stderr, /BLOCKED \(guard-lifecycle-ready/u);
+});
+
+// ALFRED-QP3-BUILD: tests for the third signed quality package (appended to the HEAD test file; ALFRED-QP3B additionally makes the
+// pre-existing "SIGNED-AGENT closed enforcing origin and filesystem grammar" test win32-safe -- see stage.mjs `testEdits`).
+//   QP3-2c/2d (ALFRED-QP3B F-B) the sanctioned script is matched by physical identity: same-named file elsewhere / link refused,
+//          letter-case variant of the real file admitted (win32).
+//   QP3-1  zero-authority orphan archive verbs of scripts/session-cleanup.mjs are admitted in exact closed argv, also while
+//          readiness is `partial`; --owner-nonce-file and every other deviation stay refused.
+//   QP3-2  G8: the signed-package lane admits a native-Windows invocation (backslash path words) ONLY on win32 and ONLY as the
+//          canonical rendering of the validated path words; every forbidden metacharacter and every other backslash use is refused.
+//   QP3-3  W0-4 hardening F-1: the record lane's realpath walk continues only on ENOENT/ENOTDIR and refuses on any other fault.
+//   QP3-4  W0-4 F-2: the record lane admits exactly THREE prefixes -- backlog/, docs/ and scratch/ -- and refuses a traversal
+//          out of scratch/ ("scratch/../project/...").
+const QP3_GUARD_MODULE = "./guard-lifecycle-ready.mjs";
+
+test("QP3-1 non-ready session-cleanup admits the zero-authority orphan archive verbs only in their exact closed argv (also while partial)", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const digest = "a".repeat(64);
+    const script = `node '${SESSION_CLEANUP_SCRIPT}'`;
+    const plan = `${script} plan-archive-orphan --repo '${path}'`;
+    const archive = `${script} archive-orphan --repo '${path}' --session-descriptor orphan-01 --expected-descriptor-sha256 ${digest} --by operator --reason 'foreign zero-authority orphan'`;
+    const admitted = [
+      plan, `${plan} --runner claude`, `${plan} --runner codex`,
+      archive, `${archive} --runner claude`, `${archive} --runner codex`,
+      `${script} archive-orphan --repo '${path}' --session-descriptor Orphan_1.x --expected-descriptor-sha256 ${digest} --by 'a b' --reason 'a reason with spaces'`,
+    ];
+    for (const status of ["partial", "continuity-damaged"]) {
+      for (const command of admitted) {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+        assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+        }).exitCode, 0, `${status}: ${command}`);
+      }
+    }
+    const rejected = [
+      `${script} plan-archive-orphan --repo /tmp/other`,
+      `${plan} --owner-nonce-file '${path}/nonce'`,
+      `${plan} --force`,
+      `${plan} --runner cursor`,
+      `${plan} --runner`,
+      `${plan} --runner claude --runner codex`,
+      `${plan} --session-descriptor orphan-01`,
+      `${script} plan-archive-orphan '${path}'`,
+      `${script} plan-archive-orphan --repo '${path}' && touch bypass`,
+      `${archive} --force`,
+      `${archive} --owner-nonce-file '${path}/nonce'`,
+      `${archive} --runner cursor`,
+      `${archive} --runner claude --runner codex`,
+      `${archive} --runner claude --owner-nonce-file '${path}/nonce'`,
+      archive.replace(`'${path}'`, "/tmp/other"),
+      archive.replace("--by operator ", ""),
+      archive.replace("--by operator", "--by ''"),
+      archive.replace(" --reason 'foreign zero-authority orphan'", ""),
+      archive.replace(" --reason 'foreign zero-authority orphan'", " --reason ''"),
+      archive.replace("--session-descriptor orphan-01 ", ""),
+      archive.replace(`--expected-descriptor-sha256 ${digest} `, ""),
+      archive.replace(digest, "z".repeat(64)),
+      archive.replace(digest, "a".repeat(63)),
+      archive.replace(digest, "A".repeat(64)),
+      archive.replace("orphan-01", "../foreign"),
+      archive.replace("orphan-01", "a/b"),
+      archive.replace("orphan-01", "'a b'"),
+      archive.replace("orphan-01", ".."),
+      archive.replace("orphan-01", "."),
+      archive.replace("orphan-01", "o".repeat(81)),
+      `${script} archive-orphan --repo '${path}' --expected-descriptor-sha256 ${digest} --session-descriptor orphan-01 --by operator --reason orphan`,
+      archive.replace("node '", "node '/tmp/other/scripts/session-cleanup.mjs' archive-orphan --repo '/tmp/x' ; node '"),
+      archive.replace(`'${SESSION_CLEANUP_SCRIPT}'`, "'/tmp/other/scripts/session-cleanup.mjs'"),
+      `${archive} && touch bypass`,
+    ];
+    for (const status of ["partial", "continuity-damaged"]) {
+      for (const command of rejected) {
+        assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+        assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+        }).exitCode, 2, `${status}: ${command}`);
+      }
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+const QP3_METACHARACTERS = ["$", "`", ";", "&", "|", "<", ">", "\r", "\n"];
+
+function qp3SignedFixture() {
+  const path = realpathSync(root());
+  mkdirSync(join(path, "project"));
+  const intent = join(path, "intent.json");
+  const proof = join(path, "proof.json");
+  const policy = join(path, "project", "critical-human-proof.json");
+  for (const file of [intent, proof, policy]) writeFileSync(file, "{}");
+  const script = realpathSync(fileURLToPath(new URL("../scripts/quality-package-materializer.mjs", import.meta.url)));
+  return { path, intent, proof, policy, script };
+}
+
+test("QP3-2a G8 on native Windows the signed-package lane admits backslash path words only as their canonical rendering", { skip: process.platform !== "win32" && "native Windows path words exist only on a win32 host" }, async () => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const f = qp3SignedFixture();
+  try {
+    const single = (word) => `'${word}'`;
+    const render = (mode, quote, script = f.script) => [process.execPath, script, f.path, f.intent, f.proof, f.policy].map(quote).join(" ") + ` ${mode}`;
+    for (const mode of ["verify", "apply", "authorize-commit"]) {
+      assert.equal(admit(render(mode, single), f.path), true, `single-quoted ${mode}`);
+      assert.equal(admit(render(mode, JSON.stringify), f.path), true, `json double-quoted ${mode}`);
+      assert.equal(admit(render(mode, single), f.path, { platform: "win32" }), true, `platform win32 injected ${mode}`);
+    }
+    const good = render("verify", single);
+    assert.equal(admit(good.replace(single(process.execPath), "node.exe"), f.path), true, "bare node.exe");
+    assert.equal(admit(render("verify", single, f.script.toLowerCase()), f.path), true, "script compared by physical identity: letter case is irrelevant on win32");
+    assert.equal(admit(render("verify", single, f.script.toUpperCase()), f.path), true, "upper-cased script spelling");
+    assert.equal(admit(good, f.path, { platform: "linux" }), false, "a backslash stays refused when the platform is not win32");
+    assert.equal(admit(good, f.path, { platform: "darwin" }), false, "darwin too");
+    // every forbidden metacharacter stays refused beside native backslash paths: trailing word and inside each path word
+    for (const meta of QP3_METACHARACTERS) {
+      assert.equal(admit(`${good} ${meta} echo x`, f.path), false, `trailing ${JSON.stringify(meta)}`);
+      assert.equal(admit(good + meta, f.path), false, `glued ${JSON.stringify(meta)}`);
+      for (const word of [f.intent, f.proof, f.policy, f.path, f.script]) {
+        assert.equal(admit(good.replace(single(word), `'${word}${meta}x'`), f.path), false, `inside ${word} ${JSON.stringify(meta)}`);
+      }
+    }
+    // a backslash anywhere other than inside a canonically rendered path word is refused
+    assert.equal(admit(`${good}\\`, f.path), false, "trailing backslash");
+    assert.equal(admit(good.replace(" verify", " verify\\"), f.path), false, "backslash glued to the mode word");
+    assert.equal(admit(good.replace(single(f.intent), f.intent), f.path), false, "unquoted native path word");
+    assert.equal(admit(good.replace(single(f.intent), `"${f.intent}"`), f.path), false, "double-quoted word with undoubled backslashes");
+    assert.equal(admit(good.replace(single(f.intent), `'${f.intent}'\\`), f.path), false, "backslash after a closing quote");
+    assert.equal(admit(good.replace(`'${f.proof}'`, `\\'${f.proof}'`), f.path), false, "escaped opening quote");
+    assert.equal(admit(good.replace(`'${f.proof}' `, `'${f.proof}'  `), f.path), false, "two spaces");
+    assert.equal(admit(good.replace(single(f.intent), `'${f.path}\\.\\intent.json'`), f.path), false, "non-canonical dot segment");
+    assert.equal(admit(good.replace(single(f.intent), `'${f.path}\\..\\${f.path.split("\\").pop()}\\intent.json'`), f.path), false, "non-canonical dot-dot segment");
+    assert.equal(admit(good.replace("verify", "VERIFY"), f.path), false, "mode case");
+  } finally { rmSync(f.path, { recursive: true, force: true }); }
+});
+
+test("QP3-2b G8 a backslash path word beside any forbidden metacharacter is refused on every platform (host independent)", async () => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const base = "node 'C:\\repo\\plugins\\pipeline-core\\scripts\\quality-package-materializer.mjs' 'C:\\repo' 'C:\\repo\\i.json' 'C:\\repo\\p.json' 'C:\\repo\\project\\critical-human-proof.json' verify";
+  for (const platform of ["win32", "linux", "darwin"]) {
+    assert.equal(admit(base, "C:\\repo", { platform }), false, `${platform}: nonexistent paths are never admitted`);
+    for (const meta of QP3_METACHARACTERS) {
+      assert.equal(admit(`${base} ${meta} echo x`, "C:\\repo", { platform }), false, `${platform} ${JSON.stringify(meta)}`);
+      assert.equal(admit(base.replace("C:\\repo\\i.json", `C:\\repo\\i${meta}.json`), "C:\\repo", { platform }), false, `${platform} in-word ${JSON.stringify(meta)}`);
+    }
+  }
+  assert.equal(admit(42, "C:\\repo", { platform: "win32" }), false, "non-string command");
+});
+
+// ALFRED-QP3B F-B: the sanctioned script is matched by physical identity (native realpath of the spelling == native realpath of the
+// sanctioned script, plus the closed physical-file grammar on the spelling itself), not by a case-folded string comparison.
+test("QP3-2c F-B the sanctioned script is matched by physical identity: a same-named file in another directory and a link to the real script are refused", async (t) => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const f = qp3SignedFixture();
+  try {
+    const render = (script) => [process.execPath, script, f.path, f.intent, f.proof, f.policy, "verify"].map((word) => JSON.stringify(word)).join(" ");
+    assert.equal(admit(render(f.script), f.path), true, "control: the real script in its canonical spelling");
+    for (const dir of [join(f.path, "plugins", "pipeline-core", "scripts"), join(f.path, "other")]) {
+      mkdirSync(dir, { recursive: true });
+      const sameName = join(dir, "quality-package-materializer.mjs");
+      writeFileSync(sameName, readFileSync(f.script));
+      assert.equal(admit(render(sameName), f.path), false, `same file name in another directory: ${dir}`);
+      assert.equal(admit(render(sameName.toUpperCase()), f.path), false, "a case variant of a DIFFERENT file is still a different file");
+    }
+    // Links: each sub-case is a SUBTEST that skips ONLY itself, with an explicit reason, when the host cannot create the link (a file
+    // symlink needs a privilege on win32; a directory junction does not, so the reparse-point spelling stays covered on such a host).
+    // A top-level t.skip() is deliberately not used: it marks the whole test skipped and lets a later assertion failure exit 0.
+    const tryLink = (target, file, type) => {
+      try { symlinkSync(target, file, type); return true; } catch (error) {
+        if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+        return false;
+      }
+    };
+    const noLinkReason = "symlink creation not permitted on this host";
+    const junction = join(f.path, "scripts-junction");
+    const junctionMade = tryLink(dirname(f.script), junction, process.platform === "win32" ? "junction" : "dir");
+    await t.test("QP3-2c directory link to the real scripts directory is not the sanctioned spelling", { skip: !junctionMade && noLinkReason }, () => {
+      assert.equal(admit(render(join(junction, "quality-package-materializer.mjs")), f.path), false, "the real script reached through a directory link has the same realpath but is not the sanctioned spelling");
+    });
+    const link = join(f.path, "link-to-script.mjs");
+    const linkMade = tryLink(f.script, link, "file");
+    await t.test("QP3-2c file symlink to the real script is not the sanctioned spelling", { skip: !linkMade && noLinkReason }, () => {
+      assert.equal(admit(render(link), f.path), false, "a symlink to the real script is not the sanctioned spelling");
+    });
+  } finally { rmSync(f.path, { recursive: true, force: true }); }
+});
+
+test("QP3-2d F-B on native Windows a letter-case variant of the real script is admitted because it is the same physical file", { skip: process.platform !== "win32" && "letter case is irrelevant only on a case-insensitive win32 filesystem" }, async () => {
+  const admit = (await import(QP3_GUARD_MODULE)).signedQualityPackageCommandAdmission;
+  const f = qp3SignedFixture();
+  try {
+    const render = (script) => [process.execPath, script, f.path, f.intent, f.proof, f.policy, "verify"].map((word) => JSON.stringify(word)).join(" ");
+    const swapped = (f.script[0] === f.script[0].toUpperCase() ? f.script[0].toLowerCase() : f.script[0].toUpperCase()) + f.script.slice(1);
+    const variants = [swapped, f.script.toLowerCase(), f.script.toUpperCase()].filter((variant) => variant !== f.script);
+    assert.ok(variants.length >= 2, "at least two spellings differ from the real script only by letter case");
+    for (const variant of variants) assert.equal(admit(render(variant), f.path), true, `case variant ${variant}`);
+    assert.equal(admit(render(f.script + "x"), f.path), false, "a different name is never a case variant");
+  } finally { rmSync(f.path, { recursive: true, force: true }); }
+});
+
+test("QP3-3 W0-4 hardening F-1: the record lane's realpath walk continues only on ENOENT/ENOTDIR and refuses on any other fault", () => {
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  const target = "docs/qp3-f1/not-yet.md";
+  const run = (w04RealpathSyncFn) => evaluateLifecycleReadyGuard({ tool_name: "Write", tool_input: { file_path: target } }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn: QW04_OUTCOMES.invalid, w04RealpathSyncFn,
+  });
+  const faultAt = (suffix, code) => (candidate) => {
+    if (String(candidate).endsWith(suffix)) {
+      const error = new Error(`injected ${code} at ${suffix}`);
+      error.code = code;
+      throw error;
+    }
+    return realpathSync(candidate);
+  };
+  assert.equal(run(realpathSync).exitCode, 0, "control: the unfaulted walk admits the record");
+  for (const suffix of ["qp3-f1", "not-yet.md"]) {
+    for (const code of ["ENOENT", "ENOTDIR"]) {
+      assert.equal(run(faultAt(suffix, code)).exitCode, 0, `${code} at ${suffix} still means "does not exist yet" and continues`);
+    }
+    for (const code of ["EACCES", "EPERM", "ELOOP", "EIO", "EMFILE", undefined]) {
+      const result = run(faultAt(suffix, code));
+      assert.equal(result.exitCode, 2, `${code} at ${suffix} must refuse`);
+      assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, `${code}/${suffix}`);
+    }
+  }
+  for (const code of ["EACCES", "EPERM"]) {
+    assert.equal(run(faultAt("docs", code)).exitCode, 2, `${code} on an existing ancestor component refuses`);
+    assert.equal(run(faultAt(path.split(/[\\/]/u).pop(), code)).exitCode, 2, `${code} on the project root component refuses`);
+  }
+});
+
+test("QP3-4 W0-4 F-2: the record lane admits exactly backlog/, docs/ and scratch/ and refuses a traversal out of scratch/", () => {
+  for (const [status, state] of Object.entries(QW04_STATES)) {
+    const path = qw04GuardRoot(state);
+    for (const toolName of ["Write", "Edit"]) {
+      for (const target of ["backlog/items/qp3-defect.md", "docs/qp3-note.md", "scratch/qp3-note.md", "scratch/qp3/deeper/not-yet-created.md"]) {
+        const result = qw04Run(path, toolName, { file_path: target });
+        assert.equal(result.exitCode, 0, `${status}/${toolName}/${target}: ${result.stderr}`);
+      }
+    }
+    const notebook = qw04Run(path, "NotebookEdit", { notebook_path: "scratch/qp3.ipynb" });
+    assert.equal(notebook.exitCode, 0, `${status}/NotebookEdit/scratch/qp3.ipynb: ${notebook.stderr}`);
+  }
+  const path = qw04GuardRoot(QW04_STATES.approved);
+  assert.equal(qw04Run(path, "Write", { file_path: "scratch/qp3-note.md" }).exitCode, 0, "lane control");
+  qw04AssertRefused(path, [
+    "scratch/../project/pipeline-state.json", "scratch/../project/pipeline.json", "scratch/../src/app.js",
+    "scratch/../.claude/pipeline-state.json", "scratch/../docs/../src/app.js", "scratch", "scratch/..",
+  ], "scratch traversal and bare prefix");
+  const notebookTraversal = qw04Run(path, "NotebookEdit", { notebook_path: "scratch/../project/qp3.ipynb" });
+  assert.equal(notebookTraversal.exitCode, 2, "NotebookEdit traversal out of scratch/ refused");
+});
+
+// ALFRED-QP4-BUILD2: tests for the fourth signed quality package (appended to the HEAD test file); re-scoped to the guard-side changes only.
+// Contract: scratch/qp4/false-positives.md. The refusal label GUARD-READ-SCOPE-OUTSIDE-ROOT used to be printed for EVERY non-admitted single read-family
+// command (isRejectedReadFamilyCommand), so R1-R3/R6 were never outside-root reads: they are refused for rg flags the closed grammar does not know
+// (--no-heading, -m, a repeated -g -- fixed separately in the unprotected guard-command-grammar.mjs), R5 for a double-quoted native-Windows drive
+// path whose backslashes the POSIX tokenizer drops.
+//   QP4-1  a single read-family command the grammar does not support (R1, R2, R3, R6 shapes and in-root siblings) is refused with the NEW code
+//          GUARD-READ-COMMAND-UNSUPPORTED and never with the scope code; a target that really resolves outside the root keeps the scope code.
+//   QP4-2  win32: a double-quoted native drive path made of plain path characters is the same file for the shell and the guard (R5).
+//   QP4-3  Codex and Antigravity Bash payload shapes reach the same predicate and carry the same labels; in-root tail/wc/head stay admitted (R4).
+//   QP4-4  Glob wildcard listing inside the project root (G1, G3, G4); G2 (.git) refused. Round 2 (R2-1, SEC-11 "native Grep requires an exact file"): the
+//          directory-scoped Grep lane is REMOVED, so every directory-scoped Grep (round 1 admitted five shapes) is refused again, exactly as at HEAD.
+//   QP4-5  Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING (F1), never for private or outside paths.
+//   QP4-6  Round 2 (R2-1): the Glob wildcard listing is admitted only when no directory at or below the named path has a name starting with "." (a bounded,
+//          fail-closed walk that follows links to their physical target); a fixture WITHOUT any secret-named file proves the refusal comes from that walk.
+//   QP4-7  Round 2 (R2-2): the outside-root label looks only at read targets -- the rg/grep PATTERN and the value of an option that takes a value are not.
+const QP4_READ_TARGET = "GUARD-READ-TARGET";
+const QP4_UNSUPPORTED = /GUARD-READ-COMMAND-UNSUPPORTED:/u;
+const QP4_SCOPE = /GUARD-READ-SCOPE-OUTSIDE-ROOT/u;
+
+function qp4Fwd(path) { return path.replaceAll("\\", "/"); }
+
+function qp4Fixture() {
+  const path = realpathSync(root());
+  markGovernedFixture(path);
+  for (const dir of ["scratch/sub", "plugins/pipeline-core/scripts", "plugins/pipeline-core/lib", "vault", ".git/agent-pipeline/session-descriptors/active"]) {
+    mkdirSync(join(path, ...dir.split("/")), { recursive: true });
+  }
+  writeFileSync(join(path, "scratch", "notes.md"), "authorize-commit apply\n");
+  writeFileSync(join(path, "scratch", "log.txt"), "line\n");
+  writeFileSync(join(path, "scratch", "sub", "a.md"), "authorize-commit\n");
+  writeFileSync(join(path, "scratch", "sub", "b.mjs"), "export const b = 1;\n");
+  writeFileSync(join(path, "plugins", "pipeline-core", "scripts", "signed-quality-package.mjs"), "export const apply = 1;\n");
+  writeFileSync(join(path, "plugins", "pipeline-core", "lib", "a.mjs"), "export const a = 1;\n");
+  writeFileSync(join(path, "vault", "id_rsa"), "private\n");
+  writeFileSync(join(path, "vault", "readme.md"), "x\n");
+  writeFileSync(join(path, ".git", "agent-pipeline", "session-descriptors", "active", "s.json"), "{}\n");
+  return path;
+}
+
+// On native Windows the system temp directory sits under LOCALAPPDATA, which the passive read policy protects by design; the fixture
+// is a project root of its own, so those two variables point at a missing directory for the duration of the case.
+function qp4WithoutAppDataRoots(fn) {
+  const saved = { APPDATA: process.env.APPDATA, LOCALAPPDATA: process.env.LOCALAPPDATA };
+  const missing = join(tmpdir(), `qp4-no-appdata-${process.pid}`);
+  process.env.APPDATA = missing;
+  process.env.LOCALAPPDATA = missing;
+  try { return fn(); } finally {
+    for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+}
+
+function qp4Verdict(input, path) {
+  const r = evaluateLifecycleReadyGuard(input, { projectDir: path });
+  return { exitCode: r.exitCode, text: String(r.stderr ?? "") };
+}
+
+function qp4Admit(command, path) {
+  const predicate = isReadOnlyDiagnosticCommand(command, path);
+  const verdict = qp4Verdict(bash(command), path);
+  assert.equal(predicate, true, `predicate: ${command}`);
+  assert.equal(verdict.exitCode, 0, `guard: ${command}\n${verdict.text}`);
+}
+
+function qp4Refuse(command, path) {
+  const verdict = qp4Verdict(bash(command), path);
+  assert.equal(isReadOnlyDiagnosticCommand(command, path), false, `predicate: ${command}`);
+  assert.equal(verdict.exitCode, 2, `guard: ${command}`);
+  return verdict;
+}
+
+// Refused because the COMMAND is not supported: the new code, never the scope code.
+function qp4RefuseUnsupported(command, path) {
+  const verdict = qp4Refuse(command, path);
+  assert.match(verdict.text, QP4_UNSUPPORTED, `unsupported label: ${command}`);
+  assert.doesNotMatch(verdict.text, QP4_SCOPE, `no scope label: ${command}`);
+}
+
+// Refused because a target really resolves outside the project: the scope code, never the unsupported code.
+function qp4RefuseOutside(command, path) {
+  const verdict = qp4Refuse(command, path);
+  assert.match(verdict.text, QP4_SCOPE, `scope label: ${command}`);
+  assert.doesNotMatch(verdict.text, QP4_UNSUPPORTED, `no unsupported label: ${command}`);
+}
+
+test("QP4-1 a single read-family command the grammar does not support is refused with GUARD-READ-COMMAND-UNSUPPORTED (R1, R2, R3, R6 shapes), a target that really resolves outside the root keeps GUARD-READ-SCOPE-OUTSIDE-ROOT", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const fwd = qp4Fwd(path);
+      const script = "plugins/pipeline-core/scripts/signed-quality-package.mjs";
+      // Every target below is INSIDE the project root; the commands are refused for their own flags or spelling only. The rg flag gaps themselves
+      // (--no-heading, -m N, a repeated -g) are NOT admitted by this package: they are refused with the truthful code until guard-command-grammar.mjs
+      // learns them in a separate, ordinary commit.
+      for (const command of [
+        `rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
+        `rg -n --no-heading "authorize-commit" ${fwd}/scratch`,
+        `rg -n --no-heading -m 20 "authorize-commit\\|\\"apply\\"" ${script}`,
+        `rg -n --no-heading -m 20 apply ${fwd}/${script} ${fwd}/plugins/pipeline-core/lib/a.mjs`,
+        `rg -m 5 apply ${script}`,
+        `rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"`,
+        "rg --hidden --no-ignore apply .",
+        "grep -R apply .",
+        "git diff --output scratch/escaped.txt",
+        "node --test-reporter-destination scratch/escaped.txt --test",
+      ]) qp4RefuseUnsupported(command, path);
+      // The refusal still states the complete admitted grammar and a machine-readable (empty) retry envelope.
+      const unsupported = qp4Refuse(`rg -n --no-heading apply ${script}`, path);
+      assert.match(unsupported.text, /pipeline\.guard-retry-actions\.v1/u);
+      assert.match(unsupported.text, /not a path|not reported as a read outside the project root/u);
+      // Targets that really resolve outside the project keep the scope code. A plain outside file may be an admitted passive read (that policy is
+      // unchanged), so the refused outside targets here are protected credential reads: absolute, relative-traversal and tilde spellings.
+      const outsideSecret = qp4Fwd(join(outside, "vault", "id_rsa"));
+      for (const command of [
+        `cat ${outsideSecret}`,
+        `tail -n 20 ${outsideSecret}`,
+        `rg -n private ${outsideSecret}`,
+        `cat ${qp4Fwd(relative(path, join(outside, "vault", "id_rsa")))}`,
+        "cat ~/.ssh/id_rsa",
+      ]) qp4RefuseOutside(command, path);
+      // Secrets inside the root and the admitted forms of the same commands are unchanged.
+      qp4Refuse("cat vault/id_rsa", path);
+      qp4Admit(`rg -n -e authorize ${fwd}/${script}`, path);
+      qp4Admit(`rg -n apply ${script}`, path);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("QP4-2 R5 on native Windows a double-quoted drive path of plain path characters is admitted; protected and mixed-quote spellings stay refused", { skip: process.platform !== "win32" && "native Windows drive paths exist only on a win32 host (the rewrite is gated on process.platform and is inert elsewhere)" }, () => {
+  const path = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const bwd = path.replaceAll("/", "\\");
+      qp4Admit(`wc -l "${bwd}\\scratch\\notes.md"`, path);
+      qp4Admit(`tail -n 20 "${bwd}\\scratch\\log.txt"`, path);
+      qp4Admit(`rg -n apply "${bwd}\\scratch\\notes.md"`, path);
+      qp4Refuse(`wc -l "${bwd}\\vault\\id_rsa"`, path);
+      qp4Refuse(`wc -l "${path.slice(0, 3)}Users\\x\\.ssh\\id_ed25519"`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\notes.md" 'scratch\\log.txt'`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\notes.md\\"`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\$HOME"`, path);
+      qp4Refuse(`wc -l x"${bwd}\\scratch\\notes.md"`, path);
+      qp4Refuse(`wc -l "${bwd}\\scratch\\notes.md" > out.txt`, path);
+      // An outside-root drive path in the same spelling is still a scope refusal, not an unsupported command.
+      const outside = qp4Fixture();
+      try { qp4RefuseOutside(`wc -l "${outside.replaceAll("/", "\\")}\\vault\\id_rsa"`, path); } finally { rmSync(outside, { recursive: true, force: true }); }
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("QP4-3 R4 an existing in-root file through tail, wc and head is admitted; the Codex and Antigravity Bash payload shapes reach the same predicate and carry the same labels", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      for (const command of ["tail -n 20 scratch/log.txt", `tail -n 20 ${qp4Fwd(path)}/scratch/log.txt`, "wc -l scratch/notes.md", "head -n 5 scratch/notes.md"]) qp4Admit(command, path);
+      const script = `${qp4Fwd(path)}/plugins/pipeline-core/scripts/signed-quality-package.mjs`;
+      // Codex: PreToolUse {tool_name:"Bash", tool_input:{command}} -> isReadOnlyDiagnosticCommand(command, projectRoot) (codex-pretool-guard.mjs).
+      // Codex has no Glob/Grep/Read tool at the adapter: supportedTools is exactly Bash, apply_patch, Edit, Write.
+      const codexRefused = { tool_name: "Bash", tool_input: { command: `rg -n --no-heading -m 20 apply ${script}` } };
+      assert.equal(isReadOnlyDiagnosticCommand(codexRefused.tool_input.command, path), false);
+      const codexVerdict = evaluateLifecycleReadyGuard(codexRefused, { projectDir: path });
+      assert.equal(codexVerdict.exitCode, 2);
+      assert.match(String(codexVerdict.stderr), QP4_UNSUPPORTED);
+      assert.doesNotMatch(String(codexVerdict.stderr), QP4_SCOPE);
+      const codexAdmitted = { tool_name: "Bash", tool_input: { command: `rg -n -e apply ${script}` } };
+      assert.equal(isReadOnlyDiagnosticCommand(codexAdmitted.tool_input.command, path), true);
+      // Antigravity: {toolCall:{name:"run_command",args:{CommandLine,Cwd}}} normalizes to {tool_name:"Bash",tool_input:{command,cwd}};
+      // its view_file/list_dir/find_by_name/grep_search calls are read-only short-circuits at the adapter and never reach this guard.
+      const antigravity = (command) => ({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, cwd: path } });
+      const unsupported = evaluateLifecycleReadyGuard(antigravity(`rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt"`), { projectDir: path });
+      assert.equal(unsupported.exitCode, 2);
+      assert.match(String(unsupported.stderr), QP4_UNSUPPORTED);
+      assert.doesNotMatch(String(unsupported.stderr), QP4_SCOPE);
+      const scope = evaluateLifecycleReadyGuard(antigravity(`cat ${qp4Fwd(join(outside, "vault", "id_rsa"))}`), { projectDir: path });
+      assert.equal(scope.exitCode, 2);
+      assert.match(String(scope.stderr), QP4_SCOPE);
+      assert.doesNotMatch(String(scope.stderr), QP4_UNSUPPORTED);
+      assert.equal(evaluateLifecycleReadyGuard(antigravity("rg -n --no-heading apply scratch > out.txt"), { projectDir: path }).exitCode, 2);
+      assert.equal(evaluateLifecycleReadyGuard(antigravity("rg -n -e apply scratch/notes.md"), { projectDir: path }).exitCode, 0);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); every directory-scoped Grep stays refused (R2-1, SEC-11)", async (t) => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const tool = (name, input) => qp4Verdict({ tool_name: name, tool_input: input }, path);
+      for (const input of [
+        { pattern: "scratch/sub/*", path },
+        { pattern: "scratch/*", path },
+        { pattern: "scratch/*", path: qp4Fwd(path) },
+        { pattern: "*", path: join(path, "scratch") },
+        { pattern: "scratch/sub/*" },
+      ]) assert.equal(tool("Glob", input).exitCode, 0, JSON.stringify(input));
+      for (const input of [
+        { pattern: ".git/agent-pipeline/session-descriptors/active/*.json", path },
+        { pattern: ".git/agent-pipeline/session-descriptors/active/*", path },
+        { pattern: "*", path: join(path, ".git") },
+        { pattern: "*", path: join(path, ".git", "agent-pipeline") },
+        { pattern: "vault/*", path },
+        { pattern: "scratch/*/*", path },
+        { pattern: "scratch/**", path },
+        { pattern: "../*", path },
+        { pattern: "scratch/../vault/*", path },
+        { pattern: "scratch/*", path: join(outside, "scratch") },
+        { pattern: "scratch/*", path: outside },
+        { pattern: "/*", path },
+        { pattern: "scratch\\*", path },
+      ]) {
+        const r = tool("Glob", input);
+        assert.equal(r.exitCode, 2, JSON.stringify(input));
+        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+      // R2-1 (SEC-11 "native Grep requires an exact file"): the directory-scoped Grep lane is removed. Round 1 admitted these five shapes; each is
+      // refused again, exactly as at HEAD (content search over a tree uses the admitted `git grep`).
+      for (const input of [
+        { pattern: "authorize-commit|apply", path: join(path, "scratch"), glob: "*.md" },
+        { pattern: "authorize", path: join(path, "scratch"), glob: "**/*.md" },
+        { pattern: "authorize", path: qp4Fwd(join(path, "scratch")), glob: "*.mjs" },
+        { pattern: "authorize", path: "scratch", glob: "*.md" },
+        { pattern: "apply", path: join(path, "plugins", "pipeline-core"), glob: "**/*.mjs" },
+      ]) {
+        const r = tool("Grep", input);
+        assert.equal(r.exitCode, 2, JSON.stringify(input));
+        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+      for (const input of [
+        { pattern: "x", path: join(path, "scratch") },
+        { pattern: "x", glob: "*.md" },
+        { pattern: "x", path: join(path, ".git"), glob: "*.json" },
+        { pattern: "x", path: join(path, ".git", "agent-pipeline"), glob: "**/*.json" },
+        { pattern: "x", path: join(path, "vault"), glob: "*.md" },
+        { pattern: "x", path, glob: "*.md" },
+        { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
+        { pattern: "x", path: join(path, "scratch"), glob: "*" },
+        { pattern: "x", path: join(path, "scratch"), glob: "../*.md" },
+        { pattern: "x", path: join(path, "scratch"), glob: ".git/*.md" },
+        { pattern: "x", path: join(outside, "scratch"), glob: "*.md" },
+        { pattern: "x", path: join(path, "scratch", "notes.md"), glob: "*.md" },
+      ]) {
+        const r = tool("Grep", input);
+        assert.equal(r.exitCode, 2, JSON.stringify(input));
+        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+      assert.equal(tool("Read", { file_path: join(path, "scratch", "notes.md") }).exitCode, 0);
+      assert.equal(tool("Read", { file_path: join(path, "vault", "id_rsa") }).exitCode, 2);
+    });
+    // A directory link that leaves the project is an escape for both lanes (a junction on native Windows, a symlink elsewhere).
+    let linked = true;
+    try { symlinkSync(join(outside, "scratch"), join(path, "scratch", "escape"), "junction"); } catch (error) {
+      if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+      linked = false;
+    }
+    await t.test("QP4-4 directory link escape is refused", { skip: !linked && "directory link creation not permitted on this host" }, () => {
+      qp4WithoutAppDataRoots(() => {
+        assert.equal(qp4Verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/escape/*", path } }, path).exitCode, 2);
+        assert.equal(qp4Verdict({ tool_name: "Grep", tool_input: { pattern: "x", path: join(path, "scratch", "escape"), glob: "*.md" } }, path).exitCode, 2);
+      });
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING; private, secret-named and outside paths keep GUARD-READ-TARGET", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const read = (file) => qp4Verdict({ tool_name: "Read", tool_input: { file_path: file } }, path);
+      for (const file of [join(path, "scratch", "perf", "tests.log"), join(path, "scratch", "missing.log"), "scratch/missing.log", qp4Fwd(join(path, "scratch", "missing.log"))]) {
+        const r = read(file);
+        assert.equal(r.exitCode, 2, file);
+        assert.match(r.text, /GUARD-READ-TARGET-MISSING/u, file);
+      }
+      for (const file of [join(path, ".git", "agent-pipeline", "missing.json"), join(path, "scratch", "id_rsa"), join(path, "scratch", ".env"), join(path, "scratch", "k.pem"),
+        join(outside, "scratch", "missing.log"), join(path, "..", "missing.log"), join(path, "scratch", "notes.md", "inner"), join(path, "vault", "id_rsa")]) {
+        const r = read(file);
+        assert.equal(r.exitCode, 2, file);
+        assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, file);
+      }
+      assert.equal(read(join(path, "scratch", "log.txt")).exitCode, 0);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// R2-1 fixture: NO secret-named file anywhere, so the whole-tree secret screen passes and every refusal below can only come from the hidden-directory walk.
+function qp4HiddenFixture() {
+  const path = realpathSync(root());
+  markGovernedFixture(path);
+  for (const dir of ["src/sub", "docs", "top/mid/.cache", "nest/.claude", ".claude", ".git/agent-pipeline", "shallow/d/d/d/d/d", "deep"]) {
+    mkdirSync(join(path, ...dir.split("/")), { recursive: true });
+  }
+  mkdirSync(join(path, "deep", ...Array.from({ length: 40 }, () => "d")), { recursive: true });
+  for (const file of ["src/a.md", "src/sub/b.mjs", "docs/c.md", "top/mid/.cache/d.md", "nest/.claude/x.md", "nest/n.md", ".claude/x.md", ".git/agent-pipeline/x.json"]) {
+    writeFileSync(join(path, ...file.split("/")), "x\n");
+  }
+  return path;
+}
+
+test("QP4-6 R2-1 the Glob wildcard listing is admitted only when no directory at or below the named path is hidden (name starts with a dot); the refusal is the walk's, not the secret screen's", async (t) => {
+  const path = qp4HiddenFixture();
+  try {
+    const tool = (input) => qp4Verdict({ tool_name: "Glob", tool_input: input }, path);
+    const refused = (input) => {
+      const r = tool(input);
+      assert.equal(r.exitCode, 2, JSON.stringify(input));
+      assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+    };
+    qp4WithoutAppDataRoots(() => {
+      for (const input of [
+        { pattern: "src/*", path }, { pattern: "*", path: join(path, "src") }, { pattern: "docs/*", path }, { pattern: "src/sub/*", path },
+        { pattern: "*", path: qp4Fwd(join(path, "src", "sub")) }, { pattern: "shallow/*", path },
+      ]) assert.equal(tool(input).exitCode, 0, JSON.stringify(input));
+      // The project root (it contains .claude and .git), the parent of a hidden directory, a directory with a hidden directory further below, and a
+      // tree deeper than the walk's bound (40 nested directories, no hidden one) are all refused.
+      for (const input of [
+        { pattern: "*", path }, { pattern: "*" }, { pattern: "nest/*", path }, { pattern: "*", path: join(path, "nest") }, { pattern: "top/*", path },
+        { pattern: "*", path: qp4Fwd(join(path, "top")) }, { pattern: "top/mid/*", path }, { pattern: "deep/*", path },
+      ]) refused(input);
+      // Controls: remove the one hidden directory and the very same listing is admitted -- the hidden directory alone was the reason.
+      rmSync(join(path, "nest", ".claude"), { recursive: true, force: true });
+      assert.equal(tool({ pattern: "nest/*", path }).exitCode, 0, "control: nest/* once its hidden directory is gone");
+      rmSync(join(path, "top", "mid", ".cache"), { recursive: true, force: true });
+      assert.equal(tool({ pattern: "top/*", path }).exitCode, 0, "control: top/* once its hidden directory is gone");
+    });
+    let linked = true;
+    try { symlinkSync(join(path, "src"), join(path, "docs", "to-src"), "junction"); } catch (error) {
+      if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+      linked = false;
+    }
+    await t.test("QP4-6 a link to a visible in-root directory is followed; a link whose physical target is hidden is refused", { skip: !linked && "directory link creation not permitted on this host" }, () => {
+      qp4WithoutAppDataRoots(() => {
+        assert.equal(tool({ pattern: "docs/*", path }).exitCode, 0, "a link to a visible in-root directory");
+        symlinkSync(join(path, ".claude"), join(path, "docs", "to-hidden"), "junction");
+        refused({ pattern: "docs/*", path });
+      });
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("QP4-7 R2-2 the outside-root label looks only at read targets: an rg/grep pattern and the value of an option that takes a value are never one", () => {
+  const path = qp4Fixture();
+  const outside = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      // In-root targets; the command is refused for the unsupported flag only. A pattern that looks like a path ("// TODO" is absolute, a tilde-prefixed
+      // pattern is a home path) or an option value ("-g //x") must not turn that into a scope refusal.
+      for (const command of [
+        `rg -n --no-heading "// TODO" scratch`,
+        `rg -n --no-heading "~/notes" scratch`,
+        `rg -n --no-heading "~notes" scratch`,
+        `rg -n --no-heading -e "// TODO" scratch`,
+        `rg -n --no-heading -e "~/x" -e "//y" scratch`,
+        `rg -n --no-heading --regexp "// TODO" scratch`,
+        `rg -n --no-heading -g "//x" apply scratch`,
+        `rg -n --no-heading --glob "~/x" apply scratch`,
+        `rg -n --no-heading -m 20 "// TODO" scratch`,
+        `rg -n --no-heading "// TODO" ${qp4Fwd(path)}/scratch/notes.md`,
+        `grep -n --no-heading "// TODO" scratch/notes.md`,
+        `grep -n -e "~/x" -m 5 scratch/notes.md`,
+      ]) qp4RefuseUnsupported(command, path);
+      // A target that really resolves outside the project still gets the scope code, however the pattern is spelled -- including a pattern FILE (-f), which the
+      // command reads.
+      const outsideFile = qp4Fwd(join(outside, "vault", "id_rsa"));
+      for (const command of [
+        `rg -n --no-heading "// TODO" ${outsideFile}`,
+        `rg -n --no-heading -e "~/x" ${outsideFile}`,
+        `rg -n --no-heading -g "*.md" apply ${outsideFile}`,
+        `rg -n --no-heading "// TODO" scratch ${outsideFile}`,
+        `rg -n --no-heading -f ${outsideFile} scratch`,
+        `grep -n -e apply ${outsideFile}`,
+      ]) qp4RefuseOutside(command, path);
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// ALFRED-RECCOL-PREP: tests for the dispatch-record write-after-commit fix (appended after package 4's appendix, which is appended after the HEAD tests).
+// Contract: scratch/reccol/critic-spec.md. The owning dispatch (the Claude runtime agent_id that made the opening write of
+// evidence/dispatch-record-<TASK_ID>.json, recorded in the guard's private owner registry under the git common dir) may keep writing its record after its own commit;
+// a different writer (another dispatch, the orchestrator) may not; a final-terminal record is immutable except for the owner's identical-content re-write;
+// a runner whose payload carries no agent identity keeps today's behaviour.
+//   RECCOL-1  the owner may checkpoint after its commit (in-progress log append, interim outcome, Edit of the interim record, final outcome + report).
+//   RECCOL-2  a foreign writer (other dispatch, orchestrator) is refused on a claimed record; an unclaimed record keeps today's behaviour.
+//   RECCOL-3  a final-terminal record refuses every write except the owner's identical-content re-write.
+//   RECCOL-4  task-id reuse bound by git history, or by another owner's claim, stays refused and creates no claim.
+//   RECCOL-5  a payload without a resolvable agent identity creates no claim and keeps today's behaviour (the post-commit refusal remains for that runner).
+//   RECCOL-6  claimDispatchRecordOwnership: first opening write claims, never adopts an existing record, never overwrites a claim, never guesses an identity.
+import * as reccolGuardNs from "./guard-lifecycle-ready.mjs";
+
+const RECCOL_OWNER = "reccol-agent-owner";
+const RECCOL_OTHER = "reccol-agent-other";
+const RECCOL_SHA = "f262a5c712345678";
+const RECCOL_COMMIT = "a".repeat(40);
+
+function reccolFixture() {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  mkdirSync(join(path, "evidence"), { recursive: true });
+  mkdirSync(join(commonDir, "agent-pipeline", "bootstrap-receipt"), { recursive: true });
+  const fx = { path, commonDir, history: null };
+  for (const agentId of [RECCOL_OWNER, RECCOL_OTHER]) {
+    writeFileSync(bootstrapReceiptPathFixture(commonDir, agentId), JSON.stringify({
+      schema: "pipeline.bootstrap-receipt.v1", agentId, agentType: "pipeline-core:goldfish-deep", observedAt: "1970-01-01T00:00:00.000Z",
+    }));
+  }
+  fx.deps = {
+    projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(),
+    nowFn: () => "1970-01-01T00:00:00.000Z", gitCommitForTaskIdFn: () => fx.history,
+  };
+  fx.rel = (id) => "evidence/dispatch-record-" + id + ".json";
+  fx.file = (id) => join(path, "evidence", "dispatch-record-" + id + ".json");
+  fx.claim = (id) => join(commonDir, "agent-pipeline", "dispatch-record-owner", id + ".json");
+  fx.input = (agentId, tool, toolInput) => ({
+    tool_name: tool, tool_input: toolInput, transcript_path: "/parent/session.jsonl",
+    ...(agentId === null ? {} : { agent_id: agentId, agent_type: "pipeline-core:goldfish-deep" }),
+  });
+  fx.write = (agentId, id, record) => evaluateLifecycleReadyGuard(fx.input(agentId, "Write", { file_path: fx.rel(id), content: JSON.stringify(record, null, 2) }), fx.deps);
+  fx.edit = (agentId, id, from, to) => evaluateLifecycleReadyGuard(fx.input(agentId, "Edit", { file_path: fx.rel(id), old_string: from, new_string: to }), fx.deps);
+  fx.land = (id, record) => writeFileSync(fx.file(id), JSON.stringify(record, null, 2));
+  fx.cleanup = () => { rmSync(path, { recursive: true, force: true }); rmSync(commonDir, { recursive: true, force: true }); };
+  return fx;
+}
+
+const RECCOL_COLLISION = /GUARD-DISPATCH-RECORD-COLLISION/u;
+
+test("RECCOL-1 owner may checkpoint after commit: log append, interim outcome, Edit of the interim record and the final outcome with report are admitted for the dispatch that opened the record", () => {
+  const fx = reccolFixture();
+  const id = "RECCOL-OWN-1";
+  try {
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    const opened = fx.write(RECCOL_OWNER, id, open);
+    assert.equal(opened.exitCode, 0, opened.stderr);
+    fx.land(id, open);
+    fx.history = RECCOL_SHA; // the dispatch's own commit now cites the task id in git history
+    const appended = { ...open, log: [{ phase: "committed" }] };
+    const logAppend = fx.write(RECCOL_OWNER, id, appended);
+    assert.equal(logAppend.exitCode, 0, logAppend.stderr); // before the fix: GUARD-DISPATCH-RECORD-COLLISION "already bound to commit ... in git history"
+    assert.equal(JSON.parse(readFileSync(fx.claim(id), "utf8")).agentId, RECCOL_OWNER, "the opening write recorded its owner");
+    fx.land(id, appended);
+    const interim = { ...appended, outcome: "committed-pending-report", commits: [RECCOL_COMMIT] };
+    const checkpoint = fx.write(RECCOL_OWNER, id, interim);
+    assert.equal(checkpoint.exitCode, 0, checkpoint.stderr);
+    fx.land(id, interim);
+    const editInterim = fx.edit(RECCOL_OWNER, id, "\"log\": [", "\"log\": [{ \"phase\": \"checkpoint\" },");
+    assert.equal(editInterim.exitCode, 0, editInterim.stderr);
+    const final = { ...interim, outcome: "completed", candidateCommit: RECCOL_COMMIT, report: { text: "done" } };
+    const finalized = fx.write(RECCOL_OWNER, id, final);
+    assert.equal(finalized.exitCode, 0, finalized.stderr);
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-2 a foreign writer (another dispatch, the orchestrator) is refused on a claimed record; an unclaimed record keeps today's behaviour", () => {
+  const fx = reccolFixture();
+  const id = "RECCOL-FOREIGN-2";
+  try {
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(RECCOL_OWNER, id, open).exitCode, 0);
+    fx.land(id, open);
+    for (const who of [RECCOL_OTHER, null]) {
+      for (const result of [
+        fx.write(who, id, { ...open, log: [{ x: 1 }] }),
+        fx.write(who, id, { ...open, outcome: "completed" }),
+        fx.edit(who, id, "\"log\": [", "\"log\": [{ \"x\": 1 },"),
+      ]) {
+        assert.equal(result.exitCode, 2, String(who));
+        assert.match(result.stderr, RECCOL_COLLISION);
+        assert.match(result.stderr, /owned by dispatch agent reccol-agent-owner/u);
+      }
+    }
+    assert.equal(fx.write(RECCOL_OWNER, id, { ...open, log: [{ x: 1 }] }).exitCode, 0);
+    // a record nobody claimed (created by the orchestrator, or before this fix) is finalised exactly as before
+    const legacy = "RECCOL-LEGACY-2";
+    fx.land(legacy, { taskId: legacy, outcome: "in-progress" });
+    assert.equal(fx.write(null, legacy, { taskId: legacy, outcome: "completed" }).exitCode, 0);
+    assert.equal(existsSync(fx.claim(legacy)), false);
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-3 a final-terminal record refuses every write except the owner's identical-content re-write", () => {
+  const fx = reccolFixture();
+  const id = "RECCOL-FINAL-3";
+  try {
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(RECCOL_OWNER, id, open).exitCode, 0);
+    const final = { taskId: id, outcome: "completed", candidateCommit: RECCOL_COMMIT, commits: [RECCOL_COMMIT], log: [], report: { text: "final" } };
+    fx.land(id, final);
+    const reordered = Object.fromEntries(Object.entries(final).reverse());
+    assert.equal(fx.write(RECCOL_OWNER, id, reordered).exitCode, 0, "identical content in another key order is a no-op");
+    for (const result of [
+      fx.write(RECCOL_OWNER, id, { ...final, report: { text: "altered" } }),
+      fx.write(RECCOL_OWNER, id, { ...final, outcome: "in-progress" }),
+      fx.write(RECCOL_OWNER, id, { ...final, outcome: "committed-pending-report" }),
+      fx.edit(RECCOL_OWNER, id, "final", "altered"),
+    ]) {
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, RECCOL_COLLISION);
+      assert.match(result.stderr, /already been used by a completed dispatch/u);
+    }
+    for (const who of [RECCOL_OTHER, null]) {
+      for (const result of [fx.write(who, id, final), fx.write(who, id, { ...final, report: { text: "altered" } }), fx.edit(who, id, "final", "altered")]) {
+        assert.equal(result.exitCode, 2, String(who));
+        assert.match(result.stderr, RECCOL_COLLISION);
+      }
+    }
+    for (const outcome of ["blocked", "partial", "read-only-completed", "stopped-without-commit", "completed-no-delivery"]) {
+      fx.land(id, { ...final, outcome });
+      const refused = fx.write(RECCOL_OWNER, id, { ...final, outcome, report: { text: "altered" } });
+      assert.equal(refused.exitCode, 2, outcome);
+      assert.match(refused.stderr, RECCOL_COLLISION, outcome);
+    }
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-4 reusing a task id that git history or another owner's claim already binds stays refused and creates no claim", () => {
+  const fx = reccolFixture();
+  try {
+    const bound = "RECCOL-HIST-4";
+    fx.history = RECCOL_SHA; // git history binds this id to another dispatch's commit
+    const reuse = fx.write(RECCOL_OTHER, bound, { taskId: bound, outcome: "in-progress", commits: [], log: [] });
+    assert.equal(reuse.exitCode, 2);
+    assert.match(reuse.stderr, RECCOL_COLLISION);
+    assert.match(reuse.stderr, /already bound to commit f262a5c71234 in git history/u);
+    assert.equal(existsSync(fx.claim(bound)), false);
+    fx.history = null;
+    const claimed = "RECCOL-CLAIMED-4";
+    const open = { taskId: claimed, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(RECCOL_OWNER, claimed, open).exitCode, 0); // claims; the record file never lands (another guard may refuse the write)
+    const second = fx.write(RECCOL_OTHER, claimed, open);
+    assert.equal(second.exitCode, 2);
+    assert.match(second.stderr, /owned by dispatch agent reccol-agent-owner/u);
+    assert.equal(JSON.parse(readFileSync(fx.claim(claimed), "utf8")).agentId, RECCOL_OWNER);
+    assert.equal(fx.write(RECCOL_OWNER, claimed, open).exitCode, 0, "the owner may retry its own opening write");
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-5 a payload without a resolvable agent identity creates no claim and keeps today's behaviour (the post-commit refusal remains for that runner)", () => {
+  const fx = reccolFixture();
+  try {
+    const id = "RECCOL-NOID-5";
+    const open = { taskId: id, outcome: "in-progress", commits: [], log: [] };
+    assert.equal(fx.write(null, id, open).exitCode, 0);
+    assert.equal(existsSync(fx.claim(id)), false);
+    fx.land(id, open);
+    fx.history = RECCOL_SHA;
+    const refused = fx.write(null, id, { ...open, log: [{ phase: "committed" }] });
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /already bound to commit f262a5c71234 in git history/u);
+    fx.history = null;
+    const malformed = "RECCOL-BADID-5";
+    const result = evaluateLifecycleReadyGuard({
+      tool_name: "Write", tool_input: { file_path: fx.rel(malformed), content: JSON.stringify({ taskId: malformed, outcome: "in-progress" }) },
+      transcript_path: "/parent/session.jsonl", agent_id: "../traversal", agent_type: "pipeline-core:goldfish-deep",
+    }, fx.deps);
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.equal(existsSync(fx.claim(malformed)), false);
+  } finally { fx.cleanup(); }
+});
+
+test("RECCOL-6 claimDispatchRecordOwnership claims on the first opening write only, never adopts an existing record, never overwrites a claim, never guesses an identity", () => {
+  const fx = reccolFixture();
+  try {
+    assert.equal(typeof reccolGuardNs.claimDispatchRecordOwnership, "function", "claimDispatchRecordOwnership is exported");
+    const claim = (id, agentId, extra = {}) => reccolGuardNs.claimDispatchRecordOwnership({
+      relPath: fx.rel(id), requested: fx.file(id), root: fx.path, input: fx.input(agentId, "Write", { file_path: fx.rel(id) }), dependencies: fx.deps, ...extra,
+    });
+    assert.equal(claim("RECCOL-C-6", RECCOL_OWNER).status, "claimed");
+    const stored = JSON.parse(readFileSync(fx.claim("RECCOL-C-6"), "utf8"));
+    assert.deepEqual(stored, {
+      schema: "pipeline.dispatch-record-owner.v1", taskId: "RECCOL-C-6", agentId: RECCOL_OWNER, agentType: "pipeline-core:goldfish-deep", claimedAt: "1970-01-01T00:00:00.000Z",
+    });
+    assert.equal(claim("RECCOL-C-6", RECCOL_OTHER).status, "claim-exists");
+    assert.equal(JSON.parse(readFileSync(fx.claim("RECCOL-C-6"), "utf8")).agentId, RECCOL_OWNER);
+    fx.land("RECCOL-E-6", { taskId: "RECCOL-E-6", outcome: "in-progress" });
+    assert.equal(claim("RECCOL-E-6", RECCOL_OWNER).status, "record-exists");
+    assert.equal(existsSync(fx.claim("RECCOL-E-6")), false);
+    assert.equal(claim("RECCOL-N-6", null).status, "no-identity");
+    assert.equal(existsSync(fx.claim("RECCOL-N-6")), false);
+    assert.equal(claim("RECCOL-D-6", RECCOL_OWNER, { dependencies: { ...fx.deps, resolveGitCommonDirFn: () => null } }).status, "no-common-dir");
+    assert.equal(reccolGuardNs.claimDispatchRecordOwnership({
+      relPath: "evidence/not-a-record.json", requested: join(fx.path, "evidence", "not-a-record.json"), root: fx.path, input: fx.input(RECCOL_OWNER, "Write", {}), dependencies: fx.deps,
+    }).status, "not-a-dispatch-record");
+  } finally { fx.cleanup(); }
+});
+
+// ENVDUMP-T2: pins for backlog item 2026-10-07-a-read-only-probe-can-dump-the-process-environment-into-a-transcript
+// (appended after the RECCOL tests). A command whose effect is to print the process environment writes every secret in that
+// environment into a transcript that cannot be un-printed. Triage widened the scope from agent sessions to every session the
+// lifecycle guard sees, with no override route, so each command is pinned for BOTH session shapes: "agent" (the payload carries
+// agent_id/agent_type) and "main" (the same payload without them). The refusal carries a typed code containing ENV-DUMP
+// (planned: GUARD-ENV-DUMP).
+// SAFETY: every command string below is DATA passed in-process to evaluateLifecycleReadyGuard. None is ever spawned or executed
+// by this test; the guard only inspects the string. The fixture is READY, so an exit 0 is a real admission and a refusal that
+// is not the env-dump one (a different guard standing in) fails the stderr match instead of passing by accident.
+// Controls pin the other direction: ordinary read-only and test-running commands stay admitted in both shapes.
+const ENVDUMP_AGENT_ID = "envdump-agent-1";
+const ENVDUMP_REFUSAL = /ENV-DUMP/u;
+const ENVDUMP_SHAPES = ["agent", "main"];
+const ENVDUMP_DUMP_CASES = [
+  ["Bash", "env"],
+  ["Bash", "/usr/bin/env"],
+  ["Bash", "\"/usr/bin/env\" <<EOF\nx\nEOF"],
+  ["Bash", "printenv"],
+  ["Bash", "printenv PATH"],
+  ["Bash", "set"],
+  ["Bash", "export -p"],
+  ["Bash", "declare -x"],
+  ["Bash", "cat /proc/self/environ"],
+  ["Bash", "env | sort"],
+  ["Bash", "node -e \"console.log(process.env)\""],
+  ["Bash", "node -p process.env"],
+  ["PowerShell", "Get-ChildItem env:"],
+  ["PowerShell", "gci env:"],
+  ["PowerShell", "dir env:"],
+  ["PowerShell", "[Environment]::GetEnvironmentVariables()"],
+];
+const ENVDUMP_CONTROL_CASES = [
+  ["Bash", "git status"],
+  ["Bash", "node --test plugins/pipeline-core/lib/git-cmd.test.mjs"],
+];
+
+function envdumpFixture() {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  mkdirSync(join(commonDir, "agent-pipeline", "bootstrap-receipt"), { recursive: true });
+  writeFileSync(bootstrapReceiptPathFixture(commonDir, ENVDUMP_AGENT_ID), JSON.stringify({
+    schema: "pipeline.bootstrap-receipt.v1", agentId: ENVDUMP_AGENT_ID, agentType: "pipeline-core:goldfish-deep", observedAt: "1970-01-01T00:00:00.000Z",
+  }));
+  const deps = {
+    projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(),
+    nowFn: () => "1970-01-01T00:00:00.000Z",
+  };
+  return {
+    run: (shape, tool, command) => evaluateLifecycleReadyGuard({
+      tool_name: tool, tool_input: { command }, transcript_path: "/parent/session.jsonl",
+      ...(shape === "agent" ? { agent_id: ENVDUMP_AGENT_ID, agent_type: "pipeline-core:goldfish-deep" } : {}),
+    }, deps),
+    cleanup: () => { rmSync(path, { recursive: true, force: true }); rmSync(commonDir, { recursive: true, force: true }); },
+  };
+}
+
+for (const shape of ENVDUMP_SHAPES) {
+  for (const [tool, command] of ENVDUMP_DUMP_CASES) {
+    test(`ENVDUMP: ${shape} ${tool} ${JSON.stringify(command)}`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 2, `an environment-dump command must be refused in the ${shape} session (got exit ${result.exitCode}); stderr: ${result.stderr}`);
+        assert.match(result.stderr, ENVDUMP_REFUSAL);
+      } finally { fx.cleanup(); }
+    });
+  }
+  for (const [tool, command] of ENVDUMP_CONTROL_CASES) {
+    test(`ENVDUMP: control ${shape} ${tool} ${JSON.stringify(command)}`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 0, `an ordinary command must stay admitted in the ${shape} session; stderr: ${result.stderr}`);
+      } finally { fx.cleanup(); }
+    });
+  }
+}
+
+// ENVDUMP-T1-T2 (critic finding T1-F1, ruling 40): `env` used as a WRAPPER for an environment dump. Same data-only safety
+// contract as above: the strings are inspected in-process, never executed. RED until the lane fix lands.
+const ENVDUMP_WRAPPER_DUMP_CASES = [
+  ["Bash", "env printenv"],
+  ["Bash", "env env"],
+  ["Bash", "env FOO=1 printenv"],
+  ["Bash", "env -i printenv"],
+  ["Bash", "env -- printenv"],
+  ["Bash", "env FOO=1 env"],
+];
+const ENVDUMP_WRAPPER_CONTROL_CASES = [
+  ["Bash", "env FOO=1 node --version"],
+];
+
+for (const shape of ENVDUMP_SHAPES) {
+  for (const [tool, command] of ENVDUMP_WRAPPER_DUMP_CASES) {
+    test(`ENVDUMP: ${shape} ${tool} ${JSON.stringify(command)} (T1-T2)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 2, `an env-wrapped environment-dump command must be refused in the ${shape} session (got exit ${result.exitCode}); stderr: ${result.stderr}`);
+        assert.match(result.stderr, /GUARD-ENV-DUMP/u);
+      } finally { fx.cleanup(); }
+    });
+  }
+  for (const [tool, command] of ENVDUMP_WRAPPER_CONTROL_CASES) {
+    test(`ENVDUMP: control ${shape} ${tool} ${JSON.stringify(command)} (T1-T2)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, tool, command);
+        assert.equal(result.exitCode, 0, `an env-wrapped ordinary command must stay admitted in the ${shape} session; stderr: ${result.stderr}`);
+      } finally { fx.cleanup(); }
+    });
+  }
+}
+
+// ENVDUMP-T1-T3 (ruling 51): bounded `env` recursion. An adversarial chain must not exhaust the classifier (a crashed
+// PreToolUse hook does not block); beyond the nesting bound the lane fails closed. Same data-only safety contract: strings are
+// built in-process, inspected, never executed. RED (crash or wrong verdict) until the lane fix lands.
+// The command is LINEAR in `levels` (7 characters a level). The first form of this helper wrapped each level in `env -S '...'` and
+// re-escaped every `'` at every level, so the command grew about 3x per level: level 18 already passed Node's maximum string length
+// and the test process died of heap exhaustion before the lane was ever called. Here each level is the pair `env -S` and the levels
+// are chained by the -S splice itself (a `-S` takes the next word as its value and re-parses it as env arguments) instead of by
+// re-quoting; the outer quote makes the first splice a quoted value like the rest. The lane counts one splice and one operand hop
+// a level on its shared counter, exactly as it does for a re-quoted chain, so `levels` levels are `levels` real nesting levels.
+function envdumpNestedEnvS(levels, tail) {
+  return `env -S '${"env -S ".repeat(levels - 1)}${tail}'`;
+}
+const ENVDUMP_DEEP_DUMP_CASES = [
+  ["5000 env words then printenv", () => `${Array(5000).fill("env").join(" ")} printenv`],
+  ["5000 env words then node --version", () => `${Array(5000).fill("env").join(" ")} node --version`],
+  ["40-level nested env -S", () => envdumpNestedEnvS(40, "printenv")],
+];
+const ENVDUMP_DEEP_CONTROL_CASES = [
+  ["two-level env env node --version", () => "env env node --version"],
+];
+
+for (const shape of ENVDUMP_SHAPES) {
+  for (const [label, build] of ENVDUMP_DEEP_DUMP_CASES) {
+    test(`ENVDUMP: ${shape} ${label} (T1-T3)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, "Bash", build());
+        assert.equal(result.exitCode, 2, `a deeply nested env chain must be refused in the ${shape} session (got exit ${result.exitCode}); stderr: ${result.stderr}`);
+        assert.match(result.stderr, /GUARD-ENV-DUMP/u);
+      } finally { fx.cleanup(); }
+    });
+  }
+  for (const [label, build] of ENVDUMP_DEEP_CONTROL_CASES) {
+    test(`ENVDUMP: control ${shape} ${label} (T1-T3)`, () => {
+      const fx = envdumpFixture();
+      try {
+        const result = fx.run(shape, "Bash", build());
+        assert.equal(result.exitCode, 0, `a shallow env chain must stay admitted in the ${shape} session; stderr: ${result.stderr}`);
+      } finally { fx.cleanup(); }
+    });
+  }
+}
+
+// ============================================================================================================================
+// TR-B-T (dispatch TR-B-T-20261009; design specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md rows T74 and T77, slice TR-B).
+// RED pins for the read-grammar spellings TR-B will admit, each paired with a per-spelling KEY-OPERAND corpus (the I1-P gap of section 3.2:
+// nothing pinned that a newly admitted spelling routes its operand to isAllowedPassiveReadTarget). Appended at EOF; no existing case touched.
+//
+// Cases (every title starts with "TR-B <row> <spelling>"):
+//   admit pin   the spelling is admitted for an ordinary in-project operand (scratch/notes.md).
+//   refuse pin  the same spelling in the same operand shape with a key or credential operand is refused. A refusal CODE cannot tell an operand
+//               refusal from a spelling refusal here: the first run of this block showed that an admitted spelling given an in-root key operand
+//               reports GUARD-READ-COMMAND-UNSUPPORTED as its first GUARD- code. So the pin is non-vacuous by construction instead; per shape it
+//               requires (1) the unmodified admitted spelling to refuse the key operand, (2) the spelling under test to be ADMITTED for an
+//               ordinary operand of that shape, and (3) the spelling under test to REFUSE the key operand. A spelling still refused for its own
+//               sake fails at (2) and is RED (never vacuously green); after admission the pin is green only if the key operand is still refused.
+//   control     the already-admitted spelling admits an ordinary operand and refuses every corpus operand (the oracle the pins are measured against).
+//   T77 lane    the rg -g filename-filter lane is characterised (GREEN by design, see assumption 4); directory Grep stays refused (GREEN).
+//
+// Assumptions (named, not fixed by the design):
+//   1. Spellings in scope: rg -o / --only-matching, grep -o / --only-matching, rg --max-columns N (T74); quoted alternation for rg ("a|b") and
+//      grep ("a\|b") (named in the T74 row; the `git grep` half belongs to TR-C and is not touched here); rg -g / --glob "*.md" (T77).
+//      The `=` spellings (--max-columns=200) stay refused by the grammar's own rule and are not pinned as admits.
+//   2. Key corpus = the basenames SECRET_BASENAME of lib/passive-read-policy.mjs refuses: po-private.pem, id_ed25519, id_rsa, *.key, *.pem.
+//      Fixtures hold path names only, content "x" (SEC-03: no key material).
+//   3. Operand positions per spelling: first positional, -e pattern + positional (every positional is a file operand, Ruling 106), -f value
+//      (a read file, Ruling 106), second positional, and a directory holding keys (rg). A shape whose unmodified control is not admitted for an
+//      ordinary operand (for example grep -e if the grammar never admits it) is skipped; at least the first-positional shape must be checked for
+//      every key. A directory shape is also skipped when the unmodified control admits the key directory (no directory scope is decided here).
+//   4. The T77 log row does not preserve the refused rg -g spelling. The lane test pins what the grammar does TODAY (guard-command-grammar.mjs
+//      isBoundedFilenameFilter, comment :27-29: path globs and hidden-name selectors stay closed): one bounded basename-extension filter is
+//      admitted, a multi-dot, path, recursive or negated glob is refused with GUARD-READ-COMMAND-UNSUPPORTED. A repeated -g is pinned by QP4-1.
+//      Whether TR-B admits any of those is a decision for the fix dispatch; flipping that case then is deliberate.
+//   5. The state of every case at authoring time is recorded in specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-MANIFEST.md; the run is
+//      the evidence, not this comment.
+// ============================================================================================================================
+const TRB_KEY_OPERANDS = ["vault/po-private.pem", "vault/id_ed25519", "vault/id_rsa", "vault/server.key", "vault/client.pem"];
+
+const TRB_TEMPLATES = {
+  rg: [
+    (o, p, k) => ["rg", "-n", ...o, p, k],
+    (o, p, k) => ["rg", "-n", ...o, "-e", p, k],
+    (o, p, k) => ["rg", "-n", ...o, "-f", k, "scratch/notes.md"],
+    (o, p, k) => ["rg", "-n", ...o, p, "scratch/notes.md", k],
+    (o, p) => ["rg", "-n", ...o, p, "vault"],
+  ],
+  grep: [
+    (o, p, k) => ["grep", "-n", ...o, p, k],
+    (o, p, k) => ["grep", "-n", ...o, p, "scratch/notes.md", k],
+    (o, p, k) => ["grep", "-n", ...o, "-e", p, k],
+  ],
+};
+
+const TRB_SPELLINGS = [
+  { row: "T74", id: "rg -o", tool: "rg", opt: ["-o"], pat: "apply" },
+  { row: "T74", id: "rg --only-matching", tool: "rg", opt: ["--only-matching"], pat: "apply" },
+  { row: "T74", id: "rg --max-columns 200", tool: "rg", opt: ["--max-columns", "200"], pat: "apply" },
+  { row: "T74", id: "grep -o", tool: "grep", opt: ["-o"], pat: "apply" },
+  { row: "T74", id: "grep --only-matching", tool: "grep", opt: ["--only-matching"], pat: "apply" },
+  { row: "T74", id: "rg quoted alternation", tool: "rg", opt: [], pat: '"apply|authorize"' },
+  { row: "T74", id: "grep quoted alternation", tool: "grep", opt: [], pat: '"apply\\|authorize"' },
+  { row: "T77", id: "rg -g", tool: "rg", opt: ["-g", '"*.md"'], pat: "apply" },
+  { row: "T77", id: "rg --glob", tool: "rg", opt: ["--glob", '"*.md"'], pat: "apply" },
+];
+
+function trbFixture() {
+  const path = qp4Fixture();
+  for (const name of ["vault/po-private.pem", "vault/id_ed25519", "vault/server.key", "vault/client.pem"]) {
+    writeFileSync(join(path, ...name.split("/")), "x\n");
+  }
+  return path;
+}
+
+for (const { row, id, tool, opt, pat } of TRB_SPELLINGS) {
+  const admit = [tool, "-n", ...opt, pat, "scratch/notes.md"].join(" ");
+  test(`TR-B ${row} ${id}: admitted for an ordinary in-project operand`, () => {
+    const path = trbFixture();
+    try {
+      qp4WithoutAppDataRoots(() => { qp4Admit(admit, path); });
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+    }
+  });
+  test(`TR-B ${row} ${id}: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus)`, () => {
+    const path = trbFixture();
+    try {
+      qp4WithoutAppDataRoots(() => {
+        let firstShapeChecked = 0;
+        for (const key of TRB_KEY_OPERANDS) {
+          TRB_TEMPLATES[tool].forEach((template, shape) => {
+            const directory = tool === "rg" && shape === 4;
+            if (directory && key !== TRB_KEY_OPERANDS[0]) return;
+            const build = directory ? ((o, p, k) => [tool, "-n", ...o, p, k]) : template;
+            const ordinary = directory ? "scratch/sub" : "scratch/notes.md";
+            const keyed = directory ? "vault" : key;
+            if (!isReadOnlyDiagnosticCommand(build([], "apply", ordinary).join(" "), path)) return;
+            const control = build([], "apply", keyed).join(" ");
+            if (directory && isReadOnlyDiagnosticCommand(control, path)) return;
+            qp4Refuse(control, path);
+            qp4Admit(build(opt, pat, ordinary).join(" "), path);
+            qp4Refuse(build(opt, pat, keyed).join(" "), path);
+            if (shape === 0) firstShapeChecked += 1;
+          });
+        }
+        assert.equal(firstShapeChecked, TRB_KEY_OPERANDS.length, "the first-positional shape was checked for every corpus operand");
+      });
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+    }
+  });
+}
+
+test("TR-B T74/T77 control: the already-admitted rg and grep spellings admit an ordinary operand and refuse every key operand", () => {
+  const path = trbFixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      qp4Admit("rg -n private scratch/notes.md", path);
+      qp4Admit("grep -n private scratch/notes.md", path);
+      for (const key of TRB_KEY_OPERANDS) {
+        for (const tool of ["rg", "grep"]) qp4Refuse(`${tool} -n private ${key}`, path);
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("TR-B T77 rg -g lane: one bounded basename-extension filter is admitted; multi-dot, path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED (characterisation, GREEN by design -- flip deliberately if TR-B admits one)", () => {
+  const path = trbFixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      qp4Admit('rg -n -g "*.md" apply scratch/notes.md', path);
+      qp4Admit('rg -n apply scratch/notes.md --glob "*.md"', path);
+      for (const glob of ['"*.test.mjs"', '"**/*.md"', '"!*.md"', '"scratch/*.md"']) {
+        qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("TR-B T74 directory Grep: the Grep tool on a directory stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4, repeated here under the row)", () => {
+  const path = trbFixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      for (const input of [{ pattern: "apply", path: join(path, "scratch") }, { pattern: "apply", path: join(path, "vault") }]) {
+        const verdict = qp4Verdict({ tool_name: "Grep", tool_input: input }, path);
+        assert.equal(verdict.exitCode, 2, JSON.stringify(input));
+        assert.match(verdict.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
