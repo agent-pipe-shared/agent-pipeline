@@ -70,7 +70,7 @@ All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for ins
   - **`goldfish-deep`** — effort **`xhigh`**: test-suite/verify authorship, guardrail/hook/canon code, tasks with genuine in-task design latitude, senior-class work.
   Planning/design and analysis synthesis stay unchanged on the Design tier at `xhigh`+ (MP-01/MP-22/MP-23 untouched).
 - **Pre-authorized revert path:** if the error rate measurably rises (first-pass-rate measurement series), a dated revert from `medium` to `xhigh` for the Implementor tier is pre-approved — needs only a dated entry in the project's own decision log + telemetry evidence, no new gate.
-- **Cross-note (Critic matrix, MP-07 untouched):** as Goldfish implementation effort drops, the importance of the review gate RISES rather than falls — the trigger criteria and model choice in MP-07 stay unchanged.
+- **Cross-note (Critic matrix, MP-07):** as Goldfish implementation effort drops, the importance of the review gate RISES rather than falls — the criticality criteria and model choice in MP-07 do not depend on Goldfish effort.
 - **Why:** clearly briefed, plan-faithful execution doesn't need the same thinking budget as guardrail/design work; the matrix maps that 1:1 onto three named, versioned subagents instead of an effort field in the dispatch prompt.
 - **How to check:** `grep` across the three agent frontmatters (`plugins/pipeline-core/agents/goldfish-mechanic.md`, `-implementor.md`, `-deep.md`) shows the three effort values exactly; dispatch metadata names the chosen subagent; first-pass rate feeds into the next periodic review (Section 5).
 
@@ -121,16 +121,18 @@ All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for ins
 - **Why:** Effort is the ordinary savings lever for writing. Caution: the effort scale is calibrated PER MODEL — "high" on a smaller model ≠ "high" on a larger one; don't compare effort levels across models.
 - **How to check:** telemetry; frontmatter defaults in the plugin.
 
-### MP-07 — Critic staggering: Review tier by default, escalation on criticality
+### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
 
-- **Must:** Critic reviews run by default on the Review-tier model / effort `max`. **Escalation to a higher tier (Design-tier model) is MANDATORY** when the review subject touches any of:
-  - **Architecture:** ADR-required decisions, core contracts, operating-model changes;
-  - **Guardrails:** hooks (esp. git-guard), permissions/settings, permission modes, workflow preconditions;
-  - **Security:** secrets/credentials, auth, network exposure, history rewrites — plus anything that can control real devices or production systems.
-  In addition, the orchestrator MAY escalate by judgment (e.g. unusually large blast radius). De-escalation below the Review-tier model is forbidden (MP-03).
-- **Why:** Critic input is small (spec + diff + guardrails, never chat history), so model quality dominates over input cost. On critical reviews, a missed finding is orders of magnitude more expensive than the tier difference.
-- **How to check:** the Critic briefing template contains "criticality → model" as a conditional part of the mandatory "dispatch metadata" field (canonical briefing field list: `docs/operating-model.md`, *The lifecycle* — step 5, Dispatch; `roles/goldfish.md` GF-01); the telemetry line records the Critic model. ONE Critic agent + invocation parameter `model` (`plugins/pipeline-core/agents/critic.md`) — no fork for the critical case; the orchestrator sets the escalation per dispatch.
-- **Addendum (MP-27):** as Goldfish implementation effort (MP-27) drops, the importance of this review gate RISES rather than falls — the trigger criteria and model choice above stay UNCHANGED (criticality still governs architecture/guardrails/security, not Goldfish effort).
+- **Must (PO rule, 2026-10-09, Sprint Alfred Ruling 156 — binds consumer repositories as well):**
+  1. Every Critic runs on the Review-tier model / effort `max` (the Critic agent's own route, Sonnet) **except** as item 2 allows. De-escalation below the Review-tier model is forbidden (MP-03).
+  2. A Critic runs on the Design-tier model (Opus) **only** for genuinely critical **architecture** (ADR-required decisions, core contracts, operating-model changes) or **security** (secrets/credentials, auth, network exposure, history rewrites, anything that can control real devices or production systems) changes. Guardrail-only changes (hooks, permissions/settings, permission modes, workflow preconditions) no longer escalate on their own; they escalate only where they are also security-critical in the sense above.
+  3. Even then there is **ONE** Design-tier Critic over a larger batch of slices, never one per slice. The dispatch states the batch scope (the slice ids and the single candidate range it covers) and the rationale, and sets the tool-layer `model` parameter (MP-29).
+  4. Any later review of the same batch is a **re-critic restricted to the delta diff** since the reviewed candidate: it names the delta range as its only search surface, and runs on the Review tier unless the delta itself is newly critical architecture/security.
+  5. The orchestrator no longer escalates a single slice by judgment alone (e.g. blast radius); that is a reason to widen or defer the batch, not to add a per-slice Design-tier Critic.
+- **Why:** Critic input is small (spec + diff + guardrails, never chat history), so model quality dominates over input cost, and a missed finding on genuinely critical architecture/security is orders of magnitude more expensive than the tier difference. Per-diff Design-tier rounds, however, cost about 20 % of a weekly budget in one night (2026-10-09), so the Design-tier spend is concentrated in one batched pass plus delta re-critics.
+- **Open alignment (needs an ADR amendment, not a policy edit):** the canonical trigger wording quoted word-identically in `harness/review-protocol.md` §2.1, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and ADR-0014 still states the per-diff A/G/S escalation. Until those are amended, this rule is the PO's standing decision and wins on the model choice; the register (`docs/state.md`) wins over both.
+- **How to check:** the Critic briefing template contains "criticality → model" and a "batch scope" line (or, for a re-critic, the delta range) as part of the mandatory "dispatch metadata" field (canonical briefing field list: `docs/operating-model.md`, *The lifecycle* — step 5, Dispatch; `roles/goldfish.md` GF-01); the telemetry line records the Critic model. ONE Critic agent + invocation parameter `model` (`plugins/pipeline-core/agents/critic.md`) — no fork for the critical case; the orchestrator sets the escalation per dispatch, at most once per batch.
+- **Addendum (MP-27):** as Goldfish implementation effort (MP-27) drops, the importance of this review gate RISES rather than falls — the criticality criteria and model choice above are independent of Goldfish effort.
 
 ### MP-29 — A subagent definition's own frontmatter `model:` pin overrides dispatch-TEXT model naming; only the tool-layer `model` parameter is authoritative
 

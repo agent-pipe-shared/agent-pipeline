@@ -23,4 +23,4 @@
 
 ## Triage
 
-Open. Queued for the 0.7.0 candidate (PO: everything not Batman/Nightwing goes into the next local candidate).
+Canon part done (2026-10-09, dispatch CRITIC-RULE-20261009), commit `docs(policy): one batched Opus Critic for critical architecture and security, Sonnet otherwise` (SHA in `evidence/dispatch-record-CRITIC-RULE-20261009.json`): MP-07 rewritten, `critic-review.md` gains the batch-scope/re-critic field. STILL OPEN: (a) the word-identical canonical trigger wording in `harness/review-protocol.md` §2.1 (T1-T4), `roles/critic.md` (§3, :215), `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and ADR-0014 still states per-diff A/G/S escalation and needs an ADR amendment; (b) the `critic-review.md` line-25 tier text and criticality example; (c) plugin Critic route/budget checks and test pin; (d) the German reference half of `model-policy.md` is not updated.
