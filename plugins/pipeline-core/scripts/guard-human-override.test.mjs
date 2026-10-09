@@ -32,6 +32,8 @@ import test from "node:test";
 import { main } from "./guard-human-override.mjs";
 import {
   HGO_SIGNATURE_REASON,
+  HumanGuardOverrideError,
+  humanGuardRouteUnavailableReason,
   inspectHumanGuardOverrideAudit,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
@@ -898,6 +900,91 @@ test("repair-audit requires the exact flag set and explicit activation", () => {
     assert.equal(main(["repair-audit", ...args], captured), 2);
     assert.equal(captured.stdout, "");
     assert.match(captured.stderr, /^HGO-USAGE:/u);
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// T90-T2 (Ruling 125, Critic T90 F1; RED). The CLI's catch (scripts/guard-human-override.mjs
+// :576-579) prints only `<code>: <message>`, so the typed recovery of an
+// HGO-AUDIT-LOCK-AMBIGUOUS refusal never reaches the human who has to act on it. Ruling 125:
+// "the CLI gets the same line from the same helper" as humanGuardRouteUnavailableReason.
+//
+// Seam. This file already drives the library through `main(argv, io, { dependencies })`; for
+// repair-audit those `dependencies` are spread into acquireAuditLock (lib :4511), whose publish
+// step calls `dependencies.afterTemporarySyncFn`. A callback that throws makes acquireAuditLock
+// fail with exactly the error the test hands it, so a hand-built HGO-AUDIT-LOCK-AMBIGUOUS error
+// reaches the CLI's catch with no production change. The fixture is the temp repository of the
+// torn-audit test above (a recoverable torn append, so repair-audit gets as far as the lock);
+// the live store is never touched.
+//
+// State: exit code 2, empty stdout and the unchanged first line are green today; the recovery
+// line is RED ("stderr carries no recovery line").
+//
+// ASSUMPTIONS (the fix slice must match them, or the Critic rules and this pin changes):
+//   C1. stderr keeps `<code>: <message>\n` as its first line, byte-identical to today.
+//   C2. The recovery text is the renderer's third line, produced by the same helper
+//       (humanGuardRouteUnavailableReason, host-default platform) and written to stderr after
+//       the first line. The substrings pinned first are the ruling's own: the lock path, an
+//       attended delete, and the precondition verbatim; equality with the shared helper's
+//       line is asserted last.
+//   C3. The error is built with the REPOSITORY-RELATIVE lock path. ambiguousAuditLockRefusal
+//       emits an absolute one today (lib :2441); that gap belongs to the fix slice (see the
+//       renderer pins in lib/human-guard-override.test.mjs, assumption R6).
+// ---------------------------------------------------------------------------------
+test("repair-audit prints the typed audit-lock recovery on stderr, from the same helper as the shared renderer (T90-T2 RED pin)", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "old head\n" }, denials,
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    const oldHead = readFileSync(join(base, "audit.head.json"));
+    recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "torn tail\n" }, denials,
+    });
+    writeFileSync(join(base, "audit.head.json"), oldHead, { mode: 0o600 });
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+
+    const lock = ".git/agent-pipeline/human-guard-overrides/audit.lock";
+    const message = "audit lock owner state is ambiguous";
+    const refusal = new HumanGuardOverrideError("HGO-AUDIT-LOCK-AMBIGUOUS", message);
+    refusal.recovery = { files: [lock], command: `rm -- '${lock}'` };
+
+    const captured = io();
+    assert.equal(main([
+      "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
+    ], captured, {
+      dependencies: {
+        isattyFn: () => true,
+        readLineFn: () => challenge,
+        afterTemporarySyncFn() { throw refusal; },
+      },
+    }), 2, captured.stderr);
+    assert.equal(captured.stdout, "");
+    assert.ok(captured.stderr.startsWith(`HGO-AUDIT-LOCK-AMBIGUOUS: ${message}\n`),
+      `C1: stderr must keep the code and message as its first line, but it is ${JSON.stringify(captured.stderr)}`);
+
+    // RED from here: today stderr is exactly that one line.
+    assert.ok(captured.stderr.includes(`'${lock}'`),
+      `the typed recovery must reach stderr: expected the lock ${lock} (single-quoted), but stderr is ${JSON.stringify(captured.stderr)}`);
+    assert.ok(captured.stderr.includes("only after confirming that no other Pipeline session is running an override ceremony"),
+      `stderr must carry the precondition verbatim, but it is ${JSON.stringify(captured.stderr)}`);
+    assert.match(captured.stderr, /attended/iu, "stderr must mark the deletion as attended");
+    assert.match(captured.stderr, process.platform === "win32" ? /Remove-Item -LiteralPath / : /rm -- /u,
+      "stderr must carry the host's delete command, rebuilt from the validated files");
+
+    const shared = humanGuardRouteUnavailableReason("command", { error: refusal }).split("\n")[2];
+    assert.ok(typeof shared === "string" && shared.length > 0,
+      "the shared renderer must produce the recovery line this CLI is expected to reuse (C2)");
+    assert.ok(captured.stderr.includes(shared),
+      `C2: the CLI must print the shared renderer's recovery line ${JSON.stringify(shared)}, but stderr is ${JSON.stringify(captured.stderr)}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
