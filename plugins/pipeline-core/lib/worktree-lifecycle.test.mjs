@@ -50,6 +50,7 @@ import {
   startSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
 import { main as worktreeCreateMain } from "../scripts/worktree-create.mjs";
+import { observeConcurrentSessionWarning } from "../scripts/pipeline-start-preflight.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -841,6 +842,49 @@ check("D0 session owner runtime status is sanitized, detects PID reuse, and pres
   legacyDescriptor.schema = "pipeline.session-descriptor.v1";
   writeFileSync(legacy.path, `${JSON.stringify(legacyDescriptor, null, 2)}\n`, { mode: 0o600 });
   assert.equal(inspectSessionOwnerRuntime(primary, legacy.sessionId).status, "unobserved");
+});
+
+// CSW-T (Ruling 117, backlog 2026-10-09-concurrent-session-warning-never-fires-on-native-windows). EL-18: a second live
+// session in the same repository must be warned about on EVERY host. `localProcessStartIdentity` reads /proc and so
+// returns null off Linux; the descriptor then carries `ownerRuntime: null`, the owner reads "unavailable", and the
+// warning (which keys on a live owner) never fires on native Windows or macOS. These cases run on the real host
+// platform and use the module's process seam (`ownerPid`): the owner recorded for the "second" session is this very
+// test process, which is alive. No platform seam exists in the module, so a non-win32 host cannot synthesize the
+// win32 branch; the pin is red on native win32 and green on Linux, and a fix that adds a platform seam may extend it.
+check("CSW-T a live second session in the same repository fires the concurrent-session warning on this host platform", () => {
+  const { primary } = repoFixture();
+  const mine = startSessionDescriptor(primary, {
+    sessionId: "session-csw-this-one",
+    ownerNonce: "owner-nonce-csw-mine-00000001",
+  });
+  const other = startSessionDescriptor(primary, {
+    sessionId: "session-csw-another-live",
+    ownerNonce: "owner-nonce-csw-other-0000001",
+    ownerPid: process.pid,
+  });
+  const warning = observeConcurrentSessionWarning({ startPath: primary, currentSessionId: mine.sessionId });
+  assert.notEqual(
+    warning,
+    null,
+    `no concurrent-session warning on platform ${process.platform}: the live second session's owner reads `
+      + `"${inspectSessionOwnerRuntime(primary, other.sessionId).status}", and the warning fires only for a live owner`,
+  );
+  assert.equal(warning.sessionId, other.sessionId);
+  assert.equal(warning.descriptorSha256, other.descriptorSha256);
+});
+
+check("CSW-T control: a second session whose owner pid does not exist never fires the concurrent-session warning", () => {
+  const { primary } = repoFixture();
+  const mine = startSessionDescriptor(primary, {
+    sessionId: "session-csw-control-mine",
+    ownerNonce: "owner-nonce-csw-control-mine-1",
+  });
+  startSessionDescriptor(primary, {
+    sessionId: "session-csw-control-dead",
+    ownerNonce: "owner-nonce-csw-control-dead-1",
+    ownerPid: 2_147_483_647,
+  });
+  assert.equal(observeConcurrentSessionWarning({ startPath: primary, currentSessionId: mine.sessionId }), null);
 });
 
 check("D0 session-cleanup CLI accepts descriptor ownership without receiving the nonce", () => {
