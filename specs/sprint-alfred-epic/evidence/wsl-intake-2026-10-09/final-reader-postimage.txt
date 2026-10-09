@@ -1,0 +1,120 @@
+command: node scratch/alfred-reader-proposal-check.mjs
+label: ALFRED-READER-B-PARK-20261009
+exitCode: 0
+head: 3344c4689a1a54f01fa63ec281d885636c00dbbb
+tree: 7fad1fc5fe483f06a3faed507cafca8785866dad
+dirty: true
+--- stdout ---
+{
+  "sourcePath": "plugins/pipeline-core/lib/architecture-design.mjs",
+  "sourceSha256": "2ca715d8789dcdcf2890e7ee5578c9b6ed413bcb7c985d271dcf45cff54061e6",
+  "outputPath": "specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs",
+  "postimageSha256": "a31ab89a2b550c4a0e5701329ba6ffb3a85c753586e9a336beb9505341f31a1b",
+  "testPath": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+  "testSourceSha256": "9b319aa0b41ad7918caba095d2dd49a80e32867da60273efff78c9f977334249",
+  "adaptations": [
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 6,
+      "before": "import { derivePlanLifecycle } from \"./plan-spec-state-v2.mjs\";",
+      "after": "import { derivePlanLifecycle } from \"file://<repo-root>/plugins/pipeline-core/lib/plan-spec-state-v2.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 7,
+      "before": "import { validatePoGateAuthorityForRepository } from \"./po-gate-authority.mjs\";",
+      "after": "import { validatePoGateAuthorityForRepository } from \"file://<repo-root>/plugins/pipeline-core/lib/po-gate-authority.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 8,
+      "before": "import { rereadApprovedDesignWorkflowPackage } from \"./design-workflow-package.mjs\";",
+      "after": "import { rereadApprovedDesignWorkflowPackage } from \"file://<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 9,
+      "before": "import { verifyStoredDesignWorkflowPackageSignature } from \"./design-workflow-approval.mjs\";",
+      "after": "import { verifyStoredDesignWorkflowPackageSignature } from \"file://<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 10,
+      "before": "import { readCriticalHumanProofPolicy } from \"./critical-human-proof-policy.mjs\";",
+      "after": "import { readCriticalHumanProofPolicy } from \"file://<repo-root>/plugins/pipeline-core/lib/critical-human-proof-policy.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 11,
+      "before": "import { validateAgainstSchema } from \"./schema-lite.mjs\";",
+      "after": "import { validateAgainstSchema } from \"file://<repo-root>/plugins/pipeline-core/lib/schema-lite.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 12,
+      "before": "import { initialGreenfieldMapTargets } from \"./architecture-map-scaffold.mjs\";",
+      "after": "import { initialGreenfieldMapTargets } from \"file://<repo-root>/plugins/pipeline-core/lib/architecture-map-scaffold.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 13,
+      "before": "import { resolveModuleForPath } from \"../scripts/module-inventory.mjs\";",
+      "after": "import { resolveModuleForPath } from \"file://<repo-root>/plugins/pipeline-core/scripts/module-inventory.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 14,
+      "before": "import { renderArchitectureOverview } from \"../scripts/generate-architecture-overview.mjs\";",
+      "after": "import { renderArchitectureOverview } from \"file://<repo-root>/plugins/pipeline-core/scripts/generate-architecture-overview.mjs\";"
+    },
+    {
+      "file": "diagnostic architecture-design.mjs",
+      "line": 15,
+      "before": "const moduleSchema = JSON.parse(readFileSync(new URL(\"../schemas/pipeline.module-inventory.v1.json\", import.meta.url), \"utf8\"));",
+      "after": "const moduleSchema = JSON.parse(readFileSync(new URL(\"file://<repo-root>/plugins/pipeline-core/schemas/pipeline.module-inventory.v1.json\", import.meta.url), \"utf8\"));"
+    },
+    {
+      "file": "diagnostic design-approval-route.test.mjs",
+      "line": 65,
+      "before": "import { tmpdir } from \"node:os\";",
+      "after": "const tmpdir = () => new URL(\"./fixtures/\", import.meta.url).pathname;"
+    },
+    {
+      "file": "diagnostic design-approval-route.test.mjs",
+      "line": 73,
+      "before": "const moduleUrl = (relative) => new URL(relative, import.meta.url).href;",
+      "after": "const moduleUrl = (relative) => relative === \"./architecture-design.mjs\" ? new URL(relative, import.meta.url).href : new URL(relative, \"file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs\").href;"
+    }
+  ]
+}
+syntax exit: 0
+focused command: node --test --test-name-pattern=^(S[0-9]+ stored verifier:|FINAL-READER) scratch/alfred-reader-b-diagnostic/design-approval-route.test.mjs
+✔ S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file (36.272752ms)
+✔ S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file (4.11847ms)
+✔ S3 stored verifier: package bytes changed after the approval are refused (C2 item 1) (4.978098ms)
+✔ S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3) (11.27422ms)
+✔ S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4) (6.448423ms)
+✔ S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4) (4.515224ms)
+✔ S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused (5.308651ms)
+✔ S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused (7.231139ms)
+✔ S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today) (2.518955ms)
+✔ S10 stored verifier: a signature made with another key over the same intent is refused (4.731586ms)
+✔ S11 stored verifier: a proof whose key is not in the configured anchors is refused (5.640815ms)
+✔ FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state (9.645994ms)
+✔ FINAL-READER accepts the explicit rebind path with readiness execution disabled (4.968338ms)
+✔ FINAL-READER refuses a forged stored signature after its valid positive control (6.665795ms)
+✔ FINAL-READER refuses changed source bytes after its valid positive control (6.16623ms)
+✔ FINAL-READER refuses package and presentation digest drift after valid positive controls (9.713974ms)
+✔ FINAL-READER refuses Advisor-exception attribution drift after its valid positive control (5.484453ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 178.686884
+focused suite exit: 0
+source and immutable tests unchanged: true
+
+--- stderr ---
