@@ -102,6 +102,12 @@
 //      search tool's pattern argument; for rg and grep that is the first positional and the value of -e or
 //      --regexp. Pinned under the production pattern set. Not pinned: whether the first positional is a file
 //      operand once -e or --regexp supplies the pattern (rg -e foo <name>), which the ruling leaves open.
+//  15. (Ruling 106, TR-S2-T4) Settles what the last sentence of 14 left open. When -e, --regexp, -f or --file
+//      (including their = forms) is present, no positional of rg or grep is the pattern, so EVERY positional
+//      is a file operand (rg -e foo <name> refuses). The values of -e and --regexp stay exempt as patterns;
+//      the values of -f and --file are read files and are checked like operands. Pinned under the production
+//      pattern set, for rg and grep, in both carriers. Not pinned: the attached short forms (-efoo, -fNAMES),
+//      clustered short options (-ne), and a pattern-supplying option placed after the positionals.
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
@@ -1638,6 +1644,126 @@ defineRows(
     },
   ],
   "refused",
+);
+
+// =====================================================================================================
+// TR-S2-T4-20261009 -- Ruling 106 pins: the pattern-supplying options of rg and grep. Test-only (QG-04):
+// the module fix is the parallel slice TR-S2-F2. Same fixture as the F3 groups above (withPatterns: the
+// production pattern set).
+//
+// The first positional of rg/grep is the pattern only while no pattern-supplying option is present. With
+// -e, --regexp, -f or --file (or their = forms) present, EVERY positional is a file operand. The values of
+// -e and --regexp stay exempt (they ARE the pattern); the values of -f and --file are files that get read,
+// so they are checked like operands. Each shape runs for both tools: the "a" row is the spelling the
+// briefing names, the "b" row is the same shape with the other tool. Every row runs in both carriers.
+//
+// Only the pattern rule can decide these rows: the key name is BARE wherever it appears (the exact-name
+// rule needs a directory component) and the pattern-only name is not an exact secret name (F3S-0).
+// =====================================================================================================
+
+// --- F4 refused: once an option supplies the pattern, the positionals and the -f/--file values are files
+// RED today unless TR-S2-F2 has landed: the module ignores secretPatterns for bare names.
+
+defineRows(
+  "TR-S2-T4 F4 refused: with a pattern-supplying option present, every positional and the -f/--file value is a file operand",
+  [
+    {
+      id: "F4R-1a",
+      title: "rg -e foo <key name> (the positional after -e is a file operand, not the pattern)",
+      command: `rg -e foo ${POLICY_KEY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4R-1b",
+      title: "grep -e foo <key name> (same shape, the other tool)",
+      command: `grep -e foo ${POLICY_KEY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4R-2a",
+      title: "grep --regexp=foo docs/<pattern-only name> (the attached long form; a directory-qualified operand)",
+      command: `grep --regexp=foo docs/${PATTERN_ONLY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4R-2b",
+      title: "rg --regexp=foo docs/<pattern-only name> (same shape, the other tool)",
+      command: `rg --regexp=foo docs/${PATTERN_ONLY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4R-3a",
+      title: "rg -f <key name> docs/ (the value of -f is a read file, checked like an operand)",
+      command: `rg -f ${POLICY_KEY_NAME} docs/`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4R-3b",
+      title: "grep -f <key name> docs/ (same shape, the other tool)",
+      command: `grep -f ${POLICY_KEY_NAME} docs/`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4R-4a",
+      title: "grep --file=<key name> docs (the attached value of --file is a read file)",
+      command: `grep --file=${POLICY_KEY_NAME} docs`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4R-4b",
+      title: "rg --file=<key name> docs (same shape, the other tool)",
+      command: `rg --file=${POLICY_KEY_NAME} docs`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+  ],
+  "refused",
+);
+
+// --- F4 admitted: the -e/--regexp VALUE is still the pattern, and the positional after it is a clean file
+// F4A-1a is the same command as F3P-3. F3P-3 pins "the value of -e is exempt"; here the point is the other
+// half of Ruling 106, that the positional after -e is a file operand and a non-secret one passes.
+
+defineRows(
+  "TR-S2-T4 F4 admitted: the value of -e/--regexp stays exempt as a pattern, the positional after it is a clean file",
+  [
+    {
+      id: "F4A-1a",
+      title: "rg -e <key name> docs/ (the -e value is the pattern; docs/ is a file operand and not a secret; same command as F3P-3)",
+      command: `rg -e ${POLICY_KEY_NAME} docs/`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4A-1b",
+      title: "grep -e <key name> docs/ (same shape, the other tool)",
+      command: `grep -e ${POLICY_KEY_NAME} docs/`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4A-2a",
+      title: "grep --regexp <key name> docs (the separate-word long form; the value is the pattern)",
+      command: `grep --regexp ${POLICY_KEY_NAME} docs`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F4A-2b",
+      title: "rg --regexp <key name> docs (same shape, the other tool)",
+      command: `rg --regexp ${POLICY_KEY_NAME} docs`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+  ],
+  "admitted",
 );
 
 // --- PURE: no fs, no child_process in the module ---------------------------------------------------
